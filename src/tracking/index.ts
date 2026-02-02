@@ -8,19 +8,12 @@ import type { TrackEvent, TrackingClient } from "./@types.js";
 export type {
 	EventType,
 	LinkClickedProperties,
-	LocationInfo,
-	MCPProvider,
-	NormalizedMeta,
-	OpenAIMeta,
 	PurchaseCompletedProperties,
 	QuoteSucceededProperties,
 	ToolCalledProperties,
 	TrackEvent,
 	TrackingClient,
 } from "./@types.js";
-
-// Re-export metadata utilities
-export { detectProvider, extractMetadata } from "./metadata.js";
 
 export function createTrackingClient(config: InternalConfig): TrackingClient {
 	const { baseUrl, apiKey } = config;

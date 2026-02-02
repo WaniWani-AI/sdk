@@ -1,50 +1,6 @@
 // Tracking Module Types
 
 // ============================================
-// Provider Types
-// ============================================
-
-export type MCPProvider = "openai" | "anthropic" | "unknown";
-
-/** OpenAI-specific MCP metadata structure */
-export interface OpenAIMeta {
-	"openai/subject"?: string;
-	"openai/session"?: string;
-	"openai/userAgent"?: string;
-	"openai/locale"?: string;
-	"openai/userLocation"?: {
-		city?: string;
-		region?: string;
-		country?: string;
-		timezone?: string;
-		latitude?: string;
-		longitude?: string;
-	};
-	timezone_offset_minutes?: number;
-}
-
-/** Anthropic-specific MCP metadata structure (TBD) */
-export type AnthropicMeta = Record<string, unknown>;
-
-/** Location information (provider-agnostic) */
-export interface LocationInfo {
-	city?: string;
-	region?: string;
-	country?: string;
-	timezone?: string;
-}
-
-/** Normalized metadata extracted from any MCP provider */
-export interface NormalizedMeta {
-	provider: MCPProvider;
-	sessionId?: string;
-	externalUserId?: string;
-	userAgent?: string;
-	locale?: string;
-	location?: LocationInfo;
-}
-
-// ============================================
 // Event Types
 // ============================================
 
@@ -108,20 +64,11 @@ interface BaseEvent {
 	 */
 	properties?: Record<string, unknown>;
 	/**
-	 * MCP request metadata. The SDK auto-extracts provider fields
-	 * (sessionId, userId, location, etc.). Can also include custom fields.
+	 * MCP request metadata passed through to the API.
 	 *
 	 * Location varies by MCP library:
 	 * - `@vercel/mcp-handler`: `extra._meta`
 	 * - `@modelcontextprotocol/sdk`: `request.params._meta`
-	 *
-	 * @example
-	 * ```typescript
-	 * wani.track({
-	 *   event: 'tool.called',
-	 *   meta: extra._meta,
-	 * });
-	 * ```
 	 */
 	meta?: Record<string, unknown>;
 }
