@@ -1,0 +1,47 @@
+{
+  "name": "@waniwani",
+  "version": "0.0.0",
+  "description": "WaniWani SDK - MCP event tracking and tools",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && npm run typecheck && npm run lint && tsup",
+    "dev": "tsx --watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check . --write",
+    "prepublishOnly": "npm run build",
+    "release": "npm version patch && npm publish --access public",
+    "release:minor": "npm version minor && npm publish --access public",
+    "release:major": "npm version major && npm publish --access public"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.13",
+    "@types/node": "^22.10.0",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WaniWani-AI/sdk"
+  },
+  "keywords": [
+    "sdk",
+    "mcp",
+    "waniwani",
+    "tracking",
+    "events",
+    "tools"
+  ],
+  "author": "WaniWani",
+  "license": "MIT"
+}
