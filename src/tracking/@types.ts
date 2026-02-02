@@ -18,6 +18,7 @@ export type ToolType =
 
 interface BaseEvent {
 	sessionId: string;
+	userAgent?: string;
 	externalUserId?: string;
 	metadata?: Record<string, unknown>;
 }
