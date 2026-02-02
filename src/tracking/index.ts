@@ -3,7 +3,6 @@
 import { WaniWaniError } from "../error.js";
 import type { InternalConfig } from "../types.js";
 import type { TrackEvent, TrackingClient } from "./@types.js";
-import { extractMetadata } from "./metadata.js";
 
 // Re-export types
 export type {
@@ -37,19 +36,13 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 			try {
 				checkIfApiKeyIsSet();
 
-				// Extract provider-specific fields from meta if present
-				const normalized = event.meta ? extractMetadata(event.meta) : {};
-
 				const response = await fetch(`${baseUrl}/api/mcp/events`, {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
 						Authorization: `Bearer ${apiKey}`,
 					},
-					body: JSON.stringify({
-						...event,
-						...normalized,
-					}),
+					body: JSON.stringify(event),
 				});
 
 				const data = await response.json();
