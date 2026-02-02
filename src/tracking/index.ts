@@ -35,14 +35,7 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 				checkIfApiKeyIsSet();
 
 				// Extract provider-specific fields from meta if present
-				const normalized = event.meta ? extractMetadata(event.meta) : null;
-
-				// Build payload with extracted fields
-				const payload = {
-					...event,
-					// normalized metadata from the provider
-					...(normalized ? { ...normalized } : {}),
-				};
+				const normalized = event.meta ? extractMetadata(event.meta) : {};
 
 				const response = await fetch(`${baseUrl}/api/mcp/events`, {
 					method: "POST",
@@ -50,7 +43,10 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 						"Content-Type": "application/json",
 						Authorization: `Bearer ${apiKey}`,
 					},
-					body: JSON.stringify(payload),
+					body: JSON.stringify({
+						...event,
+						...normalized,
+					}),
 				});
 
 				const data = await response.json();
