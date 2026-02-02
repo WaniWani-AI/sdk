@@ -8,11 +8,14 @@ import { extractMetadata } from "./metadata.js";
 // Re-export types
 export type {
 	EventType,
+	LinkClickedProperties,
 	LocationInfo,
 	MCPProvider,
 	NormalizedMeta,
 	OpenAIMeta,
-	ToolType,
+	PurchaseCompletedProperties,
+	QuoteSucceededProperties,
+	ToolCalledProperties,
 	TrackEvent,
 	TrackingClient,
 } from "./@types.js";

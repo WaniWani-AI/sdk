@@ -22,10 +22,9 @@ const client = waniwani({
 
 // Track events
 await client.track({
-  eventType: "tool.called",
-  sessionId: "session-123",
-  toolName: "pricing",
-  toolType: "pricing"
+  event: "tool.called",
+  properties: { name: "pricing", type: "pricing" },
+  meta: extra._meta  // MCP request metadata
 });
 
 // Get or create session from MCP metadata

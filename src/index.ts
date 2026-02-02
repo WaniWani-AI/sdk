@@ -6,11 +6,14 @@ export { WaniWaniError } from "./error.js";
 // Types - Tracking
 export type {
 	EventType,
+	LinkClickedProperties,
 	LocationInfo,
 	MCPProvider,
 	NormalizedMeta,
 	OpenAIMeta,
-	ToolType,
+	PurchaseCompletedProperties,
+	QuoteSucceededProperties,
+	ToolCalledProperties,
 	TrackEvent,
 } from "./tracking/index.js";
 

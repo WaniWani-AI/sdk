@@ -49,7 +49,6 @@ export interface NormalizedMeta {
 // ============================================
 
 export type EventType =
-	| "session.started"
 	| "tool.called"
 	| "quote.requested"
 	| "quote.succeeded"
@@ -57,14 +56,57 @@ export type EventType =
 	| "link.clicked"
 	| "purchase.completed";
 
-export type ToolType =
-	| "pricing"
-	| "product_info"
-	| "availability"
-	| "support"
-	| "other";
+// ============================================
+// Event Properties
+// ============================================
+export interface ToolCalledProperties {
+	name?: string;
+	type?: "pricing" | "product_info" | "availability" | "support" | "other";
+}
+
+export interface QuoteSucceededProperties {
+	amount?: number;
+	currency?: string;
+}
+
+export interface LinkClickedProperties {
+	url?: string;
+}
+
+export interface PurchaseCompletedProperties {
+	amount?: number;
+	currency?: string;
+}
+
+// ============================================
+// Track Event
+// ============================================
 
 interface BaseEvent {
+	/**
+	 * Event type.
+	 *
+	 * @example
+	 * ```typescript
+	 * wani.track({
+	 *   event: 'tool.called',
+	 * });
+	 * ```
+	 */
+	event: EventType;
+
+	/**
+	 * Event properties.
+	 *
+	 * @example
+	 * ```typescript
+	 * wani.track({
+	 *   event: 'tool.called',
+	 *   properties: { name: 'search' },
+	 * });
+	 * ```
+	 */
+	properties?: Record<string, unknown>;
 	/**
 	 * MCP request metadata. The SDK auto-extracts provider fields
 	 * (sessionId, userId, location, etc.). Can also include custom fields.
@@ -76,8 +118,7 @@ interface BaseEvent {
 	 * @example
 	 * ```typescript
 	 * wani.track({
-	 *   eventType: 'tool.called',
-	 *   toolName: 'search',
+	 *   event: 'tool.called',
 	 *   meta: extra._meta,
 	 * });
 	 * ```
@@ -86,24 +127,17 @@ interface BaseEvent {
 }
 
 export type TrackEvent =
-	| ({ eventType: "session.started" } & BaseEvent)
+	| ({ event: "tool.called"; properties: ToolCalledProperties } & BaseEvent)
+	| ({ event: "quote.requested" } & BaseEvent)
 	| ({
-			eventType: "tool.called";
-			toolName?: string;
-			toolType?: ToolType;
+			event: "quote.succeeded";
+			properties: QuoteSucceededProperties;
 	  } & BaseEvent)
-	| ({ eventType: "quote.requested" } & BaseEvent)
+	| ({ event: "quote.failed" } & BaseEvent)
+	| ({ event: "link.clicked"; properties: LinkClickedProperties } & BaseEvent)
 	| ({
-			eventType: "quote.succeeded";
-			quoteAmount?: number;
-			quoteCurrency?: string;
-	  } & BaseEvent)
-	| ({ eventType: "quote.failed" } & BaseEvent)
-	| ({ eventType: "link.clicked"; linkUrl?: string } & BaseEvent)
-	| ({
-			eventType: "purchase.completed";
-			purchaseAmount?: number;
-			purchaseCurrency?: string;
+			event: "purchase.completed";
+			properties: PurchaseCompletedProperties;
 	  } & BaseEvent);
 
 /**
