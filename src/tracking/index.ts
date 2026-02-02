@@ -3,14 +3,22 @@
 import { WaniWaniError } from "../error.js";
 import type { InternalConfig } from "../types.js";
 import type { TrackEvent, TrackingClient } from "./@types.js";
+import { extractMetadata } from "./metadata.js";
 
 // Re-export types
 export type {
 	EventType,
+	LocationInfo,
+	MCPProvider,
+	NormalizedMeta,
+	OpenAIMeta,
 	ToolType,
 	TrackEvent,
 	TrackingClient,
 } from "./@types.js";
+
+// Re-export metadata utilities
+export { detectProvider, extractMetadata } from "./metadata.js";
 
 export function createTrackingClient(config: InternalConfig): TrackingClient {
 	const { baseUrl, apiKey } = config;
@@ -26,13 +34,23 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 			try {
 				checkIfApiKeyIsSet();
 
+				// Extract provider-specific fields from meta if present
+				const normalized = event.meta ? extractMetadata(event.meta) : null;
+
+				// Build payload with extracted fields
+				const payload = {
+					...event,
+					// normalized metadata from the provider
+					...(normalized ? { ...normalized } : {}),
+				};
+
 				const response = await fetch(`${baseUrl}/api/mcp/events`, {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
 						Authorization: `Bearer ${apiKey}`,
 					},
-					body: JSON.stringify(event),
+					body: JSON.stringify(payload),
 				});
 
 				const data = await response.json();
@@ -49,20 +67,6 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 				console.error("[WaniWani] Track error:", error);
 				throw error;
 			}
-		},
-
-		async getOrCreateSession(meta?: Record<string, unknown>): Promise<string> {
-			if (meta) {
-				const sessionId =
-					meta["openai/sessionId"] || meta.sessionId || meta.conversationId;
-				if (typeof sessionId === "string" && sessionId.length > 0) {
-					return sessionId;
-				}
-			}
-
-			const sessionId = crypto.randomUUID();
-			await this.track({ eventType: "session.started", sessionId });
-			return sessionId;
 		},
 	};
 }

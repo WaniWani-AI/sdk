@@ -1,5 +1,53 @@
 // Tracking Module Types
 
+// ============================================
+// Provider Types
+// ============================================
+
+export type MCPProvider = "openai" | "anthropic" | "unknown";
+
+/** OpenAI-specific MCP metadata structure */
+export interface OpenAIMeta {
+	"openai/subject"?: string;
+	"openai/session"?: string;
+	"openai/userAgent"?: string;
+	"openai/locale"?: string;
+	"openai/userLocation"?: {
+		city?: string;
+		region?: string;
+		country?: string;
+		timezone?: string;
+		latitude?: string;
+		longitude?: string;
+	};
+	timezone_offset_minutes?: number;
+}
+
+/** Anthropic-specific MCP metadata structure (TBD) */
+export type AnthropicMeta = Record<string, unknown>;
+
+/** Location information (provider-agnostic) */
+export interface LocationInfo {
+	city?: string;
+	region?: string;
+	country?: string;
+	timezone?: string;
+}
+
+/** Normalized metadata extracted from any MCP provider */
+export interface NormalizedMeta {
+	provider: MCPProvider;
+	sessionId?: string;
+	externalUserId?: string;
+	userAgent?: string;
+	locale?: string;
+	location?: LocationInfo;
+}
+
+// ============================================
+// Event Types
+// ============================================
+
 export type EventType =
 	| "session.started"
 	| "tool.called"
@@ -17,10 +65,24 @@ export type ToolType =
 	| "other";
 
 interface BaseEvent {
-	sessionId: string;
-	userAgent?: string;
-	externalUserId?: string;
-	metadata?: Record<string, unknown>;
+	/**
+	 * MCP request metadata. The SDK auto-extracts provider fields
+	 * (sessionId, userId, location, etc.). Can also include custom fields.
+	 *
+	 * Location varies by MCP library:
+	 * - `@vercel/mcp-handler`: `extra._meta`
+	 * - `@modelcontextprotocol/sdk`: `request.params._meta`
+	 *
+	 * @example
+	 * ```typescript
+	 * wani.track({
+	 *   eventType: 'tool.called',
+	 *   toolName: 'search',
+	 *   meta: extra._meta,
+	 * });
+	 * ```
+	 */
+	meta?: Record<string, unknown>;
 }
 
 export type TrackEvent =
@@ -49,15 +111,8 @@ export type TrackEvent =
  */
 export interface TrackingClient {
 	/**
-	 * Track an event using the WaniWani API
+	 * Track an event. Pass MCP request metadata to auto-extract session, user,
+	 * and location info from the provider (OpenAI, Anthropic, etc.).
 	 */
 	track: (event: TrackEvent) => Promise<{ eventId: string }>;
-	/**
-	 * Extract session ID from MCP request metadata, or generate a new one.
-	 * If a new session ID is generated, automatically tracks a session.started event.
-	 *
-	 * @param meta - The _meta object from the MCP request (extra?._meta)
-	 * @returns The session ID (existing or newly generated)
-	 */
-	getOrCreateSession: (meta?: Record<string, unknown>) => Promise<string>;
 }
