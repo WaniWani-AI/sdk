@@ -1,6 +1,6 @@
 {
   "name": "@waniwani",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "WaniWani SDK - MCP event tracking and tools",
   "type": "module",
   "exports": {
