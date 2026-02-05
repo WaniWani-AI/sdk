@@ -1,34 +1,67 @@
 {
   "name": "@waniwani/sdk",
   "version": "0.0.5",
-  "description": "WaniWani SDK - MCP event tracking and tools",
+  "description": "WaniWani SDK - MCP event tracking, widget framework, and tools",
   "type": "module",
   "exports": {
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./mcp": {
+      "import": "./dist/mcp/index.js",
+      "types": "./dist/mcp/index.d.ts"
+    },
+    "./mcp/react": {
+      "import": "./dist/mcp/react.js",
+      "types": "./dist/mcp/react.d.ts"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && npm run typecheck && npm run lint && tsup",
+    "build": "rm -rf dist && bun run typecheck && bun run lint && tsup",
     "dev": "tsx --watch src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "bun run build",
     "release": "npm version patch && npm publish --access public",
     "release:minor": "npm version minor && npm publish --access public",
     "release:major": "npm version major && npm publish --access public"
   },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": ">=1.0.0",
+    "@modelcontextprotocol/ext-apps": ">=0.1.0",
+    "zod": ">=3.0.0",
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "@modelcontextprotocol/ext-apps": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.3.13",
+    "@modelcontextprotocol/ext-apps": "^0.1.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "zod": "^3.0.0"
   },
   "repository": {
     "type": "git",
@@ -40,7 +73,8 @@
     "waniwani",
     "tracking",
     "events",
-    "tools"
+    "tools",
+    "widgets"
   ],
   "author": "WaniWani",
   "license": "MIT"
