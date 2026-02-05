@@ -56,7 +56,9 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 	}
 
 	async connect(): Promise<void> {
-		await this.app.connect(new PostMessageTransport(window.parent));
+		await this.app.connect(
+			new PostMessageTransport(window.parent, window.parent),
+		);
 		this.hostContext = this.app.getHostContext();
 	}
 
@@ -128,9 +130,9 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 		return (this.hostContext?.displayMode as DisplayMode) ?? "inline";
 	}
 
-	async requestDisplayMode(_mode: DisplayMode): Promise<DisplayMode> {
-		// MCP Apps doesn't support display mode requests
-		return this.getDisplayMode();
+	async requestDisplayMode(mode: DisplayMode): Promise<DisplayMode> {
+		const result = await this.app.requestDisplayMode({ mode });
+		return result.mode as DisplayMode;
 	}
 
 	onDisplayModeChange(callback: (mode: DisplayMode) => void): () => void {
