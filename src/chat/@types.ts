@@ -1,0 +1,71 @@
+// ============================================================================
+// Chat Theme
+// ============================================================================
+
+export interface ChatTheme {
+	/** Primary brand color (bubble, send button, user messages) */
+	primaryColor?: string;
+	/** Primary text color on primary background */
+	primaryForeground?: string;
+	/** Chat panel background */
+	backgroundColor?: string;
+	/** Default text color */
+	textColor?: string;
+	/** Secondary/muted text */
+	mutedColor?: string;
+	/** Border color */
+	borderColor?: string;
+	/** Assistant message bubble background */
+	assistantBubbleColor?: string;
+	/** User message bubble background */
+	userBubbleColor?: string;
+	/** Input field background */
+	inputBackgroundColor?: string;
+	/** Border radius for the panel (px) */
+	borderRadius?: number;
+	/** Border radius for message bubbles (px) */
+	messageBorderRadius?: number;
+	/** Font family */
+	fontFamily?: string;
+}
+
+// ============================================================================
+// Chat Widget Props (React component)
+// ============================================================================
+
+export interface ChatWidgetProps {
+	/** WaniWani project API key */
+	apiKey?: string;
+	/** Chat API endpoint URL. Defaults to WaniWani hosted endpoint */
+	api?: string;
+	/** Initial greeting shown before user types */
+	welcomeMessage?: string;
+	/** Header title */
+	title?: string;
+	/** Header subtitle */
+	subtitle?: string;
+	/** Theme overrides */
+	theme?: ChatTheme;
+	/** Additional headers to send with chat API requests */
+	headers?: Record<string, string>;
+	/** Additional body fields to send with each chat request */
+	body?: Record<string, unknown>;
+	/** Chat panel width in pixels */
+	width?: number;
+	/** Chat panel height in pixels */
+	height?: number;
+	/** Callback fired when a message is sent */
+	onMessageSent?: (message: string) => void;
+	/** Callback fired when a response is received */
+	onResponseReceived?: () => void;
+}
+
+// ============================================================================
+// Embed Script Config (for window.WaniWani.chat.init)
+// ============================================================================
+
+export interface ChatEmbedConfig
+	extends Omit<ChatWidgetProps, "onMessageSent" | "onResponseReceived"> {
+	/** DOM element to mount into (defaults to document.body) */
+	container?: HTMLElement;
+}

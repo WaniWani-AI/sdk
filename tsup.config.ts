@@ -54,4 +54,37 @@ export default defineConfig([
 			js: '"use client";',
 		},
 	},
+	// Chat widget (React component)
+	{
+		entry: { "chat/index": "src/chat/index.ts" },
+		format: ["esm"],
+		target: "es2022",
+		dts: true,
+		clean: false,
+		shims: false,
+		splitting: true,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		external: ["react", "react-dom", "@ai-sdk/react", "ai"],
+		banner: {
+			js: '"use client";',
+		},
+	},
+	// Chat widget (embeddable script - self-contained IIFE)
+	{
+		entry: { "chat/embed": "src/chat/embed/embed.ts" },
+		format: ["iife"],
+		target: "es2020",
+		dts: false,
+		clean: false,
+		shims: true,
+		splitting: false,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		platform: "browser",
+		noExternal: [/.*/],
+		outExtension: () => ({ js: ".js" }),
+	},
 ]);
