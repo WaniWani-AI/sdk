@@ -28,7 +28,13 @@ export function InitializeNextJsInChatGpt({ baseUrl }: { baseUrl: string }) {
 									mutation.target === htmlElement
 								) {
 									const attrName = mutation.attributeName;
-									if (attrName && attrName !== "suppresshydrationwarning") {
+									// Preserve class/style so consumers can use html.dark { ... } for theming
+									if (
+										attrName &&
+										attrName !== "suppresshydrationwarning" &&
+										attrName !== "class" &&
+										attrName !== "style"
+									) {
 										htmlElement.removeAttribute(attrName);
 									}
 								}
