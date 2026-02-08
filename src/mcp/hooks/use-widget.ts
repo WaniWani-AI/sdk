@@ -84,6 +84,18 @@ export function WidgetProvider({
 		};
 	}, []);
 
+	// Sync theme to <html> class so consumers can use html.dark { ... } or dark: variants
+	useEffect(() => {
+		if (!client) return;
+
+		const syncTheme = (theme: Theme) => {
+			document.documentElement.classList.toggle("dark", theme === "dark");
+		};
+
+		syncTheme(client.getTheme());
+		return client.onThemeChange(syncTheme);
+	}, [client]);
+
 	if (error && onError) {
 		return React.createElement(React.Fragment, null, onError(error));
 	}
