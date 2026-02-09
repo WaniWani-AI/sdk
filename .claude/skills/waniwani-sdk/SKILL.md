@@ -21,6 +21,7 @@ bun add @waniwani/sdk
 | `@waniwani/sdk` | Event tracking | None |
 | `@waniwani/sdk/mcp` | Widget creation (server-side) | `@modelcontextprotocol/sdk`, `zod` |
 | `@waniwani/sdk/mcp/react` | Widget React hooks (client-side) | `react`, optionally `@modelcontextprotocol/ext-apps` |
+| `@waniwani/sdk/chat` | [Chat widget](chat.md) (embeddable UI) | `react`, `react-dom`, `@ai-sdk/react`, `ai` |
 
 ---
 

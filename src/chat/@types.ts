@@ -54,18 +54,10 @@ export interface ChatWidgetProps {
 	width?: number;
 	/** Chat panel height in pixels */
 	height?: number;
+	/** Enable file attachments in the input. Defaults to false. */
+	allowAttachments?: boolean;
 	/** Callback fired when a message is sent */
 	onMessageSent?: (message: string) => void;
 	/** Callback fired when a response is received */
 	onResponseReceived?: () => void;
-}
-
-// ============================================================================
-// Embed Script Config (for window.WaniWani.chat.init)
-// ============================================================================
-
-export interface ChatEmbedConfig
-	extends Omit<ChatWidgetProps, "onMessageSent" | "onResponseReceived"> {
-	/** DOM element to mount into (defaults to document.body) */
-	container?: HTMLElement;
 }

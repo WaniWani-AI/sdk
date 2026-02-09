@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+	--color-background: var(--ww-bg, #ffffff);
+	--color-foreground: var(--ww-text, #1f2937);
+	--color-primary: var(--ww-primary, #6366f1);
+	--color-primary-foreground: var(--ww-primary-fg, #ffffff);
+	--color-muted-foreground: var(--ww-muted, #6b7280);
+	--color-border: var(--ww-border, #e5e7eb);
+	--color-input: var(--ww-input-bg, #f9fafb);
+	--color-accent: var(--ww-assistant-bubble, #f3f4f6);
+	--color-accent-foreground: var(--ww-text, #1f2937);
+	--radius: var(--ww-radius, 16px);
+	--font-sans: var(--ww-font, system-ui, -apple-system, "Segoe UI", sans-serif);
+}
