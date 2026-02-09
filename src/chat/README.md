@@ -1,33 +1,29 @@
 # Chat Module
 
-Embeddable chat widget with theming, Shadow DOM isolation, and event tracking.
+Embeddable chat widget built with Tailwind CSS, composable AI elements, and streaming markdown.
 
 ## Architecture
 
 ```
 chat/
-├── index.ts                  # Public exports
-├── @types.ts                 # ChatWidgetProps, ChatTheme, ChatEmbedConfig
+├── index.ts                  # Public exports (ChatWidget, ChatTheme, ChatWidgetProps, theme utils)
+├── @types.ts                 # ChatWidgetProps, ChatTheme interfaces
 ├── theme.ts                  # Default theme + CSS variable generation
-├── styles.ts                 # Global stylesheet (animations, scrollbar)
-├── icons.tsx                 # SVG icons (SendIcon, ToolIcon)
-├── embed/
-│   └── embed.ts              # Script-tag embed with Shadow DOM + auto-init
-├── hooks/
-│   └── use-chat-tracking.ts  # Tracks chat.opened, chat.message_sent, chat.response_received
+├── tailwind.css              # Tailwind theme mapping (--ww-* vars → Tailwind tokens)
+├── lib/
+│   └── utils.ts              # cn() helper (clsx + tailwind-merge)
+├── ui/
+│   └── button.tsx            # Base Button component (default, outline, ghost variants)
+├── ai-elements/
+│   ├── conversation.tsx      # Scrollable message container (use-stick-to-bottom)
+│   ├── loader.tsx            # Bouncing dots typing indicator
+│   ├── message.tsx           # Message bubble (user/assistant) + Streamdown markdown renderer
+│   └── prompt-input.tsx      # Composable input (textarea, submit, attachments, drag & drop)
 └── components/
-    ├── chat-widget.tsx        # Root component (useChat, transport, theme, tracking)
-    ├── chat-panel.tsx         # Layout shell (header + messages + input)
-    ├── chat-header.tsx        # Title bar with optional subtitle
-    ├── chat-input.tsx         # Auto-resizing textarea + send button
-    ├── chat-messages.tsx      # Scrollable message list + typing indicator
-    ├── chat-message.tsx       # Message bubble (user/assistant) + tool invocations
-    └── chat-markdown.tsx      # Zero-dep markdown renderer (bold, italic, code, links, lists)
+    └── chat-widget.tsx       # Root component (useChat, transport, theme, layout)
 ```
 
 ## Usage
-
-### React component
 
 ```tsx
 import { ChatWidget } from "@waniwani/sdk/chat";
@@ -40,65 +36,55 @@ import { ChatWidget } from "@waniwani/sdk/chat";
   width={400}
   height={600}
   theme={{ primaryColor: "#6366f1" }}
+  allowAttachments
   onMessageSent={(msg) => console.log(msg)}
 />
 ```
 
-### Embed script
+### Props
 
-```html
-<script
-  src="https://cdn.waniwani.ai/chat/embed.js"
-  data-api-key="ww_..."
-  data-title="Support"
-  data-welcome-message="Hi! How can I help?"
-></script>
-```
-
-Or initialize programmatically:
-
-```js
-const chat = window.WaniWani.chat.init({
-  apiKey: "ww_...",
-  title: "Support",
-  container: document.getElementById("chat-container"),
-});
-
-// Cleanup
-chat.destroy();
-```
+| Prop                 | Type                          | Default                              |
+| -------------------- | ----------------------------- | ------------------------------------ |
+| `apiKey`             | `string`                      | —                                    |
+| `api`                | `string`                      | `https://app.waniwani.ai/api/chat`   |
+| `title`              | `string`                      | `"Chat"`                             |
+| `subtitle`           | `string`                      | —                                    |
+| `welcomeMessage`     | `string`                      | —                                    |
+| `theme`              | `ChatTheme`                   | see Theming                          |
+| `headers`            | `Record<string, string>`      | —                                    |
+| `body`               | `Record<string, unknown>`     | —                                    |
+| `width`              | `number`                      | `400`                                |
+| `height`             | `number`                      | `600`                                |
+| `allowAttachments`   | `boolean`                     | `false`                              |
+| `onMessageSent`      | `(message: string) => void`   | —                                    |
+| `onResponseReceived` | `() => void`                  | —                                    |
 
 ## Theming
 
 Pass a `theme` object to override any of the defaults:
 
-| Property              | CSS Variable          | Default     |
-| --------------------- | --------------------- | ----------- |
-| `primaryColor`        | `--ww-primary`        | `#6366f1`   |
-| `primaryForeground`   | `--ww-primary-fg`     | `#ffffff`   |
-| `backgroundColor`     | `--ww-bg`             | `#ffffff`   |
-| `textColor`           | `--ww-text`           | `#1a1a1a`   |
-| `mutedColor`          | `--ww-muted`          | `#6b7280`   |
-| `borderColor`         | `--ww-border`         | `#e5e7eb`   |
-| `assistantBubbleColor`| `--ww-assistant-bg`   | `#f3f4f6`   |
-| `userBubbleColor`     | `--ww-user-bg`        | (primary)   |
-| `inputBackgroundColor`| `--ww-input-bg`       | `#f9fafb`   |
-| `borderRadius`        | `--ww-radius`         | `16px`      |
-| `messageBorderRadius` | `--ww-msg-radius`     | `16px`      |
-| `fontFamily`          | `--ww-font`           | system stack |
+| Property              | CSS Variable             | Default      |
+| --------------------- | ------------------------ | ------------ |
+| `primaryColor`        | `--ww-primary`           | `#6366f1`    |
+| `primaryForeground`   | `--ww-primary-fg`        | `#ffffff`    |
+| `backgroundColor`     | `--ww-bg`                | `#ffffff`    |
+| `textColor`           | `--ww-text`              | `#1f2937`    |
+| `mutedColor`          | `--ww-muted`             | `#6b7280`    |
+| `borderColor`         | `--ww-border`            | `#e5e7eb`    |
+| `assistantBubbleColor`| `--ww-assistant-bubble`  | `#f3f4f6`    |
+| `userBubbleColor`     | `--ww-user-bubble`       | `#6366f1`    |
+| `inputBackgroundColor`| `--ww-input-bg`          | `#f9fafb`    |
+| `borderRadius`        | `--ww-radius`            | `16px`       |
+| `messageBorderRadius` | `--ww-msg-radius`        | `12px`       |
+| `fontFamily`          | `--ww-font`              | system stack |
+
+CSS variables are bridged to Tailwind tokens via `tailwind.css`, so all components use standard Tailwind classes (e.g. `bg-primary`, `text-foreground`) that resolve to the `--ww-*` values at runtime.
 
 ## Data flow
 
 1. `ChatWidget` creates a `DefaultChatTransport` (from `ai` SDK) pointed at the chat API
-2. `useChat` manages message state and streaming
-3. User input → `sendMessage()` → API → streamed response → rendered as markdown
-4. Tool invocations appear inline with a pulse animation while running
-5. `useChatTracking` fires analytics events silently in the background
-
-## Embed isolation
-
-The embed script (`embed/embed.ts`) uses **Shadow DOM** for full CSS isolation:
-- Host `<div>` appended to the target container (or `document.body`)
-- Stylesheet injected inside the shadow root
-- All CSS scoped via `.ww-` prefixed classes and `--ww-` CSS variables
-- No styles leak in or out
+2. `useChat` (from `@ai-sdk/react`) manages message state and streaming
+3. User input → `sendMessage()` → API → streamed response → rendered via `Streamdown` markdown
+4. Tool invocations appear inline with status labels while running
+5. `Conversation` (powered by `use-stick-to-bottom`) auto-scrolls to new messages
+6. `PromptInput` supports file attachments via file picker, paste, and global drag & drop

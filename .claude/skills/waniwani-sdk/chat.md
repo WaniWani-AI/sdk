@@ -136,8 +136,6 @@ src/chat/
 ├── icons.tsx                 # SVG icons (SendIcon, ToolIcon)
 ├── embed/
 │   └── embed.ts              # Script-tag embed with Shadow DOM + auto-init
-├── hooks/
-│   └── use-chat-tracking.ts  # Tracks chat events via WaniWani API
 └── components/
     ├── chat-widget.tsx        # Root (useChat transport, theme, tracking)
     ├── chat-panel.tsx         # Layout shell (header + messages + input)

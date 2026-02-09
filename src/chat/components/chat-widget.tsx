@@ -27,11 +27,9 @@ import {
 } from "../ai-elements/prompt-input";
 import { mergeTheme, themeToCSSProperties } from "../theme";
 
-const DEFAULT_API = "https://app.waniwani.ai/api/chat";
-
 export function ChatWidget(props: ChatWidgetProps) {
 	const {
-		api = DEFAULT_API,
+		api = "https://app.waniwani.ai/api/chat",
 		welcomeMessage,
 		title = "Chat",
 		subtitle,
@@ -47,7 +45,6 @@ export function ChatWidget(props: ChatWidgetProps) {
 
 	const resolvedTheme = mergeTheme(userTheme);
 	const cssVars = themeToCSSProperties(resolvedTheme);
-
 
 	const transportRef = useRef(
 		new DefaultChatTransport({
@@ -78,6 +75,7 @@ export function ChatWidget(props: ChatWidgetProps) {
 				text: message.text || "",
 				files: message.files,
 			});
+			
 			onMessageSent?.(message.text || "");
 			setText("");
 		},
