@@ -1,29 +1,22 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import type { ToolUIPart } from "ai";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ToolUIPart } from "ai";
 import type { ChatWidgetProps } from "../@types";
+import { Attachments } from "../ai-elements/attachments";
 import {
 	Conversation,
 	ConversationContent,
 	ConversationScrollButton,
 } from "../ai-elements/conversation";
-import { Attachments } from "../ai-elements/attachments";
 import { Loader } from "../ai-elements/loader";
 import {
 	Message,
 	MessageContent,
 	MessageResponse,
 } from "../ai-elements/message";
-import {
-	Tool,
-	ToolContent,
-	ToolHeader,
-	ToolInput,
-	ToolOutput,
-} from "../ai-elements/tool";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
 import {
 	PromptInput,
@@ -31,6 +24,13 @@ import {
 	PromptInputSubmit,
 	PromptInputTextarea,
 } from "../ai-elements/prompt-input";
+import {
+	Tool,
+	ToolContent,
+	ToolHeader,
+	ToolInput,
+	ToolOutput,
+} from "../ai-elements/tool";
 import { cn } from "../lib/utils";
 import { mergeTheme, themeToCSSProperties } from "../theme";
 
@@ -162,8 +162,14 @@ export function ChatWidget(props: ChatWidgetProps) {
 							const textParts = message.parts.filter((p) => p.type === "text");
 							const fileParts = message.parts.filter((p) => p.type === "file");
 							const toolParts = message.parts.filter(
-								(p): p is typeof p & { toolCallId: string; state: ToolUIPart["state"]; input: unknown; title?: string } =>
-									"toolCallId" in p,
+								(
+									p,
+								): p is typeof p & {
+									toolCallId: string;
+									state: ToolUIPart["state"];
+									input: unknown;
+									title?: string;
+								} => "toolCallId" in p,
 							);
 							const isLastAssistant =
 								message === lastMessage && message.role === "assistant";
@@ -172,29 +178,29 @@ export function ChatWidget(props: ChatWidgetProps) {
 							return (
 								<Message from={message.role} key={message.id}>
 									{toolParts.map((part) => (
-									<Tool
-										key={part.toolCallId}
-										defaultOpen={part.state === "output-available"}
-									>
-										<ToolHeader
-											title={part.title ?? part.type.replace("tool-", "")}
-											state={part.state}
-										/>
-										<ToolContent>
-											<ToolInput input={part.input} />
-											{"output" in part && part.output !== undefined && (
-												<ToolOutput
-													output={part.output}
-													errorText={"errorText" in part ? part.errorText : undefined}
-												/>
-											)}
-										</ToolContent>
-									</Tool>
-								))}
+										<Tool
+											key={part.toolCallId}
+											defaultOpen={part.state === "output-available"}
+										>
+											<ToolHeader
+												title={part.title ?? part.type.replace("tool-", "")}
+												state={part.state}
+											/>
+											<ToolContent>
+												<ToolInput input={part.input} />
+												{"output" in part && part.output !== undefined && (
+													<ToolOutput
+														output={part.output}
+														errorText={
+															"errorText" in part ? part.errorText : undefined
+														}
+													/>
+												)}
+											</ToolContent>
+										</Tool>
+									))}
 									<MessageContent>
-										{fileParts.length > 0 && (
-											<Attachments files={fileParts} />
-										)}
+										{fileParts.length > 0 && <Attachments files={fileParts} />}
 										{hasTextContent
 											? textParts.map((part, i) => (
 													<MessageResponse key={`${message.id}-${i}`}>

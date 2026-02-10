@@ -38,7 +38,9 @@ export const Tool = ({
 }: ToolProps) => {
 	const [open, setOpen] = useState(defaultOpen);
 	return (
-		<ToolOpenContext.Provider value={{ open, toggle: () => setOpen((o) => !o) }}>
+		<ToolOpenContext.Provider
+			value={{ open, toggle: () => setOpen((o) => !o) }}
+		>
 			<div
 				className={cn("mb-4 w-full rounded-md border border-border", className)}
 				data-state={open ? "open" : "closed"}
@@ -154,11 +156,7 @@ export type ToolInputProps = HTMLAttributes<HTMLDivElement> & {
 	input: ToolUIPart["input"];
 };
 
-export const ToolInput = ({
-	className,
-	input,
-	...props
-}: ToolInputProps) => (
+export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
 	<div className={cn("space-y-2 overflow-hidden", className)} {...props}>
 		<h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
 			Parameters

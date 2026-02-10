@@ -13,7 +13,11 @@ export type AttachmentsProps = HTMLAttributes<HTMLDivElement> & {
 	files: FileUIPart[];
 };
 
-export const Attachments = ({ files, className, ...props }: AttachmentsProps) => {
+export const Attachments = ({
+	files,
+	className,
+	...props
+}: AttachmentsProps) => {
 	if (files.length === 0) return null;
 
 	return (
@@ -45,9 +49,7 @@ function AttachmentItem({ file }: { file: FileUIPart }) {
 	return (
 		<span className="inline-flex items-center gap-1.5 rounded bg-background/20 px-2 py-1 text-xs">
 			<FileIcon className="size-3 shrink-0" />
-			<span className="max-w-24 truncate">
-				{file.filename ?? "file"}
-			</span>
+			<span className="max-w-24 truncate">{file.filename ?? "file"}</span>
 		</span>
 	);
 }
