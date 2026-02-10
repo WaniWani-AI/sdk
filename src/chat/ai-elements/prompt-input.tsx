@@ -6,6 +6,7 @@ import {
 	LoaderIcon,
 	PaperclipIcon,
 	SquareIcon,
+	XIcon,
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import type {
@@ -481,6 +482,26 @@ export const PromptInputAddAttachments = ({
 	...props
 }: PromptInputAddAttachmentsProps) => {
 	const attachments = usePromptInputAttachments();
+	const hasFiles = attachments.files.length > 0;
+
+	if (hasFiles) {
+		return (
+			<Button
+				className={cn("group relative", className)}
+				onClick={() => attachments.clear()}
+				size="icon-sm"
+				type="button"
+				variant="ghost"
+				aria-label="Remove all attachments"
+				{...props}
+			>
+				<span className="flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground transition-opacity group-hover:opacity-0">
+					{attachments.files.length}
+				</span>
+				<XIcon className="absolute size-4 opacity-0 transition-opacity group-hover:opacity-100" />
+			</Button>
+		);
+	}
 
 	return (
 		<Button
