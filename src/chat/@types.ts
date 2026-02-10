@@ -40,20 +40,16 @@ export interface ChatWidgetProps {
 	api?: string;
 	/** Initial greeting shown before user types */
 	welcomeMessage?: string;
-	/** Header title */
-	title?: string;
-	/** Header subtitle */
-	subtitle?: string;
 	/** Theme overrides */
 	theme?: ChatTheme;
 	/** Additional headers to send with chat API requests */
 	headers?: Record<string, string>;
 	/** Additional body fields to send with each chat request */
 	body?: Record<string, unknown>;
-	/** Chat panel width in pixels */
+	/** Chat bar width in pixels. Defaults to 600. */
 	width?: number;
-	/** Chat panel height in pixels */
-	height?: number;
+	/** Max height of the expanded messages panel in pixels. Defaults to 400. */
+	expandedHeight?: number;
 	/** Enable file attachments in the input. Defaults to false. */
 	allowAttachments?: boolean;
 	/** Callback fired when a message is sent */

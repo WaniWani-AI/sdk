@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatWidgetProps } from "../@types";
 import {
 	Conversation,
@@ -19,25 +19,21 @@ import type { PromptInputMessage } from "../ai-elements/prompt-input";
 import {
 	PromptInput,
 	PromptInputAddAttachments,
-	PromptInputBody,
-	PromptInputFooter,
 	PromptInputSubmit,
 	PromptInputTextarea,
-	PromptInputTools,
 } from "../ai-elements/prompt-input";
+import { cn } from "../lib/utils";
 import { mergeTheme, themeToCSSProperties } from "../theme";
 
 export function ChatWidget(props: ChatWidgetProps) {
 	const {
 		api = "https://app.waniwani.ai/api/chat",
 		welcomeMessage,
-		title = "Chat",
-		subtitle,
 		theme: userTheme,
 		headers: userHeaders,
 		body,
-		width = 400,
-		height = 600,
+		width = 600,
+		expandedHeight = 400,
 		allowAttachments = false,
 		onMessageSent,
 		onResponseReceived,
@@ -64,6 +60,26 @@ export function ChatWidget(props: ChatWidgetProps) {
 	});
 
 	const [text, setText] = useState("");
+	const [isFocused, setIsFocused] = useState(false);
+	const containerRef = useRef<HTMLDivElement>(null);
+
+	const hasMessages = messages.length > 0;
+	const isExpanded = isFocused;
+
+	// Close on outside click
+	useEffect(() => {
+		if (!isFocused) return;
+		const handleClickOutside = (e: MouseEvent) => {
+			if (
+				containerRef.current &&
+				!containerRef.current.contains(e.target as Node)
+			) {
+				setIsFocused(false);
+			}
+		};
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => document.removeEventListener("mousedown", handleClickOutside);
+	}, [isFocused]);
 
 	const handleSubmit = useCallback(
 		(message: PromptInputMessage) => {
@@ -75,7 +91,7 @@ export function ChatWidget(props: ChatWidgetProps) {
 				text: message.text || "",
 				files: message.files,
 			});
-			
+
 			onMessageSent?.(message.text || "");
 			setText("");
 		},
@@ -89,109 +105,97 @@ export function ChatWidget(props: ChatWidgetProps) {
 		[],
 	);
 
+	const handleFocus = useCallback(() => {
+		setIsFocused(true);
+	}, []);
+
+	// Determine if loader should show (only when streaming and last message has no text yet)
+	const showLoader =
+		(status === "submitted" || status === "streaming") &&
+		(!hasMessages ||
+			messages[messages.length - 1].role === "user" ||
+			messages[messages.length - 1].parts.every((p) => p.type !== "text"));
+
 	return (
 		<div
-			style={{ ...cssVars, width, height }}
+			ref={containerRef}
+			style={{ ...cssVars, width }}
 			data-waniwani-chat=""
-			className="flex flex-col overflow-hidden rounded-[var(--ww-radius)] border border-border bg-background font-[family-name:var(--ww-font)] text-foreground"
+			className="flex flex-col font-[family-name:var(--ww-font)] text-foreground"
 		>
-			{/* Header */}
-			{(title || subtitle) && (
-				<div className="shrink-0 border-b border-border bg-primary px-4 py-3">
-					{title && (
-						<h2 className="text-[15px] font-semibold text-primary-foreground">
-							{title}
-						</h2>
-					)}
-					{subtitle && (
-						<p className="text-xs text-primary-foreground/85">{subtitle}</p>
-					)}
-				</div>
-			)}
+			{/* Messages panel — fades up on expand */}
+			<div
+				className={cn(
+					"overflow-hidden bg-background/80 backdrop-blur-xl transition-all duration-300 ease-out",
+					isExpanded
+						? "opacity-100 translate-y-0"
+						: "opacity-0 translate-y-2 pointer-events-none max-h-0",
+				)}
+				style={{
+					...(isExpanded ? { maxHeight: expandedHeight } : undefined),
+					maskImage:
+						"linear-gradient(to bottom, transparent, black 24px, black calc(100% - 16px), transparent), linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent)",
+					maskComposite: "intersect",
+					WebkitMaskImage:
+						"linear-gradient(to bottom, transparent, black 24px, black calc(100% - 16px), transparent), linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent)",
+					WebkitMaskComposite: "source-in",
+				}}
+			>
+				<Conversation className="flex-1" style={{ height: expandedHeight }}>
+					<ConversationContent>
+						{welcomeMessage && !hasMessages && (
+							<Message from="assistant">
+								<MessageContent>
+									<MessageResponse>{welcomeMessage}</MessageResponse>
+								</MessageContent>
+							</Message>
+						)}
+						{messages.map((message) => (
+							<Message from={message.role} key={message.id}>
+								<MessageContent>
+									{message.parts
+										.filter((part) => part.type === "text")
+										.map((part, i) => (
+											<MessageResponse key={`${message.id}-${i}`}>
+												{part.type === "text" ? part.text : ""}
+											</MessageResponse>
+										))}
+								</MessageContent>
+							</Message>
+						))}
+						{showLoader && (
+							<Message from="assistant">
+								<MessageContent>
+									<Loader />
+								</MessageContent>
+							</Message>
+						)}
+					</ConversationContent>
+					<ConversationScrollButton />
+				</Conversation>
+			</div>
 
-			{/* Messages */}
-			<Conversation className="flex-1">
-				<ConversationContent>
-					{welcomeMessage && messages.length === 0 && (
-						<Message from="assistant">
-							<MessageContent>
-								<MessageResponse>{welcomeMessage}</MessageResponse>
-							</MessageContent>
-						</Message>
-					)}
-					{messages.map((message) => (
-						<Message from={message.role} key={message.id}>
-							<MessageContent>
-								{message.parts.map((part, i) => {
-									switch (part.type) {
-										case "text":
-											return (
-												<MessageResponse key={`${message.id}-${i}`}>
-													{part.text}
-												</MessageResponse>
-											);
-										default: {
-											if (part.type.startsWith("tool-")) {
-												const toolPart = part as {
-													type: string;
-													state: string;
-													title?: string;
-												};
-												const label =
-													toolPart.title ?? toolPart.type.replace("tool-", "");
-												const isDone =
-													toolPart.state === "output-available" ||
-													toolPart.state === "output-error" ||
-													toolPart.state === "output-denied";
-												return (
-													<div
-														key={`${message.id}-${i}`}
-														className="flex items-center gap-1.5 py-1 text-xs italic text-muted-foreground"
-													>
-														<span>
-															{isDone ? `Used ${label}` : `Using ${label}...`}
-														</span>
-													</div>
-												);
-											}
-											return null;
-										}
-									}
-								})}
-							</MessageContent>
-						</Message>
-					))}
-					{(status === "submitted" || status === "streaming") && (
-						<Message from="assistant">
-							<MessageContent>
-								<Loader />
-							</MessageContent>
-						</Message>
-					)}
-				</ConversationContent>
-				<ConversationScrollButton />
-			</Conversation>
-
-			{/* Input */}
-			<div className="shrink-0 border-t border-border p-3">
+			{/* Input bar — always visible */}
+			<div className="shrink-0">
 				<PromptInput
 					onSubmit={handleSubmit}
 					globalDrop={allowAttachments}
 					multiple={allowAttachments}
+					className={cn(
+						"rounded-[var(--ww-radius)] shadow-sm transition-all duration-300 ease-out",
+					)}
 				>
-					<PromptInputBody>
+					<div className="flex items-center gap-1 px-3 py-2">
+						{allowAttachments && <PromptInputAddAttachments />}
 						<PromptInputTextarea
 							onChange={handleTextChange}
 							value={text}
 							placeholder="Type a message..."
+							onFocus={handleFocus}
+							className="min-h-0 py-1.5 px-2"
 						/>
-					</PromptInputBody>
-					<PromptInputFooter>
-						<PromptInputTools>
-							{allowAttachments && <PromptInputAddAttachments />}
-						</PromptInputTools>
 						<PromptInputSubmit status={status} />
-					</PromptInputFooter>
+					</div>
 				</PromptInput>
 			</div>
 		</div>

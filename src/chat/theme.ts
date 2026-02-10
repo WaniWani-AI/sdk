@@ -15,19 +15,19 @@ export const DEFAULT_THEME: Required<ChatTheme> = {
 	fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
 };
 
-const CSS_VAR_MAP: Record<keyof ChatTheme, string> = {
-	primaryColor: "--ww-primary",
-	primaryForeground: "--ww-primary-fg",
-	backgroundColor: "--ww-bg",
-	textColor: "--ww-text",
-	mutedColor: "--ww-muted",
-	borderColor: "--ww-border",
-	assistantBubbleColor: "--ww-assistant-bubble",
-	userBubbleColor: "--ww-user-bubble",
-	inputBackgroundColor: "--ww-input-bg",
-	borderRadius: "--ww-radius",
-	messageBorderRadius: "--ww-msg-radius",
-	fontFamily: "--ww-font",
+const CSS_VAR_MAP: Record<keyof ChatTheme, string[]> = {
+	primaryColor: ["--ww-primary", "--color-primary"],
+	primaryForeground: ["--ww-primary-fg", "--color-primary-foreground"],
+	backgroundColor: ["--ww-bg", "--color-background"],
+	textColor: ["--ww-text", "--color-foreground", "--color-accent-foreground"],
+	mutedColor: ["--ww-muted", "--color-muted-foreground"],
+	borderColor: ["--ww-border", "--color-border"],
+	assistantBubbleColor: ["--ww-assistant-bubble", "--color-accent"],
+	userBubbleColor: ["--ww-user-bubble"],
+	inputBackgroundColor: ["--ww-input-bg", "--color-input"],
+	borderRadius: ["--ww-radius", "--radius"],
+	messageBorderRadius: ["--ww-msg-radius"],
+	fontFamily: ["--ww-font"],
 };
 
 export function mergeTheme(userTheme?: ChatTheme): Required<ChatTheme> {
@@ -38,9 +38,12 @@ export function themeToCSSProperties(
 	theme: Required<ChatTheme>,
 ): Record<string, string> {
 	const vars: Record<string, string> = {};
-	for (const [key, cssVar] of Object.entries(CSS_VAR_MAP)) {
+	for (const [key, cssVars] of Object.entries(CSS_VAR_MAP)) {
 		const value = theme[key as keyof ChatTheme];
-		vars[cssVar] = typeof value === "number" ? `${value}px` : String(value);
+		const resolved = typeof value === "number" ? `${value}px` : String(value);
+		for (const cssVar of cssVars) {
+			vars[cssVar] = resolved;
+		}
 	}
 	return vars;
 }

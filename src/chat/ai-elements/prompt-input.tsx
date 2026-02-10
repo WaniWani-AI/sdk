@@ -2,7 +2,7 @@
 
 import type { ChatStatus, FileUIPart } from "ai";
 import {
-	CornerDownLeftIcon,
+	ArrowUpIcon,
 	LoaderIcon,
 	PaperclipIcon,
 	SquareIcon,
@@ -435,7 +435,7 @@ export const PromptInputSubmit = ({
 }: PromptInputSubmitProps) => {
 	const isGenerating = status === "submitted" || status === "streaming";
 
-	let Icon = <CornerDownLeftIcon className="size-4" />;
+	let Icon = <ArrowUpIcon className="size-4" />;
 	if (status === "submitted") {
 		Icon = <LoaderIcon className="size-4 animate-spin" />;
 	} else if (status === "streaming") {
