@@ -1,18 +1,16 @@
 import { createMCPClient } from "@ai-sdk/mcp";
-import { openai } from "@ai-sdk/openai";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
-  streamText,
   convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
-  stepCountIs,
-  type UIMessage,
+  streamText,
   type ToolSet,
+  type UIMessage
 } from "ai";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 export const maxDuration = 60;
-const mcpServerUrl = "http://localhost:3000/mcp";
+const mcpServerUrl = process.env.MCP_SERVER_URL || "http://localhost:3000/mcp";
 
 export async function POST(request: Request) {
   try {
