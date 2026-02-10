@@ -4,6 +4,7 @@ import {
   convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
+  stepCountIs,
   streamText,
   type ToolSet,
   type UIMessage
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
             "You are a helpful assistant. Keep responses concise and friendly.",
           messages: modelMessages,
           tools: tools as ToolSet,
+          stopWhen: stepCountIs(5),
         });
 
         writer.merge(result.toUIMessageStream());
