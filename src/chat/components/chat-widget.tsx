@@ -109,12 +109,11 @@ export function ChatWidget(props: ChatWidgetProps) {
 		setIsFocused(true);
 	}, []);
 
-	// Determine if loader should show (only when streaming and last message has no text yet)
-	const showLoader =
-		(status === "submitted" || status === "streaming") &&
-		(!hasMessages ||
-			messages[messages.length - 1].role === "user" ||
-			messages[messages.length - 1].parts.every((p) => p.type !== "text"));
+	const isLoading = status === "submitted" || status === "streaming";
+	const lastMessage = messages[messages.length - 1];
+	// Show a standalone loader bubble only when waiting and no assistant message exists yet
+	const showLoaderBubble =
+		isLoading && (!hasMessages || lastMessage.role === "user");
 
 	return (
 		<div
@@ -143,27 +142,34 @@ export function ChatWidget(props: ChatWidgetProps) {
 			>
 				<Conversation className="flex-1" style={{ height: expandedHeight }}>
 					<ConversationContent>
-						{welcomeMessage && !hasMessages && (
+						{welcomeMessage && (
 							<Message from="assistant">
 								<MessageContent>
 									<MessageResponse>{welcomeMessage}</MessageResponse>
 								</MessageContent>
 							</Message>
 						)}
-						{messages.map((message) => (
-							<Message from={message.role} key={message.id}>
-								<MessageContent>
-									{message.parts
-										.filter((part) => part.type === "text")
-										.map((part, i) => (
-											<MessageResponse key={`${message.id}-${i}`}>
-												{part.type === "text" ? part.text : ""}
-											</MessageResponse>
-										))}
-								</MessageContent>
-							</Message>
-						))}
-						{showLoader && (
+						{messages.map((message) => {
+							const textParts = message.parts.filter((p) => p.type === "text");
+							const isLastAssistant =
+								message === lastMessage && message.role === "assistant";
+							const hasTextContent = textParts.length > 0;
+
+							return (
+								<Message from={message.role} key={message.id}>
+									<MessageContent>
+										{hasTextContent
+											? textParts.map((part, i) => (
+													<MessageResponse key={`${message.id}-${i}`}>
+														{part.type === "text" ? part.text : ""}
+													</MessageResponse>
+												))
+											: isLastAssistant && isLoading && <Loader />}
+									</MessageContent>
+								</Message>
+							);
+						})}
+						{showLoaderBubble && (
 							<Message from="assistant">
 								<MessageContent>
 									<Loader />
