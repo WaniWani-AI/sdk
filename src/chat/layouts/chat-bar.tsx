@@ -113,7 +113,7 @@ export function ChatBar(props: ChatBarProps) {
 						<PromptInputTextarea
 							onChange={engine.handleTextChange}
 							value={engine.text}
-							placeholder="Type a message..."
+							placeholder="Ask anything..."
 							onFocus={handleFocus}
 							className="min-h-0 py-1.5 px-2"
 						/>

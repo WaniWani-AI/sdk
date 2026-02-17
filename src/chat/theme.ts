@@ -2,13 +2,13 @@ import type { ChatTheme } from "./@types";
 
 export const DEFAULT_THEME: Required<ChatTheme> = {
 	primaryColor: "#6366f1",
-	primaryForeground: "#ffffff",
+	primaryForeground: "#1f2937",
 	backgroundColor: "#ffffff",
 	textColor: "#1f2937",
 	mutedColor: "#6b7280",
 	borderColor: "#e5e7eb",
 	assistantBubbleColor: "#f3f4f6",
-	userBubbleColor: "#303030",
+	userBubbleColor: "#f4f4f4",
 	inputBackgroundColor: "#f9fafb",
 	borderRadius: 16,
 	messageBorderRadius: 12,
@@ -16,11 +16,13 @@ export const DEFAULT_THEME: Required<ChatTheme> = {
 	headerBackgroundColor: "#ffffff",
 	headerTextColor: "#1f2937",
 	statusColor: "#22c55e",
+	toolCardColor: "#f4f4f5",
 };
 
 export const DARK_THEME: ChatTheme = {
 	backgroundColor: "#212121",
-	headerBackgroundColor: "#171717",
+	headerBackgroundColor: "#1e1e1e",
+	headerTextColor: "#ececec",
 	textColor: "#ececec",
 	primaryForeground: "#ffffff",
 	mutedColor: "#8e8ea0",
@@ -30,6 +32,7 @@ export const DARK_THEME: ChatTheme = {
 	inputBackgroundColor: "#2f2f2f",
 	primaryColor: "#6366f1",
 	statusColor: "#22c55e",
+	toolCardColor: "#262626",
 };
 
 const CSS_VAR_MAP: Record<keyof ChatTheme, string[]> = {
@@ -48,6 +51,7 @@ const CSS_VAR_MAP: Record<keyof ChatTheme, string[]> = {
 	headerBackgroundColor: ["--ww-header-bg"],
 	headerTextColor: ["--ww-header-text"],
 	statusColor: ["--ww-status"],
+	toolCardColor: ["--ww-tool-card", "--color-tool-card"],
 };
 
 export function mergeTheme(userTheme?: ChatTheme): Required<ChatTheme> {

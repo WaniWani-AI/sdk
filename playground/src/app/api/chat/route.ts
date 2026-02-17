@@ -41,6 +41,9 @@ export async function POST(request: Request) {
 
         writer.merge(result.toUIMessageStream());
       },
+      onFinish: () => {
+        mcp.close();
+      },
     });
 
     return createUIMessageStreamResponse({ stream });

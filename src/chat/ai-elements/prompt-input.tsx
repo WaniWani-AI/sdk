@@ -458,11 +458,14 @@ export const PromptInputSubmit = ({
 	return (
 		<Button
 			aria-label={isGenerating ? "Stop" : "Submit"}
-			className={cn(className)}
+			className={cn(
+				"bg-foreground text-background hover:bg-foreground",
+				className,
+			)}
 			onClick={handleClick}
 			size="icon-sm"
 			type={isGenerating && onStop ? "button" : "submit"}
-			variant="default"
+			variant="ghost"
 			{...props}
 		>
 			{children ?? Icon}

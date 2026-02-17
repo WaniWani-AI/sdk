@@ -33,6 +33,8 @@ export interface ChatTheme {
 	headerTextColor?: string;
 	/** Status dot color. Defaults to green (#22c55e). */
 	statusColor?: string;
+	/** Tool call JSON section background. Defaults to light gray / #262626 in dark. */
+	toolCardColor?: string;
 }
 
 // ============================================================================

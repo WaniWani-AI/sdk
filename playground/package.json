@@ -18,7 +18,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.563.0",
     "nanoid": "^5.0.0",
-    "next": "^15.0.0",
+    "next": "^16.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.2.4",
     "streamdown": "^2.1.0",

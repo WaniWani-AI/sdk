@@ -3,83 +3,100 @@
 import type { ToolUIPart } from "ai";
 import {
 	BracesIcon,
-	CheckCircleIcon,
 	CheckIcon,
 	ChevronDownIcon,
 	ChevronRightIcon,
-	CircleIcon,
 	ClipboardCopyIcon,
-	ClockIcon,
 	ServerIcon,
-	XCircleIcon,
 } from "lucide-react";
-import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
-import { createContext, useContext, useState } from "react";
+import type { HTMLAttributes } from "react";
+import {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { cn } from "../lib/utils";
 import { Button } from "../ui/button";
 
-// ============================================================================
-// Truncated JSON preview
-// ============================================================================
-
+/**
+ * Produces an abbreviated single-line JSON preview for collapsed display.
+ * Objects show truncated keys/values: `{ci… 'M…,  pos… '2…,  squa… 80}`
+ * Arrays show their length: `Array(13)`
+ */
 function truncateJSON(data: unknown, maxLength = 80): string {
 	if (data === null || data === undefined) return String(data);
 	if (typeof data !== "object") return String(data).slice(0, maxLength);
 
+	if (Array.isArray(data)) {
+		return `Array(${data.length})`;
+	}
+
 	const stringified = JSON.stringify(data);
 	if (stringified.length <= maxLength) return stringified;
 
-	if (!Array.isArray(data)) {
-		const entries = Object.entries(data as Record<string, unknown>);
-		const parts: string[] = [];
-		let remaining = maxLength - 2;
+	const entries = Object.entries(data as Record<string, unknown>);
+	const parts: string[] = [];
+	let remaining = maxLength - 2;
 
-		for (const [key, value] of entries) {
-			if (remaining <= 8) break;
-			const keyAbbrev = key.length > 4 ? `${key.slice(0, 4)}\u2026` : key;
-			let valStr: string;
-			if (typeof value === "string") {
-				valStr =
-					value.length > 2 ? `'${value.slice(0, 1)}\u2026` : `'${value}'`;
-			} else if (Array.isArray(value)) {
-				valStr = `Array(${value.length})`;
-			} else if (typeof value === "object" && value !== null) {
-				valStr = `{\u2026}`;
-			} else {
-				valStr = String(value);
-			}
-			const part = `${keyAbbrev}\u2009${valStr}`;
-			parts.push(part);
-			remaining -= part.length + 3;
+	for (const [key, value] of entries) {
+		if (remaining <= 8) break;
+		const keyAbbrev = key.length > 4 ? `${key.slice(0, 4)}\u2026` : key;
+		let valStr: string;
+		if (typeof value === "string") {
+			valStr = value.length > 2 ? `'${value.slice(0, 1)}\u2026` : `'${value}'`;
+		} else if (Array.isArray(value)) {
+			valStr = `Array(${value.length})`;
+		} else if (typeof value === "object" && value !== null) {
+			valStr = `{\u2026}`;
+		} else {
+			valStr = String(value);
 		}
-
-		return `{${parts.join(",  ")}}`;
+		const part = `${keyAbbrev}\u2009${valStr}`;
+		parts.push(part);
+		remaining -= part.length + 3;
 	}
 
-	return `Array(${(data as unknown[]).length})`;
+	return `{${parts.join(",  ")}}`;
 }
 
-// ============================================================================
-// CopyButton
-// ============================================================================
+interface CopyButtonProps {
+	text: string;
+	className?: string;
+}
 
-const CopyButton = ({
-	text,
-	className,
-	...props
-}: ComponentProps<"button"> & { text: string }) => {
+/** Ghost button that copies `text` to clipboard, showing "Copied" for 2s. */
+function CopyButton({ text, className }: CopyButtonProps) {
 	const [copied, setCopied] = useState(false);
+	const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-	const handleCopy = async (e: React.MouseEvent) => {
-		e.stopPropagation();
-		try {
-			await navigator.clipboard.writeText(text);
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
-		} catch {
-			// Clipboard not available
-		}
-	};
+	useEffect(() => {
+		return () => {
+			if (timeoutRef.current) {
+				clearTimeout(timeoutRef.current);
+			}
+		};
+	}, []);
+
+	const handleCopy = useCallback(
+		async (e: React.MouseEvent) => {
+			e.stopPropagation();
+			try {
+				await navigator.clipboard.writeText(text);
+				setCopied(true);
+				if (timeoutRef.current) {
+					clearTimeout(timeoutRef.current);
+				}
+				timeoutRef.current = setTimeout(() => setCopied(false), 2000);
+			} catch {
+				// Clipboard API not available
+			}
+		},
+		[text],
+	);
 
 	return (
 		<Button
@@ -90,7 +107,6 @@ const CopyButton = ({
 				"h-auto gap-1 px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground",
 				className,
 			)}
-			{...props}
 		>
 			{copied ? (
 				<>
@@ -105,38 +121,36 @@ const CopyButton = ({
 			)}
 		</Button>
 	);
-};
+}
 
-// ============================================================================
-// CollapsibleJSON
-// ============================================================================
+interface CollapsibleJSONProps extends HTMLAttributes<HTMLDivElement> {
+	data: unknown;
+	label: string;
+}
 
-const CollapsibleJSON = ({
+/**
+ * Labeled JSON section with a Copy button and a collapsible preview.
+ * Collapsed: shows a truncated single-line abbreviation with a `>` chevron.
+ * Expanded: rotates the chevron and shows full pretty-printed JSON.
+ */
+function CollapsibleJSON({
 	data,
 	label,
 	className,
 	...props
-}: HTMLAttributes<HTMLDivElement> & {
-	data: unknown;
-	label: string;
-}) => {
+}: CollapsibleJSONProps) {
 	const [expanded, setExpanded] = useState(false);
-	const fullJSON = JSON.stringify(data, null, 2);
+	const fullJSON = useMemo(() => JSON.stringify(data, null, 2), [data]);
 	const preview = truncateJSON(data);
 
 	return (
-		<div
-			className={cn("rounded-lg border border-border", className)}
-			{...props}
-		>
-			{/* Header row */}
+		<div className={cn("rounded-lg bg-tool-card", className)} {...props}>
 			<div className="flex items-center justify-between px-3 pt-2.5 pb-1.5">
 				<span className="text-xs font-medium text-muted-foreground">
 					{label}
 				</span>
 				<CopyButton text={fullJSON} />
 			</div>
-			{/* JSON preview / expanded */}
 			<button
 				type="button"
 				onClick={() => setExpanded((v) => !v)}
@@ -160,31 +174,38 @@ const CollapsibleJSON = ({
 			</button>
 		</div>
 	);
-};
-
-// ============================================================================
-// Collapsible Context (lightweight, no Radix dependency)
-// ============================================================================
+}
 
 const ToolOpenContext = createContext<{
 	open: boolean;
 	toggle: () => void;
 }>({ open: false, toggle: () => {} });
 
-// ============================================================================
-// Tool
-// ============================================================================
-
 export type ToolProps = HTMLAttributes<HTMLDivElement> & {
 	defaultOpen?: boolean;
 };
 
-export const Tool = ({
+/**
+ * Compound component root for a tool call display.
+ * Provides open/closed state via context to ToolHeader and ToolContent.
+ *
+ * ```tsx
+ * <Tool defaultOpen>
+ *   <ToolHeader title="Price estimate ready" state="output-available" />
+ *   <ToolContent>
+ *     <ToolServerInfo toolName="get_price_estimate" serverName="Tuio v2" />
+ *     <ToolInput input={args} />
+ *     <ToolOutput output={result} errorText={undefined} />
+ *   </ToolContent>
+ * </Tool>
+ * ```
+ */
+export function Tool({
 	className,
 	defaultOpen = false,
 	children,
 	...props
-}: ToolProps) => {
+}: ToolProps) {
 	const [open, setOpen] = useState(defaultOpen);
 	return (
 		<ToolOpenContext.Provider
@@ -199,54 +220,20 @@ export const Tool = ({
 			</div>
 		</ToolOpenContext.Provider>
 	);
-};
+}
 
-// ============================================================================
-// Status helpers (kept for backward compat)
-// ============================================================================
-
-const statusLabels: Record<ToolUIPart["state"], string> = {
-	"approval-requested": "Awaiting Approval",
-	"approval-responded": "Responded",
-	"input-available": "Running",
-	"input-streaming": "Pending",
-	"output-available": "Completed",
-	"output-denied": "Denied",
-	"output-error": "Error",
-};
-
-const statusIcons: Record<ToolUIPart["state"], ReactNode> = {
-	"approval-requested": <ClockIcon className="size-4 text-yellow-600" />,
-	"approval-responded": <CheckCircleIcon className="size-4 text-blue-600" />,
-	"input-available": <ClockIcon className="size-4 animate-pulse" />,
-	"input-streaming": <CircleIcon className="size-4" />,
-	"output-available": <CheckCircleIcon className="size-4 text-green-600" />,
-	"output-denied": <XCircleIcon className="size-4 text-orange-600" />,
-	"output-error": <XCircleIcon className="size-4 text-red-600" />,
-};
-
-export const getStatusBadge = (state: ToolUIPart["state"]) => (
-	<span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-		{statusIcons[state]}
-		{statusLabels[state]}
-	</span>
-);
-
-// ============================================================================
-// ToolHeader
-// ============================================================================
-
-export type ToolHeaderProps = ComponentProps<"button"> & {
+export type ToolHeaderProps = HTMLAttributes<HTMLButtonElement> & {
 	title?: string;
 	state: ToolUIPart["state"];
 };
 
-export const ToolHeader = ({
+/** Clickable header that toggles the tool accordion. Shows a `{≡}` icon, title, and chevron. */
+export function ToolHeader({
 	className,
 	title,
 	state,
 	...props
-}: ToolHeaderProps) => {
+}: ToolHeaderProps) {
 	const { open, toggle } = useContext(ToolOpenContext);
 	const isRunning = state === "input-available" || state === "input-streaming";
 
@@ -276,11 +263,7 @@ export const ToolHeader = ({
 			/>
 		</button>
 	);
-};
-
-// ============================================================================
-// ToolServerInfo
-// ============================================================================
+}
 
 export type ToolServerInfoProps = HTMLAttributes<HTMLDivElement> & {
 	serverName?: string;
@@ -288,13 +271,14 @@ export type ToolServerInfoProps = HTMLAttributes<HTMLDivElement> & {
 	toolName: string;
 };
 
-export const ToolServerInfo = ({
+/** Optional MCP server identity card. Shows server icon + name and the tool function name. Renders nothing if no props need display. */
+export function ToolServerInfo({
 	className,
 	serverName,
 	serverIcon,
 	toolName,
 	...props
-}: ToolServerInfoProps) => {
+}: ToolServerInfoProps) {
 	return (
 		<div
 			className={cn(
@@ -322,65 +306,62 @@ export const ToolServerInfo = ({
 			</div>
 		</div>
 	);
-};
-
-// ============================================================================
-// ToolContent
-// ============================================================================
+}
 
 export type ToolContentProps = HTMLAttributes<HTMLDivElement>;
 
-export const ToolContent = ({
+/** Collapsible body that animates open/closed. Content below smoothly pushes up/down via a grid-row height transition. */
+export function ToolContent({
 	className,
 	children,
 	...props
-}: ToolContentProps) => {
+}: ToolContentProps) {
 	const { open } = useContext(ToolOpenContext);
-
-	if (!open) return null;
 
 	return (
 		<div
 			className={cn(
-				"mt-2 space-y-3 rounded-lg border border-border p-3",
-				className,
+				"grid transition-[grid-template-rows,opacity] duration-200 ease-out",
+				open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
 			)}
-			{...props}
 		>
-			{children}
+			<div className="min-h-0 overflow-hidden">
+				<div
+					className={cn(
+						"mt-2 space-y-3 rounded-lg border border-border bg-background p-3",
+						className,
+					)}
+					{...props}
+				>
+					{children}
+				</div>
+			</div>
 		</div>
 	);
-};
-
-// ============================================================================
-// ToolInput
-// ============================================================================
+}
 
 export type ToolInputProps = HTMLAttributes<HTMLDivElement> & {
 	input: ToolUIPart["input"];
 };
 
-export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
-	<CollapsibleJSON
-		data={input}
-		label="Request"
-		className={className}
-		{...props}
-	/>
-);
-
-// ============================================================================
-// ToolOutput
-// ============================================================================
+/** Displays the tool call request parameters as a collapsible JSON section labeled "Request". */
+export function ToolInput({ className, input, ...props }: ToolInputProps) {
+	return (
+		<CollapsibleJSON
+			data={input}
+			label="Request"
+			className={className}
+			{...props}
+		/>
+	);
+}
 
 export type ToolOutputProps = HTMLAttributes<HTMLDivElement> & {
 	output: ToolUIPart["output"];
 	errorText: ToolUIPart["errorText"];
 };
 
-/**
- * Extract the MCP app resource URI from a tool output's _meta field.
- */
+/** Extract the MCP app resource URI from `output._meta.ui.resourceUri`, if present. */
 export function getResourceUri(output: unknown): string | undefined {
 	if (typeof output !== "object" || output === null) return undefined;
 	const meta = (output as Record<string, unknown>)._meta;
@@ -391,12 +372,13 @@ export function getResourceUri(output: unknown): string | undefined {
 	return typeof uri === "string" ? uri : undefined;
 }
 
-export const ToolOutput = ({
+/** Displays the tool call result as a collapsible JSON section labeled "Response", or an error block if `errorText` is set. */
+export function ToolOutput({
 	className,
 	output,
 	errorText,
 	...props
-}: ToolOutputProps) => {
+}: ToolOutputProps) {
 	if (!(output || errorText)) return null;
 
 	if (errorText) {
@@ -420,4 +402,4 @@ export const ToolOutput = ({
 			{...props}
 		/>
 	);
-};
+}

@@ -16,9 +16,13 @@ import {
 	ToolHeader,
 	ToolInput,
 	ToolOutput,
-	ToolServerInfo,
 } from "../ai-elements/tool";
 import { McpAppFrame } from "./mcp-app-frame";
+
+/** Converts `get_price_estimate` or `compare-prices` → `Get price estimate` / `Compare prices` */
+function formatToolName(name: string): string {
+	return name.replace(/[-_]/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+}
 
 interface MessageListProps {
 	messages: UIMessage[];
@@ -79,11 +83,10 @@ export function MessageList({
 								<div key={part.toolCallId}>
 									<Tool defaultOpen={part.state === "output-available"}>
 										<ToolHeader
-											title={part.title ?? part.type.replace("tool-", "")}
+											title={part.title ?? formatToolName(part.toolName)}
 											state={part.state}
 										/>
 										<ToolContent>
-											<ToolServerInfo toolName={part.toolName} />
 											<ToolInput input={part.input} />
 											{output !== undefined && (
 												<ToolOutput

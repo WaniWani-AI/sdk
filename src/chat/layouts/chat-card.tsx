@@ -42,17 +42,21 @@ export function ChatCard(props: ChatCardProps) {
 			data-waniwani-chat=""
 			data-waniwani-layout="card"
 			{...(isDark ? { "data-waniwani-dark": "" } : {})}
-			className="flex flex-col font-[family-name:var(--ww-font)] text-foreground rounded-[var(--ww-radius)] border border-border shadow-md overflow-hidden"
+			className="flex flex-col font-[family-name:var(--ww-font)] text-foreground bg-background rounded-[var(--ww-radius)] border border-border shadow-md overflow-hidden"
 		>
 			{/* Header */}
-			<div className="shrink-0 flex items-center gap-3 px-4 py-3 bg-card-header border-b border-border">
+			<div
+				className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-border"
+				style={{
+					backgroundColor: resolvedTheme.headerBackgroundColor,
+					color: resolvedTheme.headerTextColor,
+				}}
+			>
 				{showStatus && <span className="size-2.5 rounded-full bg-status" />}
 				<div className="flex-1 min-w-0">
-					<div className="text-sm font-semibold text-card-header-foreground truncate">
-						{title}
-					</div>
+					<div className="text-xs font-semibold truncate">{title}</div>
 					{subtitle && (
-						<div className="text-xs text-muted-foreground truncate">
+						<div className="text-[11px] text-muted-foreground truncate">
 							{subtitle}
 						</div>
 					)}
@@ -86,7 +90,7 @@ export function ChatCard(props: ChatCardProps) {
 						<PromptInputTextarea
 							onChange={engine.handleTextChange}
 							value={engine.text}
-							placeholder={`Message ${title}...`}
+							placeholder="Ask anything..."
 							className="min-h-0 py-1.5 px-2"
 						/>
 						<PromptInputSubmit status={engine.status} />
