@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../lib/utils";
 
 const DEFAULT_RESOURCE_ENDPOINT = "/api/mcp/resource";
@@ -18,6 +18,8 @@ export interface McpAppFrameProps {
 	resourceEndpoint?: string;
 	isDark?: boolean;
 	className?: string;
+	/** When true, the iframe height auto-adapts to its content. Set via `_meta.ui.autoHeight` in the tool result. */
+	autoHeight?: boolean;
 }
 
 export function McpAppFrame({
@@ -27,14 +29,24 @@ export function McpAppFrame({
 	resourceEndpoint = DEFAULT_RESOURCE_ENDPOINT,
 	isDark = false,
 	className,
+	// TODO: REMOVE — defaulting to true for playground testing
+	autoHeight = true,
 }: McpAppFrameProps) {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const toolInputRef = useRef(toolInput);
 	const toolResultRef = useRef(toolResult);
-	const [height, setHeight] = useState(DEFAULT_HEIGHT);
+	const [height, setHeight] = useState(autoHeight ? 0 : DEFAULT_HEIGHT);
 
 	toolInputRef.current = toolInput;
 	toolResultRef.current = toolResult;
+
+	const clampHeight = useCallback(
+		(h: number) => {
+			if (autoHeight) return Math.max(h, 0);
+			return Math.min(Math.max(h, 50), MAX_HEIGHT);
+		},
+		[autoHeight],
+	);
 
 	// Build the iframe src URL directly — avoids null-origin issues with srcdoc
 	const iframeSrc = useMemo(
@@ -76,7 +88,10 @@ export function McpAppFrame({
 						protocolVersion: data.params?.protocolVersion ?? PROTOCOL_VERSION,
 						hostInfo: { name: "WaniWani Chat", version: "1.0.0" },
 						hostCapabilities: {},
-						hostContext: { theme: isDarkRef.current ? "dark" : "light" },
+						hostContext: {
+							theme: isDarkRef.current ? "dark" : "light",
+							autoHeight,
+						},
 					},
 				});
 				return;
@@ -111,7 +126,7 @@ export function McpAppFrame({
 			if (method === "ui/notifications/size-changed") {
 				const h = data.params?.height;
 				if (typeof h === "number" && !disposed) {
-					setHeight(Math.min(Math.max(h, 50), MAX_HEIGHT));
+					setHeight(clampHeight(h));
 				}
 				return;
 			}
@@ -138,7 +153,49 @@ export function McpAppFrame({
 			disposed = true;
 			window.removeEventListener("message", handleMessage);
 		};
-	}, []);
+	}, [autoHeight, clampHeight]);
+
+	// Auto-height: observe the iframe body via ResizeObserver (same-origin only)
+	useEffect(() => {
+		if (!autoHeight) return;
+
+		const iframe = iframeRef.current;
+		if (!iframe) return;
+
+		let observer: ResizeObserver | undefined;
+		let disposed = false;
+
+		const attach = () => {
+			if (disposed) return;
+			try {
+				const body = iframe.contentDocument?.body;
+				if (!body) return;
+
+				observer = new ResizeObserver(() => {
+					if (disposed) return;
+					const h = body.scrollHeight;
+					if (h > 0) setHeight(h);
+				});
+				observer.observe(body);
+
+				// Set initial height
+				const initial = body.scrollHeight;
+				if (initial > 0) setHeight(initial);
+			} catch {
+				// Cross-origin — fall back to postMessage size-changed protocol
+			}
+		};
+
+		iframe.addEventListener("load", attach);
+		// In case it already loaded
+		attach();
+
+		return () => {
+			disposed = true;
+			observer?.disconnect();
+			iframe.removeEventListener("load", attach);
+		};
+	}, [autoHeight]);
 
 	return (
 		<iframe
@@ -147,7 +204,7 @@ export function McpAppFrame({
 			sandbox="allow-scripts allow-forms allow-same-origin"
 			className={cn("w-full rounded-md border border-border", className)}
 			style={{
-				height,
+				height: height || undefined,
 				border: "none",
 				colorScheme: "auto",
 			}}

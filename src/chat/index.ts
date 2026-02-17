@@ -4,6 +4,7 @@ export type {
 	ChatBarProps,
 	ChatBaseProps,
 	ChatCardProps,
+	ChatHandle,
 	ChatTheme,
 	ChatWidgetProps,
 } from "./@types";

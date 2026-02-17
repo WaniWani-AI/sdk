@@ -52,6 +52,8 @@ export type WidgetConfig<TInput extends ZodRawShapeCompat> = {
 	widgetDomain?: string;
 	/** Optional: whether widget prefers border (defaults to true) */
 	prefersBorder?: boolean;
+	/** Optional: when true, the iframe height auto-adapts to its content instead of using a fixed height */
+	autoHeight?: boolean;
 	/** Content Security Policy configuration (required for app submission) */
 	widgetCSP?: WidgetCSP;
 	/** Optional: Annotations describe the tool’s potential impact. ChatGPT uses these hints to classify tools and decide when to ask the user for confirmation (elicitation) before using the tool.

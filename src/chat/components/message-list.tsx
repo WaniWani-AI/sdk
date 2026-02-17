@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChatStatus, ToolUIPart, UIMessage } from "ai";
+import type { ChatStatus, ReasoningUIPart, ToolUIPart, UIMessage } from "ai";
 
 import { Attachments } from "../ai-elements/attachments";
 import { Loader } from "../ai-elements/loader";
@@ -9,7 +9,9 @@ import {
 	MessageContent,
 	MessageResponse,
 } from "../ai-elements/message";
+import { Reasoning } from "../ai-elements/reasoning";
 import {
+	getAutoHeight,
 	getResourceUri,
 	Tool,
 	ToolContent,
@@ -56,6 +58,9 @@ export function MessageList({
 			)}
 			{messages.map((message) => {
 				const textParts = message.parts.filter((p) => p.type === "text");
+				const reasoningParts = message.parts.filter(
+					(p): p is ReasoningUIPart => p.type === "reasoning",
+				);
 				const fileParts = message.parts.filter((p) => p.type === "file");
 				const toolParts = message.parts.filter(
 					(
@@ -74,10 +79,18 @@ export function MessageList({
 
 				return (
 					<Message from={message.role} key={message.id}>
+						{reasoningParts.map((part, i) => (
+							<Reasoning
+								key={`reasoning-${message.id}-${i}`}
+								text={part.text}
+							/>
+						))}
 						{toolParts.map((part) => {
 							const output = "output" in part ? part.output : undefined;
 							const resourceUri =
 								output !== undefined ? getResourceUri(output) : undefined;
+							const autoHeight =
+								output !== undefined ? getAutoHeight(output) : false;
 
 							return (
 								<div key={part.toolCallId}>
@@ -113,6 +126,7 @@ export function MessageList({
 											}}
 											resourceEndpoint={resourceEndpoint}
 											isDark={isDark}
+											autoHeight={autoHeight}
 										/>
 									)}
 								</div>

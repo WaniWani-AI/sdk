@@ -96,5 +96,18 @@ export interface ChatCardProps extends ChatBaseProps {
 // Backward Compatibility
 // ============================================================================
 
+// ============================================================================
+// Imperative Handle (ref API)
+// ============================================================================
+
+export interface ChatHandle {
+	/** Programmatically send a user message into the chat */
+	sendMessage: (text: string) => void;
+}
+
+// ============================================================================
+// Backward Compatibility
+// ============================================================================
+
 /** @deprecated Use ChatBarProps instead */
 export type ChatWidgetProps = ChatBarProps;

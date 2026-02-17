@@ -361,15 +361,24 @@ export type ToolOutputProps = HTMLAttributes<HTMLDivElement> & {
 	errorText: ToolUIPart["errorText"];
 };
 
-/** Extract the MCP app resource URI from `output._meta.ui.resourceUri`, if present. */
-export function getResourceUri(output: unknown): string | undefined {
+function getUiMeta(output: unknown): Record<string, unknown> | undefined {
 	if (typeof output !== "object" || output === null) return undefined;
 	const meta = (output as Record<string, unknown>)._meta;
 	if (typeof meta !== "object" || meta === null) return undefined;
 	const ui = (meta as Record<string, unknown>).ui;
 	if (typeof ui !== "object" || ui === null) return undefined;
-	const uri = (ui as Record<string, unknown>).resourceUri;
+	return ui as Record<string, unknown>;
+}
+
+/** Extract the MCP app resource URI from `output._meta.ui.resourceUri`, if present. */
+export function getResourceUri(output: unknown): string | undefined {
+	const uri = getUiMeta(output)?.resourceUri;
 	return typeof uri === "string" ? uri : undefined;
+}
+
+/** Extract the auto-height flag from `output._meta.ui.autoHeight`, if present. */
+export function getAutoHeight(output: unknown): boolean {
+	return getUiMeta(output)?.autoHeight === true;
 }
 
 /** Displays the tool call result as a collapsible JSON section labeled "Response", or an error block if `errorText` is set. */

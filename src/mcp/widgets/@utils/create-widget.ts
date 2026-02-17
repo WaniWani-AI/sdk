@@ -110,6 +110,7 @@ function buildToolMeta(config: {
 	mcpTemplateUri: string;
 	invoking: string;
 	invoked: string;
+	autoHeight?: boolean;
 }) {
 	return {
 		// OpenAI metadata
@@ -121,6 +122,7 @@ function buildToolMeta(config: {
 		// MCP Apps metadata
 		ui: {
 			resourceUri: config.mcpTemplateUri,
+			...(config.autoHeight && { autoHeight: true }),
 		},
 	} as const;
 }
@@ -161,6 +163,7 @@ export function createWidget<TInput extends z.ZodRawShape>(
 		invoked = "Loaded",
 		widgetDomain,
 		prefersBorder = true,
+		autoHeight,
 		widgetCSP,
 		annotations,
 	} = config;
@@ -186,6 +189,7 @@ export function createWidget<TInput extends z.ZodRawShape>(
 				mcpTemplateUri,
 				invoking,
 				invoked,
+				autoHeight,
 			});
 
 			// Register OpenAI Apps SDK resource
