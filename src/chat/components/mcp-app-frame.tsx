@@ -35,7 +35,8 @@ export function McpAppFrame({
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const toolInputRef = useRef(toolInput);
 	const toolResultRef = useRef(toolResult);
-	const [height, setHeight] = useState(autoHeight ? 0 : DEFAULT_HEIGHT);
+	const heightSettledRef = useRef(false);
+	const [height, setHeight] = useState(DEFAULT_HEIGHT);
 
 	toolInputRef.current = toolInput;
 	toolResultRef.current = toolResult;
@@ -124,6 +125,7 @@ export function McpAppFrame({
 
 			// ui/notifications/size-changed — widget requests resize
 			if (method === "ui/notifications/size-changed") {
+				if (heightSettledRef.current) return;
 				const h = data.params?.height;
 				if (typeof h === "number" && !disposed) {
 					setHeight(clampHeight(h));
@@ -155,7 +157,7 @@ export function McpAppFrame({
 		};
 	}, [autoHeight, clampHeight]);
 
-	// Auto-height: observe the iframe body via ResizeObserver (same-origin only)
+	// Auto-height: observe the iframe body size via ResizeObserver (same-origin only)
 	useEffect(() => {
 		if (!autoHeight) return;
 
@@ -173,21 +175,20 @@ export function McpAppFrame({
 
 				observer = new ResizeObserver(() => {
 					if (disposed) return;
-					const h = body.scrollHeight;
+					const style = iframe.contentDocument?.defaultView?.getComputedStyle(body);
+					const marginTop = Number.parseInt(style?.marginTop ?? "0", 10) || 0;
+					const marginBottom = Number.parseInt(style?.marginBottom ?? "0", 10) || 0;
+					const h = Math.max(body.scrollHeight, body.offsetHeight) + marginTop + marginBottom;
 					if (h > 0) setHeight(h);
 				});
-				observer.observe(body);
 
-				// Set initial height
-				const initial = body.scrollHeight;
-				if (initial > 0) setHeight(initial);
+				observer.observe(body);
 			} catch {
 				// Cross-origin — fall back to postMessage size-changed protocol
 			}
 		};
 
 		iframe.addEventListener("load", attach);
-		// In case it already loaded
 		attach();
 
 		return () => {
