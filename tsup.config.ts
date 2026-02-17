@@ -85,4 +85,22 @@ export default defineConfig([
 			js: '"use client";',
 		},
 	},
+	// Chat server-side handler (Node.js)
+	{
+		entry: { "chat/server/index": "src/chat/server/index.ts" },
+		format: ["esm"],
+		target: "node20",
+		dts: true,
+		clean: false,
+		shims: true,
+		splitting: true,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		external: [
+			"ai",
+			"@ai-sdk/mcp",
+			"@modelcontextprotocol/sdk",
+		],
+	},
 ]);

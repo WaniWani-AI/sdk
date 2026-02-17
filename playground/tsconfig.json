@@ -28,6 +28,9 @@
       ],
       "@waniwani/sdk/chat": [
         "../src/chat/index.ts"
+      ],
+      "@waniwani/sdk/chat/server": [
+        "../src/chat/server/index.ts"
       ]
     }
   },
