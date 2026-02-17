@@ -1,64 +1,44 @@
-// Chat Handler - Creates a request handler for AI chat with MCP tools
+// Chat Handler - Proxies chat requests to the WaniWani API
 
-import { createMCPClient } from "@ai-sdk/mcp";
-import {
-	convertToModelMessages,
-	createUIMessageStream,
-	createUIMessageStreamResponse,
-	stepCountIs,
-	streamText,
-	type ToolSet,
-	type UIMessage,
-} from "ai";
 import { WaniWaniError } from "../../error";
 import type { ChatHandlerOptions } from "./@types";
 import { createMcpConfigResolver } from "./mcp-config-resolver";
 
 /**
- * Create a chat request handler that connects to a WaniWani MCP server,
- * discovers tools, and streams AI responses.
+ * Create a chat request handler that proxies requests to the WaniWani API.
+ * The WaniWani API handles MCP tool discovery, LLM calls, and event logging.
  *
  * Returns a `(request: Request) => Promise<Response>` function compatible
  * with Next.js Route Handlers, Hono, and any framework using the Fetch API.
  *
- * Note: Streamable HTTP transport is only supported for the MCP server.
- *
  * @example
  * ```typescript
  * import { createChatHandler } from "@waniwani/sdk/chat/server";
- * import { openai } from "@ai-sdk/openai";
  *
  * export const POST = createChatHandler({
  *   systemPrompt: "You are a helpful assistant.",
- *   mcpServerUrl: "http://localhost:3000/mcp",
  * });
  * ```
  */
 export function createChatHandler(
-	options: ChatHandlerOptions,
+	options: ChatHandlerOptions = {},
 ): (request: Request) => Promise<Response> {
 	const {
-		model = "openai/gpt-5.2-chat",
 		apiKey = process.env.WANIWANI_API_KEY,
 		baseUrl = "https://app.waniwani.ai",
 		systemPrompt,
 		maxSteps = 5,
 		beforeRequest,
-		onFinish,
 		mcpServerUrl: mcpServerUrlOverride,
 	} = options;
-
-	console.log("createChatHandler", options);
 
 	const resolveConfig = createMcpConfigResolver(baseUrl, apiKey);
 
 	return async function handler(request: Request): Promise<Response> {
-		let mcp: Awaited<ReturnType<typeof createMCPClient>> | null = null;
-
 		try {
 			// 1. Parse request body
 			const body = await request.json();
-			let messages: UIMessage[] = body.messages ?? [];
+			let messages = body.messages ?? [];
 			let sessionId: string | undefined = body.sessionId;
 			let effectiveSystemPrompt = systemPrompt;
 
@@ -90,59 +70,43 @@ export function createChatHandler(
 			const mcpServerUrl =
 				mcpServerUrlOverride ?? (await resolveConfig()).mcpServerUrl;
 
-			// 4. Convert messages for the model
-			const modelMessages = await convertToModelMessages(messages);
-
-			// 5. Create MCP client and discover tools
-			mcp = await createMCPClient({
-				transport: {
-					type: "http",
-					url: mcpServerUrl,
-					headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+			// 4. Forward to WaniWani API
+			const response = await fetch(`${baseUrl}/api/mcp/chat`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
 				},
-			});
-			const tools = await mcp.tools();
-
-			// 6. Create and return the streaming response
-			const stream = createUIMessageStream({
-				execute: async ({ writer }) => {
-					const result = streamText({
-						model,
-						system: effectiveSystemPrompt,
-						messages: modelMessages,
-						tools: tools as ToolSet,
-						stopWhen: stepCountIs(maxSteps),
-					});
-
-					writer.merge(result.toUIMessageStream());
-				},
-				onFinish: async (event) => {
-					// Always close the MCP client
-					await mcp?.close().catch(() => {});
-					mcp = null;
-
-					// Call user's onFinish hook
-					if (onFinish) {
-						try {
-							await onFinish({
-								messages: event.messages,
-								isContinuation: event.isContinuation,
-								isAborted: event.isAborted,
-								responseMessage: event.responseMessage,
-							});
-						} catch (err) {
-							console.error("[WaniWani] onFinish error:", err);
-						}
-					}
-				},
+				body: JSON.stringify({
+					messages,
+					mcpServerUrl,
+					sessionId,
+					systemPrompt: effectiveSystemPrompt,
+					maxSteps,
+				}),
+				signal: request.signal,
 			});
 
-			return createUIMessageStreamResponse({ stream });
+			if (!response.ok) {
+				const errorBody = await response.text().catch(() => "");
+				return new Response(errorBody, {
+					status: response.status,
+					headers: {
+						"Content-Type":
+							response.headers.get("Content-Type") ?? "application/json",
+					},
+				});
+			}
+
+			// 5. Stream the response back
+			return new Response(response.body, {
+				status: response.status,
+				headers: {
+					"Content-Type":
+						response.headers.get("Content-Type") ?? "text/event-stream",
+				},
+			});
 		} catch (error) {
-			console.error("[Waniwani] createChatHandler:", error);
-			// Ensure MCP client is closed on error
-			await mcp?.close().catch(() => {});
-
 			const message =
 				error instanceof Error ? error.message : "Unknown error occurred";
 			const status = error instanceof WaniWaniError ? error.status : 500;

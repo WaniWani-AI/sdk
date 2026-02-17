@@ -26,6 +26,9 @@
       "@/*": [
         "./src/*"
       ],
+      "@waniwani/sdk": [
+        "../src/index.ts"
+      ],
       "@waniwani/sdk/chat": [
         "../src/chat/index.ts"
       ],

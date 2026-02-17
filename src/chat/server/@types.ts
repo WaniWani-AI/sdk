@@ -1,6 +1,6 @@
 // WaniWani SDK - Chat Server Types
 
-import type { LanguageModel, UIMessage } from "ai";
+import type { UIMessage } from "ai";
 
 // ============================================================================
 // Chat Handler Options
@@ -24,24 +24,7 @@ export type BeforeRequestResult = {
 	sessionId?: string;
 };
 
-export interface OnFinishContext {
-	/** The final list of UI messages */
-	messages: UIMessage[];
-	/** Whether the response is a continuation of a prior message */
-	isContinuation: boolean;
-	/** Whether the stream was aborted */
-	isAborted: boolean;
-	/** The response message sent to the client */
-	responseMessage: UIMessage;
-}
-
 export interface ChatHandlerOptions {
-	/**
-	 * The language model to use for chat completions.
-	 * Defaults to "openai/gpt-5.2-chat".
-	 */
-	model?: LanguageModel;
-
 	/**
 	 * Your WaniWani API key.
 	 * Defaults to process.env.WANIWANI_API_KEY.
@@ -66,7 +49,7 @@ export interface ChatHandlerOptions {
 	maxSteps?: number;
 
 	/**
-	 * Hook called before each request is processed.
+	 * Hook called before each request is forwarded to the WaniWani API.
 	 * - Return void to use defaults.
 	 * - Return an object to override messages, systemPrompt, or sessionId.
 	 * - Throw to reject the request (the error message is returned as JSON).
@@ -77,12 +60,6 @@ export interface ChatHandlerOptions {
 		| Promise<BeforeRequestResult | undefined>
 		| BeforeRequestResult
 		| undefined;
-
-	/**
-	 * Hook called after the stream has been fully consumed.
-	 * Errors thrown here are logged but do not affect the response.
-	 */
-	onFinish?: (context: OnFinishContext) => Promise<undefined> | undefined;
 
 	/**
 	 * Override the MCP server URL directly, bypassing config resolution.

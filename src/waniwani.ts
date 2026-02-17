@@ -1,5 +1,6 @@
 // WaniWani SDK - Main Entry
 
+import { createChatHandler } from "./chat/server/chat-handler.js";
 import { createTrackingClient } from "./tracking/index.js";
 import type { WaniWaniClient, WaniWaniConfig } from "./types.js";
 
@@ -33,7 +34,7 @@ export function waniwani(config?: WaniWaniConfig): WaniWaniClient {
 
 	return {
 		...tracking,
-		// Future modules will be spread here
-		// ...tools,
+		createChatHandler: (options = {}) =>
+			createChatHandler({ ...options, apiKey, baseUrl }),
 	};
 }
