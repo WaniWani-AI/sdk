@@ -27,13 +27,19 @@ export interface ChatTheme {
 	messageBorderRadius?: number;
 	/** Font family */
 	fontFamily?: string;
+	/** Header background color (card layout). Falls back to backgroundColor. */
+	headerBackgroundColor?: string;
+	/** Header text color. Falls back to textColor. */
+	headerTextColor?: string;
+	/** Status dot color. Defaults to green (#22c55e). */
+	statusColor?: string;
 }
 
 // ============================================================================
-// Chat Widget Props (React component)
+// Shared Base Props
 // ============================================================================
 
-export interface ChatWidgetProps {
+export interface ChatBaseProps {
 	/** WaniWani project API key */
 	apiKey?: string;
 	/** Chat API endpoint URL. Defaults to WaniWani hosted endpoint */
@@ -46,14 +52,47 @@ export interface ChatWidgetProps {
 	headers?: Record<string, string>;
 	/** Additional body fields to send with each chat request */
 	body?: Record<string, unknown>;
-	/** Chat bar width in pixels. Defaults to 600. */
-	width?: number;
-	/** Max height of the expanded messages panel in pixels. Defaults to 400. */
-	expandedHeight?: number;
 	/** Enable file attachments in the input. Defaults to false. */
 	allowAttachments?: boolean;
 	/** Callback fired when a message is sent */
 	onMessageSent?: (message: string) => void;
 	/** Callback fired when a response is received */
 	onResponseReceived?: () => void;
+	/** Endpoint URL for fetching MCP app resources (HTML widgets). Defaults to "/api/mcp/resource" */
+	resourceEndpoint?: string;
 }
+
+// ============================================================================
+// ChatBar Props (compact bar that expands upward)
+// ============================================================================
+
+export interface ChatBarProps extends ChatBaseProps {
+	/** Chat bar width in pixels. Defaults to 600. */
+	width?: number;
+	/** Max height of the expanded messages panel in pixels. Defaults to 400. */
+	expandedHeight?: number;
+}
+
+// ============================================================================
+// ChatCard Props (always-visible card with header)
+// ============================================================================
+
+export interface ChatCardProps extends ChatBaseProps {
+	/** Title shown in the card header. Defaults to "Assistant". */
+	title?: string;
+	/** Subtitle or status text shown under the title. */
+	subtitle?: string;
+	/** Show the status dot in the header. Defaults to true. */
+	showStatus?: boolean;
+	/** Card width in pixels. Defaults to 400. */
+	width?: number;
+	/** Card height in pixels. Defaults to 600. */
+	height?: number;
+}
+
+// ============================================================================
+// Backward Compatibility
+// ============================================================================
+
+/** @deprecated Use ChatBarProps instead */
+export type ChatWidgetProps = ChatBarProps;

@@ -10,6 +10,7 @@
     "@ai-sdk/mcp": "^1.0.19",
     "@ai-sdk/openai": "^3.0.26",
     "@ai-sdk/react": "^3.0.80",
+    "@modelcontextprotocol/ext-apps": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@streamdown/cjk": "^1.0.2",
     "@streamdown/code": "^1.0.1",

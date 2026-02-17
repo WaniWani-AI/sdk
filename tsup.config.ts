@@ -78,6 +78,8 @@ export default defineConfig([
 			"clsx",
 			"tailwind-merge",
 			"nanoid",
+			"@modelcontextprotocol/ext-apps",
+			/^@modelcontextprotocol\/ext-apps\//,
 		],
 		banner: {
 			js: '"use client";',

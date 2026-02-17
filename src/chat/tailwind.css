@@ -23,8 +23,12 @@
 	--color-input: var(--ww-input-bg, #f9fafb);
 	--color-accent: var(--ww-assistant-bubble, #f3f4f6);
 	--color-accent-foreground: var(--ww-text, #1f2937);
+	--color-user-bubble: var(--ww-user-bubble, #303030);
 	--color-card: var(--ww-bg, #ffffff);
 	--color-card-foreground: var(--ww-text, #1f2937);
+	--color-card-header: var(--ww-header-bg, var(--ww-bg, #ffffff));
+	--color-card-header-foreground: var(--ww-header-text, var(--ww-text, #1f2937));
+	--color-status: var(--ww-status, #22c55e);
 	--radius: var(--ww-radius, 16px);
 	--font-sans: var(--ww-font, system-ui, -apple-system, "Segoe UI", sans-serif);
 }
