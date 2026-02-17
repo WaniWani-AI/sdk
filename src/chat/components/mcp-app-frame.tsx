@@ -175,10 +175,15 @@ export function McpAppFrame({
 
 				observer = new ResizeObserver(() => {
 					if (disposed) return;
-					const style = iframe.contentDocument?.defaultView?.getComputedStyle(body);
+					const style =
+						iframe.contentDocument?.defaultView?.getComputedStyle(body);
 					const marginTop = Number.parseInt(style?.marginTop ?? "0", 10) || 0;
-					const marginBottom = Number.parseInt(style?.marginBottom ?? "0", 10) || 0;
-					const h = Math.max(body.scrollHeight, body.offsetHeight) + marginTop + marginBottom;
+					const marginBottom =
+						Number.parseInt(style?.marginBottom ?? "0", 10) || 0;
+					const h =
+						Math.max(body.scrollHeight, body.offsetHeight) +
+						marginTop +
+						marginBottom;
 					if (h > 0) setHeight(h);
 				});
 
