@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --turbopack -p 3333",
+    "dev": "next dev --webpack -p 3333",
     "build": "next build"
   },
   "dependencies": {
