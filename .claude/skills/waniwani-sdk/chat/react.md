@@ -1,11 +1,11 @@
-# Chat Widget (`@waniwani/sdk/chat`)
+# Chat React Component (`@waniwani/sdk/chat`)
 
-Embeddable chat widget with theming, Shadow DOM isolation, and event tracking.
+React component for embedding an AI chat widget with theming and event tracking.
 
-## Export Path
+## Import
 
-```
-@waniwani/sdk/chat
+```tsx
+import { ChatWidget } from "@waniwani/sdk/chat";
 ```
 
 Peer dependencies: `react`, `react-dom`, `@ai-sdk/react`, `ai`
@@ -17,12 +17,11 @@ Peer dependencies: `react`, `react-dom`, `@ai-sdk/react`, `ai`
 | `ChatWidget` | React component | Main chat widget component |
 | `ChatTheme` | TypeScript type | Theme customization interface |
 | `ChatWidgetProps` | TypeScript type | Props for `ChatWidget` |
-| `ChatEmbedConfig` | TypeScript type | Config for embed script `init()` |
 | `DEFAULT_THEME` | Object | Default theme values |
 | `mergeTheme` | Function | Merges user theme with defaults |
 | `themeToCSSProperties` | Function | Converts theme to CSS custom properties |
 
-## React Component
+## Usage
 
 ```tsx
 import { ChatWidget } from "@waniwani/sdk/chat";
@@ -39,7 +38,7 @@ import { ChatWidget } from "@waniwani/sdk/chat";
 />
 ```
 
-### `ChatWidgetProps`
+## `ChatWidgetProps`
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
@@ -55,44 +54,6 @@ import { ChatWidget } from "@waniwani/sdk/chat";
 | `height` | `number` | `600` | Panel height in pixels |
 | `onMessageSent` | `(message: string) => void` | `undefined` | Callback on message sent |
 | `onResponseReceived` | `() => void` | `undefined` | Callback on response received |
-
-## Embed Script
-
-For non-React sites. Uses Shadow DOM for full CSS isolation.
-
-### Via script tag
-
-```html
-<script
-  src="https://cdn.waniwani.ai/chat/embed.js"
-  data-api-key="ww_..."
-  data-title="Support"
-  data-welcome-message="Hi! How can I help?"
-  data-primary-color="#6366f1"
-></script>
-```
-
-### Programmatic init
-
-```js
-const chat = window.WaniWani.chat.init({
-  apiKey: "ww_...",
-  title: "Support",
-  container: document.getElementById("chat-container"),
-  theme: { primaryColor: "#6366f1" },
-});
-
-// Cleanup
-chat.destroy();
-```
-
-### `ChatEmbedConfig`
-
-Same as `ChatWidgetProps` (without callbacks) plus:
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `container` | `HTMLElement` | `document.body` | DOM element to mount into |
 
 ## Theming
 
@@ -134,8 +95,6 @@ src/chat/
 ├── theme.ts                  # Default theme + CSS variable generation
 ├── styles.ts                 # Global stylesheet (animations, scrollbar)
 ├── icons.tsx                 # SVG icons (SendIcon, ToolIcon)
-├── embed/
-│   └── embed.ts              # Script-tag embed with Shadow DOM + auto-init
 └── components/
     ├── chat-widget.tsx        # Root (useChat transport, theme, tracking)
     ├── chat-panel.tsx         # Layout shell (header + messages + input)
@@ -158,5 +117,3 @@ src/chat/
 
 - **Wrong import path** — Use `@waniwani/sdk/chat`, not `@waniwani/sdk`
 - **Missing peer deps** — Requires `react`, `react-dom`, `@ai-sdk/react`, and `ai`
-- **Embed cleanup** — Always call `chat.destroy()` on unmount to prevent memory leaks
-- **Shadow DOM** — The embed uses Shadow DOM; external CSS won't affect widget styles (use the `theme` prop instead)

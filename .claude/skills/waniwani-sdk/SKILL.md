@@ -16,12 +16,14 @@ bun add @waniwani/sdk
 
 ## Export Paths
 
-| Export | Purpose | Peer Dependencies |
-|--------|---------|-------------------|
-| `@waniwani/sdk` | Event tracking | None |
-| `@waniwani/sdk/mcp` | Widget creation (server-side) | `@modelcontextprotocol/sdk`, `zod` |
-| `@waniwani/sdk/mcp/react` | Widget React hooks (client-side) | `react`, optionally `@modelcontextprotocol/ext-apps` |
-| `@waniwani/sdk/chat` | [Chat widget](chat.md) (embeddable UI) | `react`, `react-dom`, `@ai-sdk/react`, `ai` |
+| Export | Purpose | Docs | Peer Dependencies |
+|--------|---------|------|-------------------|
+| `@waniwani/sdk` | Event tracking | (below) | None |
+| `@waniwani/sdk/mcp` | Widget creation (server-side) | [mcp/server.md](mcp/server.md) | `@modelcontextprotocol/sdk`, `zod` |
+| `@waniwani/sdk/mcp` | Multi-step flows | [mcp/flows.md](mcp/flows.md) | `@modelcontextprotocol/sdk`, `zod` |
+| `@waniwani/sdk/mcp/react` | Widget React hooks (client-side) | [mcp/react.md](mcp/react.md) | `react`, optionally `@modelcontextprotocol/ext-apps` |
+| `@waniwani/sdk/chat` | Chat React component | [chat/react.md](chat/react.md) | `react`, `react-dom`, `@ai-sdk/react`, `ai` |
+| `@waniwani/sdk/chat` | Chat embed script | [chat/embed.md](chat/embed.md) | `react`, `react-dom`, `@ai-sdk/react`, `ai` |
 
 ---
 
@@ -91,201 +93,6 @@ server.registerTool("get_pricing", {
 
 ---
 
-## Widget Creation (`@waniwani/sdk/mcp`)
-
-Creates dual-platform widgets that work on both ChatGPT (OpenAI) and Claude (MCP Apps).
-
-### `createWidget(config, handler)`
-
-```typescript
-import { createWidget, registerWidgets } from "@waniwani/sdk/mcp";
-import { z } from "zod";
-```
-
-**Config fields:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `id` | `string` | Yes | Unique tool/widget identifier |
-| `title` | `string` | Yes | Display title |
-| `description` | `string` | Yes | Action-oriented (tells model WHEN to use) |
-| `widgetDescription` | `string` | No | UI description (WHAT it displays), falls back to `description` |
-| `baseUrl` | `string` | Yes | Where to fetch widget HTML |
-| `htmlPath` | `string` | Yes | Path relative to baseUrl |
-| `inputSchema` | `ZodRawShape` | Yes | Input parameters using zod |
-| `widgetDomain` | `string` | Yes | Domain for OpenAI security context |
-| `invoking` | `string` | No | Loading message (default: `"Loading..."`) |
-| `invoked` | `string` | No | Loaded message (default: `"Loaded"`) |
-| `prefersBorder` | `boolean` | No | Widget border (default: `true`) |
-| `widgetCSP` | `WidgetCSP` | No | Content Security Policy |
-| `annotations` | `object` | No | `readOnlyHint`, `idempotentHint`, `openWorldHint`, `destructiveHint` |
-
-**Handler signature:**
-
-```typescript
-async (input: TypedInput, context: WidgetHandlerContext) => Promise<{
-  text: string;                    // Text content for LLM
-  data: Record<string, unknown>;   // Structured data for widget UI
-}>
-```
-
-The `context` has `extra._meta` with MCP request metadata.
-
-### `WidgetCSP`
-
-```typescript
-type WidgetCSP = {
-  connect_domains?: string[];   // fetch/XHR requests
-  resource_domains?: string[];  // static assets (images, fonts, scripts)
-  frame_domains?: string[];     // iframe embeds
-  redirect_domains?: string[];  // openExternal redirects
-};
-```
-
-### `registerWidgets(server, widgets[])`
-
-Registers multiple widgets on an `McpServer`:
-
-```typescript
-await registerWidgets(server, [widget1, widget2]);
-```
-
-### Complete Example
-
-```typescript
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { createWidget, registerWidgets } from "@waniwani/sdk/mcp";
-import { z } from "zod";
-
-const pricingWidget = createWidget({
-  id: "show_pricing",
-  title: "Show Pricing",
-  description: "Show pricing plans when users ask about pricing",
-  baseUrl: "https://my-app.com",
-  htmlPath: "/widgets/pricing",
-  widgetDomain: "my-app.com",
-  inputSchema: {
-    plan: z.enum(["starter", "pro", "enterprise"]).describe("Plan to display"),
-  },
-  annotations: { readOnlyHint: true },
-}, async ({ plan }, context) => {
-  const pricing = await getPricing(plan);
-  return {
-    text: `Showing ${plan} pricing: $${pricing.amount}/mo`,
-    data: { plan, ...pricing },
-  };
-});
-
-const server = new McpServer({ name: "my-server", version: "1.0.0" });
-await registerWidgets(server, [pricingWidget]);
-```
-
-### Platform Detection
-
-```typescript
-import { detectPlatform, isOpenAI, isMCPApps } from "@waniwani/sdk/mcp";
-
-detectPlatform(); // "openai" | "mcp-apps"
-isOpenAI();       // true if window.openai exists
-isMCPApps();      // true if sandboxed iframe
-```
-
-Note: These are client-side utilities for use in widget frontends, not server code.
-
----
-
-## React Hooks (`@waniwani/sdk/mcp/react`)
-
-Client-side hooks for widget frontends. All widgets must be wrapped in `WidgetProvider`.
-
-### `WidgetProvider`
-
-```tsx
-import { WidgetProvider } from "@waniwani/sdk/mcp/react";
-
-export default function App() {
-  return (
-    <WidgetProvider loading={<div>Loading...</div>}>
-      <MyWidget />
-    </WidgetProvider>
-  );
-}
-```
-
-### Hooks Reference
-
-| Hook | Returns | Platform |
-|------|---------|----------|
-| `useToolOutput<T>()` | `T \| null` | Both |
-| `useCallTool()` | `(name, args) => Promise<ToolCallResult>` | Both |
-| `useTheme()` | `"light" \| "dark"` | Both |
-| `useLocale()` | `string` (e.g. `"en-US"`) | Both |
-| `useDisplayMode()` | `"pip" \| "inline" \| "fullscreen"` | Both (MCP Apps: always `"inline"`) |
-| `useRequestDisplayMode()` | `(mode) => Promise<DisplayMode>` | OpenAI only (no-op on MCP Apps) |
-| `useOpenExternal()` | `(url) => void` | Both |
-| `useSendFollowUp()` | `(prompt) => void` | Both |
-| `useSafeArea()` | `SafeArea \| null` | OpenAI only (`null` on MCP Apps) |
-| `useMaxHeight()` | `number \| null` | OpenAI only (`null` on MCP Apps) |
-| `useWidgetState<T>(default?)` | `[T \| null, setState]` | OpenAI only (`[null, no-op]` on MCP Apps) |
-| `useToolResponseMetadata()` | `object \| null` | OpenAI only |
-| `useIsChatGptApp()` | `boolean` | OpenAI only |
-| `useWidgetClient()` | `UnifiedWidgetClient` | Both |
-
-### Example Widget
-
-```tsx
-"use client";
-import {
-  WidgetProvider,
-  useToolOutput,
-  useTheme,
-} from "@waniwani/sdk/mcp/react";
-
-function PricingContent() {
-  const data = useToolOutput<{ plan: string; amount: number }>();
-  const theme = useTheme();
-
-  if (!data) return null;
-
-  return (
-    <div className={theme === "dark" ? "dark" : ""}>
-      <h1>{data.plan} Plan</h1>
-      <p>${data.amount}/mo</p>
-    </div>
-  );
-}
-
-export default function PricingWidget() {
-  return (
-    <WidgetProvider loading={<div>Loading pricing...</div>}>
-      <PricingContent />
-    </WidgetProvider>
-  );
-}
-```
-
-### Components
-
-- **`InitializeNextJsInChatGpt`** — Required in Next.js layout for ChatGPT iframe compatibility. Takes `baseUrl` prop.
-- **`LoadingWidget`** — Pre-built loading spinner for widget loading states.
-
-### Dev Tools
-
-For local development without a ChatGPT/Claude host:
-
-```tsx
-import { DevModeProvider } from "@waniwani/sdk/mcp/react";
-
-// Wraps app, mocks window.openai for local testing
-<DevModeProvider defaultProps={{ plan: "pro", amount: 49 }}>
-  <MyWidget />
-</DevModeProvider>
-```
-
-Programmatic mock updates: `initializeMockOpenAI()`, `updateMockToolOutput()`, `updateMockTheme()`, `updateMockDisplayMode()`, `updateMockGlobal()`.
-
----
-
 ## Common Patterns
 
 ### Tracking + Widget
@@ -312,22 +119,6 @@ const widget = createWidget({
 
   return { text: `Quote: $${quote.amount}`, data: quote };
 });
-```
-
-### Theme-Aware Widget
-
-```tsx
-function MyWidget() {
-  const theme = useTheme();
-  return (
-    <div style={{
-      background: theme === "dark" ? "#1a1a1a" : "#ffffff",
-      color: theme === "dark" ? "#ffffff" : "#000000",
-    }}>
-      {/* content */}
-    </div>
-  );
-}
 ```
 
 ---
