@@ -63,7 +63,7 @@ export function Playground({
       >
         {layout === "bar" && (
           <ChatBar
-            api="/api/chat"
+            api="/api/waniwani"
             welcomeMessage="Hey! How can I help you today?"
             theme={mode === "dark" ? DARK_THEME : DEFAULT_THEME}
             allowAttachments
@@ -71,7 +71,7 @@ export function Playground({
         )}
         {layout === "card" && (
           <ChatCard
-            api="/api/chat"
+            api="/api/waniwani"
             title="ChatGPT"
             welcomeMessage="Hey! How can I help you today?"
             theme={mode === "dark" ? DARK_THEME : DEFAULT_THEME}

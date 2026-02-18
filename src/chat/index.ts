@@ -7,6 +7,7 @@ export type {
 	ChatHandle,
 	ChatTheme,
 	ChatWidgetProps,
+	SuggestionsConfig,
 } from "./@types";
 export { ChatWidget } from "./components/chat-widget";
 export type { McpAppFrameProps } from "./components/mcp-app-frame";

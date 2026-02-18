@@ -1,40 +1,20 @@
-// Chat Handler - Proxies chat requests to the WaniWani API
+// Handle Chat - Proxies chat requests to the WaniWani API
 
 import { WaniWaniError } from "../../error";
-import type { ChatHandlerOptions } from "./@types";
-import { createMcpConfigResolver } from "./mcp-config-resolver";
+import type { ApiHandlerDeps } from "./@types";
 
-/**
- * Create a chat request handler that proxies requests to the WaniWani API.
- * The WaniWani API handles MCP tool discovery, LLM calls, and event logging.
- *
- * Returns a `(request: Request) => Promise<Response>` function compatible
- * with Next.js Route Handlers, Hono, and any framework using the Fetch API.
- *
- * @example
- * ```typescript
- * import { createChatHandler } from "@waniwani/sdk/chat/server";
- *
- * export const POST = createChatHandler({
- *   systemPrompt: "You are a helpful assistant.",
- * });
- * ```
- */
-export function createChatHandler(
-	options: ChatHandlerOptions = {},
-): (request: Request) => Promise<Response> {
+export function createChatRequestHandler(deps: ApiHandlerDeps) {
 	const {
-		apiKey = process.env.WANIWANI_API_KEY,
-		baseUrl = "https://app.waniwani.ai",
+		apiKey,
+		baseUrl,
 		systemPrompt,
-		maxSteps = 5,
+		maxSteps,
 		beforeRequest,
 		mcpServerUrl: mcpServerUrlOverride,
-	} = options;
+		resolveConfig,
+	} = deps;
 
-	const resolveConfig = createMcpConfigResolver(baseUrl, apiKey);
-
-	return async function handler(request: Request): Promise<Response> {
+	return async function handleChat(request: Request): Promise<Response> {
 		try {
 			// 1. Parse request body
 			const body = await request.json();

@@ -21,7 +21,9 @@ import {
 	PromptInputTextarea,
 } from "../ai-elements/prompt-input";
 import { MessageList } from "../components/message-list";
+import { Suggestions } from "../components/suggestions";
 import { useChatEngine } from "../hooks/use-chat-engine";
+import { useSuggestions } from "../hooks/use-suggestions";
 import { cn } from "../lib/utils";
 import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
 
@@ -34,13 +36,35 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			allowAttachments = false,
 			welcomeMessage,
 			resourceEndpoint,
+			api,
 		} = props;
+
+		const effectiveResourceEndpoint =
+			resourceEndpoint ?? (api ? `${api}/resource` : undefined);
 
 		const resolvedTheme = mergeTheme(userTheme);
 		const cssVars = themeToCSSProperties(resolvedTheme);
 		const isDark = isDarkTheme(resolvedTheme);
 
 		const engine = useChatEngine(props);
+
+		const suggestionsState = useSuggestions({
+			messages: engine.messages,
+			status: engine.status,
+			initialSuggestions: props.initialSuggestions,
+			suggestions: props.suggestions,
+			api: props.api,
+			apiKey: props.apiKey,
+			headers: props.headers,
+		});
+
+		const handleSuggestionSelect = useCallback(
+			(suggestion: string) => {
+				suggestionsState.clear();
+				engine.handleSubmit({ text: suggestion, files: [] });
+			},
+			[suggestionsState.clear, engine.handleSubmit],
+		);
 
 		useImperativeHandle(
 			ref,
@@ -109,13 +133,20 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 								messages={engine.messages}
 								status={engine.status}
 								welcomeMessage={welcomeMessage}
-								resourceEndpoint={resourceEndpoint}
+								resourceEndpoint={effectiveResourceEndpoint}
 								isDark={isDark}
 							/>
 						</ConversationContent>
 						<ConversationScrollButton />
 					</Conversation>
 				</div>
+
+				{/* Suggestions */}
+				<Suggestions
+					suggestions={suggestionsState.suggestions}
+					isLoading={suggestionsState.isLoading}
+					onSelect={handleSuggestionSelect}
+				/>
 
 				{/* Input bar — always visible */}
 				<div className="shrink-0">

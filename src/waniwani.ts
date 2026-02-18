@@ -1,6 +1,5 @@
 // WaniWani SDK - Main Entry
 
-import { createChatHandler } from "./chat/server/chat-handler.js";
 import { createTrackingClient } from "./tracking/index.js";
 import type { WaniWaniClient, WaniWaniConfig } from "./types.js";
 
@@ -12,14 +11,14 @@ import type { WaniWaniClient, WaniWaniConfig } from "./types.js";
  *
  * @example
  * ```typescript
- * import { waniwani } from "@waniwani";
+ * import { waniwani } from "@waniwani/sdk";
+ * import { toNextJsHandler } from "@waniwani/sdk/next-js";
  *
- * const client = waniwani({ apiKey: "..." });
+ * const wani = waniwani({ apiKey: "..." });
  *
- * await client.track({
- *   eventType: "tool.called",
- *   sessionId: "session-123",
- *   toolName: "pricing"
+ * // Next.js route handler
+ * export const { GET, POST } = toNextJsHandler(wani, {
+ *   chat: { systemPrompt: "You are a helpful assistant." },
  * });
  * ```
  */
@@ -34,7 +33,6 @@ export function waniwani(config?: WaniWaniConfig): WaniWaniClient {
 
 	return {
 		...tracking,
-		createChatHandler: (options = {}) =>
-			createChatHandler({ ...options, apiKey, baseUrl }),
+		_config: internalConfig,
 	};
 }

@@ -30,6 +30,9 @@ export function useChatEngine(props: ChatBaseProps) {
 		onFinish() {
 			onResponseReceived?.();
 		},
+		onError(error) {
+			console.warn("[WaniWani] Chat error:", error.message);
+		},
 	});
 
 	const [text, setText] = useState("");

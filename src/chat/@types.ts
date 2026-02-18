@@ -38,6 +38,15 @@ export interface ChatTheme {
 }
 
 // ============================================================================
+// Suggestions
+// ============================================================================
+
+export interface SuggestionsConfig {
+	/** Maximum number of AI suggestions to request. Defaults to 3. */
+	count?: number;
+}
+
+// ============================================================================
 // Shared Base Props
 // ============================================================================
 
@@ -62,6 +71,13 @@ export interface ChatBaseProps {
 	onResponseReceived?: () => void;
 	/** Endpoint URL for fetching MCP app resources (HTML widgets). Defaults to "/api/mcp/resource" */
 	resourceEndpoint?: string;
+	/** Static suggestions shown before the user sends their first message */
+	initialSuggestions?: string[];
+	/**
+	 * Enable AI-generated suggestions after each response.
+	 * `true` enables with defaults (3 suggestions), object allows config, `false`/undefined disables.
+	 */
+	suggestions?: boolean | SuggestionsConfig;
 }
 
 // ============================================================================

@@ -24,7 +24,11 @@
       "import": "./dist/chat/server/index.js",
       "types": "./dist/chat/server/index.d.ts"
     },
-    "./chat/styles.css": "./dist/chat/styles.css"
+    "./chat/styles.css": "./dist/chat/styles.css",
+    "./next-js": {
+      "import": "./dist/next-js/index.js",
+      "types": "./dist/next-js/index.d.ts"
+    }
   },
   "files": [
     "dist"

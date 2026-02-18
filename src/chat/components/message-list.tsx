@@ -20,6 +20,7 @@ import {
 	ToolOutput,
 } from "../ai-elements/tool";
 import { McpAppFrame } from "./mcp-app-frame";
+import { WidgetErrorBoundary } from "./widget-error-boundary";
 
 /** Converts `get_price_estimate` or `compare-prices` → `Get price estimate` / `Compare prices` */
 function formatToolName(name: string): string {
@@ -112,22 +113,24 @@ export function MessageList({
 										</ToolContent>
 									</Tool>
 									{resourceUri && output !== undefined && (
-										<McpAppFrame
-											resourceUri={resourceUri}
-											toolInput={(part.input as Record<string, unknown>) ?? {}}
-											toolResult={{
-												content: (output as Record<string, unknown>).content as
-													| Array<{ type: string; text?: string }>
-													| undefined,
-												structuredContent: (output as Record<string, unknown>)
-													.structuredContent as
-													| Record<string, unknown>
-													| undefined,
-											}}
-											resourceEndpoint={resourceEndpoint}
-											isDark={isDark}
-											autoHeight={autoHeight}
-										/>
+										<WidgetErrorBoundary>
+											<McpAppFrame
+												resourceUri={resourceUri}
+												toolInput={(part.input as Record<string, unknown>) ?? {}}
+												toolResult={{
+													content: (output as Record<string, unknown>).content as
+														| Array<{ type: string; text?: string }>
+														| undefined,
+													structuredContent: (output as Record<string, unknown>)
+														.structuredContent as
+														| Record<string, unknown>
+														| undefined,
+												}}
+												resourceEndpoint={resourceEndpoint}
+												isDark={isDark}
+												autoHeight={autoHeight}
+											/>
+										</WidgetErrorBoundary>
 									)}
 								</div>
 							);

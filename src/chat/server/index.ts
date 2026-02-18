@@ -2,7 +2,8 @@
 
 export { WaniWaniError } from "../../error";
 export type {
+	ApiHandler,
+	ApiHandlerOptions,
 	BeforeRequestContext,
 	BeforeRequestResult,
-	ChatHandlerOptions,
 } from "./@types";

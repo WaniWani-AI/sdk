@@ -34,6 +34,9 @@
       ],
       "@waniwani/sdk/chat/server": [
         "../src/chat/server/index.ts"
+      ],
+      "@waniwani/sdk/next-js": [
+        "../src/next-js/index.ts"
       ]
     }
   },

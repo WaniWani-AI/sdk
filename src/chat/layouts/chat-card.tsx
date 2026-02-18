@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useImperativeHandle } from "react";
+import { forwardRef, useCallback, useImperativeHandle } from "react";
 import type { ChatCardProps, ChatHandle } from "../@types";
 import {
 	Conversation,
@@ -14,7 +14,9 @@ import {
 	PromptInputTextarea,
 } from "../ai-elements/prompt-input";
 import { MessageList } from "../components/message-list";
+import { Suggestions } from "../components/suggestions";
 import { useChatEngine } from "../hooks/use-chat-engine";
+import { useSuggestions } from "../hooks/use-suggestions";
 import { cn } from "../lib/utils";
 import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
 
@@ -30,13 +32,35 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			allowAttachments = false,
 			welcomeMessage,
 			resourceEndpoint,
+			api,
 		} = props;
+
+		const effectiveResourceEndpoint =
+			resourceEndpoint ?? (api ? `${api}/resource` : undefined);
 
 		const resolvedTheme = mergeTheme(userTheme);
 		const cssVars = themeToCSSProperties(resolvedTheme);
 		const isDark = isDarkTheme(resolvedTheme);
 
 		const engine = useChatEngine(props);
+
+		const suggestionsState = useSuggestions({
+			messages: engine.messages,
+			status: engine.status,
+			initialSuggestions: props.initialSuggestions,
+			suggestions: props.suggestions,
+			api: props.api,
+			apiKey: props.apiKey,
+			headers: props.headers,
+		});
+
+		const handleSuggestionSelect = useCallback(
+			(suggestion: string) => {
+				suggestionsState.clear();
+				engine.handleSubmit({ text: suggestion, files: [] });
+			},
+			[suggestionsState.clear, engine.handleSubmit],
+		);
 
 		useImperativeHandle(
 			ref,
@@ -82,12 +106,20 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 							messages={engine.messages}
 							status={engine.status}
 							welcomeMessage={welcomeMessage}
-							resourceEndpoint={resourceEndpoint}
+							resourceEndpoint={effectiveResourceEndpoint}
 							isDark={isDark}
 						/>
 					</ConversationContent>
 					<ConversationScrollButton />
 				</Conversation>
+
+				{/* Suggestions */}
+				<Suggestions
+					suggestions={suggestionsState.suggestions}
+					isLoading={suggestionsState.isLoading}
+					onSelect={handleSuggestionSelect}
+					className="border-t border-border"
+				/>
 
 				{/* Input */}
 				<div className="shrink-0 border-t border-border bg-background">

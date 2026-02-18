@@ -103,4 +103,22 @@ export default defineConfig([
 			"@modelcontextprotocol/sdk",
 		],
 	},
+	// Next.js adapter
+	{
+		entry: { "next-js/index": "src/next-js/index.ts" },
+		format: ["esm"],
+		target: "node20",
+		dts: true,
+		clean: false,
+		shims: true,
+		splitting: true,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		external: [
+			"ai",
+			"@ai-sdk/mcp",
+			"@modelcontextprotocol/sdk",
+		],
+	},
 ]);

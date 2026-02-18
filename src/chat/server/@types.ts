@@ -3,7 +3,7 @@
 import type { UIMessage } from "ai";
 
 // ============================================================================
-// Chat Handler Options
+// Before Request Hook
 // ============================================================================
 
 export interface BeforeRequestContext {
@@ -24,7 +24,11 @@ export type BeforeRequestResult = {
 	sessionId?: string;
 };
 
-export interface ChatHandlerOptions {
+// ============================================================================
+// API Handler Options
+// ============================================================================
+
+export interface ApiHandlerOptions {
 	/**
 	 * Your WaniWani API key.
 	 * Defaults to process.env.WANIWANI_API_KEY.
@@ -66,4 +70,42 @@ export interface ChatHandlerOptions {
 	 * Useful for development/testing when pointing to a local MCP server.
 	 */
 	mcpServerUrl?: string;
+}
+
+// ============================================================================
+// API Handler Result
+// ============================================================================
+
+export interface ApiHandler {
+	/** Proxies chat messages to the WaniWani API */
+	handleChat: (request: Request) => Promise<Response>;
+	/** Serves MCP resource content (HTML widgets) */
+	handleResource: (url: URL) => Promise<Response>;
+	/** Routes GET sub-paths (e.g. /resource) */
+	routeGet: (request: Request) => Promise<Response>;
+}
+
+// ============================================================================
+// Internal Dependencies (shared across sub-handlers)
+// ============================================================================
+
+interface McpEnvironmentConfig {
+	mcpServerUrl: string;
+}
+
+type ConfigResolver = () => Promise<McpEnvironmentConfig>;
+
+export interface ApiHandlerDeps {
+	apiKey: string | undefined;
+	baseUrl: string;
+	systemPrompt: string | undefined;
+	maxSteps: number;
+	beforeRequest: ApiHandlerOptions["beforeRequest"];
+	mcpServerUrl: string | undefined;
+	resolveConfig: ConfigResolver;
+}
+
+export interface ResourceHandlerDeps {
+	mcpServerUrl: string | undefined;
+	resolveConfig: ConfigResolver;
 }

@@ -1,6 +1,5 @@
 // WaniWani SDK - Core Types
 
-import type { ChatHandlerOptions } from "./chat/server/@types.js";
 import type { TrackingClient } from "./tracking/@types.js";
 
 // ============================================================================
@@ -34,16 +33,13 @@ export interface WaniWaniConfig {
  *
  * Extends with each module:
  * - TrackingClient: track(), getOrCreateSession()
- * - Future: ToolsClient, etc.
+ *
+ * Pass this client to framework adapters:
+ * - `toNextJsHandler(wani, { ... })` for Next.js route handlers
  */
 export interface WaniWaniClient extends TrackingClient {
-	/**
-	 * Create a chat request handler that proxies to the WaniWani API.
-	 * Inherits apiKey and baseUrl from the client config.
-	 */
-	createChatHandler: (
-		options?: Omit<ChatHandlerOptions, "apiKey" | "baseUrl">,
-	) => (request: Request) => Promise<Response>;
+	/** @internal Resolved config — used by framework adapters */
+	readonly _config: InternalConfig;
 }
 
 // ============================================================================
