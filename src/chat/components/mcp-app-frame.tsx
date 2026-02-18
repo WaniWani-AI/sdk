@@ -43,6 +43,7 @@ export function McpAppFrame({
 	const toolInputRef = useRef(toolInput);
 	const toolResultRef = useRef(toolResult);
 	const lastSizeRef = useRef({ width: 0, height: 0 });
+	const initializedRef = useRef(false);
 	const [height, setHeight] = useState(DEFAULT_HEIGHT);
 	const [width, setWidth] = useState<number | undefined>(undefined);
 	const onOpenLinkRef = useRef(onOpenLink);
@@ -70,8 +71,9 @@ export function McpAppFrame({
 	const isDarkRef = useRef(isDark);
 	isDarkRef.current = isDark;
 
-	// Send theme changes to the iframe
+	// Send theme changes to the iframe (only after handshake is complete)
 	useEffect(() => {
+		if (!initializedRef.current) return;
 		const iframe = iframeRef.current;
 		if (!iframe?.contentWindow) return;
 
@@ -132,6 +134,7 @@ export function McpAppFrame({
 
 			// ui/notifications/initialized — widget confirms init, we send tool data
 			if (method === "ui/notifications/initialized") {
+				initializedRef.current = true;
 				const input = toolInputRef.current;
 				const result = toolResultRef.current;
 
