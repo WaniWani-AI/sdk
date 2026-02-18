@@ -37,8 +37,12 @@ const flow = createFlow<LeadState>({
   .addNode("ask_email", () =>
     interrupt({ question: "What is your work email address?", field: "email" })
   )
-  .addNode("ask_role", () =>
-    interrupt({ question: "What is your role?", field: "role" })
+  .addNode("ask_role", (state) =>
+    interrupt({
+      question: "What is your role?",
+      field: "role",
+      context: `The user's email is ${state.email}. Reference their company domain naturally.`,
+    })
   )
   .addNode("ask_use_case", () =>
     interrupt({
@@ -66,6 +70,7 @@ await registerWidgets(server, [flow]);
 | Return value | Behavior |
 |---|---|
 | `interrupt({ question, field })` | Pause → ask user → resume with answer stored at `field` |
+| `interrupt({ question, field, context })` | Same, but with hidden instructions for the assistant to enrich its response |
 | `showWidget({ widgetId, data })` | Pause → render widget → resume when widget calls back |
 | `{ key: value, ... }` | Action node → merge into state → auto-advance to next node |
 
@@ -227,7 +232,7 @@ Creates a new `StateGraph`. Config:
 
 | Function | Description |
 |----------|-------------|
-| `interrupt({ question, field, suggestions? })` | Return from a node to pause and ask the user a question |
+| `interrupt({ question, field, suggestions?, context? })` | Return from a node to pause and ask the user a question. `context` provides hidden instructions to the assistant to enrich its response using data from previous nodes. |
 | `showWidget({ widgetId, data, description? })` | Return from a node to pause and render a widget |
 
 ## Common Mistakes

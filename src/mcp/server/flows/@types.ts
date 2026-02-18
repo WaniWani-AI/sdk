@@ -20,6 +20,8 @@ export type InterruptSignal = {
 	field: string;
 	/** Optional suggestions to present as options */
 	suggestions?: string[];
+	/** Hidden context/instructions for the assistant (not shown to user directly) */
+	context?: string;
 };
 
 export type WidgetSignal = {
@@ -39,6 +41,7 @@ export function interrupt(config: {
 	question: string;
 	field: string;
 	suggestions?: string[];
+	context?: string;
 }): InterruptSignal {
 	return { __type: INTERRUPT, ...config };
 }
