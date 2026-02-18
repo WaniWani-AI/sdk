@@ -1,7 +1,7 @@
 // WaniWani SDK - Next.js Adapter
 
-import { createApiHandler } from "../chat/server/api-handler.js";
-import type { WaniWaniClient } from "../types.js";
+import type { WaniWaniClient } from "../../../types.js";
+import { createApiHandler } from "../api-handler.js";
 import type { NextJsHandlerOptions, NextJsHandlerResult } from "./@types.js";
 
 export type { NextJsHandlerOptions, NextJsHandlerResult } from "./@types.js";

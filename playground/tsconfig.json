@@ -36,7 +36,7 @@
         "../src/chat/server/index.ts"
       ],
       "@waniwani/sdk/next-js": [
-        "../src/next-js/index.ts"
+        "../src/chat/next-js/index.ts"
       ]
     }
   },

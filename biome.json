@@ -1,7 +1,7 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.3.13/schema.json",
 	"files": {
-		"includes": ["src/**", "!src/chat/tailwind.css"]
+		"includes": ["src/**", "!src/chat/web/tailwind.css"]
 	},
 	"linter": {
 		"enabled": true,

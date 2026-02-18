@@ -12,7 +12,7 @@ import React, {
 import {
 	createWidgetClient,
 	type UnifiedWidgetClient,
-} from "../widgets/@utils/widget-client";
+} from "../widgets/widget-client";
 import type { DisplayMode, SafeArea, Theme, UnknownObject } from "./@types";
 
 /**

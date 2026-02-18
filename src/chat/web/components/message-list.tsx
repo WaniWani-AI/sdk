@@ -116,9 +116,12 @@ export function MessageList({
 										<WidgetErrorBoundary>
 											<McpAppFrame
 												resourceUri={resourceUri}
-												toolInput={(part.input as Record<string, unknown>) ?? {}}
+												toolInput={
+													(part.input as Record<string, unknown>) ?? {}
+												}
 												toolResult={{
-													content: (output as Record<string, unknown>).content as
+													content: (output as Record<string, unknown>)
+														.content as
 														| Array<{ type: string; text?: string }>
 														| undefined,
 													structuredContent: (output as Record<string, unknown>)

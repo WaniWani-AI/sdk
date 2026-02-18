@@ -35,7 +35,7 @@ export default defineConfig([
 	},
 	// MCP client-side (React/Browser)
 	{
-		entry: { "mcp/react": "src/mcp/react.ts" },
+		entry: { "mcp/react": "src/mcp/react/index.ts" },
 		format: ["esm"],
 		target: "es2022",
 		dts: true,
@@ -56,7 +56,7 @@ export default defineConfig([
 	},
 	// Chat widget (React component)
 	{
-		entry: { "chat/index": "src/chat/index.ts" },
+		entry: { "chat/index": "src/chat/web/index.ts" },
 		format: ["esm"],
 		target: "es2022",
 		dts: true,
@@ -105,7 +105,7 @@ export default defineConfig([
 	},
 	// Next.js adapter
 	{
-		entry: { "next-js/index": "src/next-js/index.ts" },
+		entry: { "chat/next-js/index": "src/chat/server/next-js/index.ts" },
 		format: ["esm"],
 		target: "node20",
 		dts: true,

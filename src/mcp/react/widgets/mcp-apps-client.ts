@@ -5,7 +5,7 @@ import type {
 	SafeArea,
 	Theme,
 	UnknownObject,
-} from "../../hooks/@types";
+} from "../hooks/@types";
 import type {
 	ToolCallResult,
 	ToolResult,

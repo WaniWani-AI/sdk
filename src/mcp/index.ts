@@ -1,11 +1,35 @@
 // Server-side MCP widget framework
 
-// Widget creation
-export { createWidget, registerWidgets } from "./widgets/@utils/create-widget";
-export type { WidgetPlatform } from "./widgets/@utils/platform";
-
 // Platform detection
-export { detectPlatform, isMCPApps, isOpenAI } from "./widgets/@utils/platform";
+export type { WidgetPlatform } from "./react/widgets/platform";
+export { detectPlatform, isMCPApps, isOpenAI } from "./react/widgets/platform";
+// Widget client types (for type-sharing between server and client)
+export type {
+	HostContext,
+	ToolCallResult,
+	ToolResult,
+	UnifiedWidgetClient,
+} from "./react/widgets/widget-client";
+// Flow framework
+export type {
+	CompileOptions,
+	ConditionFn,
+	FlowConfig,
+	InterruptSignal,
+	NodeHandler,
+	RegisteredFlow,
+	WidgetSignal,
+} from "./server/flows";
+export {
+	createFlow,
+	END,
+	interrupt,
+	START,
+	StateGraph,
+	showWidget,
+} from "./server/flows";
+// Widget creation
+export { createWidget, registerWidgets } from "./server/widgets/create-widget";
 // Types
 export type {
 	McpServer,
@@ -16,12 +40,4 @@ export type {
 	WidgetHandlerContext,
 	WidgetToolCallback,
 	ZodRawShapeCompat,
-} from "./widgets/@utils/types";
-
-// Widget client types (for type-sharing between server and client)
-export type {
-	HostContext,
-	ToolCallResult,
-	ToolResult,
-	UnifiedWidgetClient,
-} from "./widgets/@utils/widget-client";
+} from "./server/widgets/types";

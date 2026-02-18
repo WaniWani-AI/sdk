@@ -1,9 +1,6 @@
 // WaniWani SDK - Next.js Adapter Types
 
-import type {
-	BeforeRequestContext,
-	BeforeRequestResult,
-} from "../chat/server/@types.js";
+import type { BeforeRequestContext, BeforeRequestResult } from "../@types.js";
 
 // ============================================================================
 // Chat Options (namespaced under `chat`)

@@ -40,4 +40,4 @@ export {
 	useWidgetState,
 	WidgetProvider,
 } from "./hooks/index";
-export { LoadingWidget } from "./widgets/@utils/loading-widget";
+export { LoadingWidget } from "./widgets/loading-widget";

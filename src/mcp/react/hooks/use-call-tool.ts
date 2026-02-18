@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import type { ToolCallResult } from "../widgets/@utils/widget-client";
+import type { ToolCallResult } from "../widgets/widget-client";
 import { useWidgetClient } from "./use-widget";
 
 /**

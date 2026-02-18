@@ -3,11 +3,8 @@ import type {
 	SafeArea,
 	Theme,
 	UnknownObject,
-} from "../../hooks/@types";
-import {
-	SET_GLOBALS_EVENT_TYPE,
-	type SetGlobalsEvent,
-} from "../../hooks/@types";
+} from "../hooks/@types";
+import { SET_GLOBALS_EVENT_TYPE, type SetGlobalsEvent } from "../hooks/@types";
 import type {
 	ToolCallResult,
 	ToolResult,

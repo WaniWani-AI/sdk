@@ -26,8 +26,8 @@
     },
     "./chat/styles.css": "./dist/chat/styles.css",
     "./next-js": {
-      "import": "./dist/next-js/index.js",
-      "types": "./dist/next-js/index.d.ts"
+      "import": "./dist/chat/next-js/index.js",
+      "types": "./dist/chat/next-js/index.d.ts"
     }
   },
   "files": [
@@ -35,7 +35,7 @@
   ],
   "scripts": {
     "build": "rm -rf dist && bun run typecheck && bun run lint && tsup && bun run build:chat-css",
-    "build:chat-css": "tailwindcss -i src/chat/tailwind.css -o dist/chat/styles.css --minify",
+    "build:chat-css": "tailwindcss -i src/chat/web/tailwind.css -o dist/chat/styles.css --minify",
     "dev": "tsx --watch src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",

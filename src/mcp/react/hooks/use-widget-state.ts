@@ -1,7 +1,7 @@
 "use client";
 
 import { type SetStateAction, useCallback, useEffect, useState } from "react";
-import { detectPlatform } from "../widgets/@utils/platform";
+import { detectPlatform } from "../widgets/platform";
 import type { UnknownObject } from "./@types";
 import { useWidgetClient } from "./use-widget";
 

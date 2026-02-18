@@ -3,7 +3,7 @@ import type {
 	SafeArea,
 	Theme,
 	UnknownObject,
-} from "../../hooks/@types";
+} from "../hooks/@types";
 
 /**
  * Result from calling a tool
