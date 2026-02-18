@@ -228,7 +228,7 @@ const inputSchema = {
 		.optional()
 		.describe("Current step name (from the previous response)"),
 	state: z
-		.record(z.unknown())
+		.record(z.string(), z.unknown())
 		.optional()
 		.describe("Flow state — pass back exactly as received"),
 	answer: z
@@ -236,7 +236,7 @@ const inputSchema = {
 		.optional()
 		.describe("The user's answer (for interrupt steps)"),
 	widgetResult: z
-		.record(z.unknown())
+		.record(z.string(), z.unknown())
 		.optional()
 		.describe("Data returned by a widget callback"),
 };
