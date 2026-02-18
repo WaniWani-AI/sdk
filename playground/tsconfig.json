@@ -29,14 +29,20 @@
       "@waniwani/sdk": [
         "../src/index.ts"
       ],
+      "@waniwani/sdk/mcp": [
+        "../src/mcp/index.ts"
+      ],
+      "@waniwani/sdk/mcp/react": [
+        "../src/mcp/react/index.ts"
+      ],
       "@waniwani/sdk/chat": [
-        "../src/chat/index.ts"
+        "../src/chat/web/index.ts"
       ],
       "@waniwani/sdk/chat/server": [
         "../src/chat/server/index.ts"
       ],
       "@waniwani/sdk/next-js": [
-        "../src/chat/next-js/index.ts"
+        "../src/chat/server/next-js/index.ts"
       ]
     }
   },
