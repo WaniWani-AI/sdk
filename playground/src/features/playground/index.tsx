@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ChatBar, ChatCard, DARK_THEME, DEFAULT_THEME } from "@waniwani/sdk/chat";
+import { useRef, useState } from "react";
+import { ChatBar, ChatCard, DARK_THEME, DEFAULT_THEME, type ChatHandle } from "@waniwani/sdk/chat";
 import { DevToolbar } from "./dev-toolbar";
 import { LAYOUTS, MODES, type Layout, type Mode } from "./types";
 
@@ -16,6 +16,8 @@ export function Playground({
   initialLayout: string;
   initialMode: string;
 }) {
+  const chatRef = useRef<ChatHandle>(null);
+
   const [layout, setLayout] = useState<Layout>(
     LAYOUTS.includes(initialLayout as Layout) ? (initialLayout as Layout) : "card"
   );
@@ -51,6 +53,28 @@ export function Playground({
         onModeChange={updateMode}
       />
 
+      <button
+        type="button"
+        onClick={() => chatRef.current?.sendMessage("I want to request a demo")}
+        style={{
+          position: "fixed",
+          top: 12,
+          right: 16,
+          zIndex: 50,
+          padding: "5px 14px",
+          borderRadius: 7,
+          border: "none",
+          cursor: "pointer",
+          fontWeight: 500,
+          fontSize: 13,
+          fontFamily: "system-ui, sans-serif",
+          background: "#fff",
+          color: "#000",
+        }}
+      >
+        Request Demo
+      </button>
+
       <div
         style={{
           flex: 1,
@@ -63,6 +87,7 @@ export function Playground({
       >
         {layout === "bar" && (
           <ChatBar
+            ref={chatRef}
             api="/api/waniwani"
             welcomeMessage="Hey! How can I help you today?"
             theme={mode === "dark" ? DARK_THEME : DEFAULT_THEME}
@@ -71,6 +96,7 @@ export function Playground({
         )}
         {layout === "card" && (
           <ChatCard
+            ref={chatRef}
             api="/api/waniwani"
             title="ChatGPT"
             welcomeMessage="Hey! How can I help you today?"

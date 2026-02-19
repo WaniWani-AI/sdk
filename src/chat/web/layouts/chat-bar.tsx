@@ -58,6 +58,20 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			headers: props.headers,
 		});
 
+		const handleWidgetMessage = useCallback(
+			(message: {
+				role: string;
+				content: Array<{ type: string; text?: string }>;
+			}) => {
+				const text = message.content
+					.map((c) => c.text ?? "")
+					.join("")
+					.trim();
+				if (text) engine.handleSubmit({ text, files: [] });
+			},
+			[engine.handleSubmit],
+		);
+
 		const handleSuggestionSelect = useCallback(
 			(suggestion: string) => {
 				suggestionsState.clear();
@@ -135,6 +149,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 								welcomeMessage={welcomeMessage}
 								resourceEndpoint={effectiveResourceEndpoint}
 								isDark={isDark}
+								onFollowUp={handleWidgetMessage}
 							/>
 						</ConversationContent>
 						<ConversationScrollButton />

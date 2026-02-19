@@ -33,6 +33,10 @@ interface MessageListProps {
 	welcomeMessage?: string;
 	resourceEndpoint?: string;
 	isDark?: boolean;
+	onFollowUp?: (message: {
+		role: string;
+		content: Array<{ type: string; text?: string }>;
+	}) => void;
 }
 
 export function MessageList({
@@ -41,6 +45,7 @@ export function MessageList({
 	welcomeMessage,
 	resourceEndpoint,
 	isDark,
+	onFollowUp,
 }: MessageListProps) {
 	const isLoading = status === "submitted" || status === "streaming";
 	const lastMessage = messages[messages.length - 1];
@@ -132,6 +137,7 @@ export function MessageList({
 												resourceEndpoint={resourceEndpoint}
 												isDark={isDark}
 												autoHeight={autoHeight}
+												onFollowUp={onFollowUp}
 											/>
 										</WidgetErrorBoundary>
 									)}

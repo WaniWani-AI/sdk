@@ -5,7 +5,7 @@ import { cn } from "../lib/utils";
 
 const DEFAULT_RESOURCE_ENDPOINT = "/api/mcp/resource";
 const MAX_HEIGHT = 500;
-const DEFAULT_HEIGHT = 300;
+const DEFAULT_HEIGHT = 0;
 const PROTOCOL_VERSION = "2026-01-26";
 const RESIZE_ANIMATION_MS = 300;
 
@@ -23,8 +23,11 @@ export interface McpAppFrameProps {
 	autoHeight?: boolean;
 	/** Called when the view requests to open a URL */
 	onOpenLink?: (url: string) => void;
-	/** Called when the view sends a chat message */
-	onMessage?: (message: { role: string; content: string }) => void;
+	/** Called when a widget sends a follow-up message via `ui/message` */
+	onFollowUp?: (message: {
+		role: string;
+		content: Array<{ type: string; text?: string }>;
+	}) => void;
 }
 
 export function McpAppFrame({
@@ -37,22 +40,23 @@ export function McpAppFrame({
 	// TODO: REMOVE — defaulting to true for playground testing
 	autoHeight = true,
 	onOpenLink,
-	onMessage,
+	onFollowUp,
 }: McpAppFrameProps) {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const toolInputRef = useRef(toolInput);
 	const toolResultRef = useRef(toolResult);
 	const lastSizeRef = useRef({ width: 0, height: 0 });
+	const animationRef = useRef<Animation | null>(null);
 	const initializedRef = useRef(false);
 	const [height, setHeight] = useState(DEFAULT_HEIGHT);
 	const [width, setWidth] = useState<number | undefined>(undefined);
 	const onOpenLinkRef = useRef(onOpenLink);
-	const onMessageRef = useRef(onMessage);
+	const onFollowUpRef = useRef(onFollowUp);
 
 	toolInputRef.current = toolInput;
 	toolResultRef.current = toolResult;
 	onOpenLinkRef.current = onOpenLink;
-	onMessageRef.current = onMessage;
+	onFollowUpRef.current = onFollowUp;
 
 	const clampHeight = useCallback(
 		(h: number) => {
@@ -96,8 +100,13 @@ export function McpAppFrame({
 		if (!iframe) return;
 
 		let disposed = false;
+		const debug = (...args: unknown[]) =>
+			console.log("[McpAppFrame]", ...args);
+
+		debug("effect mounted, waiting for handshake");
 
 		const postToIframe = (msg: Record<string, unknown>) => {
+			debug("→ send", msg.method ?? `response:${msg.id}`, msg);
 			iframe.contentWindow?.postMessage(msg, "*");
 		};
 
@@ -111,8 +120,11 @@ export function McpAppFrame({
 			const method: string | undefined = data.method;
 			const id: number | string | undefined = data.id;
 
+			debug("← recv", method ?? `response:${id}`, data);
+
 			// ui/initialize — widget requests handshake
 			if (method === "ui/initialize" && id != null) {
+				debug("handshake started");
 				postToIframe({
 					jsonrpc: "2.0",
 					id,
@@ -134,6 +146,7 @@ export function McpAppFrame({
 
 			// ui/notifications/initialized — widget confirms init, we send tool data
 			if (method === "ui/notifications/initialized") {
+				debug("handshake complete, sending tool data");
 				initializedRef.current = true;
 				const input = toolInputRef.current;
 				const result = toolResultRef.current;
@@ -172,27 +185,52 @@ export function McpAppFrame({
 					newHeight !== undefined && newHeight !== last.height;
 				const widthChanged = newWidth !== undefined && newWidth !== last.width;
 
+				debug("size-changed", {
+					newHeight,
+					newWidth,
+					lastHeight: last.height,
+					lastWidth: last.width,
+					heightChanged,
+					widthChanged,
+				});
+
 				if (!heightChanged && !widthChanged) return;
 
 				if (heightChanged && newHeight !== undefined) {
 					last.height = newHeight;
 					const clamped = clampHeight(newHeight);
 
-					// Animate the height transition
-					if (iframe.animate) {
-						const from = iframe.getBoundingClientRect().height;
-						if (Math.abs(from - clamped) > 2) {
-							iframe.animate(
-								[{ height: `${from}px` }, { height: `${clamped}px` }],
-								{
-									duration: RESIZE_ANIMATION_MS,
-									easing: "ease-out",
-									fill: "forwards",
-								},
-							);
-						}
+					// Get current visual height before canceling the old animation
+					const from = iframe.getBoundingClientRect().height;
+
+					// Cancel previous animation so its fill: "forwards" stops overriding inline style
+					if (animationRef.current) {
+						animationRef.current.cancel();
+						animationRef.current = null;
 					}
+
+					// Set the target height in React state (takes effect once no animation overrides it)
 					setHeight(clamped);
+
+					// Animate the height transition
+					if (iframe.animate && Math.abs(from - clamped) > 2) {
+						const anim = iframe.animate(
+							[{ height: `${from}px` }, { height: `${clamped}px` }],
+							{
+								duration: RESIZE_ANIMATION_MS,
+								easing: "ease-out",
+								fill: "forwards",
+							},
+						);
+						animationRef.current = anim;
+						// Once done, remove the animation so the inline style is the source of truth
+						anim.onfinish = () => {
+							if (animationRef.current === anim) {
+								anim.cancel();
+								animationRef.current = null;
+							}
+						};
+					}
 				}
 
 				if (widthChanged && autoHeight && newWidth !== undefined) {
@@ -218,8 +256,8 @@ export function McpAppFrame({
 
 			// ui/message — widget sends a chat message
 			if (method === "ui/message" && id != null) {
-				if (onMessageRef.current && data.params) {
-					onMessageRef.current(data.params);
+				if (onFollowUpRef.current && data.params) {
+					onFollowUpRef.current(data.params);
 				}
 				postToIframe({ jsonrpc: "2.0", id, result: {} });
 				return;
@@ -247,6 +285,7 @@ export function McpAppFrame({
 		window.addEventListener("message", handleMessage);
 
 		return () => {
+			debug("effect cleanup (disposed)");
 			disposed = true;
 			window.removeEventListener("message", handleMessage);
 		};
