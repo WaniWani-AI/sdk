@@ -92,6 +92,7 @@ export function Playground({
             welcomeMessage="Hey! How can I help you today?"
             theme={mode === "dark" ? DARK_THEME : DEFAULT_THEME}
             allowAttachments
+            suggestions
           />
         )}
         {layout === "card" && (
@@ -104,6 +105,9 @@ export function Playground({
             allowAttachments
             width={1000}
             height={700}
+            suggestions={{
+              initial: ["Tell me about waniwani", "I want to request a demo"],
+            }}
           />
         )}
       </div>

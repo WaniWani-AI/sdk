@@ -42,8 +42,11 @@ export interface ChatTheme {
 // ============================================================================
 
 export interface SuggestionsConfig {
-	/** Maximum number of AI suggestions to request. Defaults to 3. */
-	count?: number;
+	/**
+	 * Initial suggestions to show before the user sends their first message.
+	 * Defaults to an empty array.
+	 */
+	initial?: string[];
 }
 
 // ============================================================================

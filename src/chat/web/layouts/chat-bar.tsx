@@ -54,11 +54,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 		const suggestionsState = useSuggestions({
 			messages: engine.messages,
 			status: engine.status,
-			initialSuggestions: props.initialSuggestions,
-			suggestions: props.suggestions,
-			api: props.api,
-			apiKey: props.apiKey,
-			headers: props.headers,
+			config: props.suggestions,
 		});
 
 		const handleWidgetMessage = useCallback(

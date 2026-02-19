@@ -7,65 +7,47 @@ import type { SuggestionsConfig } from "../@types";
 export interface UseSuggestionsOptions {
 	messages: UIMessage[];
 	status: ChatStatus;
-	initialSuggestions?: string[];
-	suggestions?: boolean | SuggestionsConfig;
-	/** Chat API endpoint — used to derive the suggestions URL */
-	api?: string;
-	apiKey?: string;
-	headers?: Record<string, string>;
+	config?: boolean | SuggestionsConfig;
 }
 
 /**
- * Derive the suggestions API URL from the chat API endpoint.
- * "/api/chat" → "/api/mcp/suggestions"
- * "https://app.waniwani.ai/api/chat" → "https://app.waniwani.ai/api/mcp/suggestions"
+ * Extract suggestions from the last assistant message's data part.
+ * The API streams a `data-suggestions` part at the end of the response:
+ * `{ type: "data-suggestions", data: { suggestions: string[] } }`
  */
-function deriveSuggestionsUrl(api: string): string {
-	try {
-		const url = new URL(api);
-		url.pathname = "/api/mcp/suggestions";
-		return url.toString();
-	} catch {
-		// Relative URL — use same origin
-		return "/api/mcp/suggestions";
+function extractSuggestions(message: UIMessage): string[] | null {
+	for (const part of message.parts) {
+		const p = part as Record<string, unknown>;
+		// Handle both "data-suggestions" and generic "data" part types
+		if (p.type === "data" || p.type === "data-suggestions") {
+			const data = p.data as Record<string, unknown> | undefined;
+			if (data && Array.isArray(data.suggestions)) {
+				return data.suggestions as string[];
+			}
+		}
 	}
+	return null;
+}
+
+function isConfigObject(
+	config: boolean | SuggestionsConfig | undefined,
+): config is SuggestionsConfig {
+	return typeof config === "object" && config !== null && "initial" in config;
 }
 
 export function useSuggestions(options: UseSuggestionsOptions) {
-	const {
-		messages,
-		status,
-		initialSuggestions,
-		suggestions: suggestionsConfig,
-		api = "https://app.waniwani.ai/api/chat",
-		apiKey,
-		headers: userHeaders,
-	} = options;
+	const { messages, status, config } = options;
 
-	const [suggestions, setSuggestions] = useState<string[]>([]);
-	const [isLoading, setIsLoading] = useState(false);
+	const [suggestions, setSuggestions] = useState<string[]>(
+		(isConfigObject(config) && config.initial ? config.initial : []) ?? [],
+	);
 	const prevStatusRef = useRef<ChatStatus>(status);
-	const abortRef = useRef<AbortController | null>(null);
 
-	const isEnabled = Boolean(suggestionsConfig);
-	const count =
-		typeof suggestionsConfig === "object" ? (suggestionsConfig.count ?? 3) : 3;
-
-	const hasUserMessages = messages.some((m) => m.role === "user");
-	const suggestionsUrl = deriveSuggestionsUrl(api);
+	const isEnabled = Boolean(config);
 
 	const clear = useCallback(() => {
 		setSuggestions([]);
-		abortRef.current?.abort();
-		abortRef.current = null;
 	}, []);
-
-	// Show initial suggestions when no user messages exist
-	useEffect(() => {
-		if (!hasUserMessages && initialSuggestions?.length) {
-			setSuggestions(initialSuggestions);
-		}
-	}, [hasUserMessages, initialSuggestions]);
 
 	// Clear when a new user message arrives
 	const lastMessage = messages[messages.length - 1];
@@ -75,56 +57,26 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		}
 	}, [lastMessage, clear]);
 
-	// Fetch AI suggestions on streaming → idle transition
+	// Extract suggestions from message parts on streaming → ready transition
 	useEffect(() => {
 		const prevStatus = prevStatusRef.current;
 		prevStatusRef.current = status;
 
 		if (prevStatus === "streaming" && status === "ready" && isEnabled) {
-			const controller = new AbortController();
-			abortRef.current?.abort();
-			abortRef.current = controller;
+			const lastAssistant = [...messages]
+				.reverse()
+				.find((m) => m.role === "assistant");
+			if (!lastAssistant) return;
 
-			setIsLoading(true);
+			console.log("[WaniWani] Assistant parts:", lastAssistant.parts);
 
-			fetch(suggestionsUrl, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-					...userHeaders,
-				},
-				body: JSON.stringify({ messages, count }),
-				signal: controller.signal,
-			})
-				.then((res) => {
-					if (!res.ok) throw new Error(`Suggestions API error: ${res.status}`);
-					return res.json();
-				})
-				.then((data) => {
-					if (!controller.signal.aborted) {
-						setSuggestions(data.suggestions ?? []);
-					}
-				})
-				.catch((err) => {
-					if (err.name !== "AbortError") {
-						console.warn("[WaniWani] Failed to fetch suggestions:", err);
-					}
-				})
-				.finally(() => {
-					if (!controller.signal.aborted) {
-						setIsLoading(false);
-					}
-				});
+			const extracted = extractSuggestions(lastAssistant);
+			console.log("[WaniWani] Extracted suggestions:", extracted);
+			if (extracted) {
+				setSuggestions(extracted);
+			}
 		}
-	}, [status, isEnabled, suggestionsUrl, apiKey, messages, count, userHeaders]);
+	}, [status, isEnabled, messages]);
 
-	// Cleanup on unmount
-	useEffect(() => {
-		return () => {
-			abortRef.current?.abort();
-		};
-	}, []);
-
-	return { suggestions, isLoading, clear };
+	return { suggestions, isLoading: false, clear };
 }

@@ -79,11 +79,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 		const suggestionsState = useSuggestions({
 			messages: engine.messages,
 			status: engine.status,
-			initialSuggestions: props.initialSuggestions,
-			suggestions: props.suggestions,
-			api: props.api,
-			apiKey: props.apiKey,
-			headers: props.headers,
+			config: props.suggestions,
 		});
 
 		const handleWidgetMessage = useCallback(
