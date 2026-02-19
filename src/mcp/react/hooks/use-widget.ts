@@ -70,7 +70,7 @@ export function WidgetProvider({
 				}
 			} catch (err) {
 				if (mounted) {
-					console.log("error", err);
+					console.error("error", err);
 					setError(err instanceof Error ? err : new Error(String(err)));
 					setIsConnecting(false);
 				}

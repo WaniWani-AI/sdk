@@ -8,6 +8,8 @@ const MAX_HEIGHT = 500;
 const DEFAULT_HEIGHT = 0;
 const PROTOCOL_VERSION = "2026-01-26";
 const RESIZE_ANIMATION_MS = 300;
+const HANDSHAKE_TIMEOUT_MS = 3000;
+const MAX_RETRIES = 3;
 
 export interface McpAppFrameProps {
 	resourceUri: string;
@@ -48,6 +50,7 @@ export function McpAppFrame({
 	const lastSizeRef = useRef({ width: 0, height: 0 });
 	const animationRef = useRef<Animation | null>(null);
 	const initializedRef = useRef(false);
+	const retryCountRef = useRef(0);
 	const [height, setHeight] = useState(DEFAULT_HEIGHT);
 	const [width, setWidth] = useState<number | undefined>(undefined);
 	const onOpenLinkRef = useRef(onOpenLink);
@@ -100,10 +103,32 @@ export function McpAppFrame({
 		if (!iframe) return;
 
 		let disposed = false;
+		let handshakeReceived = false;
 		const debug = (...args: unknown[]) =>
-			console.log("[McpAppFrame]", ...args);
+			console.debug("[McpAppFrame]", ...args);
 
 		debug("effect mounted, waiting for handshake");
+
+		// Retry: reload iframe if handshake doesn't arrive in time
+		const handshakeTimer = setTimeout(() => {
+			if (disposed || handshakeReceived) return;
+			if (retryCountRef.current >= MAX_RETRIES) {
+				debug("handshake failed after", MAX_RETRIES, "retries, giving up");
+				return;
+			}
+			retryCountRef.current += 1;
+			debug(
+				"handshake timeout, reloading iframe (retry",
+				retryCountRef.current,
+				"of",
+				MAX_RETRIES,
+				")",
+			);
+			// Force reload with a cache-busting param
+			const url = new URL(iframe.src);
+			url.searchParams.set("_retry", String(retryCountRef.current));
+			iframe.src = url.toString();
+		}, HANDSHAKE_TIMEOUT_MS);
 
 		const postToIframe = (msg: Record<string, unknown>) => {
 			debug("→ send", msg.method ?? `response:${msg.id}`, msg);
@@ -124,6 +149,8 @@ export function McpAppFrame({
 
 			// ui/initialize — widget requests handshake
 			if (method === "ui/initialize" && id != null) {
+				handshakeReceived = true;
+				clearTimeout(handshakeTimer);
 				debug("handshake started");
 				postToIframe({
 					jsonrpc: "2.0",
@@ -287,6 +314,7 @@ export function McpAppFrame({
 		return () => {
 			debug("effect cleanup (disposed)");
 			disposed = true;
+			clearTimeout(handshakeTimer);
 			window.removeEventListener("message", handleMessage);
 		};
 	}, [autoHeight, clampHeight]);
@@ -298,7 +326,7 @@ export function McpAppFrame({
 			sandbox="allow-scripts allow-forms allow-same-origin"
 			className={cn("rounded-md border border-border", className)}
 			style={{
-				height: height || undefined,
+				height,
 				minWidth: width ? `min(${width}px, 100%)` : undefined,
 				width: "100%",
 				border: "none",
