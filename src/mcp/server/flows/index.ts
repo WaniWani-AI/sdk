@@ -1,16 +1,15 @@
 // Flow framework — LangGraph-inspired multi-step flows for MCP tools
 
-// Types
 export type {
-	CompileOptions,
 	ConditionFn,
 	FlowConfig,
 	InterruptSignal,
+	NodeConfig,
 	NodeHandler,
 	RegisteredFlow,
 	WidgetSignal,
 } from "./@types";
-// Signals
+// Types
 export { END, interrupt, START, showWidget } from "./@types";
 // Convenience factory
 export { createFlow } from "./create-flow";

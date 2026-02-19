@@ -1,4 +1,4 @@
-// Server-side MCP widget framework
+// Server-side MCP framework
 
 // Platform detection
 export type { WidgetPlatform } from "./react/widgets/platform";
@@ -12,10 +12,10 @@ export type {
 } from "./react/widgets/widget-client";
 // Flow framework
 export type {
-	CompileOptions,
 	ConditionFn,
 	FlowConfig,
 	InterruptSignal,
+	NodeConfig,
 	NodeHandler,
 	RegisteredFlow,
 	WidgetSignal,
@@ -28,16 +28,22 @@ export {
 	StateGraph,
 	showWidget,
 } from "./server/flows";
-// Widget creation
-export { createWidget, registerWidgets } from "./server/widgets/create-widget";
+export type {
+	RegisteredResource,
+	ResourceConfig,
+	WidgetCSP,
+} from "./server/resources";
+// Resources
+export { createResource } from "./server/resources";
+// Tool creation
+export { createTool, registerTools } from "./server/tools/create-tool";
 // Types
 export type {
 	McpServer,
-	RegisteredWidget,
-	WidgetConfig,
-	WidgetCSP,
-	WidgetHandler,
-	WidgetHandlerContext,
-	WidgetToolCallback,
+	RegisteredTool,
+	ToolConfig,
+	ToolHandler,
+	ToolHandlerContext,
+	ToolToolCallback,
 	ZodRawShapeCompat,
-} from "./server/widgets/types";
+} from "./server/tools/types";

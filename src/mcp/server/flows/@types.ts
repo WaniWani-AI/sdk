@@ -1,3 +1,7 @@
+import type { McpServer, RegisteredResource } from "../resources/types";
+
+export type { McpServer };
+
 // ============================================================================
 // Sentinel constants
 // ============================================================================
@@ -26,8 +30,8 @@ export type InterruptSignal = {
 
 export type WidgetSignal = {
 	readonly __type: typeof WIDGET;
-	/** ID of a registered widget to display */
-	widgetId: string;
+	/** The resource to display */
+	resource: RegisteredResource;
 	/** Data to pass to the widget as structuredContent */
 	data: Record<string, unknown>;
 	/** Description of what the widget does (for the AI's context) */
@@ -49,12 +53,14 @@ export function interrupt(config: {
 /**
  * Create a widget signal — pauses the flow and renders a widget UI.
  */
-export function showWidget(config: {
-	widgetId: string;
-	data: Record<string, unknown>;
-	description?: string;
-}): WidgetSignal {
-	return { __type: WIDGET, ...config };
+export function showWidget(
+	resource: RegisteredResource,
+	config: {
+		data: Record<string, unknown>;
+		description?: string;
+	},
+): WidgetSignal {
+	return { __type: WIDGET, resource, ...config };
 }
 
 export function isInterrupt(value: unknown): value is InterruptSignal {
@@ -80,6 +86,12 @@ export function isWidget(value: unknown): value is WidgetSignal {
 // ============================================================================
 
 export type MaybePromise<T> = T | Promise<T>;
+
+/** Configuration for a flow node */
+export type NodeConfig = {
+	/** Resource to display when this node returns a WidgetSignal */
+	resource?: RegisteredResource;
+};
 
 /**
  * Node handler — a single function type for all node kinds.
@@ -125,21 +137,8 @@ export type FlowConfig = {
 	};
 };
 
-export type CompileOptions = {
-	/** Map of widget IDs to their RegisteredWidget, for resolving widget resource URIs */
-	widgetRefs?: Record<string, { id: string }>;
-};
-
-// Re-export McpServer type from the widget types
-export type {
-	McpServer,
-	RegisteredWidget,
-} from "../widgets/types";
-
-import type { McpServer } from "../widgets/types";
-
 /**
- * A compiled flow — compatible with RegisteredWidget for registration.
+ * A compiled flow — can be registered on an McpServer.
  */
 export type RegisteredFlow = {
 	id: string;

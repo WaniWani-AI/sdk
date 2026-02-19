@@ -15,13 +15,13 @@ The AI carries the state between steps — no server-side storage needed.
 ## Import
 
 ```ts
-import { createFlow, interrupt, showWidget, START, END, registerWidgets } from "@waniwani/sdk/mcp";
+import { createResource, createFlow, createTool, interrupt, showWidget, registerTools, START, END } from "@waniwani/sdk/mcp";
 ```
 
 ## Quick start
 
 ```ts
-import { createFlow, interrupt, START, END, registerWidgets } from "@waniwani/sdk/mcp";
+import { createFlow, interrupt, START, END, registerTools } from "@waniwani/sdk/mcp";
 
 type LeadState = {
   email: string;
@@ -61,8 +61,8 @@ const flow = createFlow<LeadState>({
   .addEdge("complete", END)
   .compile();
 
-// Register alongside widgets
-await registerWidgets(server, [flow]);
+// Register alongside tools
+await registerTools(server, [flow]);
 ```
 
 ## Node types
@@ -71,7 +71,7 @@ await registerWidgets(server, [flow]);
 |---|---|
 | `interrupt({ question, field })` | Pause → ask user → resume with answer stored at `field` |
 | `interrupt({ question, field, context })` | Same, but with hidden instructions for the assistant to enrich its response |
-| `showWidget({ widgetId, data })` | Pause → render widget → resume when widget calls back |
+| `showWidget(resource, { data })` | Pause → render widget → resume when widget calls back |
 | `{ key: value, ... }` | Action node → merge into state → auto-advance to next node |
 
 ## Conditional edges
@@ -114,24 +114,32 @@ const flow = createFlow<{ email: string; isCompanyEmail: boolean; companyName: s
 Show a widget UI at a specific step. The widget calls back into the flow with its result.
 
 ```ts
-import { createFlow, interrupt, showWidget, createWidget, START, END } from "@waniwani/sdk/mcp";
+import { createResource, createFlow, createTool, interrupt, showWidget, registerTools, START, END } from "@waniwani/sdk/mcp";
 import { z } from "zod";
 
-// 1. Define the widget independently
-const pricingWidget = createWidget({
+// 1. Create and register a resource
+const pricingUI = createResource({
   id: "pricing_table",
   title: "Pricing Table",
   description: "Interactive pricing comparison",
   baseUrl: "https://my-app.com",
   htmlPath: "/widgets/pricing",
   widgetDomain: "my-app.com",
+});
+
+await pricingUI.register(server);
+
+// 2. Optionally create a standalone tool for the same resource
+const pricingTool = createTool({
+  resource: pricingUI,
+  description: "Show pricing comparison",
   inputSchema: { postalCode: z.string(), sqm: z.number() },
 }, async ({ postalCode, sqm }) => ({
   text: "Pricing loaded",
   data: { postalCode, sqm, prices: [/* ... */] },
 }));
 
-// 2. Reference it in the flow
+// 3. Reference the resource in a flow
 const flow = createFlow<{ postalCode: string; sqm: string; selectedPlan: string }>({
   id: "guided_quote",
   title: "Guided Quote",
@@ -143,9 +151,8 @@ const flow = createFlow<{ postalCode: string; sqm: string; selectedPlan: string 
   .addNode("ask_sqm", () =>
     interrupt({ question: "How many m² is your home?", field: "sqm" })
   )
-  .addNode("show_pricing", (state) =>
-    showWidget({
-      widgetId: "pricing_table",
+  .addNode("show_pricing", { resource: pricingUI }, (state) =>
+    showWidget(pricingUI, {
       data: { postalCode: state.postalCode, sqm: Number(state.sqm) },
       description: "Showing pricing comparison. User will select a plan.",
     })
@@ -160,8 +167,8 @@ const flow = createFlow<{ postalCode: string; sqm: string; selectedPlan: string 
   .addEdge("confirm", END)
   .compile();
 
-// 3. Register both
-await registerWidgets(server, [pricingWidget, flow]);
+// 4. Register
+await registerTools(server, [pricingTool, flow]);
 ```
 
 ### Widget callback (client-side)
@@ -218,26 +225,21 @@ Creates a new `StateGraph`. Config:
 | Method | Description |
 |--------|-------------|
 | `.addNode(name, handler)` | Add a node |
+| `.addNode(name, { resource }, handler)` | Add a node with a resource config |
 | `.addEdge(from, to)` | Static edge (`START` and `END` are valid) |
 | `.addConditionalEdge(from, condition)` | Dynamic routing based on state |
-| `.compile(options?)` | Validate graph and return a `RegisteredFlow` |
-
-### `compile(options?)`
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `widgetRefs` | `Record<string, RegisteredWidget>` | Map of widget IDs to `RegisteredWidget` objects for metadata resolution |
+| `.compile()` | Validate graph and return a `RegisteredFlow` |
 
 ### Helper functions
 
 | Function | Description |
 |----------|-------------|
 | `interrupt({ question, field, suggestions?, context? })` | Return from a node to pause and ask the user a question. `context` provides hidden instructions to the assistant to enrich its response using data from previous nodes. |
-| `showWidget({ widgetId, data, description? })` | Return from a node to pause and render a widget |
+| `showWidget(resource, { data, description? })` | Return from a node to pause and render a widget |
 
 ## Common Mistakes
 
 - **Forgetting `START`/`END` edges** — Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`
 - **Action nodes returning interrupt/widget** — If a node returns `interrupt()` or `showWidget()`, it becomes an interrupt/widget node, not an action node
-- **Missing widget registration** — When using `showWidget`, the referenced widget must also be passed to `registerWidgets`
+- **Forgetting to register the resource** — Call `await resource.register(server)` before registering the flow
 - **Widget callback shape** — The `callTool` call must include `action: "widget_result"`, `step`, `state`, and `widgetResult`

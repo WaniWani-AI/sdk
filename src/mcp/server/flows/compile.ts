@@ -22,7 +22,6 @@ interface CompileInput<TState extends Record<string, unknown>> {
 	config: FlowConfig;
 	nodes: Map<string, NodeHandler<TState>>;
 	edges: Map<string, Edge<TState>>;
-	widgetRefs?: Record<string, { id: string }>;
 }
 
 type FlowToolInput = {
@@ -76,24 +75,6 @@ async function resolveNextNode<TState extends Record<string, unknown>>(
 ): Promise<string> {
 	if (edge.type === "direct") return edge.to;
 	return edge.condition(state);
-}
-
-// ============================================================================
-// Widget metadata
-// ============================================================================
-
-function buildWidgetMeta(widgetId: string): Record<string, unknown> {
-	const openaiTemplateUri = `ui://widgets/apps-sdk/${widgetId}.html`;
-	const mcpTemplateUri = `ui://widgets/ext-apps/${widgetId}.html`;
-
-	return {
-		"openai/outputTemplate": openaiTemplateUri,
-		"openai/widgetAccessible": true,
-		"openai/resultCanProduceWidget": true,
-		ui: {
-			resourceUri: mcpTemplateUri,
-		},
-	};
 }
 
 // ============================================================================
@@ -159,11 +140,12 @@ async function executeFrom<TState extends Record<string, unknown>>(
 
 			// Widget signal — pause and show widget
 			if (isWidget(result)) {
+				const resource = result.resource;
 				return {
 					text: JSON.stringify({
 						status: "widget",
 						step: currentNode,
-						widgetId: result.widgetId,
+						widgetId: resource.id,
 						description: result.description,
 						state,
 					}),
@@ -175,7 +157,14 @@ async function executeFrom<TState extends Record<string, unknown>>(
 							state,
 						},
 					},
-					widgetMeta: buildWidgetMeta(result.widgetId),
+					widgetMeta: {
+						"openai/outputTemplate": resource.openaiUri,
+						"openai/widgetAccessible": true,
+						"openai/resultCanProduceWidget": true,
+						ui: {
+							resourceUri: resource.mcpUri,
+						},
+					},
 				};
 			}
 
@@ -261,7 +250,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			const startEdge = edges.get(START);
 			if (!startEdge) {
 				return {
-					text: JSON.stringify({ status: "error", error: "No start edge" }),
+					text: JSON.stringify({
+						status: "error",
+						error: "No start edge",
+					}),
 					data: { status: "error" },
 				};
 			}

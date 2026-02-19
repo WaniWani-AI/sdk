@@ -1,8 +1,8 @@
 import type {
-	CompileOptions,
 	ConditionFn,
 	Edge,
 	FlowConfig,
+	NodeConfig,
 	NodeHandler,
 	RegisteredFlow,
 } from "./@types";
@@ -37,14 +37,18 @@ export class StateGraph<TState extends Record<string, unknown>> {
 	}
 
 	/**
-	 * Add a node to the graph.
-	 *
-	 * The handler's return value determines the node type:
-	 * - Returns `Partial<TState>` → **action node**: state is merged, auto-advances to next node
-	 * - Returns `interrupt(...)` → **interrupt node**: pauses flow, asks user a question
-	 * - Returns `showWidget(...)` → **widget node**: pauses flow, renders a widget UI
+	 * Add a node with just a handler.
 	 */
-	addNode(name: string, handler: NodeHandler<TState>): this {
+	addNode(name: string, handler: NodeHandler<TState>): this;
+	/**
+	 * Add a node with config (e.g., resource) and a handler.
+	 */
+	addNode(name: string, config: NodeConfig, handler: NodeHandler<TState>): this;
+	addNode(
+		name: string,
+		configOrHandler: NodeConfig | NodeHandler<TState>,
+		maybeHandler?: NodeHandler<TState>,
+	): this {
 		if (name === START || name === END) {
 			throw new Error(
 				`"${name}" is a reserved name and cannot be used as a node name`,
@@ -53,6 +57,20 @@ export class StateGraph<TState extends Record<string, unknown>> {
 		if (this.nodes.has(name)) {
 			throw new Error(`Node "${name}" already exists`);
 		}
+
+		let handler: NodeHandler<TState>;
+
+		if (typeof configOrHandler === "function") {
+			handler = configOrHandler;
+		} else {
+			if (!maybeHandler) {
+				throw new Error(
+					`addNode("${name}", config, handler) requires a handler as the third argument`,
+				);
+			}
+			handler = maybeHandler;
+		}
+
 		this.nodes.set(name, handler);
 		return this;
 	}
@@ -91,14 +109,13 @@ export class StateGraph<TState extends Record<string, unknown>> {
 	 *
 	 * Validates the graph structure and returns a registration-compatible object.
 	 */
-	compile(options?: CompileOptions): RegisteredFlow {
+	compile(): RegisteredFlow {
 		this.validate();
 
 		return compileFlow<TState>({
 			config: this.config,
 			nodes: new Map(this.nodes),
 			edges: new Map(this.edges),
-			widgetRefs: options?.widgetRefs,
 		});
 	}
 
