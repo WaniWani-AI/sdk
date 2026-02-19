@@ -24,6 +24,7 @@ import { MessageList } from "../components/message-list";
 import { Suggestions } from "../components/suggestions";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSuggestions } from "../hooks/use-suggestions";
+import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { cn } from "../lib/utils";
 import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
 
@@ -35,6 +36,8 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			expandedHeight = 400,
 			allowAttachments = false,
 			welcomeMessage,
+			placeholder = "Ask me anything...",
+			triggerEvent = "triggerDemoRequest",
 			resourceEndpoint,
 			api,
 		} = props;
@@ -80,18 +83,57 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			[suggestionsState.clear, engine.handleSubmit],
 		);
 
+		const animatedPlaceholder = useTypingPlaceholder(placeholder, !engine.text);
+
+		const [isFocused, setIsFocused] = useState(false);
+		const [isHighlighted, setIsHighlighted] = useState(false);
+		const containerRef = useRef<HTMLDivElement>(null);
+		const highlightTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+		const focusInput = useCallback(() => {
+			const container = containerRef.current;
+			if (!container) return;
+			container.scrollIntoView({ behavior: "smooth", block: "center" });
+			const textarea = container.querySelector("textarea");
+			if (textarea) {
+				setTimeout(() => textarea.focus(), 300);
+			}
+			setIsFocused(true);
+			setIsHighlighted(true);
+			clearTimeout(highlightTimerRef.current);
+			highlightTimerRef.current = setTimeout(
+				() => setIsHighlighted(false),
+				2000,
+			);
+		}, []);
+
 		useImperativeHandle(
 			ref,
 			() => ({
 				sendMessage: (text: string) => {
 					engine.handleSubmit({ text, files: [] });
+					focusInput();
 				},
+				focus: focusInput,
 			}),
-			[engine.handleSubmit],
+			[engine.handleSubmit, focusInput],
 		);
 
-		const [isFocused, setIsFocused] = useState(false);
-		const containerRef = useRef<HTMLDivElement>(null);
+		// Listen for custom trigger event (e.g. "triggerDemoRequest")
+		useEffect(() => {
+			if (!triggerEvent) return;
+			const handler = (e: Event) => {
+				const detail = (e as CustomEvent).detail;
+				const message =
+					typeof detail?.message === "string" ? detail.message : undefined;
+				if (message) {
+					engine.handleSubmit({ text: message, files: [] });
+				}
+				focusInput();
+			};
+			window.addEventListener(triggerEvent, handler);
+			return () => window.removeEventListener(triggerEvent, handler);
+		}, [triggerEvent, engine.handleSubmit, focusInput]);
 		const isExpanded = isFocused;
 
 		// Close on outside click
@@ -171,6 +213,8 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 						multiple={allowAttachments}
 						className={cn(
 							"rounded-[var(--ww-radius)] shadow-sm transition-all duration-300 ease-out",
+							isHighlighted &&
+								"ring-2 ring-blue-400/70 ring-offset-2 ring-offset-background",
 						)}
 					>
 						<div className="flex items-center gap-1 px-3 py-2">
@@ -178,7 +222,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 							<PromptInputTextarea
 								onChange={engine.handleTextChange}
 								value={engine.text}
-								placeholder="Ask anything..."
+								placeholder={animatedPlaceholder}
 								onFocus={handleFocus}
 								className="min-h-0 py-1.5 px-2"
 							/>

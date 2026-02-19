@@ -65,6 +65,14 @@ export interface ChatBaseProps {
 	body?: Record<string, unknown>;
 	/** Enable file attachments in the input. Defaults to false. */
 	allowAttachments?: boolean;
+	/** Placeholder text shown in the input field. Defaults to "Ask me anything...". Animates with a typing effect. */
+	placeholder?: string;
+	/**
+	 * Name of a custom DOM event to listen for that triggers focus (scroll + glow) and optionally sends a message.
+	 * Dispatch via `new CustomEvent('triggerDemoRequest', { detail: { message: 'Hi!' } })`.
+	 * Set to `false` to disable. Defaults to `"triggerDemoRequest"`.
+	 */
+	triggerEvent?: string | false;
 	/** Callback fired when a message is sent */
 	onMessageSent?: (message: string) => void;
 	/** Callback fired when a response is received */
@@ -119,6 +127,8 @@ export interface ChatCardProps extends ChatBaseProps {
 export interface ChatHandle {
 	/** Programmatically send a user message into the chat */
 	sendMessage: (text: string) => void;
+	/** Scroll to the chat input, focus it, and show a highlight glow */
+	focus: () => void;
 }
 
 // ============================================================================

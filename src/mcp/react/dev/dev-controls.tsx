@@ -867,7 +867,9 @@ function DevControls({ defaultProps }: DevControlsProps) {
 								/>
 							</svg>
 						</div>
-						<div className="flex-1 text-gray-400 text-sm">Ask anything...</div>
+						<div className="flex-1 text-gray-400 text-sm">
+							Ask me anything...
+						</div>
 						<div className="w-8 h-8 rounded-full bg-[#424242] flex items-center justify-center">
 							<svg
 								aria-hidden="true"

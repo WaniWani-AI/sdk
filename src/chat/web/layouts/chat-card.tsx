@@ -1,6 +1,13 @@
 "use client";
 
-import { forwardRef, useCallback, useImperativeHandle } from "react";
+import {
+	forwardRef,
+	useCallback,
+	useEffect,
+	useImperativeHandle,
+	useRef,
+	useState,
+} from "react";
 import type { ChatCardProps, ChatHandle } from "../@types";
 import {
 	Conversation,
@@ -17,6 +24,7 @@ import { MessageList } from "../components/message-list";
 import { Suggestions } from "../components/suggestions";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSuggestions } from "../hooks/use-suggestions";
+import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { cn } from "../lib/utils";
 import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
 
@@ -31,6 +39,8 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			height = 600,
 			allowAttachments = false,
 			welcomeMessage,
+			placeholder = "Ask me anything...",
+			triggerEvent = "triggerDemoRequest",
 			resourceEndpoint,
 			api,
 		} = props;
@@ -43,6 +53,28 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 		const isDark = isDarkTheme(resolvedTheme);
 
 		const engine = useChatEngine(props);
+
+		const animatedPlaceholder = useTypingPlaceholder(placeholder, !engine.text);
+
+		const [isHighlighted, setIsHighlighted] = useState(false);
+		const cardRef = useRef<HTMLDivElement>(null);
+		const highlightTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+		const focusInput = useCallback(() => {
+			const container = cardRef.current;
+			if (!container) return;
+			container.scrollIntoView({ behavior: "smooth", block: "center" });
+			const textarea = container.querySelector("textarea");
+			if (textarea) {
+				setTimeout(() => textarea.focus(), 300);
+			}
+			setIsHighlighted(true);
+			clearTimeout(highlightTimerRef.current);
+			highlightTimerRef.current = setTimeout(
+				() => setIsHighlighted(false),
+				2000,
+			);
+		}, []);
 
 		const suggestionsState = useSuggestions({
 			messages: engine.messages,
@@ -81,18 +113,41 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			() => ({
 				sendMessage: (text: string) => {
 					engine.handleSubmit({ text, files: [] });
+					focusInput();
 				},
+				focus: focusInput,
 			}),
-			[engine.handleSubmit],
+			[engine.handleSubmit, focusInput],
 		);
+
+		// Listen for custom trigger event (e.g. "triggerDemoRequest")
+		useEffect(() => {
+			if (!triggerEvent) return;
+			const handler = (e: Event) => {
+				const detail = (e as CustomEvent).detail;
+				const message =
+					typeof detail?.message === "string" ? detail.message : undefined;
+				if (message) {
+					engine.handleSubmit({ text: message, files: [] });
+				}
+				focusInput();
+			};
+			window.addEventListener(triggerEvent, handler);
+			return () => window.removeEventListener(triggerEvent, handler);
+		}, [triggerEvent, engine.handleSubmit, focusInput]);
 
 		return (
 			<div
+				ref={cardRef}
 				style={{ ...cssVars, width, height }}
 				data-waniwani-chat=""
 				data-waniwani-layout="card"
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
-				className="flex flex-col font-[family-name:var(--ww-font)] text-foreground bg-background rounded-[var(--ww-radius)] border border-border shadow-md overflow-hidden"
+				className={cn(
+					"flex flex-col font-[family-name:var(--ww-font)] text-foreground bg-background rounded-[var(--ww-radius)] border border-border shadow-md overflow-hidden transition-shadow duration-300",
+					isHighlighted &&
+						"ring-2 ring-blue-400/70 ring-offset-2 ring-offset-background",
+				)}
 			>
 				{/* Header */}
 				<div
@@ -149,7 +204,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 							<PromptInputTextarea
 								onChange={engine.handleTextChange}
 								value={engine.text}
-								placeholder="Ask anything..."
+								placeholder={animatedPlaceholder}
 								className="min-h-0 py-1.5 px-2"
 							/>
 							<PromptInputSubmit status={engine.status} />
