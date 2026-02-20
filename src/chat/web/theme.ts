@@ -26,7 +26,7 @@ export const DARK_THEME: ChatTheme = {
 	textColor: "#ececec",
 	primaryForeground: "#ffffff",
 	mutedColor: "#8e8ea0",
-	borderColor: "#303030",
+	borderColor: "#444444",
 	assistantBubbleColor: "#2f2f2f",
 	userBubbleColor: "#303030",
 	inputBackgroundColor: "#2f2f2f",
