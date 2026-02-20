@@ -47,6 +47,11 @@ export interface SuggestionsConfig {
 	 * Defaults to an empty array.
 	 */
 	initial?: string[];
+	/**
+	 * Enable AI-generated suggestions after each response.
+	 * Defaults to `true` when suggestions config is provided.
+	 */
+	dynamic?: boolean;
 }
 
 // ============================================================================

@@ -43,7 +43,8 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 	);
 	const prevStatusRef = useRef<ChatStatus>(status);
 
-	const isEnabled = Boolean(config);
+	const isDynamicEnabled =
+		config === true || (isConfigObject(config) && config.dynamic !== false);
 
 	const clear = useCallback(() => {
 		setSuggestions([]);
@@ -62,7 +63,7 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		const prevStatus = prevStatusRef.current;
 		prevStatusRef.current = status;
 
-		if (prevStatus === "streaming" && status === "ready" && isEnabled) {
+		if (prevStatus === "streaming" && status === "ready" && isDynamicEnabled) {
 			const lastAssistant = [...messages]
 				.reverse()
 				.find((m) => m.role === "assistant");
@@ -76,7 +77,7 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 				setSuggestions(extracted);
 			}
 		}
-	}, [status, isEnabled, messages]);
+	}, [status, isDynamicEnabled, messages]);
 
 	return { suggestions, isLoading: false, clear };
 }
