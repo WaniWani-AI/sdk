@@ -34,7 +34,7 @@
 	}
 }
 
-@theme {
+@theme reference {
 	--color-background: #ffffff;
 	--color-foreground: #1f2937;
 	--color-primary: #6366f1;
@@ -57,22 +57,22 @@
 }
 
 [data-waniwani-chat] {
-	--color-background: var(--ww-bg);
-	--color-foreground: var(--ww-text);
-	--color-primary: var(--ww-primary);
-	--color-primary-foreground: var(--ww-primary-fg);
-	--color-muted-foreground: var(--ww-muted);
-	--color-border: var(--ww-border);
-	--color-input: var(--ww-input-bg);
-	--color-accent: var(--ww-assistant-bubble);
-	--color-accent-foreground: var(--ww-text);
-	--color-user-bubble: var(--ww-user-bubble);
-	--color-card: var(--ww-bg);
-	--color-card-foreground: var(--ww-text);
-	--color-card-header: var(--ww-header-bg);
-	--color-card-header-foreground: var(--ww-header-text);
-	--color-status: var(--ww-status);
-	--color-tool-card: var(--ww-tool-card);
-	--radius: var(--ww-radius);
-	--font-sans: var(--ww-font);
+	--color-background: var(--ww-bg, #ffffff);
+	--color-foreground: var(--ww-text, #1f2937);
+	--color-primary: var(--ww-primary, #6366f1);
+	--color-primary-foreground: var(--ww-primary-fg, #1f2937);
+	--color-muted-foreground: var(--ww-muted, #6b7280);
+	--color-border: var(--ww-border, #e5e7eb);
+	--color-input: var(--ww-input-bg, #f9fafb);
+	--color-accent: var(--ww-assistant-bubble, #f3f4f6);
+	--color-accent-foreground: var(--ww-text, #1f2937);
+	--color-user-bubble: var(--ww-user-bubble, #f4f4f4);
+	--color-card: var(--ww-bg, #ffffff);
+	--color-card-foreground: var(--ww-text, #1f2937);
+	--color-card-header: var(--ww-header-bg, #ffffff);
+	--color-card-header-foreground: var(--ww-header-text, #1f2937);
+	--color-status: var(--ww-status, #22c55e);
+	--color-tool-card: var(--ww-tool-card, #f4f4f5);
+	--radius: var(--ww-radius, 16px);
+	--font-sans: var(--ww-font, system-ui, -apple-system, "Segoe UI", sans-serif);
 }
