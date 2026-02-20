@@ -140,24 +140,28 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 				data-waniwani-layout="card"
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className={cn(
-					"flex flex-col font-[family-name:var(--ww-font)] text-foreground bg-background rounded-[var(--ww-radius)] border border-border shadow-md overflow-hidden transition-shadow duration-300",
+					"ww:flex ww:flex-col ww:font-[family-name:var(--ww-font)] ww:text-foreground ww:bg-background ww:rounded-[var(--ww-radius)] ww:border ww:border-border ww:shadow-md ww:overflow-hidden ww:transition-shadow ww:duration-300",
 					isHighlighted &&
-						"ring-2 ring-blue-400/70 ring-offset-2 ring-offset-background",
+						"ww:ring-2 ww:ring-blue-400/70 ww:ring-offset-2 ww:ring-offset-background",
 				)}
 			>
 				{/* Header */}
 				<div
-					className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-border"
+					className="ww:shrink-0 ww:flex ww:items-center ww:gap-3 ww:px-4 ww:py-2 ww:border-b ww:border-border"
 					style={{
 						backgroundColor: resolvedTheme.headerBackgroundColor,
 						color: resolvedTheme.headerTextColor,
 					}}
 				>
-					{showStatus && <span className="size-2.5 rounded-full bg-status" />}
-					<div className="flex-1 min-w-0">
-						<div className="text-xs font-semibold truncate">{title}</div>
+					{showStatus && (
+						<span className="ww:size-2.5 ww:rounded-full ww:bg-status" />
+					)}
+					<div className="ww:flex-1 ww:min-w-0">
+						<div className="ww:text-xs ww:font-semibold ww:truncate">
+							{title}
+						</div>
 						{subtitle && (
-							<div className="text-[11px] text-muted-foreground truncate">
+							<div className="ww:text-[11px] ww:text-muted-foreground ww:truncate">
 								{subtitle}
 							</div>
 						)}
@@ -165,7 +169,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 				</div>
 
 				{/* Messages */}
-				<Conversation className="flex-1 min-h-0 bg-background">
+				<Conversation className="ww:flex-1 ww:min-h-0 ww:bg-background">
 					<ConversationContent>
 						<MessageList
 							messages={engine.messages}
@@ -184,24 +188,24 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 					suggestions={suggestionsState.suggestions}
 					isLoading={suggestionsState.isLoading}
 					onSelect={handleSuggestionSelect}
-					className="border-t border-border"
+					className="ww:border-t ww:border-border"
 				/>
 
 				{/* Input */}
-				<div className="shrink-0 border-t border-border bg-background">
+				<div className="ww:shrink-0 ww:border-t ww:border-border ww:bg-background">
 					<PromptInput
 						onSubmit={engine.handleSubmit}
 						globalDrop={allowAttachments}
 						multiple={allowAttachments}
-						className={cn("rounded-none border-0")}
+						className={cn("ww:rounded-none ww:border-0")}
 					>
-						<div className="flex items-center gap-1 px-3 py-2">
+						<div className="ww:flex ww:items-center ww:gap-1 ww:px-3 ww:py-2">
 							{allowAttachments && <PromptInputAddAttachments />}
 							<PromptInputTextarea
 								onChange={engine.handleTextChange}
 								value={engine.text}
 								placeholder={animatedPlaceholder}
-								className="min-h-0 py-1.5 px-2"
+								className="ww:min-h-0 ww:py-1.5 ww:px-2"
 							/>
 							<PromptInputSubmit status={engine.status} />
 						</div>

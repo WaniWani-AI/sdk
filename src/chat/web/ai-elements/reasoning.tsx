@@ -14,7 +14,7 @@ export function Reasoning({ className, text, ...props }: ReasoningProps) {
 	return (
 		<pre
 			className={cn(
-				"mb-2 overflow-x-auto whitespace-pre-wrap break-words text-xs font-mono text-muted-foreground",
+				"ww:mb-2 ww:overflow-x-auto ww:whitespace-pre-wrap ww:break-words ww:text-xs ww:font-mono ww:text-muted-foreground",
 				className,
 			)}
 			{...props}

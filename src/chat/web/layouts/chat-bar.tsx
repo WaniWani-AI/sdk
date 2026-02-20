@@ -159,15 +159,15 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 				data-waniwani-chat=""
 				data-waniwani-layout="bar"
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
-				className="flex flex-col font-[family-name:var(--ww-font)] text-foreground"
+				className="ww:flex ww:flex-col ww:font-[family-name:var(--ww-font)] ww:text-foreground"
 			>
 				{/* Messages panel — fades up on expand */}
 				<div
 					className={cn(
-						"overflow-hidden bg-background/80 backdrop-blur-xl transition-all duration-300 ease-out",
+						"ww:overflow-hidden ww:bg-background/80 ww:backdrop-blur-xl ww:transition-all ww:duration-300 ww:ease-out",
 						isExpanded
-							? "opacity-100 translate-y-0"
-							: "opacity-0 translate-y-2 pointer-events-none max-h-0",
+							? "ww:opacity-100 ww:translate-y-0"
+							: "ww:opacity-0 ww:translate-y-2 ww:pointer-events-none ww:max-h-0",
 					)}
 					style={{
 						...(isExpanded ? { maxHeight: expandedHeight } : undefined),
@@ -179,7 +179,10 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 						WebkitMaskComposite: "source-in",
 					}}
 				>
-					<Conversation className="flex-1" style={{ height: expandedHeight }}>
+					<Conversation
+						className="ww:flex-1"
+						style={{ height: expandedHeight }}
+					>
 						<ConversationContent>
 							<MessageList
 								messages={engine.messages}
@@ -202,25 +205,25 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 				/>
 
 				{/* Input bar — always visible */}
-				<div className="shrink-0">
+				<div className="ww:shrink-0">
 					<PromptInput
 						onSubmit={engine.handleSubmit}
 						globalDrop={allowAttachments}
 						multiple={allowAttachments}
 						className={cn(
-							"rounded-[var(--ww-radius)] shadow-sm transition-all duration-300 ease-out",
+							"ww:rounded-[var(--ww-radius)] ww:shadow-sm ww:transition-all ww:duration-300 ww:ease-out",
 							isHighlighted &&
-								"ring-2 ring-blue-400/70 ring-offset-2 ring-offset-background",
+								"ww:ring-2 ww:ring-blue-400/70 ww:ring-offset-2 ww:ring-offset-background",
 						)}
 					>
-						<div className="flex items-center gap-1 px-3 py-2">
+						<div className="ww:flex ww:items-center ww:gap-1 ww:px-3 ww:py-2">
 							{allowAttachments && <PromptInputAddAttachments />}
 							<PromptInputTextarea
 								onChange={engine.handleTextChange}
 								value={engine.text}
 								placeholder={animatedPlaceholder}
 								onFocus={handleFocus}
-								className="min-h-0 py-1.5 px-2"
+								className="ww:min-h-0 ww:py-1.5 ww:px-2"
 							/>
 							<PromptInputSubmit status={engine.status} />
 						</div>

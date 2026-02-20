@@ -36,22 +36,26 @@ export const DARK_THEME: ChatTheme = {
 };
 
 const CSS_VAR_MAP: Record<keyof ChatTheme, string[]> = {
-	primaryColor: ["--ww-primary", "--color-primary"],
-	primaryForeground: ["--ww-primary-fg", "--color-primary-foreground"],
-	backgroundColor: ["--ww-bg", "--color-background"],
-	textColor: ["--ww-text", "--color-foreground", "--color-accent-foreground"],
-	mutedColor: ["--ww-muted", "--color-muted-foreground"],
-	borderColor: ["--ww-border", "--color-border"],
-	assistantBubbleColor: ["--ww-assistant-bubble", "--color-accent"],
+	primaryColor: ["--ww-primary", "--ww-color-primary"],
+	primaryForeground: ["--ww-primary-fg", "--ww-color-primary-foreground"],
+	backgroundColor: ["--ww-bg", "--ww-color-background"],
+	textColor: [
+		"--ww-text",
+		"--ww-color-foreground",
+		"--ww-color-accent-foreground",
+	],
+	mutedColor: ["--ww-muted", "--ww-color-muted-foreground"],
+	borderColor: ["--ww-border", "--ww-color-border"],
+	assistantBubbleColor: ["--ww-assistant-bubble", "--ww-color-accent"],
 	userBubbleColor: ["--ww-user-bubble"],
-	inputBackgroundColor: ["--ww-input-bg", "--color-input"],
-	borderRadius: ["--ww-radius", "--radius"],
+	inputBackgroundColor: ["--ww-input-bg", "--ww-color-input"],
+	borderRadius: ["--ww-radius"],
 	messageBorderRadius: ["--ww-msg-radius"],
 	fontFamily: ["--ww-font"],
 	headerBackgroundColor: ["--ww-header-bg"],
 	headerTextColor: ["--ww-header-text"],
 	statusColor: ["--ww-status"],
-	toolCardColor: ["--ww-tool-card", "--color-tool-card"],
+	toolCardColor: ["--ww-tool-card", "--ww-color-tool-card"],
 };
 
 export function mergeTheme(userTheme?: ChatTheme): Required<ChatTheme> {

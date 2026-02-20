@@ -54,6 +54,16 @@ When making changes to the SDK's public API or behavior, **always update the cor
 - `src/chat/web/` → `.claude/skills/waniwani-sdk/chat/react.md`
 - `src/chat/web/embed/` → `.claude/skills/waniwani-sdk/chat/embed.md`
 
+## CSS / Tailwind
+
+All Tailwind classes in `src/chat/web/` use the `ww` prefix (e.g. `ww:flex`, `ww:bg-primary`).
+This prevents the SDK's styles from leaking into host applications.
+
+- Prefix is configured via `@import "tailwindcss" prefix(ww);` in `src/chat/web/tailwind.css`
+- `tailwind-merge` is configured with `prefix: "ww"` in `src/chat/web/lib/utils.ts`
+- Always use the `ww:` prefix when adding new Tailwind classes in chat components
+- Theme CSS variables are prefixed too: `--color-*` becomes `--ww-color-*` in generated CSS
+
 ## Design Principles
 
 - Zero runtime dependencies

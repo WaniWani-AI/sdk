@@ -324,7 +324,7 @@ export function McpAppFrame({
 			ref={iframeRef}
 			src={iframeSrc}
 			sandbox="allow-scripts allow-forms allow-same-origin"
-			className={cn("rounded-md border border-border", className)}
+			className={cn("ww:rounded-md ww:border ww:border-border", className)}
 			style={{
 				height,
 				minWidth: width ? `min(${width}px, 100%)` : undefined,

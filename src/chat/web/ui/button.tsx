@@ -18,16 +18,17 @@ export const Button = ({
 	<button
 		type={type}
 		className={cn(
-			"inline-flex cursor-pointer items-center justify-center rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+			"ww:inline-flex ww:cursor-pointer ww:items-center ww:justify-center ww:rounded-md ww:font-medium ww:transition-colors ww:disabled:pointer-events-none ww:disabled:opacity-50",
 			variant === "default" &&
-				"bg-primary text-primary-foreground hover:bg-primary/90",
+				"ww:bg-primary ww:text-primary-foreground ww:hover:bg-primary/90",
 			variant === "outline" &&
-				"border border-border bg-background hover:bg-accent hover:text-accent-foreground",
-			variant === "ghost" && "hover:bg-accent hover:text-accent-foreground",
-			size === "default" && "h-9 px-4 py-2 text-sm",
-			size === "sm" && "h-8 px-3 text-xs",
-			size === "icon" && "size-9",
-			size === "icon-sm" && "size-7",
+				"ww:border ww:border-border ww:bg-background ww:hover:bg-accent ww:hover:text-accent-foreground",
+			variant === "ghost" &&
+				"ww:hover:bg-accent ww:hover:text-accent-foreground",
+			size === "default" && "ww:h-9 ww:px-4 ww:py-2 ww:text-sm",
+			size === "sm" && "ww:h-8 ww:px-3 ww:text-xs",
+			size === "icon" && "ww:size-9",
+			size === "icon-sm" && "ww:size-7",
 			className,
 		)}
 		{...props}

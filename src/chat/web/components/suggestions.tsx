@@ -20,12 +20,15 @@ export function Suggestions({
 	if (suggestions.length === 0 && !isLoading) return null;
 
 	return (
-		<div className={cn("flex flex-wrap gap-2 px-3 py-2", className)} {...props}>
+		<div
+			className={cn("ww:flex ww:flex-wrap ww:gap-2 ww:px-3 ww:py-2", className)}
+			{...props}
+		>
 			{isLoading
 				? [0, 1, 2].map((i) => (
 						<div
 							key={i}
-							className="h-7 rounded-full bg-accent animate-pulse"
+							className="ww:h-7 ww:rounded-full ww:bg-accent ww:animate-pulse"
 							style={{ width: `${60 + i * 20}px` }}
 						/>
 					))
@@ -35,10 +38,10 @@ export function Suggestions({
 							type="button"
 							onClick={() => onSelect(suggestion)}
 							className={cn(
-								"rounded-full border border-border bg-background px-3 py-1 text-xs",
-								"text-foreground hover:bg-accent hover:border-primary/30",
-								"transition-all duration-200 ease-out cursor-pointer",
-								"animate-[ww-fade-in_0.2s_ease-out_both]",
+								"ww:rounded-full ww:border ww:border-border ww:bg-background ww:px-3 ww:py-1 ww:text-xs",
+								"ww:text-foreground ww:hover:bg-accent ww:hover:border-primary/30",
+								"ww:transition-all ww:duration-200 ww:ease-out ww:cursor-pointer",
+								"ww:animate-[ww-fade-in_0.2s_ease-out_both]",
 							)}
 							style={{ animationDelay: `${index * 50}ms` }}
 						>

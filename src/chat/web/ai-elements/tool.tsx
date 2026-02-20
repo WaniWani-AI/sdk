@@ -104,18 +104,18 @@ function CopyButton({ text, className }: CopyButtonProps) {
 			size="sm"
 			onClick={handleCopy}
 			className={cn(
-				"h-auto gap-1 px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground",
+				"ww:h-auto ww:gap-1 ww:px-1.5 ww:py-0.5 ww:text-xs ww:text-muted-foreground ww:hover:text-foreground",
 				className,
 			)}
 		>
 			{copied ? (
 				<>
-					<CheckIcon className="size-3.5" />
+					<CheckIcon className="ww:size-3.5" />
 					<span>Copied</span>
 				</>
 			) : (
 				<>
-					<ClipboardCopyIcon className="size-3.5" />
+					<ClipboardCopyIcon className="ww:size-3.5" />
 					<span>Copy</span>
 				</>
 			)}
@@ -144,9 +144,9 @@ function CollapsibleJSON({
 	const preview = truncateJSON(data);
 
 	return (
-		<div className={cn("rounded-lg bg-tool-card", className)} {...props}>
-			<div className="flex items-center justify-between px-3 pt-2.5 pb-1.5">
-				<span className="text-xs font-medium text-muted-foreground">
+		<div className={cn("ww:rounded-lg ww:bg-tool-card", className)} {...props}>
+			<div className="ww:flex ww:items-center ww:justify-between ww:px-3 ww:pt-2.5 ww:pb-1.5">
+				<span className="ww:text-xs ww:font-medium ww:text-muted-foreground">
 					{label}
 				</span>
 				<CopyButton text={fullJSON} />
@@ -154,20 +154,20 @@ function CollapsibleJSON({
 			<button
 				type="button"
 				onClick={() => setExpanded((v) => !v)}
-				className="flex w-full items-start gap-2 px-3 pb-3 text-left"
+				className="ww:flex ww:w-full ww:items-start ww:gap-2 ww:px-3 ww:pb-3 ww:text-left"
 			>
 				<ChevronRightIcon
 					className={cn(
-						"mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform duration-150",
-						expanded && "rotate-90",
+						"ww:mt-0.5 ww:size-3.5 ww:shrink-0 ww:text-muted-foreground ww:transition-transform ww:duration-150",
+						expanded && "ww:rotate-90",
 					)}
 				/>
 				{expanded ? (
-					<pre className="overflow-x-auto text-xs font-mono text-foreground whitespace-pre-wrap break-all">
+					<pre className="ww:overflow-x-auto ww:text-xs ww:font-mono ww:text-foreground ww:whitespace-pre-wrap ww:break-all">
 						<code>{fullJSON}</code>
 					</pre>
 				) : (
-					<span className="truncate text-xs font-mono text-foreground/80">
+					<span className="ww:truncate ww:text-xs ww:font-mono ww:text-foreground/80">
 						{preview}
 					</span>
 				)}
@@ -212,7 +212,7 @@ export function Tool({
 			value={{ open, toggle: () => setOpen((o) => !o) }}
 		>
 			<div
-				className={cn("mb-4 w-full", className)}
+				className={cn("ww:mb-4 ww:w-full", className)}
 				data-state={open ? "open" : "closed"}
 				{...props}
 			>
@@ -242,23 +242,23 @@ export function ToolHeader({
 			type="button"
 			onClick={toggle}
 			className={cn(
-				"flex w-full items-center justify-between gap-3 py-1.5",
+				"ww:flex ww:w-full ww:items-center ww:justify-between ww:gap-3 ww:py-1.5",
 				className,
 			)}
 			aria-expanded={open}
 			{...props}
 		>
-			<div className="flex min-w-0 items-center gap-2">
-				<BracesIcon className="size-4 shrink-0 text-muted-foreground" />
-				<span className="truncate text-sm font-medium">{title}</span>
+			<div className="ww:flex ww:min-w-0 ww:items-center ww:gap-2">
+				<BracesIcon className="ww:size-4 ww:shrink-0 ww:text-muted-foreground" />
+				<span className="ww:truncate ww:text-sm ww:font-medium">{title}</span>
 				{isRunning && (
-					<span className="size-2 shrink-0 rounded-full bg-primary animate-pulse" />
+					<span className="ww:size-2 ww:shrink-0 ww:rounded-full ww:bg-primary ww:animate-pulse" />
 				)}
 			</div>
 			<ChevronDownIcon
 				className={cn(
-					"size-4 shrink-0 text-muted-foreground transition-transform duration-200",
-					open && "rotate-180",
+					"ww:size-4 ww:shrink-0 ww:text-muted-foreground ww:transition-transform ww:duration-200",
+					open && "ww:rotate-180",
 				)}
 			/>
 		</button>
@@ -282,7 +282,7 @@ export function ToolServerInfo({
 	return (
 		<div
 			className={cn(
-				"flex items-center gap-3 rounded-lg border border-border px-3 py-2.5",
+				"ww:flex ww:items-center ww:gap-3 ww:rounded-lg ww:border ww:border-border ww:px-3 ww:py-2.5",
 				className,
 			)}
 			{...props}
@@ -291,18 +291,22 @@ export function ToolServerInfo({
 				<img
 					src={serverIcon}
 					alt={serverName ?? ""}
-					className="size-8 shrink-0 rounded-full object-cover"
+					className="ww:size-8 ww:shrink-0 ww:rounded-full ww:object-cover"
 				/>
 			) : (
-				<div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
-					<ServerIcon className="size-4 text-muted-foreground" />
+				<div className="ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:border ww:border-border ww:bg-muted">
+					<ServerIcon className="ww:size-4 ww:text-muted-foreground" />
 				</div>
 			)}
-			<div className="flex min-w-0 flex-col">
+			<div className="ww:flex ww:min-w-0 ww:flex-col">
 				{serverName && (
-					<span className="text-xs text-muted-foreground">{serverName}</span>
+					<span className="ww:text-xs ww:text-muted-foreground">
+						{serverName}
+					</span>
 				)}
-				<span className="truncate text-sm font-semibold">{toolName}</span>
+				<span className="ww:truncate ww:text-sm ww:font-semibold">
+					{toolName}
+				</span>
 			</div>
 		</div>
 	);
@@ -321,14 +325,16 @@ export function ToolContent({
 	return (
 		<div
 			className={cn(
-				"grid transition-[grid-template-rows,opacity] duration-200 ease-out",
-				open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+				"ww:grid ww:transition-[grid-template-rows,opacity] ww:duration-200 ww:ease-out",
+				open
+					? "ww:grid-rows-[1fr] ww:opacity-100"
+					: "ww:grid-rows-[0fr] ww:opacity-0",
 			)}
 		>
-			<div className="min-h-0 overflow-hidden">
+			<div className="ww:min-h-0 ww:overflow-hidden">
 				<div
 					className={cn(
-						"mt-2 space-y-3 rounded-lg border border-border bg-background p-3",
+						"ww:mt-2 ww:space-y-3 ww:rounded-lg ww:border ww:border-border ww:bg-background ww:p-3",
 						className,
 					)}
 					{...props}
@@ -392,11 +398,11 @@ export function ToolOutput({
 
 	if (errorText) {
 		return (
-			<div className={cn("space-y-2", className)} {...props}>
-				<h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+			<div className={cn("ww:space-y-2", className)} {...props}>
+				<h4 className="ww:text-xs ww:font-medium ww:uppercase ww:tracking-wide ww:text-muted-foreground">
 					Error
 				</h4>
-				<div className="rounded-lg bg-destructive/10 p-3 text-xs text-destructive">
+				<div className="ww:rounded-lg ww:bg-destructive/10 ww:p-3 ww:text-xs ww:text-destructive">
 					{errorText}
 				</div>
 			</div>

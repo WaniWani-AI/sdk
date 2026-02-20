@@ -24,12 +24,12 @@ export class WidgetErrorBoundary extends Component<Props, State> {
 	render() {
 		if (this.state.hasError) {
 			return (
-				<div className="flex items-center justify-between rounded-md border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+				<div className="ww:flex ww:items-center ww:justify-between ww:rounded-md ww:border ww:border-border ww:bg-muted/50 ww:px-4 ww:py-3 ww:text-sm ww:text-muted-foreground">
 					<span>Widget failed to load</span>
 					<button
 						type="button"
 						onClick={() => this.setState({ hasError: false })}
-						className="text-xs font-medium text-primary hover:underline"
+						className="ww:text-xs ww:font-medium ww:text-primary ww:hover:underline"
 					>
 						Retry
 					</button>

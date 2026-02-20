@@ -8,11 +8,11 @@ export type LoaderProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 export const Loader = ({ className, size = 5, ...props }: LoaderProps) => (
-	<div className={cn("flex items-center gap-1", className)} {...props}>
+	<div className={cn("ww:flex ww:items-center ww:gap-1", className)} {...props}>
 		{[0, 1, 2].map((i) => (
 			<div
 				key={i}
-				className="rounded-full bg-muted-foreground/60"
+				className="ww:rounded-full ww:bg-muted-foreground/60"
 				style={{
 					width: size,
 					height: size,

@@ -261,7 +261,7 @@ export const PromptInput = ({
 			<input
 				accept={accept}
 				aria-label="Upload files"
-				className="hidden"
+				className="ww:hidden"
 				multiple={multiple}
 				onChange={handleChange}
 				ref={inputRef}
@@ -270,7 +270,7 @@ export const PromptInput = ({
 			/>
 			<form
 				className={cn(
-					"flex w-full flex-col rounded-lg border border-border bg-background",
+					"ww:flex ww:w-full ww:flex-col ww:rounded-lg ww:border ww:border-border ww:bg-background",
 					className,
 				)}
 				onSubmit={handleSubmit}
@@ -293,7 +293,10 @@ export const PromptInputHeader = ({
 	className,
 	...props
 }: PromptInputHeaderProps) => (
-	<div className={cn("flex flex-wrap gap-1 px-3 pt-3", className)} {...props} />
+	<div
+		className={cn("ww:flex ww:flex-wrap ww:gap-1 ww:px-3 ww:pt-3", className)}
+		{...props}
+	/>
 );
 
 export type PromptInputBodyProps = HTMLAttributes<HTMLDivElement>;
@@ -302,7 +305,7 @@ export const PromptInputBody = ({
 	className,
 	...props
 }: PromptInputBodyProps) => (
-	<div className={cn("contents", className)} {...props} />
+	<div className={cn("ww:contents", className)} {...props} />
 );
 
 export type PromptInputFooterProps = HTMLAttributes<HTMLDivElement>;
@@ -313,7 +316,7 @@ export const PromptInputFooter = ({
 }: PromptInputFooterProps) => (
 	<div
 		className={cn(
-			"flex items-center justify-between gap-1 px-3 pb-3",
+			"ww:flex ww:items-center ww:justify-between ww:gap-1 ww:px-3 ww:pb-3",
 			className,
 		)}
 		{...props}
@@ -327,7 +330,7 @@ export const PromptInputTools = ({
 	...props
 }: PromptInputToolsProps) => (
 	<div
-		className={cn("flex min-w-0 items-center gap-1", className)}
+		className={cn("ww:flex ww:min-w-0 ww:items-center ww:gap-1", className)}
 		{...props}
 	/>
 );
@@ -402,7 +405,7 @@ export const PromptInputTextarea = ({
 	return (
 		<textarea
 			className={cn(
-				"field-sizing-content max-h-48 min-h-16 w-full resize-none border-0 bg-transparent px-3 py-3 text-sm outline-none placeholder:text-muted-foreground",
+				"ww:field-sizing-content ww:max-h-48 ww:min-h-16 ww:w-full ww:resize-none ww:border-0 ww:bg-transparent ww:px-3 ww:py-3 ww:text-sm ww:outline-none ww:placeholder:text-muted-foreground",
 				className,
 			)}
 			name="message"
@@ -436,11 +439,11 @@ export const PromptInputSubmit = ({
 }: PromptInputSubmitProps) => {
 	const isGenerating = status === "submitted" || status === "streaming";
 
-	let Icon = <ArrowUpIcon className="size-4" />;
+	let Icon = <ArrowUpIcon className="ww:size-4" />;
 	if (status === "submitted") {
-		Icon = <LoaderIcon className="size-4 animate-spin" />;
+		Icon = <LoaderIcon className="ww:size-4 ww:animate-spin" />;
 	} else if (status === "streaming") {
-		Icon = <SquareIcon className="size-4" />;
+		Icon = <SquareIcon className="ww:size-4" />;
 	}
 
 	const handleClick = useCallback(
@@ -459,7 +462,7 @@ export const PromptInputSubmit = ({
 		<Button
 			aria-label={isGenerating ? "Stop" : "Submit"}
 			className={cn(
-				"bg-foreground text-background hover:bg-foreground",
+				"ww:bg-foreground ww:text-background ww:hover:bg-foreground",
 				className,
 			)}
 			onClick={handleClick}
@@ -490,7 +493,7 @@ export const PromptInputAddAttachments = ({
 	if (hasFiles) {
 		return (
 			<Button
-				className={cn("group relative", className)}
+				className={cn("ww:group ww:relative", className)}
 				onClick={() => attachments.clear()}
 				size="icon-sm"
 				type="button"
@@ -498,10 +501,10 @@ export const PromptInputAddAttachments = ({
 				aria-label="Remove all attachments"
 				{...props}
 			>
-				<span className="flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground transition-opacity group-hover:opacity-0">
+				<span className="ww:flex ww:size-5 ww:items-center ww:justify-center ww:rounded-full ww:bg-primary ww:text-[10px] ww:font-medium ww:text-primary-foreground ww:transition-opacity ww:group-hover:opacity-0">
 					{attachments.files.length}
 				</span>
-				<XIcon className="absolute size-4 opacity-0 transition-opacity group-hover:opacity-100" />
+				<XIcon className="ww:absolute ww:size-4 ww:opacity-0 ww:transition-opacity ww:group-hover:opacity-100" />
 			</Button>
 		);
 	}
@@ -515,7 +518,7 @@ export const PromptInputAddAttachments = ({
 			variant="ghost"
 			{...props}
 		>
-			{children ?? <PaperclipIcon className="size-4" />}
+			{children ?? <PaperclipIcon className="ww:size-4" />}
 		</Button>
 	);
 };
