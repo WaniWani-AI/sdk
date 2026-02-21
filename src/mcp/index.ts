@@ -28,6 +28,17 @@ export {
 	StateGraph,
 	showWidget,
 } from "./server/flows";
+// Dynamic flows — AI-driven form gathering
+export type {
+	BooleanField,
+	DynamicFlowConfig,
+	FieldDefinition,
+	NumberField,
+	SelectField,
+	TextField,
+	WidgetField,
+} from "./server/flows";
+export { createDynamicFlow, field } from "./server/flows";
 export type {
 	RegisteredResource,
 	ResourceConfig,

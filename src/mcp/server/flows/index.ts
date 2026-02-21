@@ -15,3 +15,14 @@ export { END, interrupt, START, showWidget } from "./@types";
 export { createFlow } from "./create-flow";
 // Builder
 export { StateGraph } from "./state-graph";
+// Dynamic flows — AI-driven form gathering
+export type {
+	BooleanField,
+	DynamicFlowConfig,
+	FieldDefinition,
+	NumberField,
+	SelectField,
+	TextField,
+	WidgetField,
+} from "./dynamic";
+export { createDynamicFlow, field } from "./dynamic";
