@@ -53,6 +53,7 @@ import { ChatWidget } from "@waniwani/sdk/chat";
 | `theme`              | `ChatTheme`                   | see Theming                          |
 | `headers`            | `Record<string, string>`      | —                                    |
 | `body`               | `Record<string, unknown>`     | —                                    |
+| `sessionStorageKey`  | `string`                      | derived from `api` endpoint          |
 | `width`              | `number`                      | `400`                                |
 | `height`             | `number`                      | `600`                                |
 | `allowAttachments`   | `boolean`                     | `false`                              |
