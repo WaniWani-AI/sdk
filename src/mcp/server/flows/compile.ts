@@ -249,14 +249,13 @@ async function executeFrom<TState extends Record<string, unknown>>(
 							state,
 						},
 					},
-					widgetMeta: {
-						"openai/outputTemplate": resource.openaiUri,
-						"openai/widgetAccessible": true,
-						"openai/resultCanProduceWidget": true,
-						ui: {
-							resourceUri: resource.mcpUri,
-						},
-					},
+					widgetMeta: buildToolMeta({
+						openaiTemplateUri: resource.openaiUri,
+						mcpTemplateUri: resource.mcpUri,
+						invoking: "Loading...",
+						invoked: "Loaded",
+						autoHeight: resource.autoHeight,
+					}),
 				};
 			}
 
