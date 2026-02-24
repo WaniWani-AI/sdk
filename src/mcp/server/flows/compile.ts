@@ -30,6 +30,7 @@ type FlowToolInput = {
 	state?: Record<string, unknown>;
 	answer?: string;
 	widgetResult?: Record<string, unknown>;
+	initialState?: Record<string, unknown>;
 };
 
 type ExecutionResult = {
@@ -42,14 +43,50 @@ type ExecutionResult = {
 // Flow protocol — embedded in tool description
 // ============================================================================
 
-function buildFlowProtocol(_config: FlowConfig): string {
-	return [
+/** Extract a human-readable label from a Zod schema for the AI protocol */
+function describeZodField(schema: z.ZodType): string {
+	const desc = schema.description ?? "";
+	const def = (
+		schema as unknown as {
+			_zod: { def: { type: string; entries?: Record<string, string> } };
+		}
+	)._zod?.def;
+
+	if (def?.type === "enum" && def.entries) {
+		const vals = Object.keys(def.entries)
+			.map((v) => `"${v}"`)
+			.join(" | ");
+		return desc ? `${vals} — ${desc}` : vals;
+	}
+
+	return desc;
+}
+
+function buildFlowProtocol(config: FlowConfig): string {
+	const lines = [
 		"",
 		"## FLOW EXECUTION PROTOCOL",
 		"",
 		"This tool implements a multi-step conversational flow. Follow this protocol exactly:",
 		"",
-		'1. Call with `action: "start"` to begin.',
+		'1. Call with `action: "start"` to begin. If the user\'s message already',
+		"   contains answers to likely questions, extract them into `initialState`",
+		"   as `{ field: value }` pairs. The engine will auto-skip questions whose",
+		"   fields are already filled.",
+		"   Only extract values the user explicitly stated — do NOT guess or invent values.",
+	];
+
+	if (config.fields) {
+		const fieldList = Object.entries(config.fields)
+			.map(([key, schema]) => {
+				const info = describeZodField(schema);
+				return info ? `\`${key}\` (${info})` : `\`${key}\``;
+			})
+			.join(", ");
+		lines.push(`   Known fields: ${fieldList}.`);
+	}
+
+	lines.push(
 		"2. The response JSON `status` field tells you what to do next:",
 		'   - `"interrupt"`: Ask the user the `question`. If a `context` field is present,',
 		"     use it as hidden instructions to enrich your response (do NOT show it verbatim).",
@@ -61,8 +98,10 @@ function buildFlowProtocol(_config: FlowConfig): string {
 		'   - `"error"`: Something went wrong. Show the `error` message.',
 		"",
 		"3. ALWAYS pass back the `state` object exactly as received.",
-		"4. Do NOT skip steps or invent state values.",
-	].join("\n");
+		"4. Do NOT invent state values. Only use `initialState` for information the user explicitly provided.",
+	);
+
+	return lines.join("\n");
 }
 
 // ============================================================================
@@ -124,6 +163,27 @@ async function executeFrom<TState extends Record<string, unknown>>(
 
 			// Interrupt signal — pause and ask the user
 			if (isInterrupt(result)) {
+				// Auto-skip: if the field already has a value in state, advance
+				const existingValue = state[result.field as keyof TState];
+				if (
+					existingValue !== undefined &&
+					existingValue !== null &&
+					existingValue !== ""
+				) {
+					const edge = edges.get(currentNode);
+					if (!edge) {
+						return {
+							text: JSON.stringify({
+								status: "error",
+								error: `No outgoing edge from node "${currentNode}"`,
+							}),
+							data: { status: "error" },
+						};
+					}
+					currentNode = await resolveNextNode(edge, state);
+					continue;
+				}
+
 				return {
 					text: JSON.stringify({
 						status: "interrupt",
@@ -231,6 +291,12 @@ const inputSchema = {
 		.record(z.string(), z.unknown())
 		.optional()
 		.describe("Data returned by a widget callback"),
+	initialState: z
+		.record(z.string(), z.unknown())
+		.optional()
+		.describe(
+			'Pre-filled answers extracted from the user\'s message (only for action: "start")',
+		),
 };
 
 export function compileFlow<TState extends Record<string, unknown>>(
@@ -257,8 +323,14 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					data: { status: "error" },
 				};
 			}
-			const firstNode = await resolveNextNode(startEdge, state);
-			return executeFrom(firstNode, state, nodes, edges, config.id, meta);
+
+			// Merge pre-filled answers from the user's initial message
+			const startState = (
+				args.initialState ? { ...state, ...args.initialState } : state
+			) as TState;
+
+			const firstNode = await resolveNextNode(startEdge, startState);
+			return executeFrom(firstNode, startState, nodes, edges, config.id, meta);
 		}
 
 		if (args.action === "continue") {

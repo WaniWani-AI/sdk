@@ -65,6 +65,39 @@ const flow = createFlow<LeadState>({
 await registerTools(server, [flow]);
 ```
 
+## Pre-filling answers with `initialState`
+
+When calling `action: "start"`, the AI can include an `initialState` object with answers extracted from the user's message. The engine automatically skips interrupt nodes whose fields are already populated in state.
+
+To enable this, declare a `fields` map on the flow config — the keys match your `interrupt({ field })` names and the values are Zod schemas with `.describe()`. These get embedded in the tool description so the AI knows exactly which keys to use and what types to expect:
+
+```ts
+const flow = createFlow<SignupState>({
+  id: "signup",
+  title: "Signup",
+  description: "Sign up for a new account",
+  fields: {
+    country: z.string().describe("Country the business is based in"),
+    status: z.enum(["registered", "unregistered"]).describe("Business registration status"),
+    email: z.string().describe("Work email address"),
+  },
+})
+```
+
+If a user says "I want to open a bank account in France", the AI calls:
+```json
+{ "action": "start", "initialState": { "country": "France" } }
+```
+
+The flow skips the "which country?" question and proceeds to the next unanswered step.
+
+**Rules:**
+- Only interrupt nodes are auto-skipped. Widget nodes always pause.
+- Action nodes between skipped interrupts still execute (their logic may be needed for conditional edges).
+- Fields with `undefined`, `null`, or `""` are NOT considered pre-filled.
+- The AI should only extract values the user explicitly stated — never guess.
+- `fields` is optional — flows without it still work, the AI just can't reliably pre-fill.
+
 ## Node types
 
 | Return value | Behavior |

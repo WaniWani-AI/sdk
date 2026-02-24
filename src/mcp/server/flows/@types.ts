@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import type { McpServer, RegisteredResource } from "../resources/types";
 
 export type { McpServer };
@@ -128,6 +129,21 @@ export type FlowConfig = {
 	title: string;
 	/** Description for the AI (explains when to use this flow) */
 	description: string;
+	/**
+	 * Describe the flow's state fields so the AI can pre-fill answers
+	 * from the user's message via `initialState`.
+	 * Keys are the field names used in `interrupt({ field })`,
+	 * values are Zod schemas with `.describe()`.
+	 *
+	 * @example
+	 * ```ts
+	 * fields: {
+	 *   country: z.string().describe("Country the business is based in"),
+	 *   status: z.enum(["registered", "unregistered"]).describe("Business registration status"),
+	 * }
+	 * ```
+	 */
+	fields?: Record<string, z.ZodType>;
 	/** Optional tool annotations */
 	annotations?: {
 		readOnlyHint?: boolean;
