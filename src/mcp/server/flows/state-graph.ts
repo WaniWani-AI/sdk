@@ -29,6 +29,7 @@ import { compileFlow } from "./compile";
  */
 export class StateGraph<TState extends Record<string, unknown>> {
 	private nodes = new Map<string, NodeHandler<TState>>();
+	private nodeConfigs = new Map<string, NodeConfig<TState>>();
 	private edges = new Map<string, Edge<TState>>();
 	private config: FlowConfig;
 
@@ -41,12 +42,16 @@ export class StateGraph<TState extends Record<string, unknown>> {
 	 */
 	addNode(name: string, handler: NodeHandler<TState>): this;
 	/**
-	 * Add a node with config (e.g., resource) and a handler.
+	 * Add a node with config (e.g., resource, field) and a handler.
 	 */
-	addNode(name: string, config: NodeConfig, handler: NodeHandler<TState>): this;
 	addNode(
 		name: string,
-		configOrHandler: NodeConfig | NodeHandler<TState>,
+		config: NodeConfig<TState>,
+		handler: NodeHandler<TState>,
+	): this;
+	addNode(
+		name: string,
+		configOrHandler: NodeConfig<TState> | NodeHandler<TState>,
 		maybeHandler?: NodeHandler<TState>,
 	): this {
 		if (name === START || name === END) {
@@ -59,6 +64,7 @@ export class StateGraph<TState extends Record<string, unknown>> {
 		}
 
 		let handler: NodeHandler<TState>;
+		let nodeConfig: NodeConfig<TState> = {};
 
 		if (typeof configOrHandler === "function") {
 			handler = configOrHandler;
@@ -69,9 +75,11 @@ export class StateGraph<TState extends Record<string, unknown>> {
 				);
 			}
 			handler = maybeHandler;
+			nodeConfig = configOrHandler;
 		}
 
 		this.nodes.set(name, handler);
+		this.nodeConfigs.set(name, nodeConfig);
 		return this;
 	}
 
@@ -115,6 +123,7 @@ export class StateGraph<TState extends Record<string, unknown>> {
 		return compileFlow<TState>({
 			config: this.config,
 			nodes: new Map(this.nodes),
+			nodeConfigs: new Map(this.nodeConfigs),
 			edges: new Map(this.edges),
 		});
 	}

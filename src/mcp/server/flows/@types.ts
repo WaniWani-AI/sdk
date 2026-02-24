@@ -37,8 +37,6 @@ export type WidgetSignal = {
 	data: Record<string, unknown>;
 	/** Description of what the widget does (for the AI's context) */
 	description?: string;
-	/** State key this widget fills — enables auto-skip when the field is already in state */
-	field?: string;
 };
 
 /**
@@ -61,8 +59,6 @@ export function showWidget(
 	config: {
 		data: Record<string, unknown>;
 		description?: string;
-		/** State key this widget fills — enables auto-skip when the field is already in state */
-		field?: string;
 	},
 ): WidgetSignal {
 	return { __type: WIDGET, resource, ...config };
@@ -93,9 +89,13 @@ export function isWidget(value: unknown): value is WidgetSignal {
 export type MaybePromise<T> = T | Promise<T>;
 
 /** Configuration for a flow node */
-export type NodeConfig = {
+export type NodeConfig<
+	TState extends Record<string, unknown> = Record<string, unknown>,
+> = {
 	/** Resource to display when this node returns a WidgetSignal */
 	resource?: RegisteredResource;
+	/** State key this node fills — enables auto-skip when the field is already in state via `initialState` */
+	field?: Extract<keyof TState, string>;
 };
 
 /**

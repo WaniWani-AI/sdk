@@ -9,6 +9,7 @@ import type {
 	Edge,
 	FlowConfig,
 	McpServer,
+	NodeConfig,
 	NodeHandler,
 	RegisteredFlow,
 } from "./@types";
@@ -21,6 +22,7 @@ import { END, isInterrupt, isWidget, START } from "./@types";
 interface CompileInput<TState extends Record<string, unknown>> {
 	config: FlowConfig;
 	nodes: Map<string, NodeHandler<TState>>;
+	nodeConfigs: Map<string, NodeConfig<TState>>;
 	edges: Map<string, Edge<TState>>;
 }
 
@@ -124,6 +126,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 	startNodeName: string,
 	initialState: TState,
 	nodes: Map<string, NodeHandler<TState>>,
+	nodeConfigs: Map<string, NodeConfig<TState>>,
 	edges: Map<string, Edge<TState>>,
 	flowId: string,
 	meta?: Record<string, unknown>,
@@ -200,9 +203,10 @@ async function executeFrom<TState extends Record<string, unknown>>(
 
 			// Widget signal — pause and show widget
 			if (isWidget(result)) {
-				// Auto-skip: if the widget declares a field and it's already filled, advance
-				if (result.field) {
-					const existingValue = state[result.field as keyof TState];
+				// Auto-skip: if the node config declares a field and it's already filled, advance
+				const nodeField = nodeConfigs.get(currentNode)?.field;
+				if (nodeField) {
+					const existingValue = state[nodeField as keyof TState];
 					if (
 						existingValue !== undefined &&
 						existingValue !== null &&
@@ -325,7 +329,7 @@ const inputSchema = {
 export function compileFlow<TState extends Record<string, unknown>>(
 	input: CompileInput<TState>,
 ): RegisteredFlow {
-	const { config, nodes, edges } = input;
+	const { config, nodes, nodeConfigs, edges } = input;
 	const protocol = buildFlowProtocol(config);
 	const fullDescription = `${config.description}\n${protocol}`;
 
@@ -353,7 +357,15 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			) as TState;
 
 			const firstNode = await resolveNextNode(startEdge, startState);
-			return executeFrom(firstNode, startState, nodes, edges, config.id, meta);
+			return executeFrom(
+				firstNode,
+				startState,
+				nodes,
+				nodeConfigs,
+				edges,
+				config.id,
+				meta,
+			);
 		}
 
 		if (args.action === "continue") {
@@ -398,7 +410,15 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 			const nextNode = await resolveNextNode(edge, updatedState);
-			return executeFrom(nextNode, updatedState, nodes, edges, config.id, meta);
+			return executeFrom(
+				nextNode,
+				updatedState,
+				nodes,
+				nodeConfigs,
+				edges,
+				config.id,
+				meta,
+			);
 		}
 
 		if (args.action === "widget_result") {
@@ -430,7 +450,15 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 			const nextNode = await resolveNextNode(edge, updatedState);
-			return executeFrom(nextNode, updatedState, nodes, edges, config.id, meta);
+			return executeFrom(
+				nextNode,
+				updatedState,
+				nodes,
+				nodeConfigs,
+				edges,
+				config.id,
+				meta,
+			);
 		}
 
 		return {
