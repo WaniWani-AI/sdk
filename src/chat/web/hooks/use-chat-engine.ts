@@ -156,6 +156,8 @@ export function useChatEngine(props: ChatBaseProps) {
 		setQueuedMessages((prev) => prev.filter((m) => m.id !== id));
 	}, []);
 
+	const queueFull = isLoading && queuedMessages.length > 0;
+
 	const handleSubmit = useCallback(
 		(message: PromptInputMessage) => {
 			const hasText = Boolean(message.text?.trim());
@@ -163,6 +165,9 @@ export function useChatEngine(props: ChatBaseProps) {
 			if (!(hasText || hasFiles)) return;
 
 			if (isLoading) {
+				// Only allow one queued message at a time
+				if (queuedMessages.length > 0) return;
+
 				setQueuedMessages((prev) => [
 					...prev,
 					{
@@ -183,25 +188,23 @@ export function useChatEngine(props: ChatBaseProps) {
 			onMessageSent?.(message.text || "");
 			setText("");
 		},
-		[sendMessage, onMessageSent, isLoading],
+		[sendMessage, onMessageSent, isLoading, queuedMessages.length],
 	);
 
 	// Flush first queued message once the current response finishes
 	useEffect(() => {
 		if (status !== "ready") return;
-		setQueuedMessages((prev) => {
-			if (prev.length === 0) return prev;
-			const [first, ...rest] = prev;
+		if (queuedMessages.length === 0) return;
 
-			sendMessage({
-				text: first.text,
-				files: first.files.length > 0 ? first.files : undefined,
-			});
-			onMessageSent?.(first.text);
+		const [first, ...rest] = queuedMessages;
+		setQueuedMessages(rest);
 
-			return rest;
+		sendMessage({
+			text: first.text,
+			files: first.files.length > 0 ? first.files : undefined,
 		});
-	}, [status, sendMessage, onMessageSent]);
+		onMessageSent?.(first.text);
+	}, [status, sendMessage, onMessageSent, queuedMessages]);
 
 	const handleTextChange = useCallback(
 		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -228,6 +231,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		hasMessages,
 		sendMessage,
 		queuedMessages,
+		queueFull,
 		removeQueuedMessage,
 	};
 }

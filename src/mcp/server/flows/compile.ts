@@ -5,6 +5,8 @@ import type {
 	ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { buildToolMeta } from "../resources/meta";
+import type { RegisteredResource } from "../resources/types";
 import type {
 	Edge,
 	FlowConfig,
@@ -95,7 +97,10 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"     Then call again with:",
 		'     `action: "continue"`, `step` = the returned `step`, `state` = the returned `state`,',
 		"     `answer` = the user's answer.",
-		'   - `"widget"`: A widget UI is being shown. Do NOT call this tool again — the widget handles the callback.',
+		'   - `"widget"`: A widget UI is being shown. The user will interact with the widget.',
+		"     When the user makes a choice and you need to continue the flow, call again with:",
+		'     `action: "widget_result"`, `step` = the returned `step`, `state` = the returned `state`,',
+		"     `answer` = the user's selection.",
 		'   - `"complete"`: The flow is done. Present the result to the user.',
 		'   - `"error"`: Something went wrong. Show the `error` message.',
 		"",
@@ -333,6 +338,25 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	const protocol = buildFlowProtocol(config);
 	const fullDescription = `${config.description}\n${protocol}`;
 
+	// Find the first resource from node configs to build tool-level widget metadata.
+	// This tells OpenAI/Claude that this tool can produce widget UIs.
+	let firstResource: RegisteredResource | undefined;
+	for (const nc of nodeConfigs.values()) {
+		if (nc.resource) {
+			firstResource = nc.resource;
+			break;
+		}
+	}
+	const toolMeta = firstResource
+		? buildToolMeta({
+				openaiTemplateUri: firstResource.openaiUri,
+				mcpTemplateUri: firstResource.mcpUri,
+				invoking: "Loading...",
+				invoked: "Loaded",
+				autoHeight: firstResource.autoHeight,
+			})
+		: undefined;
+
 	async function handleToolCall(
 		args: FlowToolInput,
 		meta?: Record<string, unknown>,
@@ -491,6 +515,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					description: fullDescription,
 					inputSchema,
 					annotations: config.annotations,
+					...(toolMeta && { _meta: toolMeta }),
 				},
 				(async (args: FlowToolInput, extra: unknown) => {
 					const requestExtra = extra as RequestHandlerExtra<
@@ -505,6 +530,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 						content: [{ type: "text" as const, text: result.text }],
 						structuredContent: result.data,
 						_meta: {
+							...(toolMeta ?? {}),
 							...(result.widgetMeta ?? {}),
 							..._meta,
 						},

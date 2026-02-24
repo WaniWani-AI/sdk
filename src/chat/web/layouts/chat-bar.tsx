@@ -241,7 +241,10 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 								onFocus={handleFocus}
 								className="ww:min-h-0 ww:py-1.5 ww:px-2"
 							/>
-							<PromptInputSubmit status={engine.status} />
+							<PromptInputSubmit
+								status={engine.status}
+								disabled={engine.queueFull}
+							/>
 						</div>
 					</PromptInput>
 				</div>
