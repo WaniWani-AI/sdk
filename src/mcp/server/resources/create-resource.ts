@@ -34,8 +34,13 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 		widgetDomain,
 		prefersBorder = true,
 		autoHeight,
-		widgetCSP,
 	} = config;
+
+	// Auto-generate CSP from baseUrl if not explicitly provided
+	const widgetCSP = config.widgetCSP ?? {
+		connect_domains: [baseUrl],
+		resource_domains: [baseUrl],
+	};
 
 	const openaiUri = `ui://widgets/apps-sdk/${id}.html`;
 	const mcpUri = `ui://widgets/ext-apps/${id}.html`;
@@ -106,6 +111,7 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 						_meta: buildMcpAppsResourceMeta({
 							description: uiDescription,
 							prefersBorder,
+							widgetDomain,
 							widgetCSP,
 						}),
 					},

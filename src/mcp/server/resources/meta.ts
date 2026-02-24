@@ -62,6 +62,7 @@ interface McpAppsResourceMeta {
 export function buildMcpAppsResourceMeta(config: {
 	description?: string;
 	prefersBorder?: boolean;
+	widgetDomain?: string;
 	widgetCSP?: WidgetCSP;
 }): McpAppsResourceMeta {
 	const csp = config.widgetCSP
@@ -76,6 +77,7 @@ export function buildMcpAppsResourceMeta(config: {
 	return {
 		ui: {
 			...(csp && { csp }),
+			...(config.widgetDomain && { domain: config.widgetDomain }),
 			...(config.prefersBorder !== undefined && {
 				prefersBorder: config.prefersBorder,
 			}),
