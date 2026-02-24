@@ -37,6 +37,8 @@ export type WidgetSignal = {
 	data: Record<string, unknown>;
 	/** Description of what the widget does (for the AI's context) */
 	description?: string;
+	/** State key this widget fills — enables auto-skip when the field is already in state */
+	field?: string;
 };
 
 /**
@@ -59,6 +61,8 @@ export function showWidget(
 	config: {
 		data: Record<string, unknown>;
 		description?: string;
+		/** State key this widget fills — enables auto-skip when the field is already in state */
+		field?: string;
 	},
 ): WidgetSignal {
 	return { __type: WIDGET, resource, ...config };

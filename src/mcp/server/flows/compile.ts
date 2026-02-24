@@ -200,6 +200,29 @@ async function executeFrom<TState extends Record<string, unknown>>(
 
 			// Widget signal — pause and show widget
 			if (isWidget(result)) {
+				// Auto-skip: if the widget declares a field and it's already filled, advance
+				if (result.field) {
+					const existingValue = state[result.field as keyof TState];
+					if (
+						existingValue !== undefined &&
+						existingValue !== null &&
+						existingValue !== ""
+					) {
+						const edge = edges.get(currentNode);
+						if (!edge) {
+							return {
+								text: JSON.stringify({
+									status: "error",
+									error: `No outgoing edge from node "${currentNode}"`,
+								}),
+								data: { status: "error" },
+							};
+						}
+						currentNode = await resolveNextNode(edge, state);
+						continue;
+					}
+				}
+
 				const resource = result.resource;
 				return {
 					text: JSON.stringify({

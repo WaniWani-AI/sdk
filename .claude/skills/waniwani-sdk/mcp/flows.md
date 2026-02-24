@@ -92,8 +92,9 @@ If a user says "I want to open a bank account in France", the AI calls:
 The flow skips the "which country?" question and proceeds to the next unanswered step.
 
 **Rules:**
-- Only interrupt nodes are auto-skipped. Widget nodes always pause.
-- Action nodes between skipped interrupts still execute (their logic may be needed for conditional edges).
+- Interrupt nodes are auto-skipped when their `field` is already filled in state.
+- Widget nodes are auto-skipped when they declare a `field` and that field is already filled in state (see `showWidget` below).
+- Action nodes between skipped steps still execute (their logic may be needed for conditional edges).
 - Fields with `undefined`, `null`, or `""` are NOT considered pre-filled.
 - The AI should only extract values the user explicitly stated — never guess.
 - `fields` is optional — flows without it still work, the AI just can't reliably pre-fill.
@@ -186,6 +187,7 @@ const flow = createFlow<{ postalCode: string; sqm: string; selectedPlan: string 
   )
   .addNode("show_pricing", { resource: pricingUI }, (state) =>
     showWidget(pricingUI, {
+      field: "selectedPlan",
       data: { postalCode: state.postalCode, sqm: Number(state.sqm) },
       description: "Showing pricing comparison. User will select a plan.",
     })
@@ -268,7 +270,7 @@ Creates a new `StateGraph`. Config:
 | Function | Description |
 |----------|-------------|
 | `interrupt({ question, field, suggestions?, context? })` | Return from a node to pause and ask the user a question. `context` provides hidden instructions to the assistant to enrich its response using data from previous nodes. |
-| `showWidget(resource, { data, description? })` | Return from a node to pause and render a widget |
+| `showWidget(resource, { data, description?, field? })` | Return from a node to pause and render a widget. Set `field` to the state key this widget fills to enable auto-skip when `initialState` provides it. |
 
 ## Common Mistakes
 
