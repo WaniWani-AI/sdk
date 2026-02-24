@@ -526,13 +526,21 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 					const result = await handleToolCall(args, _meta);
 
+					// Widget response — include structuredContent + widget metadata
+					if (result.widgetMeta) {
+						return {
+							content: [{ type: "text" as const, text: result.text }],
+							structuredContent: result.data,
+							_meta: {
+								...result.widgetMeta,
+								..._meta,
+							},
+						};
+					}
+
+					// Non-widget response (interrupt, complete, error) — text only
 					return {
 						content: [{ type: "text" as const, text: result.text }],
-						structuredContent: result.data,
-						_meta: {
-							...(result.widgetMeta ?? {}),
-							..._meta,
-						},
 					};
 				}) as unknown as ToolCallback<typeof inputSchema>,
 			);
