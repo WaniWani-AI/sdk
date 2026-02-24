@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatBaseProps } from "../@types";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
 
-const SESSION_STORAGE_KEY_PREFIX = "waniwani-chat-session-id";
+const SESSION_STORAGE_KEY = "waniwani-chat-session-id";
 const SESSION_HEADER_NAME = "x-session-id";
 
 function normalizeSessionId(value: unknown): string | undefined {
@@ -17,56 +17,33 @@ function normalizeSessionId(value: unknown): string | undefined {
 	return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function buildSessionStorageKey(
-	api: string,
-	sessionStorageKey?: string,
-): string | undefined {
-	const explicitKey = normalizeSessionId(sessionStorageKey);
-	if (explicitKey) return explicitKey;
-
+function readSessionIdFromStorage(): string | undefined {
 	if (typeof window === "undefined") return undefined;
 
 	try {
-		const url = new URL(api, window.location.href);
-		return `${SESSION_STORAGE_KEY_PREFIX}:${url.origin}${url.pathname}`;
-	} catch {
-		return `${SESSION_STORAGE_KEY_PREFIX}:${api}`;
-	}
-}
-
-function readSessionIdFromStorage(
-	storageKey: string | undefined,
-): string | undefined {
-	if (!storageKey) return undefined;
-	if (typeof window === "undefined") return undefined;
-
-	try {
-		return normalizeSessionId(window.sessionStorage.getItem(storageKey));
+		return normalizeSessionId(
+			window.sessionStorage.getItem(SESSION_STORAGE_KEY),
+		);
 	} catch {
 		return undefined;
 	}
 }
 
-function writeSessionIdToStorage(
-	storageKey: string | undefined,
-	sessionId: string,
-): void {
-	if (!storageKey) return;
+function writeSessionIdToStorage(sessionId: string): void {
 	if (typeof window === "undefined") return;
 
 	try {
-		window.sessionStorage.setItem(storageKey, sessionId);
+		window.sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
 	} catch {
 		// Ignore storage failures (private mode, security policy, etc.)
 	}
 }
 
-function removeSessionIdFromStorage(storageKey: string | undefined): void {
-	if (!storageKey) return;
+function removeSessionIdFromStorage(): void {
 	if (typeof window === "undefined") return;
 
 	try {
-		window.sessionStorage.removeItem(storageKey);
+		window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
 	} catch {
 		// Ignore storage failures (private mode, security policy, etc.)
 	}
@@ -83,22 +60,18 @@ export function useChatEngine(props: ChatBaseProps) {
 		api = "https://app.waniwani.ai/api/chat",
 		headers: userHeaders,
 		body,
-		sessionStorageKey,
 		onMessageSent,
 		onResponseReceived,
 	} = props;
 
 	const headersRef = useRef(userHeaders);
 	const bodyRef = useRef(body);
-	const storageKeyRef = useRef<string | undefined>(
-		buildSessionStorageKey(api, sessionStorageKey),
-	);
 	const sessionIdRef = useRef<string | undefined>(undefined);
 
 	const getSessionId = useCallback((): string | undefined => {
 		if (sessionIdRef.current) return sessionIdRef.current;
 
-		const storedSessionId = readSessionIdFromStorage(storageKeyRef.current);
+		const storedSessionId = readSessionIdFromStorage();
 		if (storedSessionId) sessionIdRef.current = storedSessionId;
 		return storedSessionId;
 	}, []);
@@ -109,12 +82,12 @@ export function useChatEngine(props: ChatBaseProps) {
 		if (sessionIdRef.current === sessionId) return;
 
 		sessionIdRef.current = sessionId;
-		writeSessionIdToStorage(storageKeyRef.current, sessionId);
+		writeSessionIdToStorage(sessionId);
 	}, []);
 
 	const clearSessionId = useCallback(() => {
 		sessionIdRef.current = undefined;
-		removeSessionIdFromStorage(storageKeyRef.current);
+		removeSessionIdFromStorage();
 	}, []);
 
 	useEffect(() => {
@@ -124,11 +97,6 @@ export function useChatEngine(props: ChatBaseProps) {
 	useEffect(() => {
 		bodyRef.current = body;
 	}, [body]);
-
-	useEffect(() => {
-		storageKeyRef.current = buildSessionStorageKey(api, sessionStorageKey);
-		sessionIdRef.current = undefined;
-	}, [api, sessionStorageKey]);
 
 	const transportRef = useRef(
 		new DefaultChatTransport({

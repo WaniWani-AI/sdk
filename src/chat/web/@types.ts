@@ -71,11 +71,6 @@ export interface ChatBaseProps {
 	headers?: Record<string, string>;
 	/** Additional body fields to send with each chat request */
 	body?: Record<string, unknown>;
-	/**
-	 * Optional session storage key override.
-	 * Use this to isolate sessions by tenant/bot/auth context when multiple chat widgets share the same API endpoint.
-	 */
-	sessionStorageKey?: string;
 	/** Enable file attachments in the input. Defaults to false. */
 	allowAttachments?: boolean;
 	/** Placeholder text shown in the input field. Defaults to "Ask me anything...". Animates with a typing effect. */
