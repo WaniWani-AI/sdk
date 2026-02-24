@@ -62,6 +62,10 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 		this.hostContext = this.app.getHostContext();
 	}
 
+	async close(): Promise<void> {
+		await this.app.close();
+	}
+
 	getToolOutput<T = Record<string, unknown>>(): T | null {
 		// In MCP Apps, tool output comes through ontoolresult notification
 		// Return the latest cached result

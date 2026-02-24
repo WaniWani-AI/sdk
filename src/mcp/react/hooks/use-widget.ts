@@ -57,6 +57,7 @@ export function WidgetProvider({
 
 	useEffect(() => {
 		let mounted = true;
+		let activeClient: UnifiedWidgetClient | null = null;
 
 		async function initClient() {
 			try {
@@ -65,8 +66,12 @@ export function WidgetProvider({
 				await widgetClient.connect();
 
 				if (mounted) {
+					activeClient = widgetClient;
 					setClient(widgetClient);
 					setIsConnecting(false);
+				} else {
+					// Component unmounted during connect — clean up
+					widgetClient.close();
 				}
 			} catch (err) {
 				if (mounted) {
@@ -81,6 +86,7 @@ export function WidgetProvider({
 
 		return () => {
 			mounted = false;
+			activeClient?.close();
 		};
 	}, []);
 

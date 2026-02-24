@@ -59,6 +59,13 @@ export interface UnifiedWidgetClient {
 	connect(): Promise<void>;
 
 	/**
+	 * Close the connection to the host and clean up resources.
+	 * On OpenAI, this is a no-op.
+	 * On MCP Apps, this closes the transport and removes event listeners.
+	 */
+	close(): Promise<void>;
+
+	/**
 	 * Get the tool output (structured content returned by the tool handler).
 	 * This is the main data source for widget rendering.
 	 */

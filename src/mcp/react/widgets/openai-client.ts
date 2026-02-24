@@ -53,6 +53,10 @@ export class OpenAIWidgetClient implements UnifiedWidgetClient {
 		}
 	}
 
+	async close(): Promise<void> {
+		// No-op for OpenAI - connection is managed by the host
+	}
+
 	getToolOutput<T = Record<string, unknown>>(): T | null {
 		return this.getGlobal<T | null>("toolOutput", null);
 	}
