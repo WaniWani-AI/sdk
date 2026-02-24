@@ -20,6 +20,7 @@ import {
 	PromptInputSubmit,
 	PromptInputTextarea,
 } from "../ai-elements/prompt-input";
+import { ChatQueue } from "../components/chat-queue";
 import { MessageList } from "../components/message-list";
 import { Suggestions } from "../components/suggestions";
 import { useChatEngine } from "../hooks/use-chat-engine";
@@ -57,6 +58,9 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 		const animatedPlaceholder = useTypingPlaceholder(placeholder, !engine.text);
 
 		const [isHighlighted, setIsHighlighted] = useState(false);
+		const [fullscreenToolCallId, setFullscreenToolCallId] = useState<
+			string | null
+		>(null);
 		const cardRef = useRef<HTMLDivElement>(null);
 		const highlightTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -178,39 +182,57 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 							resourceEndpoint={effectiveResourceEndpoint}
 							isDark={isDark}
 							onFollowUp={handleWidgetMessage}
+							fullscreenToolCallId={fullscreenToolCallId}
+							onWidgetDisplayModeChange={(mode, widget) => {
+								setFullscreenToolCallId(
+									mode === "fullscreen" ? widget.toolCallId : null,
+								);
+							}}
 						/>
 					</ConversationContent>
-					<ConversationScrollButton />
+					{!fullscreenToolCallId && <ConversationScrollButton />}
 				</Conversation>
 
-				{/* Suggestions */}
-				<Suggestions
-					suggestions={suggestionsState.suggestions}
-					isLoading={suggestionsState.isLoading}
-					onSelect={handleSuggestionSelect}
-					className="ww:border-t ww:border-border"
-				/>
+				{/* Suggestions — hide when fullscreen */}
+				{!fullscreenToolCallId && (
+					<Suggestions
+						suggestions={suggestionsState.suggestions}
+						isLoading={suggestionsState.isLoading}
+						onSelect={handleSuggestionSelect}
+						className="ww:border-t ww:border-border"
+					/>
+				)}
 
-				{/* Input */}
-				<div className="ww:shrink-0 ww:border-t ww:border-border ww:bg-background">
-					<PromptInput
-						onSubmit={engine.handleSubmit}
-						globalDrop={allowAttachments}
-						multiple={allowAttachments}
-						className={cn("ww:rounded-none ww:border-0")}
-					>
-						<div className="ww:flex ww:items-center ww:gap-1 ww:px-3 ww:py-2">
-							{allowAttachments && <PromptInputAddAttachments />}
-							<PromptInputTextarea
-								onChange={engine.handleTextChange}
-								value={engine.text}
-								placeholder={animatedPlaceholder}
-								className="ww:min-h-0 ww:py-1.5 ww:px-2"
-							/>
-							<PromptInputSubmit status={engine.status} />
-						</div>
-					</PromptInput>
-				</div>
+				{/* Queue — hide when fullscreen */}
+				{!fullscreenToolCallId && (
+					<ChatQueue
+						queuedMessages={engine.queuedMessages}
+						onRemove={engine.removeQueuedMessage}
+					/>
+				)}
+
+				{/* Input — hide when fullscreen */}
+				{!fullscreenToolCallId && (
+					<div className="ww:shrink-0 ww:border-t ww:border-border ww:bg-background">
+						<PromptInput
+							onSubmit={engine.handleSubmit}
+							globalDrop={allowAttachments}
+							multiple={allowAttachments}
+							className={cn("ww:rounded-none ww:border-0")}
+						>
+							<div className="ww:flex ww:items-center ww:gap-1 ww:px-3 ww:py-2">
+								{allowAttachments && <PromptInputAddAttachments />}
+								<PromptInputTextarea
+									onChange={engine.handleTextChange}
+									value={engine.text}
+									placeholder={animatedPlaceholder}
+									className="ww:min-h-0 ww:py-1.5 ww:px-2"
+								/>
+								<PromptInputSubmit status={engine.status} />
+							</div>
+						</PromptInput>
+					</div>
+				)}
 			</div>
 		);
 	},

@@ -20,6 +20,7 @@ import {
 	PromptInputSubmit,
 	PromptInputTextarea,
 } from "../ai-elements/prompt-input";
+import { ChatQueue } from "../components/chat-queue";
 import { MessageList } from "../components/message-list";
 import { Suggestions } from "../components/suggestions";
 import { useChatEngine } from "../hooks/use-chat-engine";
@@ -83,6 +84,9 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 
 		const [isFocused, setIsFocused] = useState(false);
 		const [isHighlighted, setIsHighlighted] = useState(false);
+		const [fullscreenToolCallId, setFullscreenToolCallId] = useState<
+			string | null
+		>(null);
 		const containerRef = useRef<HTMLDivElement>(null);
 		const highlightTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -130,7 +134,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			window.addEventListener(triggerEvent, handler);
 			return () => window.removeEventListener(triggerEvent, handler);
 		}, [triggerEvent, engine.handleSubmit, focusInput]);
-		const isExpanded = isFocused;
+		const isExpanded = isFocused || fullscreenToolCallId !== null;
 
 		// Close on outside click
 		useEffect(() => {
@@ -191,9 +195,15 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 								resourceEndpoint={effectiveResourceEndpoint}
 								isDark={isDark}
 								onFollowUp={handleWidgetMessage}
+								fullscreenToolCallId={fullscreenToolCallId}
+								onWidgetDisplayModeChange={(mode, widget) => {
+									setFullscreenToolCallId(
+										mode === "fullscreen" ? widget.toolCallId : null,
+									);
+								}}
 							/>
 						</ConversationContent>
-						<ConversationScrollButton />
+						{!fullscreenToolCallId && <ConversationScrollButton />}
 					</Conversation>
 				</div>
 
@@ -202,6 +212,12 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 					suggestions={suggestionsState.suggestions}
 					isLoading={suggestionsState.isLoading}
 					onSelect={handleSuggestionSelect}
+				/>
+
+				{/* Queue */}
+				<ChatQueue
+					queuedMessages={engine.queuedMessages}
+					onRemove={engine.removeQueuedMessage}
 				/>
 
 				{/* Input bar — always visible */}
