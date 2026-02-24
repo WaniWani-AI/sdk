@@ -106,7 +106,8 @@ export function Playground({
             width={1000}
             height={700}
             suggestions={{
-              initial: ["Tell me about waniwani", "I want to request a demo"],
+              dynamic: false,
+              initial: ["Je veux ouvrir un compte Qonto en France"],
             }}
           />
         )}
