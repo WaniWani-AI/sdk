@@ -111,7 +111,6 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 						_meta: buildMcpAppsResourceMeta({
 							description: uiDescription,
 							prefersBorder,
-							widgetDomain,
 							widgetCSP,
 						}),
 					},
