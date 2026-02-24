@@ -10,7 +10,10 @@ export type {
 	SuggestionsConfig,
 } from "./@types";
 export { ChatWidget } from "./components/chat-widget";
-export type { McpAppFrameProps } from "./components/mcp-app-frame";
+export type {
+	McpAppDisplayMode,
+	McpAppFrameProps,
+} from "./components/mcp-app-frame";
 export { McpAppFrame } from "./components/mcp-app-frame";
 export { ChatBar } from "./layouts/chat-bar";
 export { ChatCard } from "./layouts/chat-card";

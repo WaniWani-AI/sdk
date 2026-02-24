@@ -11,6 +11,8 @@ const RESIZE_ANIMATION_MS = 300;
 const HANDSHAKE_TIMEOUT_MS = 3000;
 const MAX_RETRIES = 3;
 
+export type McpAppDisplayMode = "inline" | "pip" | "fullscreen";
+
 export interface McpAppFrameProps {
 	resourceUri: string;
 	toolInput: Record<string, unknown>;
@@ -30,6 +32,8 @@ export interface McpAppFrameProps {
 		role: string;
 		content: Array<{ type: string; text?: string }>;
 	}) => void;
+	/** Called when the widget requests a display mode change (e.g. "fullscreen" for expand) */
+	onDisplayModeChange?: (mode: McpAppDisplayMode) => void;
 }
 
 export function McpAppFrame({
@@ -43,6 +47,7 @@ export function McpAppFrame({
 	autoHeight = true,
 	onOpenLink,
 	onFollowUp,
+	onDisplayModeChange,
 }: McpAppFrameProps) {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const toolInputRef = useRef(toolInput);
@@ -51,15 +56,18 @@ export function McpAppFrame({
 	const animationRef = useRef<Animation | null>(null);
 	const initializedRef = useRef(false);
 	const retryCountRef = useRef(0);
+	const displayModeRef = useRef<McpAppDisplayMode>("inline");
 	const [height, setHeight] = useState(DEFAULT_HEIGHT);
 	const [width, setWidth] = useState<number | undefined>(undefined);
 	const onOpenLinkRef = useRef(onOpenLink);
 	const onFollowUpRef = useRef(onFollowUp);
+	const onDisplayModeChangeRef = useRef(onDisplayModeChange);
 
 	toolInputRef.current = toolInput;
 	toolResultRef.current = toolResult;
 	onOpenLinkRef.current = onOpenLink;
 	onFollowUpRef.current = onFollowUp;
+	onDisplayModeChangeRef.current = onDisplayModeChange;
 
 	const clampHeight = useCallback(
 		(h: number) => {
@@ -164,7 +172,7 @@ export function McpAppFrame({
 						},
 						hostContext: {
 							theme: isDarkRef.current ? "dark" : "light",
-							displayMode: "inline",
+							displayMode: displayModeRef.current,
 						},
 					},
 				});
@@ -292,8 +300,27 @@ export function McpAppFrame({
 
 			// ui/request-display-mode — widget requests fullscreen/inline/pip
 			if (method === "ui/request-display-mode" && id != null) {
-				// Acknowledge but stay inline for now
-				postToIframe({ jsonrpc: "2.0", id, result: {} });
+				const requested = data.params?.mode;
+				const granted =
+					requested === "fullscreen" ||
+					requested === "inline" ||
+					requested === "pip"
+						? requested
+						: "inline";
+				displayModeRef.current = granted;
+				// Reply with the granted mode
+				postToIframe({
+					jsonrpc: "2.0",
+					id,
+					result: { mode: granted },
+				});
+				// Notify the widget of the context change
+				postToIframe({
+					jsonrpc: "2.0",
+					method: "ui/notifications/host-context-changed",
+					params: { displayMode: granted },
+				});
+				onDisplayModeChangeRef.current?.(granted);
 				return;
 			}
 
