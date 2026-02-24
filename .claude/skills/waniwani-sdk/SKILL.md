@@ -127,6 +127,8 @@ const widget = createWidget({
 
 - **Wrong import path** — Hooks come from `@waniwani/sdk/mcp/react`, not `@waniwani/sdk`
 - **Missing `WidgetProvider`** — All hooks require the `WidgetProvider` wrapper
+- **No `WidgetProvider` in `page.tsx`** — Every widget page must wrap its content with `WidgetProvider`, otherwise all hooks will fail
+- **Business logic in `page.tsx`** — Keep `page.tsx` as a thin wrapper only. All widget logic belongs in `lib/{{MCP_NAME}}/widgets/`
 - **Assuming all hooks work everywhere** — `useSafeArea`, `useMaxHeight`, `useWidgetState` return `null`/no-op on MCP Apps (Claude)
 - **Forgetting `widgetDomain`** — Required in `createWidget` config
 - **Wrong event field names** — Use `event` (not `eventType`), `properties` (not flat fields), `meta` (not `metadata`)

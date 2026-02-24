@@ -76,6 +76,47 @@ export default function PricingWidget() {
 }
 ```
 
+## Widget Page Rules
+
+Every widget `page.tsx` in `app/({{MCP_NAME}})/` **must** wrap its content with `WidgetProvider`. Without it, all hooks will fail silently and the widget won't work.
+
+The `page.tsx` should be a **thin wrapper only** — import the widget component and wrap it with `WidgetProvider`. **No business logic in `page.tsx`**. All widget logic, data fetching, and UI belongs in `lib/{{MCP_NAME}}/widgets/`.
+
+```tsx
+// app/(my-mcp)/widgets/pricing/page.tsx — THIN WRAPPER ONLY
+"use client";
+import { WidgetProvider } from "@waniwani/sdk/mcp/react";
+import { PricingWidget } from "@/lib/my-mcp/widgets/pricing";
+
+export default function PricingPage() {
+  return (
+    <WidgetProvider loading={<div>Loading...</div>}>
+      <PricingWidget />
+    </WidgetProvider>
+  );
+}
+```
+
+```tsx
+// lib/my-mcp/widgets/pricing.tsx — ALL LOGIC HERE
+"use client";
+import { useToolOutput, useTheme } from "@waniwani/sdk/mcp/react";
+
+export function PricingWidget() {
+  const data = useToolOutput<{ plan: string; amount: number }>();
+  const theme = useTheme();
+
+  if (!data) return null;
+
+  return (
+    <div className={theme === "dark" ? "dark" : ""}>
+      <h1>{data.plan} Plan</h1>
+      <p>${data.amount}/mo</p>
+    </div>
+  );
+}
+```
+
 ## Components
 
 - **`InitializeNextJsInChatGpt`** — Required in Next.js layout for ChatGPT iframe compatibility. Takes `baseUrl` prop.
@@ -116,4 +157,6 @@ function MyWidget() {
 
 - **Wrong import path** — Hooks come from `@waniwani/sdk/mcp/react`, not `@waniwani/sdk`
 - **Missing `WidgetProvider`** — All hooks require the `WidgetProvider` wrapper
+- **No `WidgetProvider` in `page.tsx`** — Every widget page must wrap its content with `WidgetProvider`, otherwise all hooks will fail
+- **Business logic in `page.tsx`** — Keep `page.tsx` as a thin wrapper only. All widget logic belongs in `lib/{{MCP_NAME}}/widgets/`
 - **Assuming all hooks work everywhere** — `useSafeArea`, `useMaxHeight`, `useWidgetState` return `null`/no-op on MCP Apps (Claude)
