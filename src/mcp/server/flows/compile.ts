@@ -530,7 +530,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 						content: [{ type: "text" as const, text: result.text }],
 						structuredContent: result.data,
 						_meta: {
-							...(toolMeta ?? {}),
 							...(result.widgetMeta ?? {}),
 							..._meta,
 						},
