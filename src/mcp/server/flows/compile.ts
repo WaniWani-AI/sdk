@@ -434,12 +434,8 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 			// Merge widget result into state.
 			// If `answer` is provided and the node declares a `field`, auto-map it.
-			let widgetUpdate: Record<string, unknown> =
-				args.widgetResult ?? {};
-			if (
-				args.answer !== undefined &&
-				Object.keys(widgetUpdate).length === 0
-			) {
+			let widgetUpdate: Record<string, unknown> = args.widgetResult ?? {};
+			if (args.answer !== undefined && Object.keys(widgetUpdate).length === 0) {
 				const nodeField = nodeConfigs.get(args.step)?.field;
 				if (nodeField) {
 					widgetUpdate = { [nodeField]: args.answer };

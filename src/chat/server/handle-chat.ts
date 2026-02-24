@@ -79,12 +79,18 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 			}
 
 			// 5. Stream the response back
+			const headers = new Headers({
+				"Content-Type":
+					response.headers.get("Content-Type") ?? "text/event-stream",
+			});
+			const upstreamSessionId = response.headers.get("x-session-id");
+			if (upstreamSessionId) {
+				headers.set("x-session-id", upstreamSessionId);
+			}
+
 			return new Response(response.body, {
 				status: response.status,
-				headers: {
-					"Content-Type":
-						response.headers.get("Content-Type") ?? "text/event-stream",
-				},
+				headers,
 			});
 		} catch (error) {
 			const message =
