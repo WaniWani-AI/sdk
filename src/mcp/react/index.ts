@@ -22,10 +22,12 @@ export type {
 	UnknownObject,
 	UserAgent,
 } from "./hooks/@types";
+export type { FlowActionResult } from "./hooks/index";
 // Hooks and provider
 export {
 	useCallTool,
 	useDisplayMode,
+	useFlowAction,
 	useIsChatGptApp,
 	useLocale,
 	useMaxHeight,

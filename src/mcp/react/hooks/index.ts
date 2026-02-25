@@ -4,6 +4,8 @@
 export type * from "./@types";
 export { useCallTool } from "./use-call-tool";
 export { useDisplayMode } from "./use-display-mode";
+export type { FlowActionResult } from "./use-flow-action";
+export { useFlowAction } from "./use-flow-action";
 export { useIsChatGptApp } from "./use-is-chatgpt-app";
 export { useLocale } from "./use-locale";
 export { useMaxHeight } from "./use-max-height";
