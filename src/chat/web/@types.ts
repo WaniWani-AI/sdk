@@ -94,6 +94,18 @@ export interface ChatBaseProps {
 	 * `true` enables with defaults (3 suggestions), object allows config, `false`/undefined disables.
 	 */
 	suggestions?: boolean | SuggestionsConfig;
+	/**
+	 * Handler for MCP tool calls from widgets.
+	 * Called when a widget uses `callServerTool` (MCP Apps standard).
+	 * If not provided, defaults to POSTing to `${api}/tool`.
+	 */
+	onCallTool?: (params: {
+		name: string;
+		arguments: Record<string, unknown>;
+	}) => Promise<{
+		content?: Array<{ type: string; text?: string }>;
+		structuredContent?: Record<string, unknown>;
+	}>;
 }
 
 // ============================================================================

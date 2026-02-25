@@ -23,6 +23,7 @@ import {
 import { ChatQueue } from "../components/chat-queue";
 import { MessageList } from "../components/message-list";
 import { Suggestions } from "../components/suggestions";
+import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
@@ -51,6 +52,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 		const isDark = isDarkTheme(resolvedTheme);
 
 		const engine = useChatEngine(props);
+		const handleCallTool = useCallTool(props);
 
 		const suggestionsState = useSuggestions({
 			messages: engine.messages,
@@ -195,6 +197,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 								resourceEndpoint={effectiveResourceEndpoint}
 								isDark={isDark}
 								onFollowUp={handleWidgetMessage}
+								onCallTool={handleCallTool}
 								fullscreenToolCallId={fullscreenToolCallId}
 								onWidgetDisplayModeChange={(mode, widget) => {
 									setFullscreenToolCallId(

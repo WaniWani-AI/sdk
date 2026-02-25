@@ -30,7 +30,7 @@ type FlowResponseText = {
 export type FlowActionResult<T> = {
 	/** Current widget data. Initially from useToolOutput, then updated inline on same-widget transitions. */
 	data: T | null;
-	/** Advance the flow with the user's answer. `value` is used for callTool (option.id), `followUpText` for sendFollowUp fallback (option.label). */
+	/** Advance the flow with the user's answer. On MCP Apps uses callTool; on OpenAI uses sendFollowUp with `followUpText` (falls back to `value`). */
 	advance: (value: string, followUpText?: string) => void;
 	/** True while a callTool request is in flight. */
 	isAdvancing: boolean;
@@ -55,22 +55,6 @@ function parseResponseText(result: ToolCallResult): FlowResponseText | null {
 	} catch {
 		return null;
 	}
-}
-
-function buildFallbackMessage(parsed: FlowResponseText): string {
-	if (parsed.status === "interrupt" && parsed.question) {
-		return parsed.question;
-	}
-	if (parsed.status === "complete") {
-		return "Flow completed.";
-	}
-	if (parsed.status === "error" && parsed.error) {
-		return `Error: ${parsed.error}`;
-	}
-	if (parsed.status === "widget" && parsed.step) {
-		return `The user selected an option. Continue the flow from step "${parsed.step}".`;
-	}
-	return "Continue the flow.";
 }
 
 // ── Hook ─────────────────────────────────────────────────────
@@ -113,66 +97,49 @@ export function useFlowAction<T extends Record<string, unknown>>(
 	}
 
 	const advance = useCallback(
-		(value: string, followUpText?: string) => {
+		async (value: string, followUpText?: string) => {
 			const platform = detectPlatform();
-			const displayText = followUpText ?? value;
 
 			// OpenAI: sendFollowUp works great, use it directly
 			if (platform === "openai") {
-				client.sendFollowUp(displayText);
+				client.sendFollowUp(followUpText ?? value);
 				return;
 			}
 
-			// MCP Apps: call the flow tool directly to bypass the composer
+			// MCP Apps: call the flow tool directly via callTool.
 			const flowMeta = flowMetaRef.current;
-			if (!flowMeta) {
-				client.sendFollowUp(displayText);
-				return;
-			}
+			if (!flowMeta) return;
 
 			setIsAdvancing(true);
-
-			client
-				.callTool(flowMeta.flowId, {
+			try {
+				const result = await client.callTool(flowMeta.flowId, {
 					action: "widget_result",
 					step: flowMeta.step,
 					state: flowMeta.state,
 					answer: value,
-				})
-				.then((result: ToolCallResult) => {
-					const parsed = parseResponseText(result);
-
-					if (!parsed) {
-						client.sendFollowUp(displayText);
-						return;
-					}
-
-					// Same-widget inline transition
-					if (
-						parsed.status === "widget" &&
-						parsed.widgetId === resourceId &&
-						result.structuredContent
-					) {
-						const newFlowMeta = extractFlowMeta(result.structuredContent);
-						if (newFlowMeta) {
-							flowMetaRef.current = newFlowMeta;
-						}
-						const { __flow, ...widgetData } = result.structuredContent;
-						setLocalData(widgetData as T);
-						return;
-					}
-
-					// All other cases: fall back to sendFollowUp
-					const message = buildFallbackMessage(parsed);
-					client.sendFollowUp(message);
-				})
-				.catch((err: unknown) => {
-					console.error("useFlowAction: callTool failed, falling back", err);
-					client.sendFollowUp(displayText);
-				})
-				.finally(() => {
-					setIsAdvancing(false);
 				});
+
+				const parsed = parseResponseText(result);
+				if (!parsed) return;
+
+				// Same-widget inline transition: update local state
+				if (
+					parsed.status === "widget" &&
+					parsed.widgetId === resourceId &&
+					result.structuredContent
+				) {
+					const newFlowMeta = extractFlowMeta(result.structuredContent);
+					if (newFlowMeta) {
+						flowMetaRef.current = newFlowMeta;
+					}
+					const { __flow, ...widgetData } = result.structuredContent;
+					setLocalData(widgetData as T);
+				}
+			} catch (err) {
+				console.error("useFlowAction: callTool failed", err);
+			} finally {
+				setIsAdvancing(false);
+			}
 		},
 		[client, resourceId],
 	);

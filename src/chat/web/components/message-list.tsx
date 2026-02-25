@@ -49,6 +49,13 @@ interface MessageListProps {
 		role: string;
 		content: Array<{ type: string; text?: string }>;
 	}) => void;
+	onCallTool?: (params: {
+		name: string;
+		arguments: Record<string, unknown>;
+	}) => Promise<{
+		content?: Array<{ type: string; text?: string }>;
+		structuredContent?: Record<string, unknown>;
+	}>;
 	onWidgetDisplayModeChange?: (
 		mode: McpAppDisplayMode,
 		widget: FullscreenWidget,
@@ -64,6 +71,7 @@ export function MessageList({
 	resourceEndpoint,
 	isDark,
 	onFollowUp,
+	onCallTool,
 	onWidgetDisplayModeChange,
 	fullscreenToolCallId,
 }: MessageListProps) {
@@ -184,6 +192,7 @@ export function MessageList({
 												isDark={isDark}
 												autoHeight={autoHeight}
 												onFollowUp={onFollowUp}
+												onCallTool={onCallTool}
 												onDisplayModeChange={
 													onWidgetDisplayModeChange
 														? (mode) =>

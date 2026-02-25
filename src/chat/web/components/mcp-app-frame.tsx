@@ -32,6 +32,14 @@ export interface McpAppFrameProps {
 		role: string;
 		content: Array<{ type: string; text?: string }>;
 	}) => void;
+	/** Called when a widget calls a tool via `tools/call` (MCP Apps standard). */
+	onCallTool?: (params: {
+		name: string;
+		arguments: Record<string, unknown>;
+	}) => Promise<{
+		content?: Array<{ type: string; text?: string }>;
+		structuredContent?: Record<string, unknown>;
+	}>;
 	/** Called when the widget requests a display mode change (e.g. "fullscreen" for expand) */
 	onDisplayModeChange?: (mode: McpAppDisplayMode) => void;
 }
@@ -47,6 +55,7 @@ export function McpAppFrame({
 	autoHeight = true,
 	onOpenLink,
 	onFollowUp,
+	onCallTool,
 	onDisplayModeChange,
 }: McpAppFrameProps) {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -61,12 +70,14 @@ export function McpAppFrame({
 	const [width, setWidth] = useState<number | undefined>(undefined);
 	const onOpenLinkRef = useRef(onOpenLink);
 	const onFollowUpRef = useRef(onFollowUp);
+	const onCallToolRef = useRef(onCallTool);
 	const onDisplayModeChangeRef = useRef(onDisplayModeChange);
 
 	toolInputRef.current = toolInput;
 	toolResultRef.current = toolResult;
 	onOpenLinkRef.current = onOpenLink;
 	onFollowUpRef.current = onFollowUp;
+	onCallToolRef.current = onCallTool;
 	onDisplayModeChangeRef.current = onDisplayModeChange;
 
 	const clampHeight = useCallback(
@@ -169,6 +180,7 @@ export function McpAppFrame({
 						hostCapabilities: {
 							openLinks: {},
 							message: {},
+							tools: {},
 						},
 						hostContext: {
 							theme: isDarkRef.current ? "dark" : "light",
@@ -295,6 +307,49 @@ export function McpAppFrame({
 					onFollowUpRef.current(data.params);
 				}
 				postToIframe({ jsonrpc: "2.0", id, result: {} });
+				return;
+			}
+
+			// tools/call — widget calls a server tool (MCP Apps standard)
+			if (method === "tools/call" && id != null) {
+				const handler = onCallToolRef.current;
+				if (!handler) {
+					postToIframe({
+						jsonrpc: "2.0",
+						id,
+						error: { code: -32601, message: "tools/call not supported" },
+					});
+					return;
+				}
+				handler({
+					name: data.params?.name,
+					arguments: data.params?.arguments ?? {},
+				})
+					.then((result) => {
+						postToIframe({ jsonrpc: "2.0", id, result });
+
+						// Feed the tool result into the conversation so the AI can
+						// respond — mirrors real MCP Apps host behavior.
+						const text = result.content
+							?.map((c) => c.text ?? "")
+							.join("")
+							.trim();
+						if (text && onFollowUpRef.current) {
+							onFollowUpRef.current({
+								role: "user",
+								content: [{ type: "text", text }],
+							});
+						}
+					})
+					.catch((err: unknown) => {
+						const message =
+							err instanceof Error ? err.message : "Tool call failed";
+						postToIframe({
+							jsonrpc: "2.0",
+							id,
+							error: { code: -32000, message },
+						});
+					});
 				return;
 			}
 
