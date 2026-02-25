@@ -123,8 +123,7 @@ export function McpAppFrame({
 
 		let disposed = false;
 		let handshakeReceived = false;
-		const debug = (...args: unknown[]) =>
-			console.debug("[McpAppFrame]", ...args);
+		const debug = (...args: unknown[]) => console.log("[McpAppFrame]", ...args);
 
 		debug("effect mounted, waiting for handshake");
 
@@ -159,6 +158,9 @@ export function McpAppFrame({
 			if (event.source !== iframe.contentWindow) return;
 
 			const data = event.data;
+
+			console.log("data", data);
+
 			if (!data || typeof data !== "object" || data.jsonrpc !== "2.0") return;
 
 			const method: string | undefined = data.method;
@@ -312,6 +314,7 @@ export function McpAppFrame({
 
 			// tools/call — widget calls a server tool (MCP Apps standard)
 			if (method === "tools/call" && id != null) {
+				debug("tools/call", data.params?.name, data.params?.arguments);
 				const handler = onCallToolRef.current;
 				if (!handler) {
 					postToIframe({

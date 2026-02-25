@@ -100,6 +100,8 @@ export function useFlowAction<T extends Record<string, unknown>>(
 		async (value: string, followUpText?: string) => {
 			const platform = detectPlatform();
 
+			console.log("platform", platform);
+
 			// OpenAI: sendFollowUp works great, use it directly
 			if (platform === "openai") {
 				client.sendFollowUp(followUpText ?? value);
@@ -108,6 +110,9 @@ export function useFlowAction<T extends Record<string, unknown>>(
 
 			// MCP Apps: call the flow tool directly via callTool.
 			const flowMeta = flowMetaRef.current;
+
+			console.log("flowMeta", flowMeta);
+
 			if (!flowMeta) return;
 
 			setIsAdvancing(true);
