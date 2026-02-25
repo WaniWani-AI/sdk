@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --webpack -p 3333",
+    "mcp": "cd demo-mcp && next dev -p 3001",
     "build": "next build"
   },
   "dependencies": {
