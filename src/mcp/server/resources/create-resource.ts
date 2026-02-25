@@ -37,10 +37,34 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 	} = config;
 
 	// Auto-generate CSP from baseUrl if not explicitly provided
-	const widgetCSP = config.widgetCSP ?? {
+	let widgetCSP = config.widgetCSP ?? {
 		connect_domains: [baseUrl],
 		resource_domains: [baseUrl],
 	};
+
+	// In development with localhost, add extra CSP domains for
+	// Next.js dev features (WebSocket HMR, Turbopack font serving)
+	if (process.env.NODE_ENV === "development") {
+		try {
+			const { hostname } = new URL(baseUrl);
+			if (hostname === "localhost" || hostname === "127.0.0.1") {
+				widgetCSP = {
+					...widgetCSP,
+					connect_domains: [
+						...(widgetCSP.connect_domains || []),
+						`ws://${hostname}:*`,
+						`wss://${hostname}:*`,
+					],
+					resource_domains: [
+						...(widgetCSP.resource_domains || []),
+						`http://${hostname}:*`,
+					],
+				};
+			}
+		} catch {
+			// Invalid baseUrl — skip dev CSP additions
+		}
+	}
 
 	const openaiUri = `ui://widgets/apps-sdk/${id}.html`;
 	const mcpUri = `ui://widgets/ext-apps/${id}.html`;
