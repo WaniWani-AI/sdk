@@ -4,7 +4,6 @@
  * so it can be run inside the ChatGPT iframe:
  * - history.pushState / history.replaceState - Prevents full-origin URLs in history
  * - window.fetch - Rewrites same-origin requests to use the correct base URL
- * - window.WebSocket - Rewrites WebSocket URLs that resolve against sandbox origin
  * - html attribute observer - Prevents ChatGPT from modifying the root element
  *
  * More information about this component can be found here:
@@ -136,35 +135,6 @@ export function InitializeNextJsInChatGpt({ baseUrl }: { baseUrl: string }) {
 
 								return originalFetch.call(window, input, init);
 							};
-
-							// Proxy WebSocket to rewrite URLs that resolve against
-							// the sandbox iframe origin instead of the app origin
-							// (fixes HMR when base-uri CSP blocks <base href>)
-							const OrigWS = window.WebSocket;
-							const WsProxy = ((url: string, protocols?: string | string[]) => {
-								try {
-									const parsed = new URL(url, window.location.href);
-									if (parsed.origin !== appOrigin) {
-										const wsOrigin = appOrigin.replace(/^http/, "ws");
-										url =
-											wsOrigin + parsed.pathname + parsed.search + parsed.hash;
-									}
-								} catch {
-									const wsOrigin = appOrigin.replace(/^http/, "ws");
-									url = wsOrigin + (url.startsWith("/") ? "" : "/") + url;
-								}
-								return protocols !== undefined
-									? new OrigWS(url, protocols)
-									: new OrigWS(url);
-							}) as unknown as typeof WebSocket;
-							WsProxy.prototype = OrigWS.prototype;
-							Object.defineProperties(WsProxy, {
-								CONNECTING: { value: OrigWS.CONNECTING },
-								OPEN: { value: OrigWS.OPEN },
-								CLOSING: { value: OrigWS.CLOSING },
-								CLOSED: { value: OrigWS.CLOSED },
-							});
-							window.WebSocket = WsProxy;
 						}
 					}).toString() +
 					")()"}
