@@ -41,9 +41,9 @@
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "prepublishOnly": "bun run build",
-    "release": "npm version patch && npm publish --access public",
-    "release:minor": "npm version minor && npm publish --access public",
-    "release:major": "npm version major && npm publish --access public"
+    "release": "npm whoami && bun run build && npm version patch && npm publish --access public",
+    "release:minor": "npm whoami && bun run build && npm version minor && npm publish --access public",
+    "release:major": "npm whoami && bun run build && npm version major && npm publish --access public"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "1.25.2",
