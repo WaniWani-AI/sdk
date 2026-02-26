@@ -107,7 +107,7 @@ export function Playground({
             height={700}
             suggestions={{
               dynamic: false,
-              initial: ["Je veux ouvrir un compte Qonto en France", "Je veux voir si ca vaut le coup de switch sur Qonto"],
+              initial: ["Je souhaite connaitre les offres BPI France", "Quelles aides existent pour creer son entreprise avec BPI?"],
             }}
           />
         )}

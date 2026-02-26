@@ -35,10 +35,10 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 		const {
 			theme: userTheme,
 			title = "Assistant",
-			subtitle,
 			showStatus = true,
-			width = 500,
-			height = 600,
+			width,
+			height,
+			className,
 			allowAttachments = false,
 			welcomeMessage,
 			placeholder = "Ask me anything...",
@@ -149,6 +149,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 					"ww:flex ww:flex-col ww:font-[family-name:var(--ww-font)] ww:text-foreground ww:bg-background ww:rounded-[var(--ww-radius)] ww:border ww:border-border ww:shadow-md ww:overflow-hidden ww:transition-shadow ww:duration-300",
 					isHighlighted &&
 						"ww:ring-2 ww:ring-blue-400/70 ww:ring-offset-2 ww:ring-offset-background",
+					className,
 				)}
 			>
 				{/* Header */}
@@ -162,16 +163,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 					{showStatus && (
 						<span className="ww:size-2.5 ww:rounded-full ww:bg-status" />
 					)}
-					<div className="ww:flex-1 ww:min-w-0">
-						<div className="ww:text-xs ww:font-semibold ww:truncate">
-							{title}
-						</div>
-						{subtitle && (
-							<div className="ww:text-[11px] ww:text-muted-foreground ww:truncate">
-								{subtitle}
-							</div>
-						)}
-					</div>
+					<div className="ww:text-xs ww:font-semibold ww:truncate">{title}</div>
 				</div>
 
 				{/* Messages */}
@@ -202,7 +194,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 						suggestions={suggestionsState.suggestions}
 						isLoading={suggestionsState.isLoading}
 						onSelect={handleSuggestionSelect}
-						className="ww:border-t ww:border-border"
+						className="ww:px-3"
 					/>
 				)}
 
@@ -216,20 +208,20 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 
 				{/* Input — hide when fullscreen */}
 				{!fullscreenToolCallId && (
-					<div className="ww:shrink-0 ww:border-t ww:border-border ww:bg-background">
+					<div className="ww:shrink-0 ww:px-3 ww:pb-5 ww:pt-2 ww:bg-background">
 						<PromptInput
 							onSubmit={engine.handleSubmit}
 							globalDrop={allowAttachments}
 							multiple={allowAttachments}
-							className={cn("ww:rounded-none ww:border-0")}
+							className="ww:rounded-full ww:border-border ww:bg-input"
 						>
-							<div className="ww:flex ww:items-center ww:gap-1 ww:px-3 ww:py-2">
+							<div className="ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-1.5">
 								{allowAttachments && <PromptInputAddAttachments />}
 								<PromptInputTextarea
 									onChange={engine.handleTextChange}
 									value={engine.text}
 									placeholder={animatedPlaceholder}
-									className="ww:min-h-0 ww:py-1.5 ww:px-2"
+									className="ww:min-h-0 ww:py-1.5 ww:px-0"
 								/>
 								<PromptInputSubmit
 									status={engine.status}
