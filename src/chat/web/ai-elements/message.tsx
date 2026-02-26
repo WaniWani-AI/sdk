@@ -3,24 +3,36 @@
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import type { UIMessage } from "ai";
-import type { ComponentProps, HTMLAttributes } from "react";
+import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
 import { memo } from "react";
 import { Streamdown } from "streamdown";
 import { cn } from "../lib/utils";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
 	from: UIMessage["role"];
+	children?: ReactNode;
 };
 
-export const Message = ({ className, from, ...props }: MessageProps) => (
+export const Message = ({
+	className,
+	from,
+	children,
+	...props
+}: MessageProps) => (
 	<div
 		className={cn(
-			"ww:group ww:flex ww:w-full ww:max-w-[95%] ww:flex-col ww:gap-2",
-			from === "user" ? "is-user ww:ml-auto ww:justify-end" : "is-assistant",
+			"ww:group ww:flex ww:w-full",
+			from === "user"
+				? "is-user ww:ml-auto ww:max-w-[80%] ww:flex-col ww:items-end"
+				: "is-assistant ww:flex-col",
 			className,
 		)}
 		{...props}
-	/>
+	>
+		<div className={cn("ww:flex ww:min-w-0 ww:flex-col ww:gap-2", "ww:w-full")}>
+			{children}
+		</div>
+	</div>
 );
 
 export type MessageContentProps = HTMLAttributes<HTMLDivElement>;

@@ -35,7 +35,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 		const {
 			theme: userTheme,
 			title = "Assistant",
-			showStatus = true,
+
 			width,
 			height,
 			className,
@@ -146,7 +146,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 				data-waniwani-layout="card"
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className={cn(
-					"ww:flex ww:flex-col ww:font-[family-name:var(--ww-font)] ww:text-foreground ww:bg-background ww:rounded-[var(--ww-radius)] ww:border ww:border-border ww:shadow-md ww:overflow-hidden ww:transition-shadow ww:duration-300",
+					"ww:flex ww:flex-col ww:font-[family-name:var(--ww-font)] ww:text-foreground ww:bg-background ww:rounded-[var(--ww-radius)] ww:overflow-hidden",
 					isHighlighted &&
 						"ww:ring-2 ww:ring-blue-400/70 ww:ring-offset-2 ww:ring-offset-background",
 					className,
@@ -154,16 +154,13 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			>
 				{/* Header */}
 				<div
-					className="ww:shrink-0 ww:flex ww:items-center ww:gap-3 ww:px-4 ww:py-2 ww:border-b ww:border-border"
+					className="ww:shrink-0 ww:flex ww:items-center ww:px-6 ww:py-3"
 					style={{
 						backgroundColor: resolvedTheme.headerBackgroundColor,
 						color: resolvedTheme.headerTextColor,
 					}}
 				>
-					{showStatus && (
-						<span className="ww:size-2.5 ww:rounded-full ww:bg-status" />
-					)}
-					<div className="ww:text-xs ww:font-semibold ww:truncate">{title}</div>
+					<div className="ww:text-sm ww:font-semibold ww:truncate">{title}</div>
 				</div>
 
 				{/* Messages */}
@@ -194,7 +191,6 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 						suggestions={suggestionsState.suggestions}
 						isLoading={suggestionsState.isLoading}
 						onSelect={handleSuggestionSelect}
-						className="ww:px-3"
 					/>
 				)}
 
@@ -208,27 +204,29 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 
 				{/* Input — hide when fullscreen */}
 				{!fullscreenToolCallId && (
-					<div className="ww:shrink-0 ww:px-3 ww:pb-5 ww:pt-2 ww:bg-background">
-						<PromptInput
-							onSubmit={engine.handleSubmit}
-							globalDrop={allowAttachments}
-							multiple={allowAttachments}
-							className="ww:rounded-full ww:border-border ww:bg-input"
-						>
-							<div className="ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-1.5">
-								{allowAttachments && <PromptInputAddAttachments />}
-								<PromptInputTextarea
-									onChange={engine.handleTextChange}
-									value={engine.text}
-									placeholder={animatedPlaceholder}
-									className="ww:min-h-0 ww:py-1.5 ww:px-0"
-								/>
-								<PromptInputSubmit
-									status={engine.status}
-									disabled={engine.queueFull}
-								/>
-							</div>
-						</PromptInput>
+					<div className="ww:shrink-0 ww:px-4 ww:pb-8 ww:pt-2 ww:bg-background">
+						<div className="ww:mx-auto ww:w-full ww:max-w-3xl">
+							<PromptInput
+								onSubmit={engine.handleSubmit}
+								globalDrop={allowAttachments}
+								multiple={allowAttachments}
+								className="ww:rounded-2xl ww:border-border ww:bg-input"
+							>
+								<div className="ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-2.5">
+									{allowAttachments && <PromptInputAddAttachments />}
+									<PromptInputTextarea
+										onChange={engine.handleTextChange}
+										value={engine.text}
+										placeholder={animatedPlaceholder}
+										className="ww:min-h-0 ww:py-1 ww:px-0"
+									/>
+									<PromptInputSubmit
+										status={engine.status}
+										disabled={engine.queueFull}
+									/>
+								</div>
+							</PromptInput>
+						</div>
 					</div>
 				)}
 			</div>

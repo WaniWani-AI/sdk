@@ -34,7 +34,9 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 	function ChatBar(props, ref) {
 		const {
 			theme: userTheme,
+			title = "Assistant",
 			width = 600,
+			expandedWidth: userExpandedWidth,
 			expandedHeight = 400,
 			allowAttachments = false,
 			welcomeMessage,
@@ -43,6 +45,10 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			resourceEndpoint,
 			api,
 		} = props;
+
+		const expandedWidth =
+			userExpandedWidth ??
+			Math.round((typeof width === "number" ? width : 600) * 1.2);
 
 		const effectiveResourceEndpoint =
 			resourceEndpoint ?? (api ? `${api}/resource` : undefined);
@@ -136,6 +142,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			window.addEventListener(triggerEvent, handler);
 			return () => window.removeEventListener(triggerEvent, handler);
 		}, [triggerEvent, engine.handleSubmit, focusInput]);
+
 		const isExpanded = isFocused || fullscreenToolCallId !== null;
 
 		// Close on outside click
@@ -161,30 +168,44 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 		return (
 			<div
 				ref={containerRef}
-				style={{ ...cssVars, width }}
+				style={{
+					...cssVars,
+					width: isExpanded ? expandedWidth : width,
+					transition: "width 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+				}}
 				data-waniwani-chat=""
 				data-waniwani-layout="bar"
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className="ww:flex ww:flex-col ww:font-[family-name:var(--ww-font)] ww:text-foreground"
 			>
-				{/* Messages panel — fades up on expand */}
+				{/* Card section — grows from nothing on focus */}
 				<div
-					className={cn(
-						"ww:overflow-hidden ww:bg-background/80 ww:backdrop-blur-xl ww:transition-all ww:duration-300 ww:ease-out",
-						isExpanded
-							? "ww:opacity-100 ww:translate-y-0"
-							: "ww:opacity-0 ww:translate-y-2 ww:pointer-events-none ww:max-h-0",
-					)}
 					style={{
-						...(isExpanded ? { maxHeight: expandedHeight } : undefined),
-						maskImage:
-							"linear-gradient(to bottom, transparent, black 24px, black calc(100% - 16px), transparent), linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent)",
-						maskComposite: "intersect",
-						WebkitMaskImage:
-							"linear-gradient(to bottom, transparent, black 24px, black calc(100% - 16px), transparent), linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent)",
-						WebkitMaskComposite: "source-in",
+						overflow: "hidden",
+						backgroundColor: resolvedTheme.backgroundColor,
+						borderRadius: "var(--ww-radius) var(--ww-radius) 0 0",
+						maxHeight: isExpanded ? expandedHeight + 200 : 0,
+						opacity: isExpanded ? 1 : 0,
+						transform: isExpanded ? "scaleX(1)" : "scaleX(0.88)",
+						transformOrigin: "center bottom",
+						transition:
+							"max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease-out, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
 					}}
 				>
+					{/* Header */}
+					<div
+						className="ww:shrink-0 ww:flex ww:items-center ww:px-6 ww:py-3"
+						style={{
+							backgroundColor: resolvedTheme.headerBackgroundColor,
+							color: resolvedTheme.headerTextColor,
+						}}
+					>
+						<div className="ww:text-sm ww:font-semibold ww:truncate">
+							{title}
+						</div>
+					</div>
+
+					{/* Messages */}
 					<Conversation
 						className="ww:flex-1"
 						style={{ height: expandedHeight }}
@@ -208,41 +229,59 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 						</ConversationContent>
 						{!fullscreenToolCallId && <ConversationScrollButton />}
 					</Conversation>
+
+					{/* Suggestions */}
+					{!fullscreenToolCallId && (
+						<Suggestions
+							suggestions={suggestionsState.suggestions}
+							isLoading={suggestionsState.isLoading}
+							onSelect={handleSuggestionSelect}
+						/>
+					)}
+
+					{/* Queue */}
+					{!fullscreenToolCallId && (
+						<ChatQueue
+							queuedMessages={engine.queuedMessages}
+							onRemove={engine.removeQueuedMessage}
+						/>
+					)}
 				</div>
 
-				{/* Suggestions */}
-				<Suggestions
-					suggestions={suggestionsState.suggestions}
-					isLoading={suggestionsState.isLoading}
-					onSelect={handleSuggestionSelect}
-				/>
-
-				{/* Queue */}
-				<ChatQueue
-					queuedMessages={engine.queuedMessages}
-					onRemove={engine.removeQueuedMessage}
-				/>
-
-				{/* Input bar — always visible */}
-				<div className="ww:shrink-0">
+				{/* Input section — always visible, joins card when expanded */}
+				<div
+					style={{
+						backgroundColor: isExpanded
+							? resolvedTheme.backgroundColor
+							: "transparent",
+						borderRadius: isExpanded
+							? "0 0 var(--ww-radius) var(--ww-radius)"
+							: undefined,
+						boxShadow: isExpanded ? "0 8px 24px rgba(0,0,0,0.1)" : "none",
+						transition:
+							"background-color 0.2s ease, border-radius 0.3s ease, box-shadow 0.35s ease, padding 0.3s ease",
+						padding: isExpanded ? "8px 16px 16px" : "0",
+					}}
+				>
 					<PromptInput
 						onSubmit={engine.handleSubmit}
 						globalDrop={allowAttachments}
 						multiple={allowAttachments}
 						className={cn(
-							"ww:rounded-[var(--ww-radius)] ww:shadow-sm ww:transition-all ww:duration-300 ww:ease-out",
+							"ww:rounded-2xl ww:border-border ww:bg-input ww:transition-all ww:duration-300",
+							!isExpanded && "ww:shadow-sm",
 							isHighlighted &&
 								"ww:ring-2 ww:ring-blue-400/70 ww:ring-offset-2 ww:ring-offset-background",
 						)}
 					>
-						<div className="ww:flex ww:items-center ww:gap-1 ww:px-3 ww:py-2">
+						<div className="ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-2.5">
 							{allowAttachments && <PromptInputAddAttachments />}
 							<PromptInputTextarea
 								onChange={engine.handleTextChange}
 								value={engine.text}
 								placeholder={animatedPlaceholder}
 								onFocus={handleFocus}
-								className="ww:min-h-0 ww:py-1.5 ww:px-2"
+								className="ww:min-h-0 ww:py-1 ww:px-0"
 							/>
 							<PromptInputSubmit
 								status={engine.status}

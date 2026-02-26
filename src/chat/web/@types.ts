@@ -115,8 +115,12 @@ export interface ChatBaseProps {
 export interface ChatBarProps extends ChatBaseProps {
 	/** Chat bar width in pixels. Defaults to 600. */
 	width?: number;
+	/** Width of the expanded card in pixels. Defaults to width × 1.2. */
+	expandedWidth?: number;
 	/** Max height of the expanded messages panel in pixels. Defaults to 400. */
 	expandedHeight?: number;
+	/** Title shown in the header when expanded. Defaults to "Assistant". */
+	title?: string;
 }
 
 // ============================================================================
