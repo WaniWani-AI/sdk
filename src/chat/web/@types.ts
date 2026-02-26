@@ -130,10 +130,12 @@ export interface ChatCardProps extends ChatBaseProps {
 	subtitle?: string;
 	/** Show the status dot in the header. Defaults to true. */
 	showStatus?: boolean;
-	/** Card width in pixels. Defaults to 400. */
-	width?: number;
-	/** Card height in pixels. Defaults to 600. */
-	height?: number;
+	/** Card width. Accepts a pixel number or any CSS value (e.g. "100%", "50vw"). Defaults to 500. */
+	width?: number | string;
+	/** Card height. Accepts a pixel number or any CSS value (e.g. "100%", "80vh"). Defaults to 600. */
+	height?: number | string;
+	/** Additional class names applied to the root element (e.g. Tailwind classes). */
+	className?: string;
 }
 
 // ============================================================================

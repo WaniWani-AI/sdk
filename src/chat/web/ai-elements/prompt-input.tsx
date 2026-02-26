@@ -462,7 +462,7 @@ export const PromptInputSubmit = ({
 		<Button
 			aria-label={isGenerating ? "Stop" : "Submit"}
 			className={cn(
-				"ww:bg-foreground ww:text-background ww:hover:bg-foreground",
+				"ww:bg-foreground ww:text-background ww:hover:bg-foreground ww:rounded-full",
 				className,
 			)}
 			onClick={handleClick}
