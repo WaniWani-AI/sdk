@@ -33,7 +33,7 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 		htmlPath,
 		widgetDomain,
 		prefersBorder = true,
-		autoHeight,
+		autoHeight = true,
 	} = config;
 
 	// Auto-generate CSP from baseUrl if not explicitly provided

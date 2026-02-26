@@ -51,8 +51,7 @@ export function McpAppFrame({
 	resourceEndpoint = DEFAULT_RESOURCE_ENDPOINT,
 	isDark = false,
 	className,
-	// TODO: REMOVE — defaulting to true for playground testing
-	autoHeight = true,
+	autoHeight = false,
 	onOpenLink,
 	onFollowUp,
 	onCallTool,
