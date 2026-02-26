@@ -22,17 +22,17 @@ import { createResource, createFlow, createTool, interrupt, showWidget, register
 
 ```ts
 import { createFlow, interrupt, START, END, registerTools } from "@waniwani/sdk/mcp";
+import { z } from "zod";
 
-type LeadState = {
-  email: string;
-  role: string;
-  useCase: string;
-};
-
-const flow = createFlow<LeadState>({
+const flow = createFlow({
   id: "demo_qualification",
   title: "Demo Qualification",
   description: "Qualify a lead for a demo. Use when a user asks for a demo or wants to get started.",
+  state: {
+    email: z.string().describe("Work email address"),
+    role: z.string().describe("The user's role at their company"),
+    useCase: z.string().describe("Primary use case for the product"),
+  },
 })
   .addNode("ask_email", () =>
     interrupt({ question: "What is your work email address?", field: "email" })
@@ -65,24 +65,31 @@ const flow = createFlow<LeadState>({
 await registerTools(server, [flow]);
 ```
 
-## Pre-filling answers with `initialState`
+## State definition (required)
 
-When calling `action: "start"`, the AI can include an `initialState` object with answers extracted from the user's message. The engine automatically skips interrupt nodes whose fields are already populated in state.
+Every flow must define its `state` — a map of field names to Zod schemas. This serves two purposes:
 
-To enable this, declare a `fields` map on the flow config — the keys match your `interrupt({ field })` names and the values are Zod schemas with `.describe()`. These get embedded in the tool description so the AI knows exactly which keys to use and what types to expect:
+1. **Type inference** — `TState` is automatically derived from the schemas, no explicit generic needed
+2. **AI protocol** — field names, types, and descriptions are embedded in the tool description so the AI can pre-fill answers via `initialState`
 
 ```ts
-const flow = createFlow<SignupState>({
+const flow = createFlow({
   id: "signup",
   title: "Signup",
   description: "Sign up for a new account",
-  fields: {
+  state: {
     country: z.string().describe("Country the business is based in"),
     status: z.enum(["registered", "unregistered"]).describe("Business registration status"),
     email: z.string().describe("Work email address"),
   },
 })
 ```
+
+At every step, the engine response includes a `field` property telling the AI which state field to collect before advancing.
+
+## Pre-filling answers with `initialState`
+
+When calling `action: "start"`, the AI can include an `initialState` object with answers extracted from the user's message. The engine automatically skips nodes whose fields are already populated in state.
 
 If a user says "I want to open a bank account in France", the AI calls:
 ```json
@@ -97,7 +104,6 @@ The flow skips the "which country?" question and proceeds to the next unanswered
 - Action nodes between skipped steps still execute (their logic may be needed for conditional edges).
 - Fields with `undefined`, `null`, or `""` are NOT considered pre-filled.
 - The AI should only extract values the user explicitly stated — never guess.
-- `fields` is optional — flows without it still work, the AI just can't reliably pre-fill.
 
 ## Node types
 
@@ -115,10 +121,15 @@ Route to different nodes based on state:
 ```ts
 const GENERIC_DOMAINS = new Set(["gmail.com", "yahoo.com", "hotmail.com", "outlook.com"]);
 
-const flow = createFlow<{ email: string; isCompanyEmail: boolean; companyName: string }>({
+const flow = createFlow({
   id: "smart_onboarding",
   title: "Smart Onboarding",
   description: "Onboards users with email-aware branching.",
+  state: {
+    email: z.string().describe("User's email address"),
+    isCompanyEmail: z.boolean().describe("Whether the email is a company domain"),
+    companyName: z.string().describe("Company name"),
+  },
 })
   .addNode("ask_email", () =>
     interrupt({ question: "What's your email?", field: "email" })
@@ -174,10 +185,15 @@ const pricingTool = createTool({
 }));
 
 // 3. Reference the resource in a flow
-const flow = createFlow<{ postalCode: string; sqm: string; selectedPlan: string }>({
+const flow = createFlow({
   id: "guided_quote",
   title: "Guided Quote",
   description: "Walk users through getting a quote.",
+  state: {
+    postalCode: z.string().describe("User's postal code"),
+    sqm: z.string().describe("Home size in square meters"),
+    selectedPlan: z.string().describe("The plan the user selected"),
+  },
 })
   .addNode("ask_postal", () =>
     interrupt({ question: "What's your postal code?", field: "postalCode" })
@@ -244,15 +260,16 @@ function PricingTable() {
 
 ## API Reference
 
-### `createFlow<TState>(config)`
+### `createFlow(config)`
 
-Creates a new `StateGraph`. Config:
+Creates a new `StateGraph`. The state type is automatically inferred from the `state` definition — no explicit generic needed.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | MCP tool name |
-| `title` | `string` | Display title |
-| `description` | `string` | Tells the AI when to use this flow |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | yes | MCP tool name |
+| `title` | `string` | yes | Display title |
+| `description` | `string` | yes | Tells the AI when to use this flow |
+| `state` | `Record<string, z.ZodType>` | yes | State schema — defines all fields the flow collects. Keys match `interrupt({ field })` names, values are Zod schemas with `.describe()` |
 
 ### `StateGraph` methods
 

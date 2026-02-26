@@ -3,6 +3,7 @@
 export type {
 	ConditionFn,
 	FlowConfig,
+	InferFlowState,
 	InterruptSignal,
 	NodeConfig,
 	NodeHandler,

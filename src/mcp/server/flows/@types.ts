@@ -134,20 +134,24 @@ export type FlowConfig = {
 	/** Description for the AI (explains when to use this flow) */
 	description: string;
 	/**
-	 * Describe the flow's state fields so the AI can pre-fill answers
-	 * from the user's message via `initialState`.
-	 * Keys are the field names used in `interrupt({ field })`,
+	 * Define the flow's state — each field the flow collects.
+	 * Keys are the field names used in `interrupt({ field })` or `NodeConfig.field`,
 	 * values are Zod schemas with `.describe()`.
+	 *
+	 * The state definition serves two purposes:
+	 * 1. Type inference — `TState` is automatically derived, no explicit generic needed
+	 * 2. AI protocol — field names, types, and descriptions are included in the tool
+	 *    description so the AI can pre-fill answers via `initialState`
 	 *
 	 * @example
 	 * ```ts
-	 * fields: {
+	 * state: {
 	 *   country: z.string().describe("Country the business is based in"),
 	 *   status: z.enum(["registered", "unregistered"]).describe("Business registration status"),
 	 * }
 	 * ```
 	 */
-	fields?: Record<string, z.ZodType>;
+	state: Record<string, z.ZodType>;
 	/** Optional tool annotations */
 	annotations?: {
 		readOnlyHint?: boolean;
@@ -155,6 +159,25 @@ export type FlowConfig = {
 		openWorldHint?: boolean;
 		destructiveHint?: boolean;
 	};
+};
+
+/**
+ * Infer the runtime state type from a flow's state schema definition.
+ *
+ * @example
+ * ```ts
+ * const config = {
+ *   state: {
+ *     country: z.enum(["FR", "DE"]),
+ *     status: z.enum(["registered", "unregistered"]),
+ *   }
+ * };
+ * type MyState = InferFlowState<typeof config.state>;
+ * // { country: "FR" | "DE"; status: "registered" | "unregistered" }
+ * ```
+ */
+export type InferFlowState<T extends Record<string, z.ZodType>> = {
+	[K in keyof T]: z.infer<T[K]>;
 };
 
 /**

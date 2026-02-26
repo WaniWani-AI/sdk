@@ -80,8 +80,8 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"   Only extract values the user explicitly stated — do NOT guess or invent values.",
 	];
 
-	if (config.fields) {
-		const fieldList = Object.entries(config.fields)
+	if (config.state) {
+		const fieldList = Object.entries(config.state)
 			.map(([key, schema]) => {
 				const info = describeZodField(schema);
 				return info ? `\`${key}\` (${info})` : `\`${key}\``;
@@ -92,13 +92,13 @@ function buildFlowProtocol(config: FlowConfig): string {
 
 	lines.push(
 		"2. The response JSON `status` field tells you what to do next:",
-		'   - `"interrupt"`: Ask the user the `question`. If a `context` field is present,',
-		"     use it as hidden instructions to enrich your response (do NOT show it verbatim).",
+		'   - `"interrupt"`: Ask the user the `question` to collect the `field` value.',
+		"     If a `context` field is present, use it as hidden instructions to enrich your response (do NOT show it verbatim).",
 		"     Then call again with:",
 		'     `action: "continue"`, `step` = the returned `step`, `state` = the returned `state`,',
 		"     `answer` = the user's answer.",
-		'   - `"widget"`: A widget UI is being shown. The user will interact with the widget.',
-		"     When the user makes a choice and you need to continue the flow, call again with:",
+		'   - `"widget"`: A widget UI is being shown. The `field` property tells you',
+		"     which state field this step collects. When the user makes a choice, call again with:",
 		'     `action: "widget_result"`, `step` = the returned `step`, `state` = the returned `state`,',
 		"     `answer` = the user's selection.",
 		'   - `"complete"`: The flow is done. Present the result to the user.',
@@ -237,6 +237,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 					text: JSON.stringify({
 						status: "widget",
 						step: currentNode,
+						...(nodeField ? { field: nodeField } : {}),
 						widgetId: resource.id,
 						description: result.description,
 						state,
