@@ -24,12 +24,13 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 		null;
 	private hostContext: McpUiHostContext | undefined;
 	private latestToolResult: ToolResult | null = null;
+	private resizeCleanup: (() => void) | null = null;
 
 	constructor() {
 		this.app = new App(
 			{ name: "WaniWani Widget", version: "1.0.0" },
 			{}, // capabilities
-			{ autoResize: true },
+			{ autoResize: false },
 		);
 
 		// Set up notification handlers
@@ -60,10 +61,65 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 			new PostMessageTransport(window.parent, window.parent),
 		);
 		this.hostContext = this.app.getHostContext();
+		this.resizeCleanup = this.setupAutoResize();
 	}
 
 	async close(): Promise<void> {
+		this.resizeCleanup?.();
+		this.resizeCleanup = null;
 		await this.app.close();
+	}
+
+	/**
+	 * Custom auto-resize that uses scrollHeight with a collapsed root element.
+	 * The library's built-in autoResize uses fit-content + getBoundingClientRect
+	 * which can fail to detect height changes when content grows.
+	 */
+	private setupAutoResize(): () => void {
+		let rafPending = false;
+		let lastWidth = 0;
+		let lastHeight = 0;
+
+		const measure = () => {
+			if (rafPending) return;
+			rafPending = true;
+			requestAnimationFrame(() => {
+				rafPending = false;
+				const el = document.documentElement;
+
+				// --- Width: use fit-content (same as library) ---
+				const savedWidth = el.style.width;
+				el.style.width = "fit-content";
+				const fitRect = el.getBoundingClientRect();
+				el.style.width = savedWidth;
+				const scrollbarGap = window.innerWidth - el.clientWidth;
+				const width = Math.ceil(fitRect.width + scrollbarGap);
+
+				// --- Height: collapse root and read scrollHeight ---
+				// fit-content on <html> can under-report when children use
+				// percentage heights or viewport units. Collapsing to 0 and
+				// reading scrollHeight gives the true content height.
+				const savedHeight = el.style.height;
+				const savedMinHeight = el.style.minHeight;
+				el.style.height = "0";
+				el.style.minHeight = "0";
+				const height = el.scrollHeight;
+				el.style.height = savedHeight;
+				el.style.minHeight = savedMinHeight;
+
+				if (width !== lastWidth || height !== lastHeight) {
+					lastWidth = width;
+					lastHeight = height;
+					this.app.sendSizeChanged({ width, height });
+				}
+			});
+		};
+
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(document.documentElement);
+		observer.observe(document.body);
+		return () => observer.disconnect();
 	}
 
 	getToolOutput<T = Record<string, unknown>>(): T | null {
