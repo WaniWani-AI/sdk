@@ -171,6 +171,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 							status={engine.status}
 							welcomeMessage={welcomeMessage}
 							resourceEndpoint={effectiveResourceEndpoint}
+							chatSessionId={engine.sessionId}
 							isDark={isDark}
 							onFollowUp={handleWidgetMessage}
 							onCallTool={handleCallTool}

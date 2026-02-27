@@ -48,3 +48,8 @@ export type {
 	ToolToolCallback,
 	ZodRawShapeCompat,
 } from "./server/tools/types";
+// Tracking helpers
+export type { TrackingRouteOptions } from "./server/tracking-route";
+export { createTrackingRoute } from "./server/tracking-route";
+export type { WithWaniwaniOptions } from "./server/with-waniwani";
+export { withWaniwani } from "./server/with-waniwani";

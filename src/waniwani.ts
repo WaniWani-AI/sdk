@@ -25,14 +25,24 @@ import type { WaniWaniClient, WaniWaniConfig } from "./types.js";
 export function waniwani(config?: WaniWaniConfig): WaniWaniClient {
 	const baseUrl = config?.baseUrl ?? "https://app.waniwani.ai";
 	const apiKey = config?.apiKey ?? process.env.WANIWANI_API_KEY;
+	const trackingConfig = {
+		endpointPath: config?.tracking?.endpointPath ?? "/api/mcp/events/v2/batch",
+		flushIntervalMs: config?.tracking?.flushIntervalMs ?? 1_000,
+		maxBatchSize: config?.tracking?.maxBatchSize ?? 20,
+		maxBufferSize: config?.tracking?.maxBufferSize ?? 1_000,
+		maxRetries: config?.tracking?.maxRetries ?? 3,
+		retryBaseDelayMs: config?.tracking?.retryBaseDelayMs ?? 200,
+		retryMaxDelayMs: config?.tracking?.retryMaxDelayMs ?? 2_000,
+		shutdownTimeoutMs: config?.tracking?.shutdownTimeoutMs ?? 2_000,
+	};
 
-	const internalConfig = { baseUrl, apiKey };
+	const internalConfig = { baseUrl, apiKey, tracking: trackingConfig };
 
 	// Compose client from modules
-	const tracking = createTrackingClient(internalConfig);
+	const trackingClient = createTrackingClient(internalConfig);
 
 	return {
-		...tracking,
+		...trackingClient,
 		_config: internalConfig,
 	};
 }

@@ -5,6 +5,33 @@ import { ChatBar, ChatCard, DARK_THEME, DEFAULT_THEME, type ChatHandle } from "@
 import { DevToolbar } from "./dev-toolbar";
 import { LAYOUTS, MODES, type Layout, type Mode } from "./types";
 
+type SupportedLocale = "en" | "fr";
+
+const INITIAL_SUGGESTIONS: Record<SupportedLocale, string[]> = {
+  en: [
+    "I want to open a Qonto account in France",
+    "I want to see if switching to Qonto is worth it",
+  ],
+  fr: [
+    "Je veux ouvrir un compte Qonto en France",
+    "Je veux voir si ca vaut le coup de switch sur Qonto",
+  ],
+};
+
+function resolveLocale(locale: string): SupportedLocale {
+  const normalized = locale.trim().toLowerCase();
+
+  if (normalized.startsWith("en") || normalized === "english") {
+    return "en";
+  }
+
+  if (normalized.startsWith("fr") || normalized === "french") {
+    return "fr";
+  }
+
+  return "fr";
+}
+
 function setCookie(name: string, value: string) {
   document.cookie = `${name}=${value};path=/;max-age=31536000`;
 }
@@ -12,11 +39,15 @@ function setCookie(name: string, value: string) {
 export function Playground({
   initialLayout,
   initialMode,
+  initialLocale,
 }: {
   initialLayout: string;
   initialMode: string;
+  initialLocale: string;
 }) {
   const chatRef = useRef<ChatHandle>(null);
+  const locale = resolveLocale(initialLocale);
+  const localizedSuggestions = INITIAL_SUGGESTIONS[locale];
 
   const [layout, setLayout] = useState<Layout>(
     LAYOUTS.includes(initialLayout as Layout) ? (initialLayout as Layout) : "card"
@@ -24,6 +55,8 @@ export function Playground({
   const [mode, setMode] = useState<Mode>(
     MODES.includes(initialMode as Mode) ? (initialMode as Mode) : "dark"
   );
+  const [isEmitting, setIsEmitting] = useState(false);
+  const [emitStatus, setEmitStatus] = useState<string | null>(null);
 
   function updateLayout(l: Layout) {
     setLayout(l);
@@ -33,6 +66,36 @@ export function Playground({
   function updateMode(m: Mode) {
     setMode(m);
     setCookie("playground-mode", m);
+  }
+
+  async function emitV2TrackingSample() {
+    setIsEmitting(true);
+    setEmitStatus(null);
+
+    try {
+      const response = await fetch("/api/track-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "playground-button" }),
+      });
+
+      const data = (await response.json().catch(() => ({}))) as {
+        eventIds?: string[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? `Request failed (${response.status})`);
+      }
+
+      const eventCount = Array.isArray(data.eventIds) ? data.eventIds.length : 0;
+      setEmitStatus(`Emitted ${eventCount} event(s)`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      setEmitStatus(`Emit failed: ${message}`);
+    } finally {
+      setIsEmitting(false);
+    }
   }
 
   return (
@@ -75,6 +138,49 @@ export function Playground({
         Request Demo
       </button>
 
+      <button
+        type="button"
+        onClick={emitV2TrackingSample}
+        disabled={isEmitting}
+        style={{
+          position: "fixed",
+          top: 44,
+          right: 16,
+          zIndex: 50,
+          padding: "5px 14px",
+          borderRadius: 7,
+          border: "none",
+          cursor: isEmitting ? "not-allowed" : "pointer",
+          fontWeight: 500,
+          fontSize: 13,
+          fontFamily: "system-ui, sans-serif",
+          background: isEmitting ? "#b3b3b3" : "#fff",
+          color: "#000",
+          opacity: isEmitting ? 0.8 : 1,
+        }}
+      >
+        {isEmitting ? "Emitting..." : "Emit V2 Event"}
+      </button>
+
+      {emitStatus && (
+        <div
+          style={{
+            position: "fixed",
+            top: 76,
+            right: 16,
+            zIndex: 50,
+            padding: "5px 10px",
+            borderRadius: 7,
+            fontSize: 12,
+            fontFamily: "system-ui, sans-serif",
+            background: "rgba(0,0,0,0.8)",
+            color: "#fff",
+          }}
+        >
+          {emitStatus}
+        </div>
+      )}
+
       <div
         style={{
           flex: 1,
@@ -92,7 +198,10 @@ export function Playground({
             welcomeMessage="Hey! How can I help you today?"
             theme={mode === "dark" ? DARK_THEME : DEFAULT_THEME}
             allowAttachments
-            suggestions
+            suggestions={{
+              dynamic: true,
+              initial: localizedSuggestions,
+            }}
           />
         )}
         {layout === "card" && (
@@ -107,7 +216,7 @@ export function Playground({
             height={700}
             suggestions={{
               dynamic: false,
-              initial: ["Je souhaite connaitre les offres BPI France", "Quelles aides existent pour creer son entreprise avec BPI?"],
+              initial: localizedSuggestions,
             }}
           />
         )}

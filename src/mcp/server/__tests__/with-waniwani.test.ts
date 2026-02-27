@@ -1,0 +1,195 @@
+import { describe, expect, test } from "bun:test";
+import type { TrackInput } from "../../../tracking/@types.js";
+import { withWaniwani } from "../with-waniwani.js";
+
+function mockClient() {
+	const tracked: TrackInput[] = [];
+	let flushed = 0;
+	return {
+		client: {
+			track: async (event: TrackInput) => {
+				tracked.push(event);
+				return { eventId: `evt_mock_${tracked.length}` };
+			},
+			flush: async () => {
+				flushed += 1;
+			},
+			_config: {
+				baseUrl: "https://test.waniwani.ai",
+				apiKey: undefined,
+				tracking: {
+					endpointPath: "/api/mcp/events/v2/batch",
+					flushIntervalMs: 1000,
+					maxBatchSize: 20,
+					maxBufferSize: 1000,
+					maxRetries: 3,
+					retryBaseDelayMs: 200,
+					retryMaxDelayMs: 2000,
+					shutdownTimeoutMs: 2000,
+				},
+			},
+		},
+		tracked,
+		get flushed() {
+			return flushed;
+		},
+	};
+}
+
+type Handler = (input: unknown, extra: unknown) => Promise<unknown>;
+type RegisterToolArgs = [string, Record<string, unknown>, Handler];
+
+function mockServer() {
+	const registered: RegisterToolArgs[] = [];
+	const server = {
+		registerTool: (...args: unknown[]) => {
+			registered.push(args as RegisterToolArgs);
+		},
+	};
+	return {
+		server: server as unknown as Parameters<typeof withWaniwani>[0],
+		registered,
+		registerTool: (...args: unknown[]) => {
+			(server.registerTool as (...a: unknown[]) => void)(...args);
+		},
+	};
+}
+
+describe("withWaniwani", () => {
+	test("emits tool.called after execution with durationMs and status ok", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("pricing", { description: "Get pricing" }, async () => ({
+			text: "done",
+		}));
+
+		expect(mock.registered).toHaveLength(1);
+		expect(mock.registered[0]?.[0]).toBe("pricing");
+
+		const handler = mock.registered[0]?.[2];
+		const result = await handler?.({}, { _meta: { requestId: "req-1" } });
+
+		expect(result).toMatchObject({ text: "done" });
+		expect(tracked).toHaveLength(1);
+		expect(tracked[0]).toMatchObject({
+			event: "tool.called",
+			properties: {
+				name: "pricing",
+				type: "other",
+				status: "ok",
+			},
+		});
+		const props = (tracked[0] as { properties: Record<string, unknown> })
+			.properties;
+		expect(typeof props.durationMs).toBe("number");
+		expect(props.durationMs).toBeGreaterThanOrEqual(0);
+	});
+
+	test("emits status error with errorMessage on handler failure", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("failing-tool", { description: "Fails" }, async () => {
+			throw new Error("tool broke");
+		});
+
+		const handler = mock.registered[0]?.[2];
+
+		let thrownError: Error | undefined;
+		try {
+			await handler?.({}, {});
+		} catch (e) {
+			thrownError = e as Error;
+		}
+
+		expect(thrownError).toBeDefined();
+		expect(thrownError?.message).toBe("tool broke");
+
+		expect(tracked).toHaveLength(1);
+		expect(tracked[0]).toMatchObject({
+			event: "tool.called",
+			properties: {
+				name: "failing-tool",
+				type: "other",
+				status: "error",
+				errorMessage: "tool broke",
+			},
+		});
+	});
+
+	test("prevents double wrapping", () => {
+		const { server } = mockServer();
+
+		const wrapped1 = withWaniwani(server, {
+			client: mockClient().client,
+		});
+		const wrapped2 = withWaniwani(wrapped1, {
+			client: mockClient().client,
+		});
+
+		expect(wrapped1).toBe(wrapped2);
+	});
+
+	test("extracts _meta from extra and passes as meta", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.({}, { _meta: { "openai/sessionId": "session-1" } });
+
+		expect(tracked[0]?.meta).toEqual({
+			"openai/sessionId": "session-1",
+		});
+	});
+
+	test("flushes after tool call when flushAfterToolCall is set", async () => {
+		const mock = mockClient();
+		const srv = mockServer();
+
+		withWaniwani(srv.server, {
+			client: mock.client,
+			flushAfterToolCall: true,
+		});
+
+		srv.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = srv.registered[0]?.[2];
+		await handler?.({}, {});
+
+		expect(mock.flushed).toBe(1);
+	});
+
+	test("injects widget endpoint metadata even without token cache", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.({}, {})) as Record<string, unknown>;
+		const meta = result._meta as Record<string, unknown>;
+		const waniwani = meta.waniwani as Record<string, unknown>;
+
+		expect(waniwani.endpoint).toBe(
+			"https://test.waniwani.ai/api/mcp/events/v2/batch",
+		);
+		expect(waniwani.token).toBe(undefined);
+	});
+});

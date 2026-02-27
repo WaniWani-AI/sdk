@@ -35,6 +35,7 @@ export interface FullscreenWidget {
 	toolResult: {
 		content?: Array<{ type: string; text?: string }>;
 		structuredContent?: Record<string, unknown>;
+		_meta?: Record<string, unknown>;
 	};
 	autoHeight: boolean;
 }
@@ -44,6 +45,7 @@ interface MessageListProps {
 	status: ChatStatus;
 	welcomeMessage?: string;
 	resourceEndpoint?: string;
+	chatSessionId?: string;
 	isDark?: boolean;
 	onFollowUp?: (message: {
 		role: string;
@@ -55,6 +57,7 @@ interface MessageListProps {
 	}) => Promise<{
 		content?: Array<{ type: string; text?: string }>;
 		structuredContent?: Record<string, unknown>;
+		_meta?: Record<string, unknown>;
 	}>;
 	onWidgetDisplayModeChange?: (
 		mode: McpAppDisplayMode,
@@ -69,6 +72,7 @@ export function MessageList({
 	status,
 	welcomeMessage,
 	resourceEndpoint,
+	chatSessionId,
 	isDark,
 	onFollowUp,
 	onCallTool,
@@ -187,8 +191,12 @@ export function MessageList({
 														.structuredContent as
 														| Record<string, unknown>
 														| undefined,
+													_meta: (output as Record<string, unknown>)._meta as
+														| Record<string, unknown>
+														| undefined,
 												}}
 												resourceEndpoint={resourceEndpoint}
+												chatSessionId={chatSessionId}
 												isDark={isDark}
 												autoHeight={autoHeight}
 												onFollowUp={onFollowUp}
@@ -213,6 +221,10 @@ export function MessageList({
 																		structuredContent: (
 																			output as Record<string, unknown>
 																		).structuredContent as
+																			| Record<string, unknown>
+																			| undefined,
+																		_meta: (output as Record<string, unknown>)
+																			._meta as
 																			| Record<string, unknown>
 																			| undefined,
 																	},

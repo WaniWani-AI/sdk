@@ -1,22 +1,13 @@
 # @waniwani
 
-SDK for [app.waniwani.ai](https://app.waniwani.ai) - MCP event tracking and tools.
+SDK for [app.waniwani.ai](https://app.waniwani.ai) with MCP tracking, widget helpers, and chat tooling.
 
 ## Warning
 
-This is **pre-alpha** software. Here's what that means:
+This is pre-alpha software:
 
-- Everything will break
-- APIs will change without notice
-- We will not apologize
-
-If you're not comfortable with that, wait for v1.0.
-
-## What is WaniWani?
-
-[WaniWani](https://app.waniwani.ai) is the Shopify of MCP servers — enabling quote-based businesses that sell complex services to deploy AI agents that capture leads, qualify customers, and generate quotes.
-
-This SDK is how you track events and interactions in your MCP server.
+- APIs can change without notice
+- Behavior can change between releases
 
 ## Installation
 
@@ -30,37 +21,64 @@ npm install @waniwani
 import { waniwani } from "@waniwani";
 
 const client = waniwani({
-  apiKey: "your-api-key", // or use WANIWANI_API_KEY env var
+  apiKey: "your-api-key", // or WANIWANI_API_KEY
 });
 
-// Track a tool call
-await client.track({
-  eventType: "tool.called",
-  sessionId: "session-123",
-  toolName: "pricing",
-  toolType: "pricing",
+const { eventId } = await client.track({
+  event: "tool.called",
+  properties: { name: "pricing", type: "pricing" },
+  meta: extra._meta,
 });
 
-// Get or create session from MCP metadata
-const sessionId = await client.getOrCreateSession(extra?._meta);
+await client.flush();
 ```
+
+## Events API V2
+
+New SDK versions send tracking data to **V2 only**:
+
+- Endpoint: `POST /api/mcp/events/v2/batch`
+- Transport: buffered batching with immediate scheduling, interval flush, size-threshold flush
+- Resilience: retry/backoff on transient failures, permanent stop on auth failures
+
+Legacy `track()` input shapes remain supported and are mapped internally to canonical V2 events.
 
 ## API
 
 ### `waniwani(config?)`
 
-Creates a WaniWani client.
-
 ```typescript
 const client = waniwani({
   apiKey: "...", // defaults to WANIWANI_API_KEY env var
   baseUrl: "...", // defaults to https://app.waniwani.ai
+  tracking: {
+    endpointPath: "/api/mcp/events/v2/batch",
+    flushIntervalMs: 1000,
+    maxBatchSize: 20,
+    maxBufferSize: 1000,
+    maxRetries: 3,
+    retryBaseDelayMs: 200,
+    retryMaxDelayMs: 2000,
+    shutdownTimeoutMs: 2000,
+  },
 });
 ```
 
 ### `client.track(event)`
 
-Track an event. Returns `{ eventId: string }`.
+Accepts modern and legacy shapes and returns `{ eventId: string }` immediately after enqueue.
+
+Modern shape:
+
+```typescript
+await client.track({
+  event: "quote.succeeded",
+  properties: { amount: 99, currency: "USD" },
+  meta: extra._meta,
+});
+```
+
+Legacy-compatible shape:
 
 ```typescript
 await client.track({
@@ -68,47 +86,46 @@ await client.track({
   sessionId: "session-123",
   toolName: "pricing",
   toolType: "pricing",
-  metadata: { custom: "data" },
+  metadata: { source: "legacy" },
 });
 ```
 
-**Event Types:**
+### `client.flush()`
 
-| Event Type           | Description                | Additional Fields                        |
-| -------------------- | -------------------------- | ---------------------------------------- |
-| `session.started`    | New session began          | -                                        |
-| `tool.called`        | MCP tool was invoked       | `toolName?`, `toolType?`                 |
-| `quote.requested`    | Quote was requested        | -                                        |
-| `quote.succeeded`    | Quote completed            | `quoteAmount?`, `quoteCurrency?`         |
-| `quote.failed`       | Quote failed               | -                                        |
-| `link.clicked`       | User clicked a link        | `linkUrl?`                               |
-| `purchase.completed` | Purchase was completed     | `purchaseAmount?`, `purchaseCurrency?`   |
+Flushes buffered events.
 
-**Tool Types:** `pricing`, `product_info`, `availability`, `support`, `other`
+### `client.shutdown(options?)`
 
-**Base Event Fields:**
-
-- `sessionId` (required): Session identifier
-- `externalUserId?`: Your user identifier
-- `metadata?`: Custom key-value data
-
-### `client.getOrCreateSession(meta?)`
-
-Extract session ID from MCP request metadata, or generate a new one. If a new session is generated, automatically tracks a `session.started` event.
+Flushes and stops transport. Returns:
 
 ```typescript
-// In your MCP tool handler
-const sessionId = await client.getOrCreateSession(extra?._meta);
+{ timedOut: boolean; pendingEvents: number }
 ```
 
-Looks for session ID in: `meta["openai/sessionId"]`, `meta.sessionId`, or `meta.conversationId`.
+## Event Types
 
-## Configuration
+- `session.started`
+- `tool.called`
+- `quote.requested`
+- `quote.succeeded`
+- `quote.failed`
+- `link.clicked`
+- `purchase.completed`
 
-| Option    | Environment Variable | Default                    |
-| --------- | -------------------- | -------------------------- |
-| `apiKey`  | `WANIWANI_API_KEY`   | -                          |
-| `baseUrl` | -                    | `https://app.waniwani.ai`  |
+## Quality Gates
+
+Run from repo root:
+
+```bash
+bun run typecheck && bun run lint && bun run build && bun run test
+```
+
+## Verification and Contracts
+
+- Manual playground flow: [`docs/playground-v2-manual-verification.md`](docs/playground-v2-manual-verification.md)
+- Events API V2 contract: [`docs/events-api-v2-contract.md`](docs/events-api-v2-contract.md)
+- Events table V2 proposal: [`docs/events-table-v2-schema.md`](docs/events-table-v2-schema.md)
+- Migration and release plan: [`docs/migration-v2-release-plan.md`](docs/migration-v2-release-plan.md)
 
 ## License
 

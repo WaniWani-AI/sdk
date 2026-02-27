@@ -66,13 +66,21 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	const headersRef = useRef(userHeaders);
 	const bodyRef = useRef(body);
-	const sessionIdRef = useRef<string | undefined>(undefined);
+	const [sessionId, setSessionIdState] = useState<string | undefined>(() =>
+		readSessionIdFromStorage(),
+	);
+	const sessionIdRef = useRef<string | undefined>(sessionId);
 
 	const getSessionId = useCallback((): string | undefined => {
 		if (sessionIdRef.current) return sessionIdRef.current;
 
 		const storedSessionId = readSessionIdFromStorage();
-		if (storedSessionId) sessionIdRef.current = storedSessionId;
+		if (storedSessionId) {
+			sessionIdRef.current = storedSessionId;
+			setSessionIdState((prev) =>
+				prev === storedSessionId ? prev : storedSessionId,
+			);
+		}
 		return storedSessionId;
 	}, []);
 
@@ -82,11 +90,13 @@ export function useChatEngine(props: ChatBaseProps) {
 		if (sessionIdRef.current === sessionId) return;
 
 		sessionIdRef.current = sessionId;
+		setSessionIdState(sessionId);
 		writeSessionIdToStorage(sessionId);
 	}, []);
 
 	const clearSessionId = useCallback(() => {
 		sessionIdRef.current = undefined;
+		setSessionIdState(undefined);
 		removeSessionIdFromStorage();
 	}, []);
 
@@ -233,5 +243,6 @@ export function useChatEngine(props: ChatBaseProps) {
 		queuedMessages,
 		queueFull,
 		removeQueuedMessage,
+		sessionId,
 	};
 }

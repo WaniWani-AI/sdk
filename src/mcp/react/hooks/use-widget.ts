@@ -17,8 +17,11 @@ import type { DisplayMode, SafeArea, Theme, UnknownObject } from "./@types";
 
 /**
  * Context for the unified widget client.
+ * @internal Exported for use by useWaniwani to optionally resolve config.
  */
-const WidgetClientContext = createContext<UnifiedWidgetClient | null>(null);
+export const WidgetClientContext = createContext<UnifiedWidgetClient | null>(
+	null,
+);
 
 /**
  * Provider props
