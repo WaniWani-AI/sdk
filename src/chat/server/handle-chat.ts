@@ -38,6 +38,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 						if (result.sessionId !== undefined) sessionId = result.sessionId;
 					}
 				} catch (hookError) {
+					console.error("[waniwani] beforeRequest hook error:", hookError);
 					const status =
 						hookError instanceof WaniWaniError ? hookError.status : 400;
 					const message =
@@ -93,6 +94,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 				headers,
 			});
 		} catch (error) {
+			console.error("[waniwani] Chat handler error:", error);
 			const message =
 				error instanceof Error ? error.message : "Unknown error occurred";
 			const status = error instanceof WaniWaniError ? error.status : 500;

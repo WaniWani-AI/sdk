@@ -79,6 +79,7 @@ export function createResourceHandler(deps: ResourceHandlerDeps) {
 				await mcp.close();
 			}
 		} catch (error) {
+			console.error("[waniwani] Resource handler error:", error);
 			const message =
 				error instanceof Error ? error.message : "Unknown error occurred";
 			const status = error instanceof WaniWaniError ? error.status : 500;
