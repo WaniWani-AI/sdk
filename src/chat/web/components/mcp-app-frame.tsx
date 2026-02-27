@@ -414,7 +414,7 @@ export function McpAppFrame({
 				minWidth: width ? `min(${width}px, 100%)` : undefined,
 				width: "100%",
 				border: "none",
-				colorScheme: "auto",
+				colorScheme: isDark ? "dark" : "auto",
 			}}
 			title="MCP App"
 		/>
