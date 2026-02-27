@@ -26,3 +26,5 @@ coverage/
 .env.local
 
 .waniwani
+package-lock.json
+test-results/

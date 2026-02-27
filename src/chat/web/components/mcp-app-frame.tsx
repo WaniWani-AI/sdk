@@ -11,6 +11,12 @@ const RESIZE_ANIMATION_MS = 300;
 const HANDSHAKE_TIMEOUT_MS = 3000;
 const MAX_RETRIES = 3;
 
+function normalizeString(value: unknown): string | undefined {
+	if (typeof value !== "string") return undefined;
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : undefined;
+}
+
 export type McpAppDisplayMode = "inline" | "pip" | "fullscreen";
 
 export interface McpAppFrameProps {
@@ -19,8 +25,10 @@ export interface McpAppFrameProps {
 	toolResult: {
 		content?: Array<{ type: string; text?: string }>;
 		structuredContent?: Record<string, unknown>;
+		_meta?: Record<string, unknown>;
 	};
 	resourceEndpoint?: string;
+	chatSessionId?: string;
 	isDark?: boolean;
 	className?: string;
 	/** When true, the iframe height auto-adapts to its content. Set via `_meta.ui.autoHeight` in the tool result. */
@@ -39,6 +47,7 @@ export interface McpAppFrameProps {
 	}) => Promise<{
 		content?: Array<{ type: string; text?: string }>;
 		structuredContent?: Record<string, unknown>;
+		_meta?: Record<string, unknown>;
 	}>;
 	/** Called when the widget requests a display mode change (e.g. "fullscreen" for expand) */
 	onDisplayModeChange?: (mode: McpAppDisplayMode) => void;
@@ -49,6 +58,7 @@ export function McpAppFrame({
 	toolInput,
 	toolResult,
 	resourceEndpoint = DEFAULT_RESOURCE_ENDPOINT,
+	chatSessionId,
 	isDark = false,
 	className,
 	autoHeight = false,
@@ -71,6 +81,7 @@ export function McpAppFrame({
 	const onFollowUpRef = useRef(onFollowUp);
 	const onCallToolRef = useRef(onCallTool);
 	const onDisplayModeChangeRef = useRef(onDisplayModeChange);
+	const chatSessionIdRef = useRef(chatSessionId);
 
 	toolInputRef.current = toolInput;
 	toolResultRef.current = toolResult;
@@ -78,6 +89,7 @@ export function McpAppFrame({
 	onFollowUpRef.current = onFollowUp;
 	onCallToolRef.current = onCallTool;
 	onDisplayModeChangeRef.current = onDisplayModeChange;
+	chatSessionIdRef.current = chatSessionId;
 
 	const clampHeight = useCallback(
 		(h: number) => {
@@ -122,25 +134,14 @@ export function McpAppFrame({
 
 		let disposed = false;
 		let handshakeReceived = false;
-		const debug = (...args: unknown[]) => console.log("[McpAppFrame]", ...args);
-
-		debug("effect mounted, waiting for handshake");
 
 		// Retry: reload iframe if handshake doesn't arrive in time
 		const handshakeTimer = setTimeout(() => {
 			if (disposed || handshakeReceived) return;
 			if (retryCountRef.current >= MAX_RETRIES) {
-				debug("handshake failed after", MAX_RETRIES, "retries, giving up");
 				return;
 			}
 			retryCountRef.current += 1;
-			debug(
-				"handshake timeout, reloading iframe (retry",
-				retryCountRef.current,
-				"of",
-				MAX_RETRIES,
-				")",
-			);
 			// Force reload with a cache-busting param
 			const url = new URL(iframe.src);
 			url.searchParams.set("_retry", String(retryCountRef.current));
@@ -148,7 +149,6 @@ export function McpAppFrame({
 		}, HANDSHAKE_TIMEOUT_MS);
 
 		const postToIframe = (msg: Record<string, unknown>) => {
-			debug("→ send", msg.method ?? `response:${msg.id}`, msg);
 			iframe.contentWindow?.postMessage(msg, "*");
 		};
 
@@ -158,20 +158,15 @@ export function McpAppFrame({
 
 			const data = event.data;
 
-			console.log("data", data);
-
 			if (!data || typeof data !== "object" || data.jsonrpc !== "2.0") return;
 
 			const method: string | undefined = data.method;
 			const id: number | string | undefined = data.id;
 
-			debug("← recv", method ?? `response:${id}`, data);
-
 			// ui/initialize — widget requests handshake
 			if (method === "ui/initialize" && id != null) {
 				handshakeReceived = true;
 				clearTimeout(handshakeTimer);
-				debug("handshake started");
 				postToIframe({
 					jsonrpc: "2.0",
 					id,
@@ -194,10 +189,40 @@ export function McpAppFrame({
 
 			// ui/notifications/initialized — widget confirms init, we send tool data
 			if (method === "ui/notifications/initialized") {
-				debug("handshake complete, sending tool data");
 				initializedRef.current = true;
 				const input = toolInputRef.current;
 				const result = toolResultRef.current;
+				const resultMeta =
+					result._meta && typeof result._meta === "object"
+						? result._meta
+						: null;
+				const normalizedChatSessionId = normalizeString(
+					chatSessionIdRef.current,
+				);
+				const waniwaniMeta =
+					resultMeta &&
+					typeof resultMeta.waniwani === "object" &&
+					resultMeta.waniwani !== null
+						? (resultMeta.waniwani as Record<string, unknown>)
+						: null;
+				const forwardedWaniwaniMeta =
+					waniwaniMeta || normalizedChatSessionId
+						? {
+								...(waniwaniMeta ?? {}),
+								...(normalizedChatSessionId
+									? { sessionId: normalizedChatSessionId }
+									: {}),
+							}
+						: undefined;
+				const forwardedMeta =
+					resultMeta || forwardedWaniwaniMeta
+						? {
+								...(resultMeta ?? {}),
+								...(forwardedWaniwaniMeta
+									? { waniwani: forwardedWaniwaniMeta }
+									: {}),
+							}
+						: undefined;
 
 				postToIframe({
 					jsonrpc: "2.0",
@@ -214,6 +239,9 @@ export function McpAppFrame({
 					params: {
 						content,
 						structuredContent: result.structuredContent,
+						_meta: forwardedMeta,
+						// Compatibility: some clients inspect `meta` instead of `_meta`.
+						meta: forwardedMeta,
 					},
 				});
 				return;
@@ -232,15 +260,6 @@ export function McpAppFrame({
 				const heightChanged =
 					newHeight !== undefined && newHeight !== last.height;
 				const widthChanged = newWidth !== undefined && newWidth !== last.width;
-
-				debug("size-changed", {
-					newHeight,
-					newWidth,
-					lastHeight: last.height,
-					lastWidth: last.width,
-					heightChanged,
-					widthChanged,
-				});
 
 				if (!heightChanged && !widthChanged) return;
 
@@ -313,7 +332,6 @@ export function McpAppFrame({
 
 			// tools/call — widget calls a server tool (MCP Apps standard)
 			if (method === "tools/call" && id != null) {
-				debug("tools/call", data.params?.name, data.params?.arguments);
 				const handler = onCallToolRef.current;
 				if (!handler) {
 					postToIframe({
@@ -396,7 +414,6 @@ export function McpAppFrame({
 		window.addEventListener("message", handleMessage);
 
 		return () => {
-			debug("effect cleanup (disposed)");
 			disposed = true;
 			clearTimeout(handshakeTimer);
 			window.removeEventListener("message", handleMessage);

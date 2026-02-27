@@ -22,8 +22,12 @@ export type {
 	UnknownObject,
 	UserAgent,
 } from "./hooks/@types";
-export type { FlowActionResult } from "./hooks/index";
 // Hooks and provider
+export type {
+	FlowActionResult,
+	UseWaniwaniOptions,
+	WaniwaniWidget,
+} from "./hooks/index";
 export {
 	useCallTool,
 	useDisplayMode,
@@ -38,6 +42,7 @@ export {
 	useTheme,
 	useToolOutput,
 	useToolResponseMetadata,
+	useWaniwani,
 	useWidgetClient,
 	useWidgetState,
 	WidgetProvider,

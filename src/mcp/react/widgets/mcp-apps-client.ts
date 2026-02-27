@@ -19,6 +19,9 @@ import type {
 export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 	private app: App;
 	private toolResultCallback: ((result: ToolResult) => void) | null = null;
+	private toolResponseMetadataChangeCallback:
+		| ((metadata: UnknownObject | null) => void)
+		| null = null;
 	private themeChangeCallback: ((theme: Theme) => void) | null = null;
 	private displayModeChangeCallback: ((mode: DisplayMode) => void) | null =
 		null;
@@ -35,14 +38,27 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 
 		// Set up notification handlers
 		this.app.ontoolresult = (params) => {
+			const rawParams = params as Record<string, unknown>;
+			const underscoreMeta =
+				typeof rawParams._meta === "object" && rawParams._meta !== null
+					? (rawParams._meta as Record<string, unknown>)
+					: null;
+			const meta =
+				typeof rawParams.meta === "object" && rawParams.meta !== null
+					? (rawParams.meta as Record<string, unknown>)
+					: null;
+			const resolvedMeta = underscoreMeta ?? meta ?? undefined;
+
 			const result: ToolResult = {
 				content: params.content,
 				structuredContent: params.structuredContent as
 					| Record<string, unknown>
 					| undefined,
+				_meta: resolvedMeta,
 			};
 			this.latestToolResult = result;
 			this.toolResultCallback?.(result);
+			this.toolResponseMetadataChangeCallback?.(result._meta ?? null);
 		};
 
 		this.app.onhostcontextchanged = (params) => {
@@ -224,12 +240,17 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 
 	// MCP Apps specific methods
 	getToolResponseMetadata(): UnknownObject | null {
-		return null;
+		return this.latestToolResult?._meta ?? null;
 	}
 
 	// MCP Apps specific methods
-	onToolResponseMetadataChange(): () => void {
-		return () => {};
+	onToolResponseMetadataChange(
+		callback: (metadata: UnknownObject | null) => void,
+	): () => void {
+		this.toolResponseMetadataChangeCallback = callback;
+		return () => {
+			this.toolResponseMetadataChangeCallback = null;
+		};
 	}
 
 	// MCP Apps specific methods

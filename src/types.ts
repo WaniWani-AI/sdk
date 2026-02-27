@@ -1,6 +1,6 @@
 // WaniWani SDK - Core Types
 
-import type { TrackingClient } from "./tracking/@types.js";
+import type { TrackingClient, TrackingConfig } from "./tracking/@types.js";
 
 // ============================================================================
 // Configuration
@@ -22,6 +22,10 @@ export interface WaniWaniConfig {
 	 * Defaults to https://app.waniwani.ai
 	 */
 	baseUrl?: string;
+	/**
+	 * Tracking transport behavior.
+	 */
+	tracking?: TrackingConfig;
 }
 
 // ============================================================================
@@ -32,7 +36,7 @@ export interface WaniWaniConfig {
  * WaniWani SDK Client
  *
  * Extends with each module:
- * - TrackingClient: track(), getOrCreateSession()
+ * - TrackingClient: track(), flush(), shutdown()
  *
  * Pass this client to framework adapters:
  * - `toNextJsHandler(wani, { ... })` for Next.js route handlers
@@ -49,4 +53,5 @@ export interface WaniWaniClient extends TrackingClient {
 export interface InternalConfig {
 	baseUrl: string;
 	apiKey: string | undefined;
+	tracking: Required<TrackingConfig>;
 }

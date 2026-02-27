@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev --webpack -p 3333",
     "mcp": "cd demo-mcp && next dev -p 3001",
+    "mock-ingest": "bun run mock-v2-ingest.ts",
+    "e2e-tracking": "bun run e2e-tracking.ts",
     "build": "next build"
   },
   "dependencies": {

@@ -4,10 +4,10 @@ import type { UnknownObject } from "./@types";
 import { useWidgetClient } from "./use-widget";
 
 /**
- * Get tool response metadata (OpenAI-only).
- * Contains identifiers like `openai/widgetSessionId` for correlating
- * multiple tool calls or logs for the same widget instance.
- * Returns null on MCP Apps.
+ * Get tool response metadata.
+ * Contains host/tool metadata (for example identifiers like
+ * `openai/widgetSessionId` and custom tool `_meta` fields).
+ * Returns null when the host does not provide metadata.
  *
  * @returns The tool response metadata object or null if not available
  */

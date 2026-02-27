@@ -18,6 +18,9 @@ export { useTheme } from "./use-theme";
 // Data hooks
 export { useToolOutput } from "./use-tool-output";
 export { useToolResponseMetadata } from "./use-tool-response-metadata";
+// Tracking
+export type { UseWaniwaniOptions, WaniwaniWidget } from "./use-waniwani";
+export { useWaniwani } from "./use-waniwani";
 export { useWidgetClient, WidgetProvider } from "./use-widget";
 // State hooks
 export { useWidgetState } from "./use-widget-state";

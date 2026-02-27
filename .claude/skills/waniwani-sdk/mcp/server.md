@@ -144,6 +144,66 @@ isMCPApps();      // true if sandboxed iframe
 
 Note: These are client-side utilities for use in widget frontends, not server code.
 
+## Server-Side Tracking Helpers
+
+### `withWaniwani(server, options?)`
+
+Wraps an MCP server so all tool handlers automatically emit `tool.called` events
+**after** execution with timing and status:
+
+```typescript
+import { withWaniwani } from "@waniwani/sdk/mcp";
+
+const server = new McpServer({ name: "my-server", version: "1.0.0" });
+withWaniwani(server, {
+  config: { apiKey: "..." },
+  flushAfterToolCall: true,
+});
+```
+
+Each `tool.called` event includes `durationMs` (execution time), `status` (`"ok"` or `"error"`),
+and `errorMessage` (on failure). Errors are re-thrown after tracking.
+
+**Widget tracking config injection (default: enabled):** When `injectWidgetToken` is `true`
+(default), `withWaniwani` injects `_meta.waniwani` into tool responses.
+
+- Always injects `endpoint` (derived from `baseUrl`).
+- Injects `token` when JWT minting via `POST /api/mcp/widget-tokens` succeeds.
+
+This allows browser widgets using `useWaniwani()` to send events directly to the WaniWani
+backend without a server-side proxy route. Tokens are cached and reused until near expiry.
+
+For additional manual tracking inside tool handlers, use `client.track()` directly and pass `extra._meta` as `meta`.
+
+### `createTrackingRoute(options?)`
+
+Creates a server-side API route handler that receives batched events from browser widgets
+(via `useWaniwani`) and forwards them to the WaniWani backend. Returns a web-standard
+`Request → Response` handler compatible with Next.js App Router and similar frameworks.
+
+```typescript
+import { createTrackingRoute } from "@waniwani/sdk/mcp";
+
+// app/api/waniwani/track/route.ts
+const handler = createTrackingRoute({
+  apiKey: process.env.WANIWANI_API_KEY,
+  baseUrl: process.env.WANIWANI_BASE_URL,
+});
+
+export { handler as POST };
+```
+
+**Options:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `apiKey` | `string` | No | API key for the WaniWani backend. Defaults to `WANIWANI_API_KEY` env var. |
+| `baseUrl` | `string` | No | Base URL for the WaniWani backend. Defaults to `https://app.waniwani.ai`. |
+
+This is an alternative to direct browser-to-backend posting via JWT tokens. Use it when
+you prefer routing widget events through your own server rather than having widgets POST
+directly to the WaniWani API.
+
 ## Common Mistakes
 
 - **Forgetting to register the resource** — Call `await resource.register(server)` before registering tools that reference it

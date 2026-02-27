@@ -11,6 +11,7 @@ import type {
 export type ToolCallResult = {
 	content?: Array<{ type: string; text?: string }>;
 	structuredContent?: Record<string, unknown>;
+	_meta?: Record<string, unknown>;
 };
 
 /**
@@ -19,6 +20,7 @@ export type ToolCallResult = {
 export type ToolResult = {
 	content?: Array<{ type: string; text?: string }>;
 	structuredContent?: Record<string, unknown>;
+	_meta?: Record<string, unknown>;
 };
 
 /**
@@ -166,15 +168,15 @@ export interface UnifiedWidgetClient {
 
 	/**
 	 * Get the tool response metadata.
-	 * OpenAI-only: returns metadata from window.openai.toolResponseMetadata.
-	 * MCP Apps: returns null.
+	 * OpenAI: returns metadata from window.openai.toolResponseMetadata.
+	 * MCP Apps: returns `_meta` from the latest `ui/notifications/tool-result`, if provided by host.
 	 */
 	getToolResponseMetadata(): UnknownObject | null;
 
 	/**
 	 * Subscribe to tool response metadata changes.
-	 * OpenAI-only: subscribes to toolResponseMetadata changes.
-	 * MCP Apps: callback is never called.
+	 * OpenAI: subscribes to toolResponseMetadata changes.
+	 * MCP Apps: fires when tool result `_meta` changes.
 	 */
 	onToolResponseMetadataChange(
 		callback: (metadata: UnknownObject | null) => void,

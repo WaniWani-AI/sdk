@@ -216,6 +216,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 								status={engine.status}
 								welcomeMessage={welcomeMessage}
 								resourceEndpoint={effectiveResourceEndpoint}
+								chatSessionId={engine.sessionId}
 								isDark={isDark}
 								onFollowUp={handleWidgetMessage}
 								onCallTool={handleCallTool}
