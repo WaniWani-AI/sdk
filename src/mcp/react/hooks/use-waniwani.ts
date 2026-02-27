@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { initAutoCapture } from "./auto-capture";
 import { WidgetClientContext } from "./use-widget";
 import type { WidgetEvent } from "./widget-transport";
@@ -296,42 +296,26 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 	const widgetClient = useContext(WidgetClientContext);
 	const contextConfig = useContextConfig(widgetClient);
 	const explicitEndpoint = normalizeString(options.endpoint);
-	const explicit = explicitEndpoint
-		? {
-				token: normalizeString(options.token),
+	const explicitToken = normalizeString(options.token);
+	const explicitSessionId = normalizeString(options.sessionId);
+
+	// Stabilize config identity — only changes when the three primitives change
+	const config = useMemo<WaniwaniConfig | null>(() => {
+		if (explicitEndpoint) {
+			return {
 				endpoint: explicitEndpoint,
-				sessionId: normalizeString(options.sessionId),
-			}
-		: null;
-	const config = explicit
-		? {
-				endpoint: explicit.endpoint,
-				token: explicit.token ?? contextConfig?.token,
-				sessionId: explicit.sessionId ?? contextConfig?.sessionId,
-			}
-		: contextConfig;
-
-	if (!state) {
-		if (typeof window === "undefined") {
-			state = createNoopState();
-		} else {
-			if (config) {
-				state = createState(config, options.metadata);
-			} else {
-				// No config available — no-op until config becomes available
-				state = createNoopState();
-			}
+				token: explicitToken ?? contextConfig?.token,
+				sessionId: explicitSessionId ?? contextConfig?.sessionId,
+			};
 		}
-	} else {
-		const configChanged = !isSameConfig(state.config, config);
-		if (configChanged) {
-			state.cleanup();
-			state = config
-				? createState(config, options.metadata)
-				: createNoopState();
-		}
-	}
+		return contextConfig;
+	}, [explicitEndpoint, explicitToken, explicitSessionId, contextConfig]);
 
+	const [widget, setWidget] = useState<WaniwaniWidget>(NOOP_WIDGET);
+	const metadataRef = useRef(options.metadata);
+	metadataRef.current = options.metadata;
+
+	// Track consumer mount/unmount for singleton lifecycle
 	useEffect(() => {
 		consumerCount++;
 		return () => {
@@ -343,7 +327,29 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 		};
 	}, []);
 
-	return state.widget;
+	// Create/swap singleton state when config changes.
+	// All side effects (timers, DOM listeners) happen here in useEffect,
+	// making this safe in Strict Mode and concurrent rendering.
+	useEffect(() => {
+		if (typeof window === "undefined") return;
+
+		if (!config) {
+			if (state?.config) {
+				state.cleanup();
+				state = createNoopState();
+				setWidget(NOOP_WIDGET);
+			}
+			return;
+		}
+
+		if (!isSameConfig(state?.config, config)) {
+			state?.cleanup();
+			state = createState(config, metadataRef.current);
+			setWidget(state.widget);
+		}
+	}, [config]);
+
+	return widget;
 }
 
 /**

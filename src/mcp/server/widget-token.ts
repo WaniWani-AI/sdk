@@ -72,15 +72,21 @@ export class WidgetTokenCache {
 
 			if (!response.ok) return null;
 
-			const data = (await response.json()) as WidgetTokenResult;
-			if (!data.token) return null;
+			const json = (await response.json()) as Record<string, unknown>;
+
+			// Support both flat { token, expiresAt } and nested { data: { token, expiresAt } }
+			const result = (
+				json.data && typeof json.data === "object" ? json.data : json
+			) as WidgetTokenResult;
+
+			if (!result.token) return null;
 
 			this.cached = {
-				token: data.token,
-				expiresAt: new Date(data.expiresAt).getTime(),
+				token: result.token,
+				expiresAt: new Date(result.expiresAt).getTime(),
 			};
 
-			return data.token;
+			return result.token;
 		} catch {
 			return null;
 		}

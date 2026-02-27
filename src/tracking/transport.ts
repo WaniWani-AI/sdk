@@ -186,6 +186,7 @@ class BatchingV2Transport implements V2BatchTransport {
 
 		if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
 			await flushPromise;
+			this.isStopped = true;
 			return { timedOut: false, pendingEvents: this.pendingEvents() };
 		}
 
@@ -196,9 +197,11 @@ class BatchingV2Transport implements V2BatchTransport {
 		]);
 
 		if (result === timeoutSignal) {
+			this.isStopped = true;
 			return { timedOut: true, pendingEvents: this.pendingEvents() };
 		}
 
+		this.isStopped = true;
 		return { timedOut: false, pendingEvents: this.pendingEvents() };
 	}
 

@@ -184,6 +184,7 @@ Options:
 |-------|------|---------|-------------|
 | `token` | `string` | — | JWT widget token (auto-resolved from context if omitted) |
 | `endpoint` | `string` | — | V2 batch endpoint URL (auto-resolved from context if omitted) |
+| `sessionId` | `string` | — | Session ID for event correlation (auto-resolved from context, then falls back to random UUID) |
 | `metadata` | `Record<string, unknown>` | — | Extra metadata merged into every event |
 
 Returns `WaniwaniWidget`:

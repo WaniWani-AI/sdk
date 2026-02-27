@@ -145,11 +145,54 @@ export class WidgetTransport {
 
 	beaconFlush(): void {
 		if (this.buffer.length === 0) return;
-		if (typeof navigator === "undefined" || !navigator.sendBeacon) return;
 
 		const events = [...this.buffer];
 		this.buffer.length = 0;
-		this.sendBeaconChunked(this.config.endpoint, events);
+
+		const headers: Record<string, string> = {
+			"Content-Type": "application/json",
+		};
+		if (this.config.token) {
+			headers.Authorization = `Bearer ${this.config.token}`;
+		}
+
+		// Use fetch with keepalive instead of sendBeacon so we can set auth headers
+		if (typeof fetch !== "undefined") {
+			this.sendKeepAliveChunked(this.config.endpoint, events, headers);
+			return;
+		}
+
+		// Final fallback: sendBeacon without auth (best-effort)
+		if (
+			typeof navigator !== "undefined" &&
+			typeof navigator.sendBeacon === "function"
+		) {
+			this.sendBeaconChunked(this.config.endpoint, events);
+		}
+	}
+
+	private sendKeepAliveChunked(
+		url: string,
+		events: WidgetEvent[],
+		headers: Record<string, string>,
+	): void {
+		const body = buildV2Batch(events);
+
+		if (body.length <= BEACON_MAX_BYTES) {
+			fetch(url, {
+				method: "POST",
+				headers,
+				body,
+				keepalive: true,
+			}).catch(() => {});
+			return;
+		}
+
+		if (events.length <= 1) return;
+
+		const mid = Math.ceil(events.length / 2);
+		this.sendKeepAliveChunked(url, events.slice(0, mid), headers);
+		this.sendKeepAliveChunked(url, events.slice(mid), headers);
 	}
 
 	private sendBeaconChunked(url: string, events: WidgetEvent[]): void {
@@ -221,8 +264,9 @@ export class WidgetTransport {
 
 				if (response.status === 429 && attempt < MAX_RETRIES) {
 					const retryAfter = response.headers.get("Retry-After");
-					const delayMs = retryAfter
-						? Number(retryAfter) * 1000
+					const parsed = retryAfter ? Number(retryAfter) : NaN;
+					const delayMs = Number.isFinite(parsed)
+						? parsed * 1000
 						: BASE_RETRY_DELAY_MS * 2 ** attempt;
 					await this.delay(delayMs);
 					continue;
