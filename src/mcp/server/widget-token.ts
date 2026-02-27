@@ -79,11 +79,12 @@ export class WidgetTokenCache {
 				json.data && typeof json.data === "object" ? json.data : json
 			) as WidgetTokenResult;
 
-			if (!result.token) return null;
+			const expiresAtMs = new Date(result.expiresAt).getTime();
+			if (!result.token || Number.isNaN(expiresAtMs)) return null;
 
 			this.cached = {
 				token: result.token,
-				expiresAt: new Date(result.expiresAt).getTime(),
+				expiresAt: expiresAtMs,
 			};
 
 			return result.token;

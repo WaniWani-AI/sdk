@@ -175,6 +175,35 @@ backend without a server-side proxy route. Tokens are cached and reused until ne
 
 For additional manual tracking inside tool handlers, use `client.track()` directly and pass `extra._meta` as `meta`.
 
+### `createTrackingRoute(options?)`
+
+Creates a server-side API route handler that receives batched events from browser widgets
+(via `useWaniwani`) and forwards them to the WaniWani backend. Returns a web-standard
+`Request → Response` handler compatible with Next.js App Router and similar frameworks.
+
+```typescript
+import { createTrackingRoute } from "@waniwani/sdk/mcp";
+
+// app/api/waniwani/track/route.ts
+const handler = createTrackingRoute({
+  apiKey: process.env.WANIWANI_API_KEY,
+  baseUrl: process.env.WANIWANI_BASE_URL,
+});
+
+export { handler as POST };
+```
+
+**Options:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `apiKey` | `string` | No | API key for the WaniWani backend. Defaults to `WANIWANI_API_KEY` env var. |
+| `baseUrl` | `string` | No | Base URL for the WaniWani backend. Defaults to `https://app.waniwani.ai`. |
+
+This is an alternative to direct browser-to-backend posting via JWT tokens. Use it when
+you prefer routing widget events through your own server rather than having widgets POST
+directly to the WaniWani API.
+
 ## Common Mistakes
 
 - **Forgetting to register the resource** — Call `await resource.register(server)` before registering tools that reference it
