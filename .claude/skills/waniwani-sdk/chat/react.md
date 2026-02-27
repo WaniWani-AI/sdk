@@ -113,6 +113,20 @@ src/chat/
 4. Tool invocations appear inline with a pulse animation while running
 5. `useChatTracking` fires analytics events silently in the background
 
+### MCP Apps Metadata Bridge
+
+- `McpAppFrame` forwards full tool result metadata (`_meta`) in
+  `ui/notifications/tool-result`.
+- This allows MCP widgets to consume tool-level metadata in the iframe runtime
+  (for example `withWaniwani` config under `_meta.waniwani`).
+- Bridge compatibility: `McpAppFrame` also mirrors metadata on `meta` and
+  explicitly preserves `waniwani` when present, so widget runtimes that
+  normalize metadata keys still receive tracking config.
+- Chat session continuity: the chat transport persists `sessionId` in browser
+  `sessionStorage` (`waniwani-chat-session-id`) and `McpAppFrame` injects that
+  value into forwarded `waniwani.sessionId`. Widget tracking can then correlate
+  widget events with the same chat session.
+
 ## Common Mistakes
 
 - **Wrong import path** — Use `@waniwani/sdk/chat`, not `@waniwani/sdk`

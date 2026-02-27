@@ -1,0 +1,31 @@
+{
+  "name": "{{MCP_NAME}}",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "next lint",
+    "postinstall": "patch-package"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "1.0.1",
+    "@modelcontextprotocol/sdk": "1.25.2",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@waniwani/sdk": "link:@waniwani/sdk",
+    "mcp-handler": "^1.0.7",
+    "next": "^16.1.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwindcss": "^4.1.18",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "patch-package": "^8.0.1",
+    "typescript": "^5"
+  }
+}

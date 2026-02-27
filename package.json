@@ -5,40 +5,47 @@
   "type": "module",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "default": "./dist/index.js"
     },
     "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
       "import": "./dist/mcp/index.js",
-      "types": "./dist/mcp/index.d.ts"
+      "default": "./dist/mcp/index.js"
     },
     "./mcp/react": {
+      "types": "./dist/mcp/react.d.ts",
       "import": "./dist/mcp/react.js",
-      "types": "./dist/mcp/react.d.ts"
+      "default": "./dist/mcp/react.js"
     },
     "./chat": {
+      "types": "./dist/chat/index.d.ts",
       "import": "./dist/chat/index.js",
-      "types": "./dist/chat/index.d.ts"
+      "default": "./dist/chat/index.js"
     },
     "./chat/server": {
+      "types": "./dist/chat/server/index.d.ts",
       "import": "./dist/chat/server/index.js",
-      "types": "./dist/chat/server/index.d.ts"
+      "default": "./dist/chat/server/index.js"
     },
     "./chat/styles.css": "./dist/chat/styles.css",
     "./next-js": {
+      "types": "./dist/chat/next-js/index.d.ts",
       "import": "./dist/chat/next-js/index.js",
-      "types": "./dist/chat/next-js/index.d.ts"
+      "default": "./dist/chat/next-js/index.js"
     }
   },
   "files": [
     "dist"
   ],
-  "scripts": {
-    "build": "rm -rf dist && bun run typecheck && bun run lint && tsup && bun run build:chat-css",
-    "build:chat-css": "tailwindcss -i src/chat/web/tailwind.css -o dist/chat/styles.css --minify",
-    "dev": "tsx --watch src/index.ts",
-    "typecheck": "tsc --noEmit",
-    "lint": "biome check .",
+	"scripts": {
+		"build": "rm -rf dist && bun run typecheck && bun run lint && tsup && bun run build:chat-css",
+		"build:chat-css": "tailwindcss -i src/chat/web/tailwind.css -o dist/chat/styles.css --minify",
+		"dev": "tsx --watch src/index.ts",
+		"test": "bun test",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
     "lint:fix": "biome check . --write",
     "prepublishOnly": "bun run build",
     "release": "npm whoami && bun run build && npm version patch && npm publish --access public",

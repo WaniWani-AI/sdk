@@ -144,6 +144,37 @@ isMCPApps();      // true if sandboxed iframe
 
 Note: These are client-side utilities for use in widget frontends, not server code.
 
+## Server-Side Tracking Helpers
+
+### `withWaniwani(server, options?)`
+
+Wraps an MCP server so all tool handlers automatically emit `tool.called` events
+**after** execution with timing and status:
+
+```typescript
+import { withWaniwani } from "@waniwani/sdk/mcp";
+
+const server = new McpServer({ name: "my-server", version: "1.0.0" });
+withWaniwani(server, {
+  config: { apiKey: "..." },
+  flushAfterToolCall: true,
+});
+```
+
+Each `tool.called` event includes `durationMs` (execution time), `status` (`"ok"` or `"error"`),
+and `errorMessage` (on failure). Errors are re-thrown after tracking.
+
+**Widget tracking config injection (default: enabled):** When `injectWidgetToken` is `true`
+(default), `withWaniwani` injects `_meta.waniwani` into tool responses.
+
+- Always injects `endpoint` (derived from `baseUrl`).
+- Injects `token` when JWT minting via `POST /api/mcp/widget-tokens` succeeds.
+
+This allows browser widgets using `useWaniwani()` to send events directly to the WaniWani
+backend without a server-side proxy route. Tokens are cached and reused until near expiry.
+
+For additional manual tracking inside tool handlers, use `client.track()` directly and pass `extra._meta` as `meta`.
+
 ## Common Mistakes
 
 - **Forgetting to register the resource** — Call `await resource.register(server)` before registering tools that reference it
