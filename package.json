@@ -1,6 +1,6 @@
 {
   "name": "@waniwani/sdk",
-  "version": "0.1.20-beta.11",
+  "version": "0.1.20-beta.12",
   "description": "WaniWani SDK - MCP event tracking, widget framework, and tools",
   "type": "module",
   "exports": {
@@ -39,13 +39,13 @@
   "files": [
     "dist"
   ],
-	"scripts": {
-		"build": "rm -rf dist && bun run typecheck && bun run lint && tsup && bun run build:chat-css",
-		"build:chat-css": "tailwindcss -i src/chat/web/tailwind.css -o dist/chat/styles.css --minify",
-		"dev": "tsx --watch src/index.ts",
-		"test": "bun test",
-		"typecheck": "tsc --noEmit",
-		"lint": "biome check .",
+  "scripts": {
+    "build": "rm -rf dist && bun run typecheck && bun run lint && tsup && bun run build:chat-css",
+    "build:chat-css": "tailwindcss -i src/chat/web/tailwind.css -o dist/chat/styles.css --minify",
+    "dev": "tsx --watch src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "prepublishOnly": "bun run build",
     "release": "npm whoami && bun run build && npm version patch && npm publish --access public",
