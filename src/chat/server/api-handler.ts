@@ -54,18 +54,26 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		resolveConfig,
 	});
 
-	function routeGet(request: Request): Promise<Response> {
-		const url = new URL(request.url);
-		const segments = url.pathname.replace(/\/$/, "").split("/").filter(Boolean);
-		const subRoute = segments.at(-1);
+	async function routeGet(request: Request): Promise<Response> {
+		try {
+			const url = new URL(request.url);
+			const segments = url.pathname
+				.replace(/\/$/, "")
+				.split("/")
+				.filter(Boolean);
+			const subRoute = segments.at(-1);
 
-		if (subRoute === "resource") {
-			return handleResource(url);
+			if (subRoute === "resource") {
+				return await handleResource(url);
+			}
+
+			return Response.json({ error: "Not found" }, { status: 404 });
+		} catch (error) {
+			console.error("[waniwani] GET handler error:", error);
+			const message =
+				error instanceof Error ? error.message : "Unknown error occurred";
+			return Response.json({ error: message }, { status: 500 });
 		}
-
-		return Promise.resolve(
-			Response.json({ error: "Not found" }, { status: 404 }),
-		);
 	}
 
 	return { handleChat, handleResource, routeGet };
