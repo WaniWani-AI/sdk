@@ -56,6 +56,28 @@
 	--font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+[data-waniwani-chat] *::-webkit-scrollbar {
+	width: 8px;
+}
+
+[data-waniwani-chat] *::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+[data-waniwani-chat] *::-webkit-scrollbar-thumb {
+	background: var(--ww-color-border);
+	border-radius: 9999px;
+}
+
+[data-waniwani-chat] *::-webkit-scrollbar-thumb:hover {
+	background: var(--ww-color-muted-foreground);
+}
+
+[data-waniwani-chat] * {
+	scrollbar-width: thin;
+	scrollbar-color: var(--ww-color-border) transparent;
+}
+
 [data-waniwani-chat] {
 	--ww-color-background: var(--ww-bg, #ffffff);
 	--ww-color-foreground: var(--ww-text, #1f2937);
