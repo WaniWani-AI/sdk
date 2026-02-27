@@ -96,7 +96,8 @@ export function WidgetProvider({
 
 		const syncTheme = (theme: Theme) => {
 			document.documentElement.classList.toggle("dark", theme === "dark");
-			document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "auto";
+			document.documentElement.style.colorScheme =
+				theme === "dark" ? "dark" : "auto";
 		};
 
 		syncTheme(client.getTheme());
