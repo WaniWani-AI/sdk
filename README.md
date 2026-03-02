@@ -112,6 +112,40 @@ Flushes and stops transport. Returns:
 - `link.clicked`
 - `purchase.completed`
 
+## Declarative Event Tracking
+
+Track conversions and funnel steps without writing JavaScript — just add data attributes to your HTML elements.
+
+### `data-ww-conversion`
+
+Fires a conversion event on click. Format: `name key:value key:value ...`
+
+```html
+<button data-ww-conversion="purchase value:49.99 currency:EUR">Buy Now</button>
+<button data-ww-conversion="signup">Sign Up Free</button>
+```
+
+| Token | Description |
+|-------|-------------|
+| First token | Conversion name (required) |
+| `value:N` | Numeric conversion value (defaults to `0`) |
+| `currency:X` | Currency code (defaults to `USD`) |
+| Any `key:value` | Included as event metadata |
+
+### `data-ww-step`
+
+Fires a funnel step event on click with an auto-incrementing sequence number. Format: `name key:value key:value ...`
+
+```html
+<button data-ww-step="pricing">View Pricing</button>
+<button data-ww-step="select-plan plan:premium">Select Plan</button>
+<button data-ww-step="checkout">Checkout</button>
+```
+
+Clicking these in order produces steps with `step_sequence` 1, 2, 3. Extra `key:value` pairs are included as event metadata.
+
+Both attributes use `closest()` to walk up the DOM tree, so clicking a child element (e.g. an icon inside a button) works automatically.
+
 ## Quality Gates
 
 Run from repo root:
