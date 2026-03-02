@@ -118,6 +118,8 @@ export function Playground({
 
       <button
         type="button"
+        data-ww-step="request-demo"
+        data-ww-conversion="demo-request"
         onClick={() => chatRef.current?.sendMessage("I want to request a demo")}
         style={{
           position: "fixed",
@@ -140,6 +142,7 @@ export function Playground({
 
       <button
         type="button"
+        data-ww-step="emit-event"
         onClick={emitV2TrackingSample}
         disabled={isEmitting}
         style={{

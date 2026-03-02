@@ -30,6 +30,29 @@ function baseFields(
 	};
 }
 
+/**
+ * Parse a data attribute value into a name and key-value properties.
+ * Format: "name key:value key:value ..."
+ * Values that look numeric are coerced to numbers.
+ */
+function parseAttr(raw: string): {
+	name: string;
+	props: Record<string, string | number>;
+} {
+	const tokens = raw.trim().split(/\s+/);
+	const name = tokens[0] || "";
+	const props: Record<string, string | number> = {};
+	for (let i = 1; i < tokens.length; i++) {
+		const idx = tokens[i].indexOf(":");
+		if (idx === -1) continue;
+		const key = tokens[i].slice(0, idx);
+		const val = tokens[i].slice(idx + 1);
+		const num = Number(val);
+		props[key] = Number.isFinite(num) && val !== "" ? num : val;
+	}
+	return { name, props };
+}
+
 function isFormField(el: HTMLElement): boolean {
 	const tag = el.tagName.toLowerCase();
 	return tag === "input" || tag === "textarea" || tag === "select";
@@ -121,6 +144,60 @@ export function initAutoCapture(
 	document.addEventListener("click", onClick, { capture: true });
 	cleanups.push(() =>
 		document.removeEventListener("click", onClick, { capture: true }),
+	);
+
+	// ── data-ww-conversion ────────────────────────────────────────────
+	// Format: "name value:49.99 currency:EUR"
+	const onConversionClick = (ev: MouseEvent) => {
+		const target = ev.target as HTMLElement | null;
+		const el = target?.closest?.("[data-ww-conversion]") as HTMLElement | null;
+		if (!el) return;
+
+		const { name, props } = parseAttr(
+			el.getAttribute("data-ww-conversion") || "",
+		);
+		if (!name) return;
+
+		enqueue([
+			baseFields(config, "conversion", {
+				event_name: name,
+				conversion_value: typeof props.value === "number" ? props.value : 0,
+				conversion_currency:
+					typeof props.currency === "string" ? props.currency : "USD",
+				metadata: Object.keys(props).length > 0 ? props : undefined,
+			}),
+		]);
+	};
+	document.addEventListener("click", onConversionClick, { capture: true });
+	cleanups.push(() =>
+		document.removeEventListener("click", onConversionClick, {
+			capture: true,
+		}),
+	);
+
+	// ── data-ww-step ─────────────────────────────────────────────────
+	// Format: "name key:value key:value ..."
+	let stepSequence = 0;
+	const onStepClick = (ev: MouseEvent) => {
+		const target = ev.target as HTMLElement | null;
+		const el = target?.closest?.("[data-ww-step]") as HTMLElement | null;
+		if (!el) return;
+
+		const { name, props } = parseAttr(el.getAttribute("data-ww-step") || "");
+		if (!name) return;
+
+		stepSequence++;
+		enqueue([
+			baseFields(config, "step", {
+				event_name: name,
+				step_sequence: stepSequence,
+				metadata: Object.keys(props).length > 0 ? props : undefined,
+			}),
+		]);
+	};
+	document.addEventListener("click", onStepClick, { capture: true });
+	cleanups.push(() =>
+		document.removeEventListener("click", onStepClick, { capture: true }),
 	);
 
 	// ── widget_link_click ──────────────────────────────────────────────

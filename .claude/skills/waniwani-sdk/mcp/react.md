@@ -180,6 +180,24 @@ to context metadata when available.
 | `widget_scroll` | Throttled scroll depth tracking |
 | `widget_form_field` | focusin/focusout on inputs — time in field |
 | `widget_form_submit` | Form submit — time to submit, validation errors |
+| `conversion` | Click on element with `data-ww-conversion` attribute |
+| `step` | Click on element with `data-ww-step` attribute |
+
+### Declarative Data Attributes
+
+Track conversions and funnel steps without calling methods — add data attributes to any clickable element:
+
+```html
+<!-- Conversion: "name key:value key:value ..." -->
+<button data-ww-conversion="purchase value:49.99 currency:EUR">Buy Now</button>
+<button data-ww-conversion="signup">Sign Up Free</button>
+
+<!-- Funnel step: "name key:value key:value ..." (auto-incrementing sequence) -->
+<button data-ww-step="pricing">View Pricing</button>
+<button data-ww-step="select-plan plan:premium">Select Plan</button>
+```
+
+First token is the event name, remaining `key:value` pairs become metadata. Numeric values are auto-coerced. `data-ww-conversion` defaults to `value:0 currency:USD` when omitted. Both use `closest()` so child clicks bubble up.
 
 Requires `WidgetProvider` wrapper (for auto-resolving the JWT token from tool response metadata).
 
