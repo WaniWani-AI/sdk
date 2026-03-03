@@ -403,7 +403,11 @@ export function ToolOutput({
 	...props
 }: ToolOutputProps) {
 	const filtered = useMemo(() => {
-		if (typeof output === "object" && output !== null && !Array.isArray(output)) {
+		if (
+			typeof output === "object" &&
+			output !== null &&
+			!Array.isArray(output)
+		) {
 			const { _meta, ...rest } = output as Record<string, unknown>;
 			return rest;
 		}
