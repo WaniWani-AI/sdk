@@ -40,7 +40,10 @@ export function createResourceHandler(deps: ResourceHandlerDeps) {
 					]);
 				log("MCP deps loaded");
 			} catch (importError) {
-				console.error("[waniwani:resource] MCP deps import failed:", importError);
+				console.error(
+					"[waniwani:resource] MCP deps import failed:",
+					importError,
+				);
 				return Response.json(
 					{
 						error:
