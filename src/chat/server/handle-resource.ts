@@ -4,13 +4,20 @@ import { WaniWaniError } from "../../error";
 import type { ResourceHandlerDeps } from "./@types";
 
 export function createResourceHandler(deps: ResourceHandlerDeps) {
-	const { mcpServerUrl: mcpServerUrlOverride, resolveConfig } = deps;
+	const { mcpServerUrl: mcpServerUrlOverride, resolveConfig, debug } = deps;
+
+	const log = debug
+		? (...args: unknown[]) => console.log("[waniwani:resource]", ...args)
+		: () => {};
 
 	return async function handleResource(url: URL): Promise<Response> {
+		log("→ GET", url.toString());
 		try {
 			const uri = url.searchParams.get("uri");
+			log("uri:", uri ?? "(missing)");
 
 			if (!uri) {
+				log("← 400 missing uri");
 				return Response.json(
 					{ error: "Missing uri query parameter" },
 					{ status: 400 },
@@ -19,6 +26,7 @@ export function createResourceHandler(deps: ResourceHandlerDeps) {
 
 			const mcpServerUrl =
 				mcpServerUrlOverride ?? (await resolveConfig()).mcpServerUrl;
+			log("mcpServerUrl:", mcpServerUrl);
 
 			// Dynamic imports — these are optional peer dependencies
 			let createMCPClient: typeof import("@ai-sdk/mcp")["createMCPClient"];
@@ -30,7 +38,9 @@ export function createResourceHandler(deps: ResourceHandlerDeps) {
 						import("@ai-sdk/mcp"),
 						import("@modelcontextprotocol/sdk/client/streamableHttp.js"),
 					]);
-			} catch {
+				log("MCP deps loaded");
+			} catch (importError) {
+				console.error("[waniwani:resource] MCP deps import failed:", importError);
 				return Response.json(
 					{
 						error:
@@ -40,15 +50,19 @@ export function createResourceHandler(deps: ResourceHandlerDeps) {
 				);
 			}
 
+			log("creating MCP client for", mcpServerUrl);
 			const mcp = await createMCPClient({
 				transport: new StreamableHTTPClientTransport(new URL(mcpServerUrl)),
 			});
 
 			try {
+				log("reading resource:", uri);
 				const result = await mcp.readResource({ uri });
+				log("resource contents count:", result.contents.length);
 
 				const content = result.contents[0];
 				if (!content) {
+					log("← 404 resource not found");
 					return Response.json(
 						{ error: "Resource not found" },
 						{ status: 404 },
@@ -63,12 +77,14 @@ export function createResourceHandler(deps: ResourceHandlerDeps) {
 				}
 
 				if (!html) {
+					log("← 404 resource has no content, keys:", Object.keys(content));
 					return Response.json(
 						{ error: "Resource has no content" },
 						{ status: 404 },
 					);
 				}
 
+				log("← 200 HTML length:", html.length);
 				return new Response(html, {
 					headers: {
 						"Content-Type": "text/html",
@@ -77,12 +93,14 @@ export function createResourceHandler(deps: ResourceHandlerDeps) {
 				});
 			} finally {
 				await mcp.close();
+				log("MCP client closed");
 			}
 		} catch (error) {
-			console.error("[waniwani] Resource handler error:", error);
+			console.error("[waniwani:resource] handler error:", error);
 			const message =
 				error instanceof Error ? error.message : "Unknown error occurred";
 			const status = error instanceof WaniWaniError ? error.status : 500;
+			log("← returning", status, "from caught error");
 			return Response.json({ error: message }, { status });
 		}
 	};

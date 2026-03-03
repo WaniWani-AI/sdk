@@ -12,9 +12,15 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 		beforeRequest,
 		mcpServerUrl: mcpServerUrlOverride,
 		resolveConfig,
+		debug,
 	} = deps;
 
+	const log = debug
+		? (...args: unknown[]) => console.log("[waniwani:chat]", ...args)
+		: () => {};
+
 	return async function handleChat(request: Request): Promise<Response> {
+		log("→ POST", request.url);
 		try {
 			// 1. Parse request body
 			const body = await request.json();
@@ -22,8 +28,16 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 			let sessionId: string | undefined = body.sessionId;
 			let effectiveSystemPrompt = systemPrompt;
 
+			log(
+				"body parsed — messages:",
+				messages.length,
+				"sessionId:",
+				sessionId ?? "(none)",
+			);
+
 			// 2. Run beforeRequest hook
 			if (beforeRequest) {
+				log("running beforeRequest hook");
 				try {
 					const result = await beforeRequest({
 						messages,
@@ -37,12 +51,19 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 							effectiveSystemPrompt = result.systemPrompt;
 						if (result.sessionId !== undefined) sessionId = result.sessionId;
 					}
+					log(
+						"beforeRequest hook done — messages:",
+						messages.length,
+						"sessionId:",
+						sessionId ?? "(none)",
+					);
 				} catch (hookError) {
-					console.error("[waniwani] beforeRequest hook error:", hookError);
+					console.error("[waniwani:chat] beforeRequest hook error:", hookError);
 					const status =
 						hookError instanceof WaniWaniError ? hookError.status : 400;
 					const message =
 						hookError instanceof Error ? hookError.message : "Request rejected";
+					log("← returning", status, "from hook error");
 					return Response.json({ error: message }, { status });
 				}
 			}
@@ -50,9 +71,12 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 			// 3. Resolve MCP server URL
 			const mcpServerUrl =
 				mcpServerUrlOverride ?? (await resolveConfig()).mcpServerUrl;
+			log("mcpServerUrl:", mcpServerUrl);
 
 			// 4. Forward to WaniWani API
-			const response = await fetch(`${baseUrl}/api/mcp/chat`, {
+			const upstreamUrl = `${baseUrl}/api/mcp/chat`;
+			log("forwarding to", upstreamUrl);
+			const response = await fetch(upstreamUrl, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -68,8 +92,11 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 				signal: request.signal,
 			});
 
+			log("upstream response status:", response.status);
+
 			if (!response.ok) {
 				const errorBody = await response.text().catch(() => "");
+				log("← returning", response.status, "upstream error:", errorBody);
 				return new Response(errorBody, {
 					status: response.status,
 					headers: {
@@ -89,16 +116,22 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 				headers.set("x-session-id", upstreamSessionId);
 			}
 
+			log(
+				"← streaming response",
+				response.status,
+				"body null?",
+				response.body === null,
+			);
 			return new Response(response.body, {
 				status: response.status,
 				headers,
 			});
 		} catch (error) {
-			console.error("[waniwani] Chat handler error:", error);
+			console.error("[waniwani:chat] handler error:", error);
 			const message =
 				error instanceof Error ? error.message : "Unknown error occurred";
 			const status = error instanceof WaniWaniError ? error.status : 500;
-
+			log("← returning", status, "from caught error");
 			return Response.json({ error: message }, { status });
 		}
 	};

@@ -45,6 +45,12 @@ export interface ChatOptions {
 export interface NextJsHandlerOptions {
 	/** Chat handler configuration */
 	chat?: ChatOptions;
+
+	/**
+	 * Enable verbose debug logging for all handler steps.
+	 * Logs request details, response codes, resolved URLs, and caught errors.
+	 */
+	debug?: boolean;
 }
 
 // ============================================================================

@@ -35,7 +35,12 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		maxSteps = 5,
 		beforeRequest,
 		mcpServerUrl,
+		debug = false,
 	} = options;
+
+	const log = debug
+		? (...args: unknown[]) => console.log("[waniwani:router]", ...args)
+		: () => {};
 
 	const resolveConfig = createMcpConfigResolver(baseUrl, apiKey);
 
@@ -47,14 +52,17 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		beforeRequest,
 		mcpServerUrl,
 		resolveConfig,
+		debug,
 	});
 
 	const handleResource = createResourceHandler({
 		mcpServerUrl,
 		resolveConfig,
+		debug,
 	});
 
 	async function routeGet(request: Request): Promise<Response> {
+		log("→ GET", request.url);
 		try {
 			const url = new URL(request.url);
 			const segments = url.pathname
@@ -62,16 +70,22 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 				.split("/")
 				.filter(Boolean);
 			const subRoute = segments.at(-1);
+			log("pathname:", url.pathname, "subRoute:", subRoute);
 
 			if (subRoute === "resource") {
-				return await handleResource(url);
+				log("dispatching to resource handler");
+				const response = await handleResource(url);
+				log("← resource handler returned", response.status);
+				return response;
 			}
 
+			log("← 404 no matching sub-route for", subRoute);
 			return Response.json({ error: "Not found" }, { status: 404 });
 		} catch (error) {
-			console.error("[waniwani] GET handler error:", error);
+			console.error("[waniwani:router] GET handler error:", error);
 			const message =
 				error instanceof Error ? error.message : "Unknown error occurred";
+			log("← 500 from caught error");
 			return Response.json({ error: message }, { status: 500 });
 		}
 	}

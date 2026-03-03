@@ -70,6 +70,12 @@ export interface ApiHandlerOptions {
 	 * Useful for development/testing when pointing to a local MCP server.
 	 */
 	mcpServerUrl?: string;
+
+	/**
+	 * Enable verbose debug logging for all handler steps.
+	 * Logs request details, response codes, resolved URLs, and caught errors.
+	 */
+	debug?: boolean;
 }
 
 // ============================================================================
@@ -103,9 +109,11 @@ export interface ApiHandlerDeps {
 	beforeRequest: ApiHandlerOptions["beforeRequest"];
 	mcpServerUrl: string | undefined;
 	resolveConfig: ConfigResolver;
+	debug: boolean;
 }
 
 export interface ResourceHandlerDeps {
 	mcpServerUrl: string | undefined;
 	resolveConfig: ConfigResolver;
+	debug: boolean;
 }

@@ -41,6 +41,7 @@ export function toNextJsHandler(
 		...options?.chat,
 		apiKey,
 		baseUrl,
+		debug: options?.debug,
 	});
 
 	return {
