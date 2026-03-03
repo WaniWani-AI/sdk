@@ -167,6 +167,7 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 			structuredContent: result.structuredContent as
 				| Record<string, unknown>
 				| undefined,
+			_meta: result._meta as Record<string, unknown> | undefined,
 		};
 	}
 

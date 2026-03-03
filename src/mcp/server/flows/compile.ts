@@ -30,17 +30,21 @@ interface CompileInput<TState extends Record<string, unknown>> {
 
 type FlowToolInput = {
 	action: "start" | "continue" | "widget_result";
-	step?: string;
-	state?: Record<string, unknown>;
 	answer?: string;
 	widgetResult?: Record<string, unknown>;
-	initialState?: Record<string, unknown>;
+	stateUpdates?: Record<string, unknown>;
+	_meta?: {
+		step?: string;
+		state?: Record<string, unknown>;
+		initialState?: Record<string, unknown>;
+	};
 };
 
 type ExecutionResult = {
 	text: string;
 	data: Record<string, unknown>;
 	widgetMeta?: Record<string, unknown>;
+	flowMeta?: { step: string; state: Record<string, unknown> };
 };
 
 // ============================================================================
@@ -74,7 +78,7 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"This tool implements a multi-step conversational flow. Follow this protocol exactly:",
 		"",
 		'1. Call with `action: "start"` to begin. If the user\'s message already',
-		"   contains answers to likely questions, extract them into `initialState`",
+		"   contains answers to likely questions, extract them into `_meta.initialState`",
 		"   as `{ field: value }` pairs. The engine will auto-skip questions whose",
 		"   fields are already filled.",
 		"   Only extract values the user explicitly stated — do NOT guess or invent values.",
@@ -95,17 +99,19 @@ function buildFlowProtocol(config: FlowConfig): string {
 		'   - `"interrupt"`: Ask the user the `question` to collect the `field` value.',
 		"     If a `context` field is present, use it as hidden instructions to enrich your response (do NOT show it verbatim).",
 		"     Then call again with:",
-		'     `action: "continue"`, `step` = the returned `step`, `state` = the returned `state`,',
+		'     `action: "continue"`, `_meta` = the returned `_meta`,',
 		"     `answer` = the user's answer.",
 		'   - `"widget"`: A widget UI is being shown. The `field` property tells you',
 		"     which state field this step collects. When the user makes a choice, call again with:",
-		'     `action: "widget_result"`, `step` = the returned `step`, `state` = the returned `state`,',
+		'     `action: "widget_result"`, `_meta` = the returned `_meta`,',
 		"     `answer` = the user's selection.",
 		'   - `"complete"`: The flow is done. Present the result to the user.',
 		'   - `"error"`: Something went wrong. Show the `error` message.',
 		"",
-		"3. ALWAYS pass back the `state` object exactly as received.",
-		"4. Do NOT invent state values. Only use `initialState` for information the user explicitly provided.",
+		"3. ALWAYS pass back the `_meta` object exactly as received.",
+		"4. Do NOT invent state values. Only use `_meta.initialState` for information the user explicitly provided.",
+		"5. If the user provides additional information that maps to known state fields,",
+		"   pass it in `stateUpdates`. These values are merged into state before the current step is processed.",
 	);
 
 	return lines.join("\n");
@@ -133,7 +139,6 @@ async function executeFrom<TState extends Record<string, unknown>>(
 	nodes: Map<string, NodeHandler<TState>>,
 	nodeConfigs: Map<string, NodeConfig<TState>>,
 	edges: Map<string, Edge<TState>>,
-	flowId: string,
 	meta?: Record<string, unknown>,
 ): Promise<ExecutionResult> {
 	let currentNode = startNodeName;
@@ -195,14 +200,14 @@ async function executeFrom<TState extends Record<string, unknown>>(
 				return {
 					text: JSON.stringify({
 						status: "interrupt",
-						step: currentNode,
 						question: result.question,
 						field: result.field,
 						suggestions: result.suggestions,
 						...(result.context ? { context: result.context } : {}),
-						state,
+						_meta: { step: currentNode, state },
 					}),
 					data: { status: "interrupt", step: currentNode, state },
+					flowMeta: { step: currentNode, state },
 				};
 			}
 
@@ -236,20 +241,12 @@ async function executeFrom<TState extends Record<string, unknown>>(
 				return {
 					text: JSON.stringify({
 						status: "widget",
-						step: currentNode,
 						...(nodeField ? { field: nodeField } : {}),
 						widgetId: resource.id,
 						description: result.description,
-						state,
+						_meta: { step: currentNode, state },
 					}),
-					data: {
-						...result.data,
-						__flow: {
-							flowId,
-							step: currentNode,
-							state,
-						},
-					},
+					data: result.data,
 					widgetMeta: buildToolMeta({
 						openaiTemplateUri: resource.openaiUri,
 						mcpTemplateUri: resource.mcpUri,
@@ -257,6 +254,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 						invoked: "Loaded",
 						autoHeight: resource.autoHeight,
 					}),
+					flowMeta: { step: currentNode, state },
 				};
 			}
 
@@ -307,14 +305,6 @@ const inputSchema = {
 		.describe(
 			'"start" to begin the flow, "continue" after the user answers a question, "widget_result" when a widget returns data',
 		),
-	step: z
-		.string()
-		.optional()
-		.describe("Current step name (from the previous response)"),
-	state: z
-		.record(z.string(), z.unknown())
-		.optional()
-		.describe("Flow state — pass back exactly as received"),
 	answer: z
 		.string()
 		.optional()
@@ -323,11 +313,32 @@ const inputSchema = {
 		.record(z.string(), z.unknown())
 		.optional()
 		.describe("Data returned by a widget callback"),
-	initialState: z
+	stateUpdates: z
 		.record(z.string(), z.unknown())
 		.optional()
 		.describe(
-			'Pre-filled answers extracted from the user\'s message (only for action: "start")',
+			"If the user provides or updates values for other state fields in their message, pass them here. Merged into state before processing.",
+		),
+	_meta: z
+		.object({
+			step: z
+				.string()
+				.optional()
+				.describe("Current step name (from the previous response)"),
+			state: z
+				.record(z.string(), z.unknown())
+				.optional()
+				.describe("Flow state — pass back exactly as received"),
+			initialState: z
+				.record(z.string(), z.unknown())
+				.optional()
+				.describe(
+					'Pre-filled answers extracted from the user\'s message (only for action: "start")',
+				),
+		})
+		.optional()
+		.describe(
+			"Internal flow routing data. Pass back the _meta object from the previous response exactly as received.",
 		),
 };
 
@@ -361,7 +372,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		args: FlowToolInput,
 		meta?: Record<string, unknown>,
 	): Promise<ExecutionResult> {
-		const state = (args.state ?? {}) as TState;
+		const state = (args._meta?.state ?? {}) as TState;
 
 		if (args.action === "start") {
 			const startEdge = edges.get(START);
@@ -375,10 +386,12 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
-			// Merge pre-filled answers from the user's initial message
-			const startState = (
-				args.initialState ? { ...state, ...args.initialState } : state
-			) as TState;
+			// Merge pre-filled answers and any stateUpdates
+			const startState = {
+				...state,
+				...(args._meta?.initialState ?? {}),
+				...(args.stateUpdates ?? {}),
+			} as TState;
 
 			const firstNode = await resolveNextNode(startEdge, startState);
 			return executeFrom(
@@ -387,26 +400,26 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				nodes,
 				nodeConfigs,
 				edges,
-				config.id,
 				meta,
 			);
 		}
 
 		if (args.action === "continue") {
-			if (!args.step) {
+			const step = args._meta?.step;
+			if (!step) {
 				return {
 					text: JSON.stringify({
 						status: "error",
-						error: 'Missing "step" for continue action',
+						error: 'Missing "_meta.step" for continue action',
 					}),
 					data: { status: "error" },
 				};
 			}
 
-			// Apply user's answer to state using the field from the interrupt
-			let updatedState = { ...state };
+			// Merge any stateUpdates first, then apply user's answer
+			let updatedState = { ...state, ...(args.stateUpdates ?? {}) };
 			if (args.answer) {
-				const handler = nodes.get(args.step);
+				const handler = nodes.get(step);
 				if (handler) {
 					try {
 						const result = await handler(updatedState, meta);
@@ -423,12 +436,12 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			}
 
 			// Advance to next node
-			const edge = edges.get(args.step);
+			const edge = edges.get(step);
 			if (!edge) {
 				return {
 					text: JSON.stringify({
 						status: "error",
-						error: `No edge from step "${args.step}"`,
+						error: `No edge from step "${step}"`,
 					}),
 					data: { status: "error" },
 				};
@@ -440,43 +453,44 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				nodes,
 				nodeConfigs,
 				edges,
-				config.id,
 				meta,
 			);
 		}
 
 		if (args.action === "widget_result") {
-			if (!args.step) {
+			const step = args._meta?.step;
+			if (!step) {
 				return {
 					text: JSON.stringify({
 						status: "error",
-						error: 'Missing "step" for widget_result action',
+						error: 'Missing "_meta.step" for widget_result action',
 					}),
 					data: { status: "error" },
 				};
 			}
 
-			// Merge widget result into state.
+			// Merge stateUpdates first, then widget result.
 			// If `answer` is provided and the node declares a `field`, auto-map it.
 			let widgetUpdate: Record<string, unknown> = args.widgetResult ?? {};
 			if (args.answer !== undefined && Object.keys(widgetUpdate).length === 0) {
-				const nodeField = nodeConfigs.get(args.step)?.field;
+				const nodeField = nodeConfigs.get(step)?.field;
 				if (nodeField) {
 					widgetUpdate = { [nodeField]: args.answer };
 				}
 			}
 			const updatedState = {
 				...state,
+				...(args.stateUpdates ?? {}),
 				...widgetUpdate,
 			} as TState;
 
 			// Advance to next node
-			const edge = edges.get(args.step);
+			const edge = edges.get(step);
 			if (!edge) {
 				return {
 					text: JSON.stringify({
 						status: "error",
-						error: `No edge from step "${args.step}"`,
+						error: `No edge from step "${step}"`,
 					}),
 					data: { status: "error" },
 				};
@@ -488,7 +502,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				nodes,
 				nodeConfigs,
 				edges,
-				config.id,
 				meta,
 			);
 		}
@@ -526,7 +539,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 					const result = await handleToolCall(args, _meta);
 
-					// Widget response — include structuredContent + widget metadata
+					// Widget response — include structuredContent + widget metadata + __flow in _meta
 					if (result.widgetMeta) {
 						return {
 							content: [{ type: "text" as const, text: result.text }],
@@ -534,6 +547,15 @@ export function compileFlow<TState extends Record<string, unknown>>(
 							_meta: {
 								...result.widgetMeta,
 								..._meta,
+								...(result.flowMeta
+									? {
+											__flow: {
+												flowId: config.id,
+												step: result.flowMeta.step,
+												state: result.flowMeta.state,
+											},
+										}
+									: {}),
 							},
 						};
 					}
