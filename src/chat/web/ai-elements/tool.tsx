@@ -348,17 +348,18 @@ export function ToolContent({
 
 export type ToolInputProps = HTMLAttributes<HTMLDivElement> & {
 	input: ToolUIPart["input"];
+	debug?: boolean;
 };
 
 /** Displays the tool call request parameters as a collapsible JSON section labeled "Request". */
-export function ToolInput({ className, input, ...props }: ToolInputProps) {
+export function ToolInput({ className, input, debug, ...props }: ToolInputProps) {
 	const filtered = useMemo(() => {
-		if (typeof input === "object" && input !== null && !Array.isArray(input)) {
+		if (!debug && typeof input === "object" && input !== null && !Array.isArray(input)) {
 			const { _meta, ...rest } = input as Record<string, unknown>;
 			return rest;
 		}
 		return input;
-	}, [input]);
+	}, [input, debug]);
 
 	return (
 		<CollapsibleJSON
@@ -373,6 +374,7 @@ export function ToolInput({ className, input, ...props }: ToolInputProps) {
 export type ToolOutputProps = HTMLAttributes<HTMLDivElement> & {
 	output: ToolUIPart["output"];
 	errorText: ToolUIPart["errorText"];
+	debug?: boolean;
 };
 
 function getUiMeta(output: unknown): Record<string, unknown> | undefined {
@@ -400,10 +402,12 @@ export function ToolOutput({
 	className,
 	output,
 	errorText,
+	debug,
 	...props
 }: ToolOutputProps) {
 	const filtered = useMemo(() => {
 		if (
+			!debug &&
 			typeof output === "object" &&
 			output !== null &&
 			!Array.isArray(output)
@@ -412,7 +416,7 @@ export function ToolOutput({
 			return rest;
 		}
 		return output;
-	}, [output]);
+	}, [output, debug]);
 
 	if (!(output || errorText)) return null;
 

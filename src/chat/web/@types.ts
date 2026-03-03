@@ -107,6 +107,13 @@ export interface ChatBaseProps {
 		structuredContent?: Record<string, unknown>;
 		_meta?: Record<string, unknown>;
 	}>;
+	/**
+	 * Enable debug mode. When true, the `_meta` field is shown in tool call
+	 * inputs and outputs instead of being filtered out.
+	 * Tip: set to `process.env.NEXT_PUBLIC_WANIWANI_DEBUG === '1'` to mirror
+	 * the server-side `WANIWANI_DEBUG` env var.
+	 */
+	debug?: boolean;
 }
 
 // ============================================================================

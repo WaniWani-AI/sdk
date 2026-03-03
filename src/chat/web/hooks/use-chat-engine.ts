@@ -57,7 +57,7 @@ export interface QueuedMessage {
 
 export function useChatEngine(props: ChatBaseProps) {
 	const {
-		api = "https://app.waniwani.ai/api/chat",
+		api = "/api/waniwani",
 		headers: userHeaders,
 		body,
 		onMessageSent,

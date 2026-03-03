@@ -65,6 +65,8 @@ interface MessageListProps {
 	) => void;
 	/** When set, only the matching widget is shown (fullscreen mode). The iframe stays mounted. */
 	fullscreenToolCallId?: string | null;
+	/** When true, show _meta in tool call inputs and outputs. */
+	debug?: boolean;
 }
 
 export function MessageList({
@@ -78,6 +80,7 @@ export function MessageList({
 	onCallTool,
 	onWidgetDisplayModeChange,
 	fullscreenToolCallId,
+	debug,
 }: MessageListProps) {
 	const isLoading = status === "submitted" || status === "streaming";
 	const lastMessage = messages[messages.length - 1];
@@ -160,13 +163,14 @@ export function MessageList({
 												state={part.state}
 											/>
 											<ToolContent>
-												<ToolInput input={part.input} />
+												<ToolInput input={part.input} debug={debug} />
 												{output !== undefined && (
 													<ToolOutput
 														output={output}
 														errorText={
 															"errorText" in part ? part.errorText : undefined
 														}
+														debug={debug}
 													/>
 												)}
 											</ToolContent>

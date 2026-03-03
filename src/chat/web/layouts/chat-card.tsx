@@ -45,17 +45,32 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			triggerEvent = "triggerDemoRequest",
 			resourceEndpoint,
 			api,
+			debug,
 		} = props;
 
+		const effectiveApi = api ?? "/api/waniwani";
 		const effectiveResourceEndpoint =
-			resourceEndpoint ?? (api ? `${api}/resource` : undefined);
+			resourceEndpoint ?? `${effectiveApi}/resource`;
 
 		const resolvedTheme = mergeTheme(userTheme);
 		const cssVars = themeToCSSProperties(resolvedTheme);
 		const isDark = isDarkTheme(resolvedTheme);
 
-		const engine = useChatEngine(props);
-		const handleCallTool = useCallTool(props);
+		const [serverDebug, setServerDebug] = useState(false);
+		const effectiveDebug = debug ?? serverDebug;
+
+		useEffect(() => {
+			(async () => {
+				try {
+					const r = await fetch(`${effectiveApi}/config`);
+					const data = await r.json();
+					if (data.debug === true) setServerDebug(true);
+				} catch {}
+			})();
+		}, [effectiveApi]);
+
+		const engine = useChatEngine({ ...props, api: effectiveApi });
+		const handleCallTool = useCallTool({ ...props, api: effectiveApi });
 
 		const animatedPlaceholder = useTypingPlaceholder(placeholder, !engine.text);
 
@@ -176,6 +191,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 							onFollowUp={handleWidgetMessage}
 							onCallTool={handleCallTool}
 							fullscreenToolCallId={fullscreenToolCallId}
+							debug={effectiveDebug}
 							onWidgetDisplayModeChange={(mode, widget) => {
 								setFullscreenToolCallId(
 									mode === "fullscreen" ? widget.toolCallId : null,

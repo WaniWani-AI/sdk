@@ -25,7 +25,7 @@ export function useCallTool(props: {
 
 			if (onCallTool) return onCallTool(params);
 
-			const endpoint = `${api ?? "https://app.waniwani.ai/api/chat"}/tool`;
+			const endpoint = `${api ?? "/api/waniwani"}/tool`;
 			const res = await fetch(endpoint, {
 				method: "POST",
 				headers: { "Content-Type": "application/json", ...headers },

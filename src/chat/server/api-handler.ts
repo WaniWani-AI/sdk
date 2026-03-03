@@ -60,6 +60,10 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		debug,
 	});
 
+	async function handleConfig(): Promise<Response> {
+		return Response.json({ debug });
+	}
+
 	async function routeGet(request: Request): Promise<Response> {
 		log("→ GET", request.url);
 		try {
@@ -75,6 +79,13 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 				log("dispatching to resource handler");
 				const response = await handleResource(url);
 				log("← resource handler returned", response.status);
+				return response;
+			}
+
+			if (subRoute === "config") {
+				log("dispatching to config handler");
+				const response = await handleConfig();
+				log("← config handler returned", response.status);
 				return response;
 			}
 
