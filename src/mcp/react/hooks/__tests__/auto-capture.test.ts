@@ -29,7 +29,7 @@ describe("data-ww-conversion", () => {
 		enqueued = [];
 	});
 
-	test("parses name, value, and currency from single attribute", () => {
+	test("parses name and properties from single attribute", () => {
 		const btn = document.createElement("button");
 		btn.setAttribute("data-ww-conversion", "purchase value:49.99 currency:EUR");
 		document.body.appendChild(btn);
@@ -46,15 +46,15 @@ describe("data-ww-conversion", () => {
 		const event = events[0][0];
 		expect(event.event_type).toBe("conversion");
 		expect(event.event_name).toBe("purchase");
-		expect(event.conversion_value).toBe(49.99);
-		expect(event.conversion_currency).toBe("EUR");
+		expect((event.metadata as Record<string, unknown>)?.value).toBe(49.99);
+		expect((event.metadata as Record<string, unknown>)?.currency).toBe("EUR");
 		expect(event.session_id).toBe("sess-1");
 		expect(event.trace_id).toBe("trace-1");
 
 		cleanup();
 	});
 
-	test("defaults to value=0 and currency=USD when only name given", () => {
+	test("sends no metadata when only name given", () => {
 		const btn = document.createElement("button");
 		btn.setAttribute("data-ww-conversion", "signup");
 		document.body.appendChild(btn);
@@ -70,8 +70,7 @@ describe("data-ww-conversion", () => {
 
 		const event = events[0][0];
 		expect(event.event_name).toBe("signup");
-		expect(event.conversion_value).toBe(0);
-		expect(event.conversion_currency).toBe("USD");
+		expect(event.metadata).toBe(undefined);
 
 		cleanup();
 	});
@@ -93,7 +92,9 @@ describe("data-ww-conversion", () => {
 		const events = byType(enqueued, "conversion");
 		expect(events).toHaveLength(1);
 		expect(events[0][0].event_name).toBe("upgrade");
-		expect(events[0][0].conversion_value).toBe(9.99);
+		expect((events[0][0].metadata as Record<string, unknown>)?.value).toBe(
+			9.99,
+		);
 
 		cleanup();
 	});

@@ -147,7 +147,7 @@ export function initAutoCapture(
 	);
 
 	// ── data-ww-conversion ────────────────────────────────────────────
-	// Format: "name value:49.99 currency:EUR"
+	// Format: "name key:value key:value ..."
 	const onConversionClick = (ev: MouseEvent) => {
 		const target = ev.target as HTMLElement | null;
 		const el = target?.closest?.("[data-ww-conversion]") as HTMLElement | null;
@@ -161,9 +161,6 @@ export function initAutoCapture(
 		enqueue([
 			baseFields(config, "conversion", {
 				event_name: name,
-				conversion_value: typeof props.value === "number" ? props.value : 0,
-				conversion_currency:
-					typeof props.currency === "string" ? props.currency : "USD",
 				metadata: Object.keys(props).length > 0 ? props : undefined,
 			}),
 		]);

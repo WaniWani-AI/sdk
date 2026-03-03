@@ -194,7 +194,7 @@ Returns `WaniwaniWidget`:
 | `identify(userId, traits?)` | Tie subsequent events to a user |
 | `step(name, meta?)` | Record a funnel step (auto-incrementing sequence) |
 | `track(event, properties?)` | Record a custom event |
-| `conversion(name, { value, currency, meta? })` | Record a revenue attribution event |
+| `conversion(name, data?)` | Record a conversion event |
 
 Auto-captured events: `widget_render`, `widget_click`, `widget_link_click`, `widget_error`, `widget_scroll`, `widget_form_field`, `widget_form_submit`.
 

@@ -128,8 +128,6 @@ Fires a conversion event on click. Format: `name key:value key:value ...`
 | Token | Description |
 |-------|-------------|
 | First token | Conversion name (required) |
-| `value:N` | Numeric conversion value (defaults to `0`) |
-| `currency:X` | Currency code (defaults to `USD`) |
 | Any `key:value` | Included as event metadata |
 
 ### `data-ww-step`
