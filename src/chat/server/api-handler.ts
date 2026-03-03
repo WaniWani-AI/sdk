@@ -1,5 +1,6 @@
 // API Handler - Composes chat and resource handlers into a unified API handler
 
+import { createLogger } from "../../utils/logger.js";
 import type { ApiHandler, ApiHandlerOptions } from "./@types";
 import { createChatRequestHandler } from "./handle-chat";
 import { createResourceHandler } from "./handle-resource";
@@ -38,9 +39,7 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		debug = false,
 	} = options;
 
-	const log = debug
-		? (...args: unknown[]) => console.log("[waniwani:router]", ...args)
-		: () => {};
+	const log = createLogger("router", debug);
 
 	const resolveConfig = createMcpConfigResolver(baseUrl, apiKey);
 

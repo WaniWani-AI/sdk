@@ -1,14 +1,13 @@
 // Handle Resource - Serves MCP resource content (HTML widgets)
 
 import { WaniWaniError } from "../../error";
+import { createLogger } from "../../utils/logger.js";
 import type { ResourceHandlerDeps } from "./@types";
 
 export function createResourceHandler(deps: ResourceHandlerDeps) {
 	const { mcpServerUrl: mcpServerUrlOverride, resolveConfig, debug } = deps;
 
-	const log = debug
-		? (...args: unknown[]) => console.log("[waniwani:resource]", ...args)
-		: () => {};
+	const log = createLogger("resource", debug);
 
 	return async function handleResource(url: URL): Promise<Response> {
 		log("→ GET", url.toString());

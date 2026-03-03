@@ -1,6 +1,7 @@
 // Handle Chat - Proxies chat requests to the WaniWani API
 
 import { WaniWaniError } from "../../error";
+import { createLogger } from "../../utils/logger.js";
 import type { ApiHandlerDeps } from "./@types";
 
 export function createChatRequestHandler(deps: ApiHandlerDeps) {
@@ -15,9 +16,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 		debug,
 	} = deps;
 
-	const log = debug
-		? (...args: unknown[]) => console.log("[waniwani:chat]", ...args)
-		: () => {};
+	const log = createLogger("chat", debug);
 
 	return async function handleChat(request: Request): Promise<Response> {
 		log("→ POST", request.url);
