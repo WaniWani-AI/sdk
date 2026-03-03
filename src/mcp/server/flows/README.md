@@ -161,9 +161,13 @@ function PricingTable() {
     if (data?.__flow) {
       callTool(data.__flow.flowId, {
         action: "widget_result",
-        step: data.__flow.step,
-        state: data.__flow.state,
+        _meta: {
+          step: data.__flow.step,
+          state: data.__flow.state,
+        },
         widgetResult: { selectedPlan: plan },
+        // Optional: update any other known flow fields at this step
+        // stateUpdates: { role: "CTO" },
       });
     }
   };

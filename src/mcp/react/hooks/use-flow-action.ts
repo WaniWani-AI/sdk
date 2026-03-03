@@ -30,8 +30,12 @@ type FlowResponseText = {
 export type FlowActionResult<T> = {
 	/** Current widget data. Initially from useToolOutput, then updated inline on same-widget transitions. */
 	data: T | null;
-	/** Advance the flow with the user's answer. On MCP Apps uses callTool; on OpenAI uses sendFollowUp with `followUpText` (falls back to `value`). */
-	advance: (value: string, followUpText?: string) => void;
+	/** Advance the flow with the user's answer. Optionally include `stateUpdates` to update any flow field at this step. */
+	advance: (
+		value: string,
+		followUpText?: string,
+		stateUpdates?: Record<string, unknown>,
+	) => void;
 	/** True while a callTool request is in flight. */
 	isAdvancing: boolean;
 };
@@ -73,6 +77,8 @@ function parseResponseText(result: ToolCallResult): FlowResponseText | null {
  * const { data, advance, isAdvancing } = useFlowAction<OptionPickerProps>("option_picker");
  * // On click:
  * advance(option.id, option.label);
+ * // With extra cross-field updates:
+ * // advance(option.id, option.label, { role: "CTO" });
  * ```
  */
 export function useFlowAction<T extends Record<string, unknown>>(
@@ -101,7 +107,11 @@ export function useFlowAction<T extends Record<string, unknown>>(
 	}
 
 	const advance = useCallback(
-		async (value: string, followUpText?: string) => {
+		async (
+			value: string,
+			followUpText?: string,
+			stateUpdates?: Record<string, unknown>,
+		) => {
 			const platform = detectPlatform();
 
 			// OpenAI: sendFollowUp works great, use it directly
@@ -124,6 +134,7 @@ export function useFlowAction<T extends Record<string, unknown>>(
 						state: flowMeta.state,
 					},
 					answer: value,
+					...(stateUpdates ? { stateUpdates } : {}),
 				});
 
 				const parsed = parseResponseText(result);

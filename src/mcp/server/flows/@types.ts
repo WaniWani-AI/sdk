@@ -94,7 +94,7 @@ export type NodeConfig<
 > = {
 	/** Resource to display when this node returns a WidgetSignal */
 	resource?: RegisteredResource;
-	/** State key this node fills — enables auto-skip when the field is already in state via `initialState` */
+	/** State key this node fills — enables auto-skip when the field is already in state */
 	field?: Extract<keyof TState, string>;
 };
 
@@ -141,7 +141,7 @@ export type FlowConfig = {
 	 * The state definition serves two purposes:
 	 * 1. Type inference — `TState` is automatically derived, no explicit generic needed
 	 * 2. AI protocol — field names, types, and descriptions are included in the tool
-	 *    description so the AI can pre-fill answers via `initialState`
+	 *    description so the AI can pre-fill answers via `_meta.state`
 	 *
 	 * @example
 	 * ```ts

@@ -36,7 +36,6 @@ type FlowToolInput = {
 	_meta?: {
 		step?: string;
 		state?: Record<string, unknown>;
-		initialState?: Record<string, unknown>;
 	};
 };
 
@@ -78,7 +77,7 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"This tool implements a multi-step conversational flow. Follow this protocol exactly:",
 		"",
 		'1. Call with `action: "start"` to begin. If the user\'s message already',
-		"   contains answers to likely questions, extract them into `_meta.initialState`",
+		"   contains answers to likely questions, extract them into `_meta.state`",
 		"   as `{ field: value }` pairs. The engine will auto-skip questions whose",
 		"   fields are already filled.",
 		"   Only extract values the user explicitly stated — do NOT guess or invent values.",
@@ -109,12 +108,22 @@ function buildFlowProtocol(config: FlowConfig): string {
 		'   - `"error"`: Something went wrong. Show the `error` message.',
 		"",
 		"3. ALWAYS pass back the `_meta` object exactly as received.",
-		"4. Do NOT invent state values. Only use `_meta.initialState` for information the user explicitly provided.",
+		"4. Do NOT invent state values. Only use `_meta.state` for information the user explicitly provided.",
 		"5. If the user provides additional information that maps to known state fields,",
 		"   pass it in `stateUpdates`. These values are merged into state before the current step is processed.",
+		"   This allows updating any known field at any node (not only the current question's field).",
 	);
 
 	return lines.join("\n");
+}
+
+function getInputMeta(args: FlowToolInput): {
+	step?: string;
+	state: Record<string, unknown>;
+} {
+	const state = args._meta?.state ?? {};
+	const step = args._meta?.step;
+	return { step, state };
 }
 
 // ============================================================================
@@ -135,14 +144,14 @@ async function resolveNextNode<TState extends Record<string, unknown>>(
 
 async function executeFrom<TState extends Record<string, unknown>>(
 	startNodeName: string,
-	initialState: TState,
+	startState: TState,
 	nodes: Map<string, NodeHandler<TState>>,
 	nodeConfigs: Map<string, NodeConfig<TState>>,
 	edges: Map<string, Edge<TState>>,
 	meta?: Record<string, unknown>,
 ): Promise<ExecutionResult> {
 	let currentNode = startNodeName;
-	let state = { ...initialState };
+	let state = { ...startState };
 
 	// Safety limit to prevent infinite loops
 	const MAX_ITERATIONS = 50;
@@ -329,12 +338,6 @@ const inputSchema = {
 				.record(z.string(), z.unknown())
 				.optional()
 				.describe("Flow state — pass back exactly as received"),
-			initialState: z
-				.record(z.string(), z.unknown())
-				.optional()
-				.describe(
-					'Pre-filled answers extracted from the user\'s message (only for action: "start")',
-				),
 		})
 		.optional()
 		.describe(
@@ -372,7 +375,8 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		args: FlowToolInput,
 		meta?: Record<string, unknown>,
 	): Promise<ExecutionResult> {
-		const state = (args._meta?.state ?? {}) as TState;
+		const inputMeta = getInputMeta(args);
+		const state = inputMeta.state as TState;
 
 		if (args.action === "start") {
 			const startEdge = edges.get(START);
@@ -389,7 +393,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			// Merge pre-filled answers and any stateUpdates
 			const startState = {
 				...state,
-				...(args._meta?.initialState ?? {}),
 				...(args.stateUpdates ?? {}),
 			} as TState;
 
@@ -405,7 +408,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		}
 
 		if (args.action === "continue") {
-			const step = args._meta?.step;
+			const step = inputMeta.step;
 			if (!step) {
 				return {
 					text: JSON.stringify({
@@ -458,7 +461,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		}
 
 		if (args.action === "widget_result") {
-			const step = args._meta?.step;
+			const step = inputMeta.step;
 			if (!step) {
 				return {
 					text: JSON.stringify({
