@@ -89,11 +89,11 @@ At every step, the engine stores the current `field` in `_meta.flow.field` — r
 
 ## Pre-filling answers
 
-When calling `action: "start"`, the AI can pass answers already present in the user's message via `_meta.flow.state`. The engine automatically skips nodes whose fields are already populated.
+When calling `action: "start"`, the AI can pass answers already present in the user's message via `stateUpdates`. The engine automatically skips nodes whose fields are already populated.
 
 If a user says "I want to open a bank account in France", the AI calls:
 ```json
-{ "action": "start", "_meta": { "flow": { "state": { "country": "France" } } } }
+{ "action": "start", "stateUpdates": { "country": "France" } }
 ```
 
 The flow skips the "which country?" question and proceeds to the next unanswered step.
@@ -223,7 +223,7 @@ await registerTools(server, [pricingTool, flow]);
 
 ### Widget callback (client-side)
 
-Inside the widget, call back into the flow:
+Inside the widget, call back into the flow using `action: "continue"` and `stateUpdates`:
 
 ```tsx
 import { useCallTool, useToolOutput, useToolResponseMetadata } from "@waniwani/sdk/mcp/react";
@@ -233,21 +233,21 @@ function PricingTable() {
     prices: Array<{ plan: string; price: number }>;
   }>();
   const meta = useToolResponseMetadata() as {
-    flow?: { flowId: string; step: string; state: Record<string, unknown> };
+    flow?: { flowId: string; step: string; state: Record<string, unknown>; field?: string };
   } | null;
   const callTool = useCallTool();
 
   const handleSelect = (plan: string) => {
     if (meta?.flow) {
       callTool(meta.flow.flowId, {
-        action: "widget_result",
+        action: "continue",
         _meta: {
           flow: {
             step: meta.flow.step,
             state: meta.flow.state,
           },
         },
-        widgetResult: { selectedPlan: plan },
+        stateUpdates: { [meta.flow.field ?? "selectedPlan"]: plan },
       });
     }
   };
@@ -299,4 +299,4 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 - **Forgetting `START`/`END` edges** — Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`
 - **Action nodes returning interrupt/widget** — If a node returns `interrupt()` or `showWidget()`, it becomes an interrupt/widget node, not an action node
 - **Forgetting to register the resource** — Call `await resource.register(server)` before registering the flow
-- **Widget callback shape** — The `callTool` call must include `action: "widget_result"`, `_meta.flow.step`, `_meta.flow.state`, and `widgetResult`
+- **Widget callback shape** — The `callTool` call must use `action: "continue"`, include `_meta.flow.step`, `_meta.flow.state`, and pass the result via `stateUpdates: { [field]: value }`

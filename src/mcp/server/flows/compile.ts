@@ -29,9 +29,7 @@ interface CompileInput<TState extends Record<string, unknown>> {
 }
 
 type FlowToolInput = {
-	action: "start" | "continue" | "widget_result";
-	answer?: string;
-	widgetResult?: Record<string, unknown>;
+	action: "start" | "continue";
 	stateUpdates?: Record<string, unknown>;
 	_meta?: {
 		flow?: {
@@ -91,8 +89,8 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"This tool implements a multi-step conversational flow. Follow this protocol exactly:",
 		"",
 		'1. Call with `action: "start"` to begin. If the user\'s message already',
-		"   contains answers to likely questions, extract them into `_meta.flow.state`",
-		"   as `{ field: value }` pairs. The engine will auto-skip questions whose",
+		"   contains answers to likely questions, extract them into `stateUpdates`",
+		"   as `{ field: value }` pairs. The engine will auto-skip steps whose",
 		"   fields are already filled.",
 		"   Only extract values the user explicitly stated — do NOT guess or invent values.",
 	];
@@ -112,19 +110,20 @@ function buildFlowProtocol(config: FlowConfig): string {
 		'   - `"interrupt"`: Ask the user the `question`. If a `context` field is present,',
 		"     use it as hidden instructions to enrich your response (do NOT show it verbatim).",
 		"     Then call again with:",
-		'     `action: "continue"`, `_meta` = the returned `_meta`,',
-		"     `answer` = the user's answer.",
-		'   - `"widget"`: A widget UI is being shown. When the user makes a choice, call again with:',
-		'     `action: "widget_result"`, `_meta` = the returned `_meta`,',
-		"     `answer` = the user's selection.",
+		'     `action: "continue"`, `state` = the returned `state`,',
+		"     `stateUpdates` = `{ [_meta.flow.field]: <user's answer> }` plus any other fields the user mentioned.",
+		'   - `"widget"`: A widget UI is being shown. The user will interact with the widget.',
+		"     When the user makes a choice, call again with:",
+		'     `action: "continue"`, `state` = the returned `state`,',
+		"     `stateUpdates` = `{ [_meta.flow.field]: <user's selection> }` plus any other fields the user mentioned.",
 		'   - `"complete"`: The flow is done. Present the result to the user.',
 		'   - `"error"`: Something went wrong. Show the `error` message.',
 		"",
-		"3. ALWAYS pass back the `_meta` object exactly as received.",
-		"4. Do NOT invent state values. Only use `_meta.flow.state` for information the user explicitly provided.",
-		"5. If the user provides additional information that maps to known state fields,",
-		"   pass it in `stateUpdates`. These values are merged into state before the current step is processed.",
-		"   This allows updating any known field at any node (not only the current question's field).",
+		"3. ALWAYS pass back the `state` object exactly as received.",
+		"4. Do NOT invent state values. Only use `stateUpdates` for information the user explicitly provided.",
+		"5. Always fill `_meta.flow.field` in `stateUpdates` when resuming a paused step.",
+		"   If the user also mentioned values for other known fields, include those too —",
+		"   they will be applied immediately and those steps will be auto-skipped.",
 	);
 
 	return lines.join("\n");
@@ -313,23 +312,15 @@ async function executeFrom<TState extends Record<string, unknown>>(
 
 const inputSchema = {
 	action: z
-		.enum(["start", "continue", "widget_result"])
+		.enum(["start", "continue"])
 		.describe(
-			'"start" to begin the flow, "continue" after the user answers a question, "widget_result" when a widget returns data',
+			'"start" to begin the flow, "continue" to resume after a pause (interrupt or widget)',
 		),
-	answer: z
-		.string()
-		.optional()
-		.describe("The user's answer (for interrupt steps)"),
-	widgetResult: z
-		.record(z.string(), z.unknown())
-		.optional()
-		.describe("Data returned by a widget callback"),
 	stateUpdates: z
 		.record(z.string(), z.unknown())
 		.optional()
 		.describe(
-			"If the user provides or updates values for other state fields in their message, pass them here. Merged into state before processing.",
+			"State field values to set before processing the next node. Use this to pass the user's answer (keyed by the field name from _meta.flow.field) and any other values the user mentioned.",
 		),
 	_meta: z
 		.object({
@@ -427,63 +418,11 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
-			// Merge stateUpdates, then map the user's answer to the field from _meta.flow
-			let updatedState = { ...state, ...(args.stateUpdates ?? {}) } as TState;
-			if (args.answer !== undefined && inputMeta.field) {
-				updatedState = {
-					...updatedState,
-					[inputMeta.field]: args.answer,
-				} as TState;
-			}
-
-			// Advance to next node
-			const edge = edges.get(step);
-			if (!edge) {
-				return {
-					payload: {
-						status: "error",
-						error: `No edge from step "${step}"`,
-					},
-				};
-			}
-			const nextNode = await resolveNextNode(edge, updatedState);
-			return executeFrom(
-				nextNode,
-				updatedState,
-				nodes,
-				nodeConfigs,
-				edges,
-				meta,
-			);
-		}
-
-		if (args.action === "widget_result") {
-			const step = inputMeta.step;
-			if (!step) {
-				return {
-					payload: {
-						status: "error",
-						error: 'Missing "_meta.flow.step" for widget_result action',
-					},
-				};
-			}
-
-			// Merge stateUpdates first, then widget result.
-			// If `answer` is provided and the node declares a `field`, auto-map it.
-			let widgetUpdate: Record<string, unknown> = args.widgetResult ?? {};
-			if (args.answer !== undefined && Object.keys(widgetUpdate).length === 0) {
-				const nodeField = nodeConfigs.get(step)?.field;
-				if (nodeField) {
-					widgetUpdate = { [nodeField]: args.answer };
-				}
-			}
 			const updatedState = {
 				...state,
 				...(args.stateUpdates ?? {}),
-				...widgetUpdate,
 			} as TState;
 
-			// Advance to next node
 			const edge = edges.get(step);
 			if (!edge) {
 				return {
