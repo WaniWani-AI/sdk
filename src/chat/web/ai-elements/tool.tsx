@@ -402,6 +402,14 @@ export function ToolOutput({
 	errorText,
 	...props
 }: ToolOutputProps) {
+	const filtered = useMemo(() => {
+		if (typeof output === "object" && output !== null && !Array.isArray(output)) {
+			const { _meta, ...rest } = output as Record<string, unknown>;
+			return rest;
+		}
+		return output;
+	}, [output]);
+
 	if (!(output || errorText)) return null;
 
 	if (errorText) {
@@ -419,7 +427,7 @@ export function ToolOutput({
 
 	return (
 		<CollapsibleJSON
-			data={output}
+			data={filtered}
 			label="Response"
 			className={className}
 			{...props}

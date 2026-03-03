@@ -6,6 +6,7 @@ import { cn } from "../lib/utils";
 const DEFAULT_RESOURCE_ENDPOINT = "/api/mcp/resource";
 const MAX_HEIGHT = 500;
 const DEFAULT_HEIGHT = 0;
+const AUTOHEIGHT_PADDING = 16;
 const PROTOCOL_VERSION = "2026-01-26";
 const RESIZE_ANIMATION_MS = 300;
 const HANDSHAKE_TIMEOUT_MS = 3000;
@@ -93,7 +94,7 @@ export function McpAppFrame({
 
 	const clampHeight = useCallback(
 		(h: number) => {
-			if (autoHeight) return Math.max(h, 0);
+			if (autoHeight) return Math.max(h + AUTOHEIGHT_PADDING, 0);
 			return Math.min(Math.max(h, 50), MAX_HEIGHT);
 		},
 		[autoHeight],
