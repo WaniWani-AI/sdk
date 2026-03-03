@@ -10,6 +10,8 @@ import { ChatWidget } from "@waniwani/sdk/chat";
 
 Peer dependencies: `react`, `react-dom`, `@ai-sdk/react`, `ai`
 
+All other dependencies (icons, markdown rendering, scroll utilities, styling helpers) are bundled into the SDK — no extra installs needed.
+
 ## Exports
 
 | Export | Type | Description |
@@ -130,4 +132,4 @@ src/chat/
 ## Common Mistakes
 
 - **Wrong import path** — Use `@waniwani/sdk/chat`, not `@waniwani/sdk`
-- **Missing peer deps** — Requires `react`, `react-dom`, `@ai-sdk/react`, and `ai`
+- **Missing peer deps** — Requires `react`, `react-dom`, `@ai-sdk/react`, and `ai`. Everything else (lucide-react, streamdown, tailwind-merge, etc.) is bundled — do NOT add them as peer deps or externals
