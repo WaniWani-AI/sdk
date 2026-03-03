@@ -37,8 +37,7 @@ export function toNextJsHandler(
 ): NextJsHandlerResult {
 	const { apiKey, baseUrl } = client._config;
 
-	const debugEnabled =
-		options?.debug ?? process.env.WANIWANI_DEBUG === "1";
+	const debugEnabled = options?.debug ?? process.env.WANIWANI_DEBUG === "1";
 
 	const handler = createApiHandler({
 		...options?.chat,

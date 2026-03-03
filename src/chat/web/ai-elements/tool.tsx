@@ -352,9 +352,19 @@ export type ToolInputProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 /** Displays the tool call request parameters as a collapsible JSON section labeled "Request". */
-export function ToolInput({ className, input, debug, ...props }: ToolInputProps) {
+export function ToolInput({
+	className,
+	input,
+	debug,
+	...props
+}: ToolInputProps) {
 	const filtered = useMemo(() => {
-		if (!debug && typeof input === "object" && input !== null && !Array.isArray(input)) {
+		if (
+			!debug &&
+			typeof input === "object" &&
+			input !== null &&
+			!Array.isArray(input)
+		) {
 			const { _meta, ...rest } = input as Record<string, unknown>;
 			return rest;
 		}
