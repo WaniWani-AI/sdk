@@ -60,15 +60,8 @@ export interface WaniwaniWidget {
 	step(name: string, meta?: Record<string, unknown>): void;
 	/** Record a generic custom event. */
 	track(event: string, properties?: Record<string, unknown>): void;
-	/** Record a revenue attribution event. */
-	conversion(
-		name: string,
-		data: {
-			value: number;
-			currency: string;
-			meta?: Record<string, unknown>;
-		},
-	): void;
+	/** Record a conversion event. */
+	conversion(name: string, data?: Record<string, unknown>): void;
 }
 
 /** No-op widget that silently discards all calls. */
@@ -243,20 +236,11 @@ function createState(
 				]);
 			},
 
-			conversion(
-				name: string,
-				data: {
-					value: number;
-					currency: string;
-					meta?: Record<string, unknown>;
-				},
-			) {
+			conversion(name: string, data?: Record<string, unknown>) {
 				enqueue([
 					baseFields("conversion", {
 						event_name: name,
-						conversion_value: data.value,
-						conversion_currency: data.currency,
-						metadata: data.meta,
+						metadata: data,
 					}),
 				]);
 			},

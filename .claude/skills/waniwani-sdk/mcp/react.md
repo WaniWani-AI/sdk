@@ -167,7 +167,7 @@ to context metadata when available.
 | `identify(userId, traits?)` | Tie subsequent events to a user |
 | `step(name, meta?)` | Record a funnel step (auto-incrementing sequence) |
 | `track(event, properties?)` | Record a custom event |
-| `conversion(name, { value, currency, meta? })` | Record a revenue attribution event |
+| `conversion(name, data?)` | Record a conversion event |
 
 **Auto-captured events:**
 
@@ -197,7 +197,7 @@ Track conversions and funnel steps without calling methods — add data attribut
 <button data-ww-step="select-plan plan:premium">Select Plan</button>
 ```
 
-First token is the event name, remaining `key:value` pairs become metadata. Numeric values are auto-coerced. `data-ww-conversion` defaults to `value:0 currency:USD` when omitted. Both use `closest()` so child clicks bubble up.
+First token is the event name, remaining `key:value` pairs become metadata. Numeric values are auto-coerced. Both use `closest()` so child clicks bubble up.
 
 Requires `WidgetProvider` wrapper (for auto-resolving the JWT token from tool response metadata).
 
