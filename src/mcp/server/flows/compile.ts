@@ -268,7 +268,12 @@ async function executeFrom<TState extends Record<string, unknown>>(
 						invoked: "Loaded",
 						autoHeight: resource.autoHeight,
 					}),
-					flowMeta: { step: currentNode, state, field: nodeField, widgetId: resource.id },
+					flowMeta: {
+						step: currentNode,
+						state,
+						field: nodeField,
+						widgetId: resource.id,
+					},
 				};
 			}
 
@@ -425,7 +430,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			// Merge stateUpdates, then map the user's answer to the field from _meta.flow
 			let updatedState = { ...state, ...(args.stateUpdates ?? {}) } as TState;
 			if (args.answer !== undefined && inputMeta.field) {
-				updatedState = { ...updatedState, [inputMeta.field]: args.answer } as TState;
+				updatedState = {
+					...updatedState,
+					[inputMeta.field]: args.answer,
+				} as TState;
 			}
 
 			// Advance to next node
@@ -535,7 +543,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 							: {}),
 					};
 					const content = [
-						{ type: "text" as const, text: JSON.stringify(result.payload, null, 2) },
+						{
+							type: "text" as const,
+							text: JSON.stringify(result.payload, null, 2),
+						},
 					];
 
 					// Widget response — include structuredContent + widget metadata + flow in _meta
