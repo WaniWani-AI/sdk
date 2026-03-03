@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import type { McpServer } from "../@types";
-import { END, interrupt, START, showWidget } from "../@types";
+import { END, interrupt, START } from "../@types";
 import { createFlow } from "../create-flow";
 
 type Handler = (input: unknown, extra: unknown) => Promise<unknown>;
@@ -54,8 +54,8 @@ describe("compileFlow response contract", () => {
 		expect(parsed).toMatchObject({
 			status: "interrupt",
 			question: "What's your primary use case?",
+			field: "useCase",
 		});
-		expect((parsed as Record<string, unknown>).field).toBe(undefined);
 		expect(result._meta).toMatchObject({
 			requestId: "req-1",
 			flow: {
@@ -97,7 +97,7 @@ describe("compileFlow response contract", () => {
 		const result = (await handler?.(
 			{
 				action: "continue",
-				answer: "Lead qualification",
+				stateUpdates: { useCase: "Lead qualification" },
 				_meta: {
 					flow: {
 						step: "ask_use_case",
@@ -142,12 +142,12 @@ describe("compileFlow response contract", () => {
 				plan: z.string().describe("Selected plan"),
 			},
 		})
-			.addNode("pick_plan", { resource, field: "plan" }, () =>
-				showWidget(resource, {
-					data: { plans: ["starter", "pro"] },
-					description: "Pick your plan",
-				}),
-			)
+			.addNode("pick_plan", {
+				resource,
+				field: "plan",
+				data: { plans: ["starter", "pro"] },
+				description: "Pick your plan",
+			})
 			.addEdge(START, "pick_plan")
 			.addEdge("pick_plan", END)
 			.compile();

@@ -7,7 +7,7 @@ LangGraph-inspired multi-step conversational flows for MCP tools. Define a state
 1. Define a graph of nodes connected by edges
 2. `compile()` turns it into an MCP tool that the AI calls step by step
 3. **Action nodes** run silently and auto-advance (API calls, data processing)
-4. **Interrupt nodes** pause the flow and ask the user a question
+4. **Interrupt nodes** pause the flow and ask the user one or more questions
 5. **Widget nodes** pause the flow and render a widget UI
 
 The AI carries the state between steps — no server-side storage needed.
@@ -21,7 +21,7 @@ import { createResource, createFlow, createTool, interrupt, showWidget, register
 ## Quick start
 
 ```ts
-import { createFlow, interrupt, START, END, registerTools } from "@waniwani/sdk/mcp";
+import { createFlow, START, END, registerTools } from "@waniwani/sdk/mcp";
 import { z } from "zod";
 
 const flow = createFlow({
@@ -34,9 +34,7 @@ const flow = createFlow({
     useCase: z.string().describe("Primary use case for the product"),
   },
 })
-  .addNode("ask_email", () =>
-    interrupt({ question: "What is your work email address?", field: "email" })
-  )
+  .addNode("ask_email", () => interrupt({ question: "What is your work email address?", field: "email" }))
   .addNode("ask_role", (state) =>
     interrupt({
       question: "What is your role?",
@@ -45,11 +43,7 @@ const flow = createFlow({
     })
   )
   .addNode("ask_use_case", () =>
-    interrupt({
-      question: "What's your main use case?",
-      field: "useCase",
-      suggestions: ["Analytics", "Lead gen", "Support"],
-    })
+    interrupt({ question: "What's your main use case?", field: "useCase", suggestions: ["Analytics", "Lead gen", "Support"] })
   )
   .addNode("complete", (state) => ({
     summary: `Lead: ${state.email}, ${state.role}, ${state.useCase}`,
@@ -70,7 +64,7 @@ await registerTools(server, [flow]);
 Every flow must define its `state` — a map of field names to Zod schemas. This serves two purposes:
 
 1. **Type inference** — `TState` is automatically derived from the schemas, no explicit generic needed
-2. **AI protocol** — field names, types, and descriptions are embedded in the tool description so the AI can pre-fill answers via `initialState`
+2. **AI protocol** — field names, types, and descriptions are embedded in the tool description so the AI can pre-fill answers via `stateUpdates`
 
 ```ts
 const flow = createFlow({
@@ -100,19 +94,72 @@ The flow skips the "which country?" question and proceeds to the next unanswered
 
 **Rules:**
 - Interrupt nodes are auto-skipped when their `field` is already filled in state.
-- Widget nodes are auto-skipped when their `addNode` config declares a `field` and that field is already filled in state.
+- Multi-question nodes are auto-skipped when **all** of their `questions[].field` values are already filled.
+- Widget nodes are auto-skipped when their `field` is already filled in state.
 - Action nodes between skipped steps still execute (their logic may be needed for conditional edges).
 - Fields with `undefined`, `null`, or `""` are NOT considered pre-filled.
 - The AI should only extract values the user explicitly stated — never guess.
 
 ## Node types
 
+### Declarative widget node — no handler needed
+
+Show a widget without a handler. Resource is declared once (no duplication).
+`data` can be static or a function of current state. `field` enables auto-skip:
+```ts
+.addNode("show_pricing", {
+  resource: pricingTableResource,
+  field: "selectedPlan",          // optional — enables auto-skip
+  description: "Show pricing.",
+  data: (state) => ({ offers: computeOffers(state.idcc) }),
+})
+```
+
+### Handler-based nodes
+
+All interrupt nodes use a handler. Use `interrupt()` for questions, `showWidget()` for widgets, or return a plain object for action nodes.
+
 | Return value | Behavior |
 |---|---|
 | `interrupt({ question, field })` | Pause → ask user → resume with answer stored at `field` |
 | `interrupt({ question, field, context })` | Same, but with hidden instructions for the assistant to enrich its response |
-| `showWidget(resource, { data })` | Pause → render widget → resume when widget calls back |
+| `interrupt({ questions: [...], context? })` | Pause → ask ALL questions in one message → resume with all answers |
+| `showWidget(resource, { data, field?, description? })` | Pause → render widget → resume when widget calls back. `field` enables auto-skip. |
 | `{ key: value, ... }` | Action node → merge into state → auto-advance to next node |
+
+**`interrupt()` — single or multi-question:**
+```ts
+// Single question
+.addNode("ask_role", (state) =>
+  interrupt({
+    question: "What is your role?",
+    field: "role",
+    context: `User's email domain: ${state.email?.split("@")[1]}`,
+  })
+)
+
+// Multiple questions (asked in one message)
+.addNode("ask_details", () =>
+  interrupt({
+    questions: [
+      { question: "How many employees?", field: "headcount" },
+      { question: "Average age?", field: "averageAge" },
+    ],
+    context: "Ask conversationally, one friendly message.",
+  })
+)
+```
+
+**`showWidget()` — with field for auto-skip:**
+```ts
+.addNode("choose_plan", (state) =>
+  showWidget(pricingResource, {
+    data: { offers: computeOffers(state.idcc) },
+    description: "Showing pricing options.",
+    field: "selectedPlan",  // enables auto-skip when already set
+  })
+)
+```
 
 ## Conditional edges
 
@@ -131,17 +178,13 @@ const flow = createFlow({
     companyName: z.string().describe("Company name"),
   },
 })
-  .addNode("ask_email", () =>
-    interrupt({ question: "What's your email?", field: "email" })
-  )
+  .addNode("ask_email", () => interrupt({ question: "What's your email?", field: "email" }))
   // Action node — runs silently, auto-advances
   .addNode("analyze_email", (state) => {
     const domain = state.email!.split("@")[1];
     return { isCompanyEmail: !GENERIC_DOMAINS.has(domain) };
   })
-  .addNode("ask_company", () =>
-    interrupt({ question: "What company are you with?", field: "companyName" })
-  )
+  .addNode("ask_company", () => interrupt({ question: "What company are you with?", field: "companyName" }))
   .addNode("done", () => ({ ready: true }))
   .addEdge(START, "ask_email")
   .addEdge("ask_email", "analyze_email")
@@ -184,7 +227,7 @@ const pricingTool = createTool({
   data: { postalCode, sqm, prices: [/* ... */] },
 }));
 
-// 3. Reference the resource in a flow
+// 3. Reference the resource in a flow (declarative widget node — no handler boilerplate)
 const flow = createFlow({
   id: "guided_quote",
   title: "Guided Quote",
@@ -195,18 +238,16 @@ const flow = createFlow({
     selectedPlan: z.string().describe("The plan the user selected"),
   },
 })
-  .addNode("ask_postal", () =>
-    interrupt({ question: "What's your postal code?", field: "postalCode" })
-  )
-  .addNode("ask_sqm", () =>
-    interrupt({ question: "How many m² is your home?", field: "sqm" })
-  )
-  .addNode("show_pricing", { resource: pricingUI, field: "selectedPlan" }, (state) =>
-    showWidget(pricingUI, {
-      data: { postalCode: state.postalCode, sqm: Number(state.sqm) },
-      description: "Showing pricing comparison. User will select a plan.",
-    })
-  )
+  // Declarative interrupts — no handlers, no boilerplate
+  .addNode("ask_postal", { question: "What's your postal code?", field: "postalCode" })
+  .addNode("ask_sqm", { question: "How many m² is your home?", field: "sqm" })
+  // Declarative widget — resource declared once, data is dynamic
+  .addNode("show_pricing", {
+    resource: pricingUI,
+    field: "selectedPlan",
+    description: "Showing pricing comparison. User will select a plan.",
+    data: (state) => ({ postalCode: state.postalCode, sqm: Number(state.sqm) }),
+  })
   .addNode("confirm", (state) => ({
     summary: `Selected ${state.selectedPlan} for ${state.postalCode}`,
   }))
@@ -281,18 +322,20 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 
 | Method | Description |
 |--------|-------------|
-| `.addNode(name, handler)` | Add a node |
-| `.addNode(name, { resource?, field? }, handler)` | Add a node with config. `field` is typed as `keyof TState` and enables auto-skip. |
+| `.addNode(name, { resource, field?, description?, data? })` | **Declarative widget** — show a widget, no handler. `data` can be static or `(state) => ({...})` |
+| `.addNode(name, handler)` | Handler node — return `interrupt()`, `showWidget()`, or a plain object |
+| `.addNode(name, { field? }, handler)` | Handler node with config. `field` enables auto-skip. |
 | `.addEdge(from, to)` | Static edge (`START` and `END` are valid) |
 | `.addConditionalEdge(from, condition)` | Dynamic routing based on state |
 | `.compile()` | Validate graph and return a `RegisteredFlow` |
 
-### Helper functions
+### Helper functions (for handler-based nodes)
 
 | Function | Description |
 |----------|-------------|
-| `interrupt({ question, field, suggestions?, context? })` | Return from a node to pause and ask the user a question. `context` provides hidden instructions to the assistant to enrich its response using data from previous nodes. |
-| `showWidget(resource, { data, description? })` | Return from a node to pause and render a widget |
+| `interrupt({ question, field, suggestions?, context? })` | Pause and ask the user a single question. `context` provides hidden AI instructions. |
+| `interrupt({ questions: [...], context? })` | Pause and ask several questions at once in one message. |
+| `showWidget(resource, { data, field?, description? })` | Pause and render a widget. `field` enables auto-skip when already set. |
 
 ## Common Mistakes
 
@@ -300,3 +343,4 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 - **Action nodes returning interrupt/widget** — If a node returns `interrupt()` or `showWidget()`, it becomes an interrupt/widget node, not an action node
 - **Forgetting to register the resource** — Call `await resource.register(server)` before registering the flow
 - **Widget callback shape** — The `callTool` call must use `action: "continue"`, include `_meta.flow.step`, `_meta.flow.state`, and pass the result via `stateUpdates: { [field]: value }`
+- **Resource declared twice** — Use the declarative widget node `{ resource, field, data }` to avoid repeating the resource in both `addNode` and `showWidget()`

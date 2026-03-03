@@ -26,6 +26,8 @@ interface CompileInput<TState extends Record<string, unknown>> {
 	nodes: Map<string, NodeHandler<TState>>;
 	nodeConfigs: Map<string, NodeConfig<TState>>;
 	edges: Map<string, Edge<TState>>;
+	/** Widget resources declared in declarative widget nodes — used for tool-level widget metadata */
+	resources: RegisteredResource[];
 }
 
 type FlowToolInput = {
@@ -107,11 +109,14 @@ function buildFlowProtocol(config: FlowConfig): string {
 
 	lines.push(
 		"2. The response JSON `status` field tells you what to do next:",
-		'   - `"interrupt"`: Ask the user the `question`. If a `context` field is present,',
-		"     use it as hidden instructions to enrich your response (do NOT show it verbatim).",
+		'   - `"interrupt"`: Pause and ask the user. Two forms:',
+		"     a. Single question: `{ question, field, context? }` — ask `question`, store answer in `field`.",
+		"     b. Multi-question: `{ questions: [{question, field}, ...], context? }` — ask ALL questions",
+		"        in one conversational message, collect all answers.",
+		"     `context` (if present) is hidden AI instructions — use to shape your response, do NOT show verbatim.",
 		"     Then call again with:",
 		'     `action: "continue"`, `state` = the returned `state`,',
-		"     `stateUpdates` = `{ [_meta.flow.field]: <user's answer> }` plus any other fields the user mentioned.",
+		"     `stateUpdates` = answers keyed by their `field` names, plus any other fields the user mentioned.",
 		'   - `"widget"`: A widget UI is being shown. The user will interact with the widget.',
 		"     When the user makes a choice, call again with:",
 		'     `action: "continue"`, `state` = the returned `state`,',
@@ -121,8 +126,8 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"",
 		"3. ALWAYS pass back the `state` object exactly as received.",
 		"4. Do NOT invent state values. Only use `stateUpdates` for information the user explicitly provided.",
-		"5. Always fill `_meta.flow.field` in `stateUpdates` when resuming a paused step.",
-		"   If the user also mentioned values for other known fields, include those too —",
+		"5. Always include answers for all pending fields in `stateUpdates` when resuming.",
+		"   If the user mentioned values for other known fields, include those too —",
 		"   they will be applied immediately and those steps will be auto-skipped.",
 	);
 
@@ -195,15 +200,14 @@ async function executeFrom<TState extends Record<string, unknown>>(
 		try {
 			const result = await handler(state, meta);
 
-			// Interrupt signal — pause and ask the user
+			// Interrupt signal — pause and ask the user one or more questions
 			if (isInterrupt(result)) {
-				// Auto-skip: if the field already has a value in state, advance
-				const existingValue = state[result.field as keyof TState];
-				if (
-					existingValue !== undefined &&
-					existingValue !== null &&
-					existingValue !== ""
-				) {
+				// Auto-skip: advance only when ALL question fields are already in state
+				const allFilled = result.questions.every((q) => {
+					const v = state[q.field as keyof TState];
+					return v !== undefined && v !== null && v !== "";
+				});
+				if (allFilled) {
 					const edge = edges.get(currentNode);
 					if (!edge) {
 						return {
@@ -217,28 +221,43 @@ async function executeFrom<TState extends Record<string, unknown>>(
 					continue;
 				}
 
+				// Single-question shorthand: unwrap for cleaner AI payload
+				const isSingle = result.questions.length === 1;
+				const q0 = result.questions[0];
+				const payload =
+					isSingle && q0
+						? {
+								status: "interrupt" as const,
+								question: q0.question,
+								field: q0.field,
+								...(q0.suggestions ? { suggestions: q0.suggestions } : {}),
+								...(q0.context || result.context
+									? { context: q0.context ?? result.context }
+									: {}),
+							}
+						: {
+								status: "interrupt" as const,
+								questions: result.questions,
+								...(result.context ? { context: result.context } : {}),
+							};
+
 				return {
-					payload: {
-						status: "interrupt",
-						question: result.question,
-						suggestions: result.suggestions,
-						...(result.context ? { context: result.context } : {}),
+					payload,
+					flowMeta: {
+						step: currentNode,
+						state,
+						...(isSingle && q0 ? { field: q0.field } : {}),
 					},
-					flowMeta: { step: currentNode, state, field: result.field },
 				};
 			}
 
 			// Widget signal — pause and show widget
 			if (isWidget(result)) {
-				// Auto-skip: if the node config declares a field and it's already filled, advance
-				const nodeField = nodeConfigs.get(currentNode)?.field;
-				if (nodeField) {
-					const existingValue = state[nodeField as keyof TState];
-					if (
-						existingValue !== undefined &&
-						existingValue !== null &&
-						existingValue !== ""
-					) {
+				// Auto-skip: use field from the signal, fall back to nodeConfig
+				const widgetField = result.field ?? nodeConfigs.get(currentNode)?.field;
+				if (widgetField) {
+					const v = state[widgetField as keyof TState];
+					if (v !== undefined && v !== null && v !== "") {
 						const edge = edges.get(currentNode);
 						if (!edge) {
 							return {
@@ -270,7 +289,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 					flowMeta: {
 						step: currentNode,
 						state,
-						field: nodeField,
+						field: widgetField,
 						widgetId: resource.id,
 					},
 				};
@@ -349,19 +368,13 @@ const inputSchema = {
 export function compileFlow<TState extends Record<string, unknown>>(
 	input: CompileInput<TState>,
 ): RegisteredFlow {
-	const { config, nodes, nodeConfigs, edges } = input;
+	const { config, nodes, nodeConfigs, edges, resources } = input;
 	const protocol = buildFlowProtocol(config);
 	const fullDescription = `${config.description}\n${protocol}`;
 
-	// Find the first resource from node configs to build tool-level widget metadata.
+	// Use the first declared resource to build tool-level widget metadata.
 	// This tells OpenAI/Claude that this tool can produce widget UIs.
-	let firstResource: RegisteredResource | undefined;
-	for (const nc of nodeConfigs.values()) {
-		if (nc.resource) {
-			firstResource = nc.resource;
-			break;
-		}
-	}
+	const firstResource = resources[0];
 	const toolMeta = firstResource
 		? buildToolMeta({
 				openaiTemplateUri: firstResource.openaiUri,
