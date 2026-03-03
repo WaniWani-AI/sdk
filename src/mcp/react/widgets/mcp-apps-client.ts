@@ -55,6 +55,10 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 					| Record<string, unknown>
 					| undefined,
 				_meta: resolvedMeta,
+				isError:
+					typeof rawParams.isError === "boolean"
+						? rawParams.isError
+						: undefined,
 			};
 			this.latestToolResult = result;
 			this.toolResultCallback?.(result);
@@ -168,6 +172,7 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 				| Record<string, unknown>
 				| undefined,
 			_meta: result._meta as Record<string, unknown> | undefined,
+			isError: typeof result.isError === "boolean" ? result.isError : undefined,
 		};
 	}
 

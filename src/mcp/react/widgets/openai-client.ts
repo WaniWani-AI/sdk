@@ -63,6 +63,7 @@ export class OpenAIWidgetClient implements UnifiedWidgetClient {
 
 	onToolResult(callback: (result: ToolResult) => void): () => void {
 		return this.onGlobalChange("toolOutput", callback, (v) => ({
+			content: [],
 			structuredContent: v ?? {},
 		}));
 	}

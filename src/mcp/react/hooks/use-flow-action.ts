@@ -9,21 +9,21 @@ import { useWidgetClient } from "./use-widget";
 
 // ── Types ────────────────────────────────────────────────────
 
-/** Flow metadata embedded in response _meta.__flow */
+/** Flow metadata embedded in response _meta.flow */
 type FlowMeta = {
 	flowId: string;
 	step: string;
 	state: Record<string, unknown>;
+	field?: string;
+	widgetId?: string;
 };
 
 /** Parsed response text from a flow tool call */
 type FlowResponseText = {
 	status: "widget" | "interrupt" | "complete" | "error";
-	widgetId?: string;
 	description?: string;
 	question?: string;
 	error?: string;
-	_meta?: { step: string; state: Record<string, unknown> };
 };
 
 /** Return type of the useFlowAction hook */
@@ -45,17 +45,21 @@ export type FlowActionResult<T> = {
 function extractFlowMeta(
 	meta: Record<string, unknown> | null | undefined,
 ): FlowMeta | null {
-	if (!meta?.__flow) return null;
-	const flow = meta.__flow as FlowMeta;
+	if (!meta?.flow) return null;
+	const flow = meta.flow as FlowMeta;
 	if (!flow.flowId || !flow.step || !flow.state) return null;
 	return flow;
 }
 
 function parseResponseText(result: ToolCallResult): FlowResponseText | null {
-	const textEntry = result.content?.find((c) => c.type === "text" && c.text);
-	if (!textEntry?.text) return null;
+	const text = (result.content ?? [])
+		.filter((c) => c.type === "text")
+		.map((c) => c.text)
+		.join("")
+		.trim();
+	if (!text) return null;
 	try {
-		return JSON.parse(textEntry.text) as FlowResponseText;
+		return JSON.parse(text) as FlowResponseText;
 	} catch {
 		return null;
 	}
@@ -95,7 +99,7 @@ export function useFlowAction<T extends Record<string, unknown>>(
 	);
 	const [isAdvancing, setIsAdvancing] = useState(false);
 
-	// Track __flow metadata across inline transitions via ref (no re-renders needed).
+	// Track flow metadata across inline transitions via ref (no re-renders needed).
 	const flowMetaRef = useRef<FlowMeta | null>(null);
 
 	// Keep flowMetaRef in sync with the latest metadata source.
@@ -130,8 +134,10 @@ export function useFlowAction<T extends Record<string, unknown>>(
 				const result = await client.callTool(flowMeta.flowId, {
 					action: "widget_result",
 					_meta: {
-						step: flowMeta.step,
-						state: flowMeta.state,
+						flow: {
+							step: flowMeta.step,
+							state: flowMeta.state,
+						},
 					},
 					answer: value,
 					...(stateUpdates ? { stateUpdates } : {}),
@@ -140,23 +146,17 @@ export function useFlowAction<T extends Record<string, unknown>>(
 				const parsed = parseResponseText(result);
 				if (!parsed) return;
 
-				// Same-widget inline transition: update local state
-				if (
-					parsed.status === "widget" &&
-					parsed.widgetId === resourceId &&
-					result.structuredContent
-				) {
-					// Extract __flow from response _meta
+				// Same-widget inline transition: widgetId is now in _meta.flow
+				if (parsed.status === "widget" && result.structuredContent) {
 					const newFlowMeta = extractFlowMeta(
 						result._meta as Record<string, unknown> | undefined,
 					);
-					if (newFlowMeta) {
+					if (newFlowMeta?.widgetId === resourceId) {
 						flowMetaRef.current = newFlowMeta;
-					}
-					// structuredContent no longer contains __flow
-					setLocalData(result.structuredContent as T);
-					if (result._meta) {
-						setLocalMeta(result._meta as Record<string, unknown>);
+						setLocalData(result.structuredContent as T);
+						if (result._meta) {
+							setLocalMeta(result._meta as Record<string, unknown>);
+						}
 					}
 				}
 			} catch (err) {

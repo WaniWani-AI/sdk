@@ -105,6 +105,7 @@ export interface ChatBaseProps {
 	}) => Promise<{
 		content?: Array<{ type: string; text?: string }>;
 		structuredContent?: Record<string, unknown>;
+		_meta?: Record<string, unknown>;
 	}>;
 }
 

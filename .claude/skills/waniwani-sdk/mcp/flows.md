@@ -85,15 +85,15 @@ const flow = createFlow({
 })
 ```
 
-At every step, the engine response includes a `field` property telling the AI which state field to collect before advancing.
+At every step, the engine stores the current `field` in `_meta.flow.field` — routing metadata the AI echoes back, not something displayed to the user.
 
-## Pre-filling answers with `initialState`
+## Pre-filling answers
 
-When calling `action: "start"`, the AI can include an `initialState` object with answers extracted from the user's message. The engine automatically skips nodes whose fields are already populated in state.
+When calling `action: "start"`, the AI can pass answers already present in the user's message via `_meta.flow.state`. The engine automatically skips nodes whose fields are already populated.
 
 If a user says "I want to open a bank account in France", the AI calls:
 ```json
-{ "action": "start", "initialState": { "country": "France" } }
+{ "action": "start", "_meta": { "flow": { "state": { "country": "France" } } } }
 ```
 
 The flow skips the "which country?" question and proceeds to the next unanswered step.
@@ -226,21 +226,27 @@ await registerTools(server, [pricingTool, flow]);
 Inside the widget, call back into the flow:
 
 ```tsx
-import { useCallTool, useToolOutput } from "@waniwani/sdk/mcp/react";
+import { useCallTool, useToolOutput, useToolResponseMetadata } from "@waniwani/sdk/mcp/react";
 
 function PricingTable() {
   const data = useToolOutput<{
     prices: Array<{ plan: string; price: number }>;
-    __flow?: { flowId: string; step: string; state: Record<string, unknown> };
   }>();
+  const meta = useToolResponseMetadata() as {
+    flow?: { flowId: string; step: string; state: Record<string, unknown> };
+  } | null;
   const callTool = useCallTool();
 
   const handleSelect = (plan: string) => {
-    if (data?.__flow) {
-      callTool(data.__flow.flowId, {
+    if (meta?.flow) {
+      callTool(meta.flow.flowId, {
         action: "widget_result",
-        step: data.__flow.step,
-        state: data.__flow.state,
+        _meta: {
+          flow: {
+            step: meta.flow.step,
+            state: meta.flow.state,
+          },
+        },
         widgetResult: { selectedPlan: plan },
       });
     }
@@ -293,4 +299,4 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 - **Forgetting `START`/`END` edges** — Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`
 - **Action nodes returning interrupt/widget** — If a node returns `interrupt()` or `showWidget()`, it becomes an interrupt/widget node, not an action node
 - **Forgetting to register the resource** — Call `await resource.register(server)` before registering the flow
-- **Widget callback shape** — The `callTool` call must include `action: "widget_result"`, `step`, `state`, and `widgetResult`
+- **Widget callback shape** — The `callTool` call must include `action: "widget_result"`, `_meta.flow.step`, `_meta.flow.state`, and `widgetResult`

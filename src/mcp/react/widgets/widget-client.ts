@@ -1,3 +1,4 @@
+import type { CallToolResult as McpCallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type {
 	DisplayMode,
 	SafeArea,
@@ -8,20 +9,12 @@ import type {
 /**
  * Result from calling a tool
  */
-export type ToolCallResult = {
-	content?: Array<{ type: string; text?: string }>;
-	structuredContent?: Record<string, unknown>;
-	_meta?: Record<string, unknown>;
-};
+export type ToolCallResult = McpCallToolResult;
 
 /**
  * Tool result notification (what the host pushes to the widget)
  */
-export type ToolResult = {
-	content?: Array<{ type: string; text?: string }>;
-	structuredContent?: Record<string, unknown>;
-	_meta?: Record<string, unknown>;
-};
+export type ToolResult = McpCallToolResult;
 
 /**
  * Host context - all values available from the host.

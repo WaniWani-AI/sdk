@@ -141,7 +141,7 @@ export type FlowConfig = {
 	 * The state definition serves two purposes:
 	 * 1. Type inference — `TState` is automatically derived, no explicit generic needed
 	 * 2. AI protocol — field names, types, and descriptions are included in the tool
-	 *    description so the AI can pre-fill answers via `_meta.state`
+	 *    description so the AI can pre-fill answers via `_meta.flow.state`
 	 *
 	 * @example
 	 * ```ts

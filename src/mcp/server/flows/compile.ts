@@ -34,16 +34,30 @@ type FlowToolInput = {
 	widgetResult?: Record<string, unknown>;
 	stateUpdates?: Record<string, unknown>;
 	_meta?: {
-		step?: string;
-		state?: Record<string, unknown>;
+		flow?: {
+			step?: string;
+			state?: Record<string, unknown>;
+			field?: string;
+			widgetId?: string;
+		};
 	};
 };
 
+type FlowPayload = {
+	status: "widget" | "interrupt" | "complete" | "error";
+	[key: string]: unknown;
+};
+
 type ExecutionResult = {
-	text: string;
-	data: Record<string, unknown>;
+	payload: FlowPayload;
+	data?: Record<string, unknown>;
 	widgetMeta?: Record<string, unknown>;
-	flowMeta?: { step: string; state: Record<string, unknown> };
+	flowMeta?: {
+		step?: string;
+		state: Record<string, unknown>;
+		field?: string;
+		widgetId?: string;
+	};
 };
 
 // ============================================================================
@@ -77,7 +91,7 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"This tool implements a multi-step conversational flow. Follow this protocol exactly:",
 		"",
 		'1. Call with `action: "start"` to begin. If the user\'s message already',
-		"   contains answers to likely questions, extract them into `_meta.state`",
+		"   contains answers to likely questions, extract them into `_meta.flow.state`",
 		"   as `{ field: value }` pairs. The engine will auto-skip questions whose",
 		"   fields are already filled.",
 		"   Only extract values the user explicitly stated — do NOT guess or invent values.",
@@ -95,20 +109,19 @@ function buildFlowProtocol(config: FlowConfig): string {
 
 	lines.push(
 		"2. The response JSON `status` field tells you what to do next:",
-		'   - `"interrupt"`: Ask the user the `question` to collect the `field` value.',
-		"     If a `context` field is present, use it as hidden instructions to enrich your response (do NOT show it verbatim).",
+		'   - `"interrupt"`: Ask the user the `question`. If a `context` field is present,',
+		"     use it as hidden instructions to enrich your response (do NOT show it verbatim).",
 		"     Then call again with:",
 		'     `action: "continue"`, `_meta` = the returned `_meta`,',
 		"     `answer` = the user's answer.",
-		'   - `"widget"`: A widget UI is being shown. The `field` property tells you',
-		"     which state field this step collects. When the user makes a choice, call again with:",
+		'   - `"widget"`: A widget UI is being shown. When the user makes a choice, call again with:',
 		'     `action: "widget_result"`, `_meta` = the returned `_meta`,',
 		"     `answer` = the user's selection.",
 		'   - `"complete"`: The flow is done. Present the result to the user.',
 		'   - `"error"`: Something went wrong. Show the `error` message.',
 		"",
 		"3. ALWAYS pass back the `_meta` object exactly as received.",
-		"4. Do NOT invent state values. Only use `_meta.state` for information the user explicitly provided.",
+		"4. Do NOT invent state values. Only use `_meta.flow.state` for information the user explicitly provided.",
 		"5. If the user provides additional information that maps to known state fields,",
 		"   pass it in `stateUpdates`. These values are merged into state before the current step is processed.",
 		"   This allows updating any known field at any node (not only the current question's field).",
@@ -120,10 +133,14 @@ function buildFlowProtocol(config: FlowConfig): string {
 function getInputMeta(args: FlowToolInput): {
 	step?: string;
 	state: Record<string, unknown>;
+	field?: string;
+	widgetId?: string;
 } {
-	const state = args._meta?.state ?? {};
-	const step = args._meta?.step;
-	return { step, state };
+	const state = args._meta?.flow?.state ?? {};
+	const step = args._meta?.flow?.step;
+	const field = args._meta?.flow?.field;
+	const widgetId = args._meta?.flow?.widgetId;
+	return { step, state, field, widgetId };
 }
 
 // ============================================================================
@@ -161,22 +178,18 @@ async function executeFrom<TState extends Record<string, unknown>>(
 		// Reached END
 		if (currentNode === END) {
 			return {
-				text: JSON.stringify({
-					status: "complete",
-					state,
-				}),
-				data: { status: "complete", state },
+				payload: { status: "complete" },
+				flowMeta: { state },
 			};
 		}
 
 		const handler = nodes.get(currentNode);
 		if (!handler) {
 			return {
-				text: JSON.stringify({
+				payload: {
 					status: "error",
 					error: `Unknown node: "${currentNode}"`,
-				}),
-				data: { status: "error" },
+				},
 			};
 		}
 
@@ -195,11 +208,10 @@ async function executeFrom<TState extends Record<string, unknown>>(
 					const edge = edges.get(currentNode);
 					if (!edge) {
 						return {
-							text: JSON.stringify({
+							payload: {
 								status: "error",
 								error: `No outgoing edge from node "${currentNode}"`,
-							}),
-							data: { status: "error" },
+							},
 						};
 					}
 					currentNode = await resolveNextNode(edge, state);
@@ -207,16 +219,13 @@ async function executeFrom<TState extends Record<string, unknown>>(
 				}
 
 				return {
-					text: JSON.stringify({
+					payload: {
 						status: "interrupt",
 						question: result.question,
-						field: result.field,
 						suggestions: result.suggestions,
 						...(result.context ? { context: result.context } : {}),
-						_meta: { step: currentNode, state },
-					}),
-					data: { status: "interrupt", step: currentNode, state },
-					flowMeta: { step: currentNode, state },
+					},
+					flowMeta: { step: currentNode, state, field: result.field },
 				};
 			}
 
@@ -234,11 +243,10 @@ async function executeFrom<TState extends Record<string, unknown>>(
 						const edge = edges.get(currentNode);
 						if (!edge) {
 							return {
-								text: JSON.stringify({
+								payload: {
 									status: "error",
 									error: `No outgoing edge from node "${currentNode}"`,
-								}),
-								data: { status: "error" },
+								},
 							};
 						}
 						currentNode = await resolveNextNode(edge, state);
@@ -248,13 +256,10 @@ async function executeFrom<TState extends Record<string, unknown>>(
 
 				const resource = result.resource;
 				return {
-					text: JSON.stringify({
+					payload: {
 						status: "widget",
-						...(nodeField ? { field: nodeField } : {}),
-						widgetId: resource.id,
 						description: result.description,
-						_meta: { step: currentNode, state },
-					}),
+					},
 					data: result.data,
 					widgetMeta: buildToolMeta({
 						openaiTemplateUri: resource.openaiUri,
@@ -263,7 +268,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 						invoked: "Loaded",
 						autoHeight: resource.autoHeight,
 					}),
-					flowMeta: { step: currentNode, state },
+					flowMeta: { step: currentNode, state, field: nodeField, widgetId: resource.id },
 				};
 			}
 
@@ -273,34 +278,27 @@ async function executeFrom<TState extends Record<string, unknown>>(
 			const edge = edges.get(currentNode);
 			if (!edge) {
 				return {
-					text: JSON.stringify({
+					payload: {
 						status: "error",
 						error: `No outgoing edge from node "${currentNode}"`,
-					}),
-					data: { status: "error" },
+					},
 				};
 			}
 			currentNode = await resolveNextNode(edge, state);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			return {
-				text: JSON.stringify({
-					status: "error",
-					step: currentNode,
-					error: message,
-					state,
-				}),
-				data: { status: "error", error: message },
+				payload: { status: "error", error: message },
+				flowMeta: { step: currentNode, state },
 			};
 		}
 	}
 
 	return {
-		text: JSON.stringify({
+		payload: {
 			status: "error",
 			error: "Flow exceeded maximum iterations (possible infinite loop)",
-		}),
-		data: { status: "error" },
+		},
 	};
 }
 
@@ -330,14 +328,21 @@ const inputSchema = {
 		),
 	_meta: z
 		.object({
-			step: z
-				.string()
+			flow: z
+				.object({
+					step: z
+						.string()
+						.optional()
+						.describe("Current step name (from the previous response)"),
+					state: z
+						.record(z.string(), z.unknown())
+						.optional()
+						.describe("Flow state — pass back exactly as received"),
+					field: z.string().optional(),
+					widgetId: z.string().optional(),
+				})
 				.optional()
-				.describe("Current step name (from the previous response)"),
-			state: z
-				.record(z.string(), z.unknown())
-				.optional()
-				.describe("Flow state — pass back exactly as received"),
+				.describe("Flow routing data. Pass back exactly as received."),
 		})
 		.optional()
 		.describe(
@@ -382,11 +387,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			const startEdge = edges.get(START);
 			if (!startEdge) {
 				return {
-					text: JSON.stringify({
+					payload: {
 						status: "error",
 						error: "No start edge",
-					}),
-					data: { status: "error" },
+					},
 				};
 			}
 
@@ -411,42 +415,27 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			const step = inputMeta.step;
 			if (!step) {
 				return {
-					text: JSON.stringify({
+					payload: {
 						status: "error",
-						error: 'Missing "_meta.step" for continue action',
-					}),
-					data: { status: "error" },
+						error: 'Missing "_meta.flow.step" for continue action',
+					},
 				};
 			}
 
-			// Merge any stateUpdates first, then apply user's answer
-			let updatedState = { ...state, ...(args.stateUpdates ?? {}) };
-			if (args.answer) {
-				const handler = nodes.get(step);
-				if (handler) {
-					try {
-						const result = await handler(updatedState, meta);
-						if (isInterrupt(result) && result.field) {
-							updatedState = {
-								...updatedState,
-								[result.field]: args.answer,
-							} as TState;
-						}
-					} catch {
-						// If re-running the handler fails, still proceed with the answer
-					}
-				}
+			// Merge stateUpdates, then map the user's answer to the field from _meta.flow
+			let updatedState = { ...state, ...(args.stateUpdates ?? {}) } as TState;
+			if (args.answer !== undefined && inputMeta.field) {
+				updatedState = { ...updatedState, [inputMeta.field]: args.answer } as TState;
 			}
 
 			// Advance to next node
 			const edge = edges.get(step);
 			if (!edge) {
 				return {
-					text: JSON.stringify({
+					payload: {
 						status: "error",
 						error: `No edge from step "${step}"`,
-					}),
-					data: { status: "error" },
+					},
 				};
 			}
 			const nextNode = await resolveNextNode(edge, updatedState);
@@ -464,11 +453,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			const step = inputMeta.step;
 			if (!step) {
 				return {
-					text: JSON.stringify({
+					payload: {
 						status: "error",
-						error: 'Missing "_meta.step" for widget_result action',
-					}),
-					data: { status: "error" },
+						error: 'Missing "_meta.flow.step" for widget_result action',
+					},
 				};
 			}
 
@@ -491,11 +479,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			const edge = edges.get(step);
 			if (!edge) {
 				return {
-					text: JSON.stringify({
+					payload: {
 						status: "error",
 						error: `No edge from step "${step}"`,
-					}),
-					data: { status: "error" },
+					},
 				};
 			}
 			const nextNode = await resolveNextNode(edge, updatedState);
@@ -510,11 +497,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		}
 
 		return {
-			text: JSON.stringify({
+			payload: {
 				status: "error",
 				error: `Unknown action: "${args.action}"`,
-			}),
-			data: { status: "error" },
+			},
 		};
 	}
 
@@ -541,31 +527,32 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					const _meta: Record<string, unknown> = requestExtra._meta ?? {};
 
 					const result = await handleToolCall(args, _meta);
+					const responseMeta = {
+						...(result.widgetMeta ?? {}),
+						..._meta,
+						...(result.flowMeta
+							? { flow: { flowId: config.id, ...result.flowMeta } }
+							: {}),
+					};
+					const content = [
+						{ type: "text" as const, text: JSON.stringify(result.payload, null, 2) },
+					];
 
-					// Widget response — include structuredContent + widget metadata + __flow in _meta
+					// Widget response — include structuredContent + widget metadata + flow in _meta
 					if (result.widgetMeta) {
 						return {
-							content: [{ type: "text" as const, text: result.text }],
+							content,
 							structuredContent: result.data,
-							_meta: {
-								...result.widgetMeta,
-								..._meta,
-								...(result.flowMeta
-									? {
-											__flow: {
-												flowId: config.id,
-												step: result.flowMeta.step,
-												state: result.flowMeta.state,
-											},
-										}
-									: {}),
-							},
+							_meta: responseMeta,
 						};
 					}
 
-					// Non-widget response (interrupt, complete, error) — text only
+					// Non-widget response (interrupt, complete, error)
 					return {
-						content: [{ type: "text" as const, text: result.text }],
+						content,
+						...(Object.keys(responseMeta).length > 0
+							? { _meta: responseMeta }
+							: {}),
 					};
 				}) as unknown as ToolCallback<typeof inputSchema>,
 			);
