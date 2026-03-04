@@ -52,6 +52,8 @@ export interface McpAppFrameProps {
 	}>;
 	/** Called when the widget requests a display mode change (e.g. "fullscreen" for expand) */
 	onDisplayModeChange?: (mode: McpAppDisplayMode) => void;
+	/** When true, the iframe fills its container (fullscreen mode). */
+	isFullscreen?: boolean;
 }
 
 export function McpAppFrame({
@@ -67,6 +69,7 @@ export function McpAppFrame({
 	onFollowUp,
 	onCallTool,
 	onDisplayModeChange,
+	isFullscreen = false,
 }: McpAppFrameProps) {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const toolInputRef = useRef(toolInput);
@@ -426,10 +429,13 @@ export function McpAppFrame({
 			ref={iframeRef}
 			src={iframeSrc}
 			sandbox="allow-scripts allow-forms allow-same-origin"
-			className={cn("ww:rounded-md ww:border ww:border-border", className)}
+			className={cn(
+				!isFullscreen && "ww:rounded-md ww:border ww:border-border",
+				className,
+			)}
 			style={{
-				height,
-				minWidth: width ? `min(${width}px, 100%)` : undefined,
+				height: isFullscreen ? "100%" : height,
+				minWidth: isFullscreen || !width ? undefined : `min(${width}px, 100%)`,
 				width: "100%",
 				border: "none",
 				colorScheme: isDark ? "dark" : "auto",

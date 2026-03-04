@@ -179,7 +179,12 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 				</div>
 
 				{/* Messages */}
-				<Conversation className="ww:flex-1 ww:min-h-0 ww:bg-background">
+				<Conversation
+					className={cn(
+						"ww:flex-1 ww:min-h-0 ww:bg-background",
+						fullscreenToolCallId && "[&>div]:ww:!overflow-hidden",
+					)}
+				>
 					<ConversationContent>
 						<MessageList
 							messages={engine.messages}

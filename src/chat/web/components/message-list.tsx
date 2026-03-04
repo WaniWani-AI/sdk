@@ -151,7 +151,11 @@ export function MessageList({
 										isHidden
 											? { display: "none" }
 											: isFullscreen
-												? { height: "100%" }
+												? {
+														position: "absolute" as const,
+														inset: 0,
+														zIndex: 10,
+													}
 												: undefined
 									}
 								>
@@ -179,6 +183,7 @@ export function MessageList({
 									{resourceUri && output !== undefined && (
 										<WidgetErrorBoundary>
 											<McpAppFrame
+												isFullscreen={isFullscreen}
 												resourceUri={resourceUri}
 												toolInput={
 													(part.input as Record<string, unknown>) ?? {}
