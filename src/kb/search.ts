@@ -1,16 +1,17 @@
-import { readFileSync } from "node:fs";
 import { cosineSimilarity, embed } from "ai";
 import type { EmbeddingsFile, KnowledgeBase, SearchResult } from "./types";
 
-export function loadKnowledgeBase(embeddingsPath: string): KnowledgeBase {
-	let cached: EmbeddingsFile | null = null;
-
+/**
+ * Create a knowledge base instance from pre-loaded embeddings data.
+ *
+ * ```typescript
+ * import embeddings from "./embeddings.json";
+ * const kb = loadKnowledgeBase(embeddings);
+ * ```
+ */
+export function loadKnowledgeBase(source: EmbeddingsFile): KnowledgeBase {
 	function getEmbeddings(): EmbeddingsFile {
-		if (cached) return cached;
-		cached = JSON.parse(
-			readFileSync(embeddingsPath, "utf-8"),
-		) as EmbeddingsFile;
-		return cached;
+		return source;
 	}
 
 	return {

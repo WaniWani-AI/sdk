@@ -45,13 +45,15 @@ Each .md file is split into chunks by H2 headings. The H1 title provides context
 Create `lib/{MCP_NAME}/knowledge-base/search.ts`:
 
 ```typescript
-import { join } from "node:path";
 import { loadKnowledgeBase } from "@waniwani/sdk/kb";
+import embeddings from "./embeddings.json";
 
-const kb = loadKnowledgeBase(join(import.meta.dirname, "embeddings.json"));
+const kb = loadKnowledgeBase(embeddings);
 
 export const search = kb.search;
 ```
+
+Note: We import the JSON directly instead of using a file path because `import.meta.dirname` is undefined in Next.js's bundled environment.
 
 ### 4. Create the embed script
 
