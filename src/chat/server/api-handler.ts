@@ -23,7 +23,7 @@ import { createMcpConfigResolver } from "./mcp-config-resolver";
  *
  * const wani = waniwani();
  *
- * export const { GET, POST } = toNextJsHandler(wani, {
+ * export const { GET, POST, dynamic } = toNextJsHandler(wani, {
  *   chat: { systemPrompt: "You are a helpful assistant." },
  * });
  * ```

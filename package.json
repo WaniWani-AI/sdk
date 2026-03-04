@@ -34,6 +34,11 @@
       "types": "./dist/chat/next-js/index.d.ts",
       "import": "./dist/chat/next-js/index.js",
       "default": "./dist/chat/next-js/index.js"
+    },
+    "./kb": {
+      "types": "./dist/kb/index.d.ts",
+      "import": "./dist/kb/index.js",
+      "default": "./dist/kb/index.js"
     }
   },
   "files": [

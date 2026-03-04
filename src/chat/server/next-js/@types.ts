@@ -62,4 +62,6 @@ export interface NextJsHandlerResult {
 	GET: (request: Request) => Promise<Response>;
 	/** POST handler: proxies chat messages to the WaniWani API */
 	POST: (request: Request) => Promise<Response>;
+	/** Forces Next.js to treat this route as dynamic (skips static generation caching for GET) */
+	dynamic: "force-dynamic";
 }
