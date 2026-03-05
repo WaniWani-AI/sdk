@@ -23,7 +23,7 @@ export type { NextJsHandlerOptions, NextJsHandlerResult } from "./@types.js";
  *
  * const wani = waniwani();
  *
- * export const { GET, POST, dynamic } = toNextJsHandler(wani, {
+ * export const { GET, POST } = toNextJsHandler(wani, {
  *   chat: {
  *     systemPrompt: "You are a helpful assistant.",
  *     mcpServerUrl: process.env.MCP_SERVER_URL!,
@@ -49,6 +49,5 @@ export function toNextJsHandler(
 	return {
 		POST: handler.handleChat,
 		GET: handler.routeGet,
-		dynamic: "force-dynamic" as const,
 	};
 }
