@@ -1,6 +1,6 @@
 {
   "name": "@waniwani/sdk",
-  "version": "0.1.20-beta.30",
+  "version": "0.1.20-beta.31",
   "description": "WaniWani SDK - MCP event tracking, widget framework, and tools",
   "type": "module",
   "exports": {
@@ -107,7 +107,7 @@
     "clsx": "^2.1.1",
     "happy-dom": "^20.7.0",
     "lucide-react": "^0.563.0",
-"postcss": "^8.5.6",
+    "postcss": "^8.5.6",
     "react": "^19.0.0",
     "react-dom": "^19.2.4",
     "streamdown": "^2.1.0",
