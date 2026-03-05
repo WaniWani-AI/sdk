@@ -505,6 +505,79 @@ describe("compileFlow response contract", () => {
 		expect(p4.status).toBe("complete");
 	});
 
+	test("widget continue without field advances to next node (no stuck loop)", async () => {
+		const resource = {
+			id: "info_panel",
+			title: "Info Panel",
+			description: "Display info",
+			openaiUri: "ui://widgets/apps-sdk/info_panel.html",
+			mcpUri: "ui://widgets/ext-apps/info_panel.html",
+			autoHeight: true,
+			register: async () => {},
+		};
+
+		const flow = createFlow({
+			id: "widget_no_field_flow",
+			title: "Widget No Field Flow",
+			description: "Widget without a field should advance on continue.",
+			state: {
+				result: z.string().describe("Final result"),
+			},
+		})
+			.addNode("show_info", {
+				resource,
+				// no field — widget is informational only
+				data: { message: "Hello" },
+				description: "Show info panel",
+			})
+			.addNode("done", () => ({ result: "finished" }))
+			.addEdge(START, "show_info")
+			.addEdge("show_info", "done")
+			.addEdge("done", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Start — should show widget
+		const r1 = (await handler?.({ action: "start" }, {})) as Record<
+			string,
+			unknown
+		>;
+		const p1 = JSON.parse(
+			(r1.content as Array<{ text: string }>)[0]?.text ?? "",
+		) as Record<string, unknown>;
+		expect(p1.status).toBe("widget");
+
+		const meta1 = (r1._meta as Record<string, unknown>)?.flow as Record<
+			string,
+			unknown
+		>;
+		expect(meta1.widgetId).toBe("info_panel");
+
+		// Continue from widget — should advance to "done" and complete
+		const r2 = (await handler?.(
+			{
+				action: "continue",
+				_meta: {
+					flow: {
+						step: meta1.step,
+						state: meta1.state,
+						widgetId: meta1.widgetId,
+					},
+				},
+			},
+			{},
+		)) as Record<string, unknown>;
+		const p2 = JSON.parse(
+			(r2.content as Array<{ text: string }>)[0]?.text ?? "",
+		) as Record<string, unknown>;
+
+		// Must complete — NOT show the widget again
+		expect(p2.status).toBe("complete");
+	});
+
 	test("returns widget JSON content and _meta.flow for widget steps", async () => {
 		const resource = {
 			id: "plan_picker",
