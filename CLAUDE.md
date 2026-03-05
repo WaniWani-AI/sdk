@@ -64,10 +64,6 @@ This prevents the SDK's styles from leaking into host applications.
 - Always use the `ww:` prefix when adding new Tailwind classes in chat components
 - Theme CSS variables are prefixed too: `--color-*` becomes `--ww-color-*` in generated CSS
 
-## Next.js Adapter (`src/chat/server/next-js/`)
-
-Never use `Response.json()` in code that returns responses to Next.js route handlers. In Next.js 16 / Turbopack, `Response.json()` creates objects that fail Next.js's internal `instanceof Response` check. The adapter wraps all handler responses with `NextResponse` from `next/server` via `toNextResponse()` to avoid this. Keep the underlying handlers (`api-handler.ts`, `handle-chat.ts`, `handle-resource.ts`) framework-agnostic — the `NextResponse` wrapping happens only in the adapter layer.
-
 ## Design Principles
 
 - Zero runtime dependencies

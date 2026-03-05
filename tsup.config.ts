@@ -110,8 +110,6 @@ export default defineConfig([
 		outDir: "dist",
 		external: [
 			"ai",
-			"next",
-			"next/server",
 			"@ai-sdk/mcp",
 			"@modelcontextprotocol/sdk",
 		],
