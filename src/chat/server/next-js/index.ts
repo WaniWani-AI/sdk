@@ -1,10 +1,38 @@
 // WaniWani SDK - Next.js Adapter
+//
+// IMPORTANT: All responses returned to Next.js must be created via
+// NextResponse (from next/server) — not the global Response.json().
+// In Next.js 16 / Turbopack the native Response.json() static method
+// produces objects that fail Next.js's internal `instanceof Response`
+// check, causing "No response is returned from route handler" errors.
 
 import type { WaniWaniClient } from "../../../types.js";
 import { createApiHandler } from "../api-handler.js";
 import type { NextJsHandlerOptions, NextJsHandlerResult } from "./@types.js";
 
 export type { NextJsHandlerOptions, NextJsHandlerResult } from "./@types.js";
+
+let _NextResponse: typeof import("next/server").NextResponse;
+
+try {
+	_NextResponse = (await import("next/server")).NextResponse;
+} catch {
+	throw new Error(
+		'@waniwani/sdk/next-js requires "next" as a dependency. Install it with: npm install next',
+	);
+}
+
+/**
+ * Re-create a Response using NextResponse so it passes Next.js's
+ * internal `instanceof` check (works around Turbopack polyfill mismatch).
+ */
+function toNextResponse(res: Response): Response {
+	return new _NextResponse(res.body, {
+		status: res.status,
+		statusText: res.statusText,
+		headers: res.headers,
+	});
+}
 
 /**
  * Create Next.js route handlers from a WaniWani client.
@@ -47,8 +75,10 @@ export function toNextJsHandler(
 	});
 
 	return {
-		POST: handler.handleChat,
-		GET: handler.routeGet,
+		POST: async (request: Request) =>
+			toNextResponse(await handler.handleChat(request)),
+		GET: async (request: Request) =>
+			toNextResponse(await handler.routeGet(request)),
 		dynamic: "force-dynamic" as const,
 	};
 }
