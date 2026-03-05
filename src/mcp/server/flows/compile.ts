@@ -532,8 +532,15 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					updatedState,
 				);
 				if (interruptResult) return interruptResult;
+				// All questions answered — fall through to advance
+			}
 
-				// All questions answered — advance to the next node
+			// Advance to next node when: all cached questions are answered, or
+			// this is a widget continue (widgets never have cached questions and
+			// re-executing the handler would cause a stuck loop for field-less widgets).
+			// Otherwise the AI may have dropped _meta.flow.questions — re-execute
+			// from the current step so the handler can re-check unanswered questions.
+			if (inputMeta.questions || inputMeta.widgetId) {
 				const edge = edges.get(step);
 				if (!edge) {
 					return {
@@ -554,33 +561,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				);
 			}
 
-			// Widget continues never have cached questions — advance to next node
-			// (same as the old behavior). Re-executing the handler would cause a
-			// stuck loop for widgets without a field.
-			if (inputMeta.widgetId) {
-				const edge = edges.get(step);
-				if (!edge) {
-					return {
-						payload: {
-							status: "error",
-							error: `No edge from step "${step}"`,
-						},
-					};
-				}
-				const nextNode = await resolveNextNode(edge, updatedState);
-				return executeFrom(
-					nextNode,
-					updatedState,
-					nodes,
-					nodeConfigs,
-					edges,
-					meta,
-				);
-			}
-
-			// No cached questions and not a widget — the AI may have dropped
-			// _meta.flow.questions. Re-execute from the current step so the
-			// handler can re-check unanswered questions.
 			return executeFrom(step, updatedState, nodes, nodeConfigs, edges, meta);
 		}
 
