@@ -532,27 +532,33 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					updatedState,
 				);
 				if (interruptResult) return interruptResult;
-				// All questions answered — fall through to advance
+
+				// All questions answered — advance to the next node
+				const edge = edges.get(step);
+				if (!edge) {
+					return {
+						payload: {
+							status: "error",
+							error: `No edge from step "${step}"`,
+						},
+					};
+				}
+				const nextNode = await resolveNextNode(edge, updatedState);
+				return executeFrom(
+					nextNode,
+					updatedState,
+					nodes,
+					nodeConfigs,
+					edges,
+					meta,
+				);
 			}
 
-			const edge = edges.get(step);
-			if (!edge) {
-				return {
-					payload: {
-						status: "error",
-						error: `No edge from step "${step}"`,
-					},
-				};
-			}
-			const nextNode = await resolveNextNode(edge, updatedState);
-			return executeFrom(
-				nextNode,
-				updatedState,
-				nodes,
-				nodeConfigs,
-				edges,
-				meta,
-			);
+			// No cached questions — the AI may have dropped _meta.flow.questions.
+			// Re-execute from the current step so the handler can re-check
+			// unanswered questions (interrupt nodes) or auto-skip (widget nodes
+			// whose field is already filled).
+			return executeFrom(step, updatedState, nodes, nodeConfigs, edges, meta);
 		}
 
 		return {

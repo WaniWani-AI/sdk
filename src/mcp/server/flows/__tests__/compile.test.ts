@@ -376,6 +376,135 @@ describe("compileFlow response contract", () => {
 		expect(p3.status).toBe("complete");
 	});
 
+	test("interrupt loops when AI drops _meta.flow.questions (no cached questions)", async () => {
+		const flow = createFlow({
+			id: "no_cache_flow",
+			title: "No Cache Flow",
+			description: "Test fallback when AI drops questions cache.",
+			state: {
+				name: z.string().describe("User name"),
+				email: z.string().describe("User email"),
+				company: z.string().describe("Company name"),
+				role: z.string().describe("User role"),
+			},
+		})
+			.addNode("ask_details", () =>
+				interrupt({
+					questions: [
+						{ question: "Name?", field: "name" },
+						{ question: "Email?", field: "email" },
+						{ question: "Company?", field: "company" },
+						{ question: "Role?", field: "role" },
+					],
+					context: "Ask all together.",
+				}),
+			)
+			.addEdge(START, "ask_details")
+			.addEdge("ask_details", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Step 1: Start — get all 4 questions
+		const r1 = (await handler?.({ action: "start" }, {})) as Record<
+			string,
+			unknown
+		>;
+		const p1 = JSON.parse(
+			(r1.content as Array<{ text: string }>)[0]?.text ?? "",
+		) as Record<string, unknown>;
+
+		expect(p1.status).toBe("interrupt");
+		expect(p1.questions).toHaveLength(4);
+
+		// Step 2: Continue with NO answers and WITHOUT passing back questions
+		// (simulates AI dropping _meta.flow.questions)
+		const meta1 = (r1._meta as Record<string, unknown>)?.flow as Record<
+			string,
+			unknown
+		>;
+		const r2 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: {},
+				_meta: {
+					flow: {
+						step: meta1.step,
+						state: meta1.state,
+						// intentionally omitting: questions, interruptContext
+					},
+				},
+			},
+			{},
+		)) as Record<string, unknown>;
+		const p2 = JSON.parse(
+			(r2.content as Array<{ text: string }>)[0]?.text ?? "",
+		) as Record<string, unknown>;
+
+		// Should still interrupt with all 4 questions — NOT advance to next node
+		expect(p2.status).toBe("interrupt");
+		expect(p2.questions).toHaveLength(4);
+
+		// Step 3: Answer 2 of 4 without questions cache
+		const meta2 = (r2._meta as Record<string, unknown>)?.flow as Record<
+			string,
+			unknown
+		>;
+		const r3 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { name: "Alice", email: "alice@test.com" },
+				_meta: {
+					flow: {
+						step: meta2.step,
+						state: meta2.state,
+						// intentionally omitting questions again
+					},
+				},
+			},
+			{},
+		)) as Record<string, unknown>;
+		const p3 = JSON.parse(
+			(r3.content as Array<{ text: string }>)[0]?.text ?? "",
+		) as Record<string, unknown>;
+
+		// Should loop with 2 remaining questions
+		expect(p3.status).toBe("interrupt");
+		expect(p3.questions).toHaveLength(2);
+		const fields3 = (p3.questions as Array<{ field: string }>).map(
+			(q) => q.field,
+		);
+		expect(fields3).toContain("company");
+		expect(fields3).toContain("role");
+
+		// Step 4: Answer all remaining — should complete
+		const meta3 = (r3._meta as Record<string, unknown>)?.flow as Record<
+			string,
+			unknown
+		>;
+		const r4 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { company: "Acme", role: "Engineer" },
+				_meta: {
+					flow: {
+						step: meta3.step,
+						state: meta3.state,
+						// omitting questions — still works
+					},
+				},
+			},
+			{},
+		)) as Record<string, unknown>;
+		const p4 = JSON.parse(
+			(r4.content as Array<{ text: string }>)[0]?.text ?? "",
+		) as Record<string, unknown>;
+
+		expect(p4.status).toBe("complete");
+	});
+
 	test("returns widget JSON content and _meta.flow for widget steps", async () => {
 		const resource = {
 			id: "plan_picker",
