@@ -53,7 +53,8 @@ export function createKbClient(config: InternalConfig): KbClient {
 			);
 		}
 
-		return response.json() as Promise<T>;
+		const json = (await response.json()) as { data: T };
+		return json.data;
 	}
 
 	return {
