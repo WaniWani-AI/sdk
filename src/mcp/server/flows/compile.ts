@@ -39,6 +39,15 @@ type FlowToolInput = {
 			state?: Record<string, unknown>;
 			field?: string;
 			widgetId?: string;
+			/** Cached interrupt questions from the previous response — used to avoid re-executing the handler */
+			questions?: Array<{
+				question: string;
+				field: string;
+				suggestions?: string[];
+				context?: string;
+			}>;
+			/** Cached overall interrupt context */
+			interruptContext?: string;
 		};
 	};
 };
@@ -57,6 +66,15 @@ type ExecutionResult = {
 		state: Record<string, unknown>;
 		field?: string;
 		widgetId?: string;
+		/** Cached interrupt questions — avoids re-executing the handler on partial answers */
+		questions?: Array<{
+			question: string;
+			field: string;
+			suggestions?: string[];
+			context?: string;
+		}>;
+		/** Cached overall interrupt context */
+		interruptContext?: string;
 	};
 };
 
@@ -126,7 +144,8 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"",
 		"3. ALWAYS pass back the `state` object exactly as received.",
 		"4. Do NOT invent state values. Only use `stateUpdates` for information the user explicitly provided.",
-		"5. Always include answers for all pending fields in `stateUpdates` when resuming.",
+		"5. Include only the fields the user actually answered in `stateUpdates` — do NOT guess missing ones.",
+		"   If the user did not answer all pending questions, the engine will re-prompt for the remaining ones.",
 		"   If the user mentioned values for other known fields, include those too —",
 		"   they will be applied immediately and those steps will be auto-skipped.",
 	);
@@ -139,12 +158,21 @@ function getInputMeta(args: FlowToolInput): {
 	state: Record<string, unknown>;
 	field?: string;
 	widgetId?: string;
+	questions?: Array<{
+		question: string;
+		field: string;
+		suggestions?: string[];
+		context?: string;
+	}>;
+	interruptContext?: string;
 } {
 	const state = args._meta?.flow?.state ?? {};
 	const step = args._meta?.flow?.step;
 	const field = args._meta?.flow?.field;
 	const widgetId = args._meta?.flow?.widgetId;
-	return { step, state, field, widgetId };
+	const questions = args._meta?.flow?.questions;
+	const interruptContext = args._meta?.flow?.interruptContext;
+	return { step, state, field, widgetId, questions, interruptContext };
 }
 
 // ============================================================================
@@ -157,6 +185,81 @@ async function resolveNextNode<TState extends Record<string, unknown>>(
 ): Promise<string> {
 	if (edge.type === "direct") return edge.to;
 	return edge.condition(state);
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/** Check whether a state value counts as "filled" (not empty/missing). */
+function isFilled(v: unknown): boolean {
+	return v !== undefined && v !== null && v !== "";
+}
+
+// ============================================================================
+// Interrupt result builder
+// ============================================================================
+
+type InterruptQuestionData = {
+	question: string;
+	field: string;
+	suggestions?: string[];
+	context?: string;
+};
+
+/**
+ * Build an interrupt ExecutionResult from a list of questions and current state.
+ * Filters out already-answered questions and caches the full question list in
+ * flowMeta so partial-answer continues can filter without re-executing the handler.
+ *
+ * Returns `null` when all questions are already filled (caller should advance).
+ */
+function buildInterruptResult<TState extends Record<string, unknown>>(
+	questions: InterruptQuestionData[],
+	context: string | undefined,
+	currentNode: string,
+	state: TState,
+): ExecutionResult | null {
+	// All filled — caller should advance to the next node
+	if (questions.every((q) => isFilled(state[q.field as keyof TState]))) {
+		return null;
+	}
+
+	// Filter out questions whose fields are already answered
+	const unanswered = questions.filter(
+		(q) => !isFilled(state[q.field as keyof TState]),
+	);
+
+	// Single-question shorthand: unwrap for cleaner AI payload
+	const isSingle = unanswered.length === 1;
+	const q0 = unanswered[0];
+	const payload =
+		isSingle && q0
+			? {
+					status: "interrupt" as const,
+					question: q0.question,
+					field: q0.field,
+					...(q0.suggestions ? { suggestions: q0.suggestions } : {}),
+					...(q0.context || context ? { context: q0.context ?? context } : {}),
+				}
+			: {
+					status: "interrupt" as const,
+					questions: unanswered,
+					...(context ? { context } : {}),
+				};
+
+	return {
+		payload,
+		flowMeta: {
+			step: currentNode,
+			state,
+			...(isSingle && q0 ? { field: q0.field } : {}),
+			// Cache the full question list so partial-answer continues
+			// can filter without re-executing the node handler.
+			questions,
+			...(context ? { interruptContext: context } : {}),
+		},
+	};
 }
 
 // ============================================================================
@@ -202,53 +305,26 @@ async function executeFrom<TState extends Record<string, unknown>>(
 
 			// Interrupt signal — pause and ask the user one or more questions
 			if (isInterrupt(result)) {
-				// Auto-skip: advance only when ALL question fields are already in state
-				const allFilled = result.questions.every((q) => {
-					const v = state[q.field as keyof TState];
-					return v !== undefined && v !== null && v !== "";
-				});
-				if (allFilled) {
-					const edge = edges.get(currentNode);
-					if (!edge) {
-						return {
-							payload: {
-								status: "error",
-								error: `No outgoing edge from node "${currentNode}"`,
-							},
-						};
-					}
-					currentNode = await resolveNextNode(edge, state);
-					continue;
+				const interruptResult = buildInterruptResult(
+					result.questions,
+					result.context,
+					currentNode,
+					state,
+				);
+				if (interruptResult) return interruptResult;
+
+				// All questions filled — auto-skip to next node
+				const edge = edges.get(currentNode);
+				if (!edge) {
+					return {
+						payload: {
+							status: "error",
+							error: `No outgoing edge from node "${currentNode}"`,
+						},
+					};
 				}
-
-				// Single-question shorthand: unwrap for cleaner AI payload
-				const isSingle = result.questions.length === 1;
-				const q0 = result.questions[0];
-				const payload =
-					isSingle && q0
-						? {
-								status: "interrupt" as const,
-								question: q0.question,
-								field: q0.field,
-								...(q0.suggestions ? { suggestions: q0.suggestions } : {}),
-								...(q0.context || result.context
-									? { context: q0.context ?? result.context }
-									: {}),
-							}
-						: {
-								status: "interrupt" as const,
-								questions: result.questions,
-								...(result.context ? { context: result.context } : {}),
-							};
-
-				return {
-					payload,
-					flowMeta: {
-						step: currentNode,
-						state,
-						...(isSingle && q0 ? { field: q0.field } : {}),
-					},
-				};
+				currentNode = await resolveNextNode(edge, state);
+				continue;
 			}
 
 			// Widget signal — pause and show widget
@@ -256,8 +332,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 				// Auto-skip: use field from the signal, fall back to nodeConfig
 				const widgetField = result.field ?? nodeConfigs.get(currentNode)?.field;
 				if (widgetField) {
-					const v = state[widgetField as keyof TState];
-					if (v !== undefined && v !== null && v !== "") {
+					if (isFilled(state[widgetField as keyof TState])) {
 						const edge = edges.get(currentNode);
 						if (!edge) {
 							return {
@@ -355,6 +430,17 @@ const inputSchema = {
 						.describe("Flow state — pass back exactly as received"),
 					field: z.string().optional(),
 					widgetId: z.string().optional(),
+					questions: z
+						.array(
+							z.object({
+								question: z.string(),
+								field: z.string(),
+								suggestions: z.array(z.string()).optional(),
+								context: z.string().optional(),
+							}),
+						)
+						.optional(),
+					interruptContext: z.string().optional(),
 				})
 				.optional()
 				.describe("Flow routing data. Pass back exactly as received."),
@@ -436,24 +522,46 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				...(args.stateUpdates ?? {}),
 			} as TState;
 
-			const edge = edges.get(step);
-			if (!edge) {
-				return {
-					payload: {
-						status: "error",
-						error: `No edge from step "${step}"`,
-					},
-				};
+			// If cached interrupt questions exist, check for unanswered questions
+			// without re-executing the node handler (avoids side-effect replay).
+			if (inputMeta.questions) {
+				const interruptResult = buildInterruptResult(
+					inputMeta.questions,
+					inputMeta.interruptContext,
+					step,
+					updatedState,
+				);
+				if (interruptResult) return interruptResult;
+				// All questions answered — fall through to advance
 			}
-			const nextNode = await resolveNextNode(edge, updatedState);
-			return executeFrom(
-				nextNode,
-				updatedState,
-				nodes,
-				nodeConfigs,
-				edges,
-				meta,
-			);
+
+			// Advance to next node when: all cached questions are answered, or
+			// this is a widget continue (widgets never have cached questions and
+			// re-executing the handler would cause a stuck loop for field-less widgets).
+			// Otherwise the AI may have dropped _meta.flow.questions — re-execute
+			// from the current step so the handler can re-check unanswered questions.
+			if (inputMeta.questions || inputMeta.widgetId) {
+				const edge = edges.get(step);
+				if (!edge) {
+					return {
+						payload: {
+							status: "error",
+							error: `No edge from step "${step}"`,
+						},
+					};
+				}
+				const nextNode = await resolveNextNode(edge, updatedState);
+				return executeFrom(
+					nextNode,
+					updatedState,
+					nodes,
+					nodeConfigs,
+					edges,
+					meta,
+				);
+			}
+
+			return executeFrom(step, updatedState, nodes, nodeConfigs, edges, meta);
 		}
 
 		return {
