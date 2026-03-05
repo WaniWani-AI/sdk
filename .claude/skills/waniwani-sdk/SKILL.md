@@ -24,7 +24,7 @@ bun add @waniwani/sdk
 | `@waniwani/sdk/mcp/react` | Widget React hooks (client-side) | [mcp/react.md](mcp/react.md) | `react`, optionally `@modelcontextprotocol/ext-apps` |
 | `@waniwani/sdk/chat` | Chat React component | [chat/react.md](chat/react.md) | `react`, `react-dom`, `@ai-sdk/react`, `ai` |
 | `@waniwani/sdk/chat` | Chat embed script | [chat/embed.md](chat/embed.md) | `react`, `react-dom`, `@ai-sdk/react`, `ai` |
-| `@waniwani/sdk/kb` | Knowledge base search & embedding | (below) | `ai`, `@ai-sdk/openai` |
+| `@waniwani/sdk/kb` | Knowledge base client | [mcp/kb.md](mcp/kb.md) | None |
 
 ---
 
