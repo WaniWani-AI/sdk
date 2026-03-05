@@ -3,6 +3,15 @@
 // Error
 export { WaniWaniError } from "./error.js";
 
+// Types - KB Client
+export type {
+	KbClient,
+	KbIngestFile,
+	KbIngestResult,
+	KbSearchOptions,
+	KbSource,
+} from "./kb/types.js";
+
 // Types - Tracking
 export type {
 	EventType,

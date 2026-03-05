@@ -1,5 +1,6 @@
 // WaniWani SDK - Core Types
 
+import type { KbClient } from "./kb/types.js";
 import type { TrackingClient, TrackingConfig } from "./tracking/@types.js";
 
 // ============================================================================
@@ -44,6 +45,8 @@ export interface WaniWaniConfig {
 export interface WaniWaniClient extends TrackingClient {
 	/** @internal Resolved config — used by framework adapters */
 	readonly _config: InternalConfig;
+	/** Knowledge base client for ingestion, search, and source listing */
+	readonly kb: KbClient;
 }
 
 // ============================================================================

@@ -1,5 +1,6 @@
 // WaniWani SDK - Main Entry
 
+import { createKbClient } from "./kb/client.js";
 import { createTrackingClient } from "./tracking/index.js";
 import type { WaniWaniClient, WaniWaniConfig } from "./types.js";
 
@@ -40,9 +41,11 @@ export function waniwani(config?: WaniWaniConfig): WaniWaniClient {
 
 	// Compose client from modules
 	const trackingClient = createTrackingClient(internalConfig);
+	const kbClient = createKbClient(internalConfig);
 
 	return {
 		...trackingClient,
+		kb: kbClient,
 		_config: internalConfig,
 	};
 }
