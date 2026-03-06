@@ -539,22 +539,19 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	const protocol = buildFlowProtocol(config, allStepNames);
 	const fullDescription = `${config.description}\n${protocol}`;
 
-	// Signal that this tool CAN produce widgets, but don't bake in a fixed
-	// output template URI.  Flows are multi-step — the correct template is
-	// included per-response when the flow reaches a widget node.  Setting a
-	// fixed `openai/outputTemplate` at registration causes hosts (e.g.
-	// ChatGPT) to render the widget on first invocation, before the flow
-	// has progressed to the widget step.
+	// Use the first declared resource to build tool-level widget metadata.
+	// This tells OpenAI/Claude that this tool can produce widget UIs.
 	const firstResource = resources[0];
 	const toolMeta = firstResource
 		? buildToolMeta({
-				openaiTemplateUri: "",
-				mcpTemplateUri: "",
+				openaiTemplateUri: firstResource.openaiUri,
+				mcpTemplateUri: firstResource.mcpUri,
 				invoking: "Loading...",
 				invoked: "Loaded",
 				autoHeight: firstResource.autoHeight,
 			})
 		: undefined;
+
 	async function handleToolCall(
 		args: FlowToolInput,
 		meta?: Record<string, unknown>,
