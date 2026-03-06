@@ -545,13 +545,16 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	// fixed `openai/outputTemplate` at registration causes hosts (e.g.
 	// ChatGPT) to render the widget on first invocation, before the flow
 	// has progressed to the widget step.
-	const toolMeta =
-		resources.length > 0
-			? buildToolMeta({
-					invoking: "Loading...",
-					invoked: "Loaded",
-				})
-			: undefined;
+	const firstResource = resources[0];
+	const toolMeta = firstResource
+		? buildToolMeta({
+				openaiTemplateUri: "",
+				mcpTemplateUri: "",
+				invoking: "Loading...",
+				invoked: "Loaded",
+				autoHeight: firstResource.autoHeight,
+			})
+		: undefined;
 	async function handleToolCall(
 		args: FlowToolInput,
 		meta?: Record<string, unknown>,
