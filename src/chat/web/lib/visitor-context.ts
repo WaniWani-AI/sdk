@@ -71,13 +71,12 @@ export function parseOS(ua: string): { name: string; version: string } | null {
 	return null;
 }
 
-export function detectDeviceType(
-	ua: string,
-): "mobile" | "tablet" | "desktop" {
+export function detectDeviceType(ua: string): "mobile" | "tablet" | "desktop" {
 	// Use UA-CH if available
 	if (
 		typeof navigator !== "undefined" &&
 		"userAgentData" in navigator &&
+		// biome-ignore lint/suspicious/noExplicitAny: userAgentData is not typed
 		(navigator as any).userAgentData?.mobile
 	) {
 		return "mobile";
@@ -153,10 +152,9 @@ export async function collectVisitorContext(): Promise<VisitorContext> {
 		viewportHeight: window.innerHeight,
 		colorDepth: screen.colorDepth,
 		devicePixelRatio: window.devicePixelRatio ?? 1,
-		touchSupport:
-			"ontouchstart" in window || navigator.maxTouchPoints > 0,
-		connectionType:
-			(navigator as any).connection?.effectiveType ?? "unknown",
+		touchSupport: "ontouchstart" in window || navigator.maxTouchPoints > 0,
+		// biome-ignore lint/suspicious/noExplicitAny: navigator.connection is not typed
+		connectionType: (navigator as any).connection?.effectiveType ?? "unknown",
 		referrer: document.referrer,
 		visitorId,
 	};
