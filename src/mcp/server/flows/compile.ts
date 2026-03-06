@@ -39,6 +39,10 @@ type FlowToolInput = {
 			state?: Record<string, unknown>;
 			field?: string;
 			widgetId?: string;
+			/** All valid flow step names for this flow definition */
+			stepNames?: string[];
+			/** Step names valid for the next continue call (usually a single step) */
+			resumeSteps?: string[];
 			/** Cached interrupt questions from the previous response — used to avoid re-executing the handler */
 			questions?: Array<{
 				question: string;
@@ -51,6 +55,10 @@ type FlowToolInput = {
 		};
 	};
 };
+
+type FlowRoutingInputMeta = NonNullable<
+	NonNullable<FlowToolInput["_meta"]>["flow"]
+>;
 
 type FlowPayload = {
 	status: "widget" | "interrupt" | "complete" | "error";
@@ -101,7 +109,7 @@ function describeZodField(schema: z.ZodType): string {
 	return desc;
 }
 
-function buildFlowProtocol(config: FlowConfig): string {
+function buildFlowProtocol(config: FlowConfig, stepNames: string[]): string {
 	const lines = [
 		"",
 		"## FLOW EXECUTION PROTOCOL",
@@ -124,6 +132,11 @@ function buildFlowProtocol(config: FlowConfig): string {
 			.join(", ");
 		lines.push(`   Known fields: ${fieldList}.`);
 	}
+	if (stepNames.length > 0) {
+		lines.push(
+			`   Valid \`_meta.flow.step\` values: ${stepNames.map((s) => `\`${s}\``).join(", ")}.`,
+		);
+	}
 
 	lines.push(
 		"2. The response JSON `status` field tells you what to do next:",
@@ -135,10 +148,12 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"     Then call again with:",
 		'     `action: "continue"`, `state` = the returned `state`,',
 		"     `stateUpdates` = answers keyed by their `field` names, plus any other fields the user mentioned.",
+		"     Keep `_meta.flow.step` exactly as received (never rename or paraphrase).",
 		'   - `"widget"`: A widget UI is being shown. The user will interact with the widget.',
 		"     When the user makes a choice, call again with:",
 		'     `action: "continue"`, `state` = the returned `state`,',
 		"     `stateUpdates` = `{ [_meta.flow.field]: <user's selection> }` plus any other fields the user mentioned.",
+		"     Keep `_meta.flow.step` exactly as received (never rename or paraphrase).",
 		'   - `"complete"`: The flow is done. Present the result to the user.',
 		'   - `"error"`: Something went wrong. Show the `error` message.',
 		"",
@@ -153,11 +168,28 @@ function buildFlowProtocol(config: FlowConfig): string {
 	return lines.join("\n");
 }
 
-function getInputMeta(args: FlowToolInput): {
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+function asStringArray(value: unknown): string[] | undefined {
+	if (!Array.isArray(value)) return undefined;
+	const items = value.filter(
+		(item): item is string => typeof item === "string",
+	);
+	return items.length > 0 ? items : undefined;
+}
+
+function getInputMeta(
+	args: FlowToolInput,
+	requestMeta?: Record<string, unknown>,
+): {
 	step?: string;
 	state: Record<string, unknown>;
 	field?: string;
 	widgetId?: string;
+	stepNames?: string[];
+	resumeSteps?: string[];
 	questions?: Array<{
 		question: string;
 		field: string;
@@ -166,13 +198,38 @@ function getInputMeta(args: FlowToolInput): {
 	}>;
 	interruptContext?: string;
 } {
-	const state = args._meta?.flow?.state ?? {};
-	const step = args._meta?.flow?.step;
-	const field = args._meta?.flow?.field;
-	const widgetId = args._meta?.flow?.widgetId;
-	const questions = args._meta?.flow?.questions;
-	const interruptContext = args._meta?.flow?.interruptContext;
-	return { step, state, field, widgetId, questions, interruptContext };
+	const argsFlow = args._meta?.flow;
+	const requestFlow = isRecord(requestMeta?.flow)
+		? (requestMeta?.flow as FlowRoutingInputMeta)
+		: undefined;
+
+	const argsState = argsFlow?.state ?? {};
+	const requestState = requestFlow?.state ?? {};
+
+	const state = {
+		...(isRecord(requestState) ? requestState : {}),
+		...(isRecord(argsState) ? argsState : {}),
+	};
+	const step = argsFlow?.step ?? requestFlow?.step;
+	const field = argsFlow?.field ?? requestFlow?.field;
+	const widgetId = argsFlow?.widgetId ?? requestFlow?.widgetId;
+	const stepNames =
+		argsFlow?.stepNames ?? asStringArray(requestFlow?.stepNames);
+	const resumeSteps =
+		argsFlow?.resumeSteps ?? asStringArray(requestFlow?.resumeSteps);
+	const questions = argsFlow?.questions ?? requestFlow?.questions;
+	const interruptContext =
+		argsFlow?.interruptContext ?? requestFlow?.interruptContext;
+	return {
+		step,
+		state,
+		field,
+		widgetId,
+		stepNames,
+		resumeSteps,
+		questions,
+		interruptContext,
+	};
 }
 
 // ============================================================================
@@ -404,58 +461,82 @@ async function executeFrom<TState extends Record<string, unknown>>(
 // Compile
 // ============================================================================
 
-const inputSchema = {
-	action: z
-		.enum(["start", "continue"])
-		.describe(
-			'"start" to begin the flow, "continue" to resume after a pause (interrupt or widget)',
-		),
-	stateUpdates: z
-		.record(z.string(), z.unknown())
-		.optional()
-		.describe(
-			"State field values to set before processing the next node. Use this to pass the user's answer (keyed by the field name from _meta.flow.field) and any other values the user mentioned.",
-		),
-	_meta: z
-		.object({
-			flow: z
-				.object({
-					step: z
-						.string()
-						.optional()
-						.describe("Current step name (from the previous response)"),
-					state: z
-						.record(z.string(), z.unknown())
-						.optional()
-						.describe("Flow state — pass back exactly as received"),
-					field: z.string().optional(),
-					widgetId: z.string().optional(),
-					questions: z
-						.array(
-							z.object({
-								question: z.string(),
-								field: z.string(),
-								suggestions: z.array(z.string()).optional(),
-								context: z.string().optional(),
-							}),
-						)
-						.optional(),
-					interruptContext: z.string().optional(),
-				})
-				.optional()
-				.describe("Flow routing data. Pass back exactly as received."),
-		})
-		.optional()
-		.describe(
-			"Internal flow routing data. Pass back the _meta object from the previous response exactly as received.",
-		),
-};
+function createInputSchema(stepNames: string[]) {
+	const stepEnumSchema =
+		stepNames.length > 0
+			? z.enum([stepNames[0] as string, ...stepNames.slice(1)])
+			: z.string();
+	const stepDescription =
+		stepNames.length > 0
+			? `Current step name (from previous response). Must be one of: ${stepNames.join(", ")}`
+			: "Current step name (from the previous response)";
+
+	const flowSchema = z.object({
+		step: stepEnumSchema.optional().describe(stepDescription),
+		state: z
+			.record(z.string(), z.unknown())
+			.optional()
+			.describe("Flow state — pass back exactly as received"),
+		field: z.string().optional(),
+		widgetId: z.string().optional(),
+		stepNames: z
+			.array(stepEnumSchema)
+			.optional()
+			.describe(
+				"All valid flow step names for this flow. Treat this as an enum list.",
+			),
+		resumeSteps: z
+			.array(stepEnumSchema)
+			.optional()
+			.describe(
+				"Valid step names for the next continue call. Prefer these when provided.",
+			),
+		questions: z
+			.array(
+				z.object({
+					question: z.string(),
+					field: z.string(),
+					suggestions: z.array(z.string()).optional(),
+					context: z.string().optional(),
+				}),
+			)
+			.optional(),
+		interruptContext: z.string().optional(),
+	});
+
+	return {
+		action: z
+			.enum(["start", "continue"])
+			.describe(
+				'"start" to begin the flow, "continue" to resume after a pause (interrupt or widget)',
+			),
+		stateUpdates: z
+			.record(z.string(), z.unknown())
+			.optional()
+			.describe(
+				"State field values to set before processing the next node. Use this to pass the user's answer (keyed by the field name from _meta.flow.field) and any other values the user mentioned.",
+			),
+		_meta: z
+			.object({
+				flow: flowSchema
+					.optional()
+					.describe("Flow routing data. Pass back exactly as received."),
+			})
+			.optional()
+			.describe(
+				"Internal flow routing data. Pass back the _meta object from the previous response exactly as received.",
+			),
+	};
+}
 
 export function compileFlow<TState extends Record<string, unknown>>(
 	input: CompileInput<TState>,
 ): RegisteredFlow {
 	const { config, nodes, nodeConfigs, edges, resources } = input;
-	const protocol = buildFlowProtocol(config);
+	const allStepNames = Array.from(nodes.keys());
+	const allStepNamesSet = new Set(allStepNames);
+	const toolInputSchema = createInputSchema(allStepNames);
+	const protocol = buildFlowProtocol(config, allStepNames);
 	const fullDescription = `${config.description}\n${protocol}`;
 
 	// Signal that this tool CAN produce widgets, but don't bake in a fixed
@@ -475,7 +556,12 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		args: FlowToolInput,
 		meta?: Record<string, unknown>,
 	): Promise<ExecutionResult> {
-		const inputMeta = getInputMeta(args);
+		// ChatGPT puts flow routing in protocol-level params._meta.flow for continue calls.
+		// For start, ignore protocol-level flow metadata to avoid stale-state leakage.
+		const inputMeta = getInputMeta(
+			args,
+			args.action === "continue" ? meta : undefined,
+		);
 		const state = inputMeta.state as TState;
 
 		if (args.action === "start") {
@@ -507,12 +593,29 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		}
 
 		if (args.action === "continue") {
-			const step = inputMeta.step;
+			let step = inputMeta.step;
+			if (step && !allStepNamesSet.has(step)) {
+				const validResumeSteps =
+					inputMeta.resumeSteps?.filter((candidate) =>
+						allStepNamesSet.has(candidate),
+					) ?? [];
+				if (validResumeSteps.length === 1) {
+					step = validResumeSteps[0];
+				}
+			}
 			if (!step) {
 				return {
 					payload: {
 						status: "error",
 						error: 'Missing "_meta.flow.step" for continue action',
+					},
+				};
+			}
+			if (!allStepNamesSet.has(step)) {
+				return {
+					payload: {
+						status: "error",
+						error: `Invalid "_meta.flow.step": "${step}". Expected one of: ${allStepNames.join(", ")}`,
 					},
 				};
 			}
@@ -583,7 +686,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				{
 					title: config.title,
 					description: fullDescription,
-					inputSchema,
+					inputSchema: toolInputSchema,
 					annotations: config.annotations,
 					...(toolMeta && { _meta: toolMeta }),
 				},
@@ -599,7 +702,16 @@ export function compileFlow<TState extends Record<string, unknown>>(
 						...(result.widgetMeta ?? {}),
 						..._meta,
 						...(result.flowMeta
-							? { flow: { flowId: config.id, ...result.flowMeta } }
+							? {
+									flow: {
+										flowId: config.id,
+										stepNames: allStepNames,
+										...(result.flowMeta.step
+											? { resumeSteps: [result.flowMeta.step] }
+											: {}),
+										...result.flowMeta,
+									},
+								}
 							: {}),
 					};
 					const content = [
@@ -625,7 +737,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 							? { _meta: responseMeta }
 							: {}),
 					};
-				}) as unknown as ToolCallback<typeof inputSchema>,
+				}) as unknown as ToolCallback<typeof toolInputSchema>,
 			);
 		},
 	};

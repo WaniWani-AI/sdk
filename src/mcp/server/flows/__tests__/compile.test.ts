@@ -123,6 +123,180 @@ describe("compileFlow response contract", () => {
 		});
 	});
 
+	test("accepts request-level _meta.flow for continue action (ChatGPT params._meta)", async () => {
+		const flow = createFlow({
+			id: "lead_flow_protocol_meta_continue",
+			title: "Lead Flow Protocol Meta Continue",
+			description: "Collect lead details.",
+			state: {
+				useCase: z.string().describe("Primary use case"),
+			},
+		})
+			.addNode("ask_use_case", () =>
+				interrupt({
+					question: "What's your primary use case?",
+					field: "useCase",
+				}),
+			)
+			.addEdge(START, "ask_use_case")
+			.addEdge("ask_use_case", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { useCase: "Lead qualification" },
+			},
+			{
+				_meta: {
+					flow: {
+						step: "ask_use_case",
+						state: {},
+						field: "useCase",
+					},
+				},
+			},
+		)) as Record<string, unknown>;
+		const content = result.content as Array<{ type: string; text?: string }>;
+		const parsed = JSON.parse(content[0]?.text ?? "") as Record<
+			string,
+			unknown
+		>;
+
+		expect(parsed).toMatchObject({ status: "complete" });
+		expect(result._meta).toMatchObject({
+			flow: {
+				flowId: "lead_flow_protocol_meta_continue",
+				state: { useCase: "Lead qualification" },
+			},
+		});
+	});
+
+	test("start ignores request-level _meta.flow to avoid stale state leakage", async () => {
+		const flow = createFlow({
+			id: "lead_flow_start_meta_isolation",
+			title: "Lead Flow Start Meta Isolation",
+			description: "Collect lead details.",
+			state: {
+				useCase: z.string().describe("Primary use case"),
+			},
+		})
+			.addNode("ask_use_case", () =>
+				interrupt({
+					question: "What's your primary use case?",
+					field: "useCase",
+				}),
+			)
+			.addEdge(START, "ask_use_case")
+			.addEdge("ask_use_case", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(
+			{ action: "start" },
+			{
+				_meta: {
+					flow: {
+						step: "ask_use_case",
+						state: { useCase: "stale value" },
+						field: "useCase",
+					},
+				},
+			},
+		)) as Record<string, unknown>;
+		const parsed = JSON.parse(
+			(result.content as Array<{ text: string }>)[0]?.text ?? "",
+		) as Record<string, unknown>;
+
+		// If stale protocol-level state were merged into start, this would auto-complete.
+		expect(parsed.status).toBe("interrupt");
+		expect(parsed.field).toBe("useCase");
+	});
+
+	test("exposes typed step names and recovers continue step from resumeSteps", async () => {
+		const flow = createFlow({
+			id: "step_names_flow",
+			title: "Step Names Flow",
+			description: "Flow that validates step names.",
+			state: {
+				contact: z.string().describe("Contact info"),
+			},
+		})
+			.addNode("ask_contact_info", () =>
+				interrupt({
+					question: "How can we contact you?",
+					field: "contact",
+				}),
+			)
+			.addNode("complete_contact", (state) => ({ contact: state.contact }))
+			.addEdge(START, "ask_contact_info")
+			.addEdge("ask_contact_info", "complete_contact")
+			.addEdge("complete_contact", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const [, toolConfig, handler] = registered[0] ?? [];
+		const inputShape = (
+			toolConfig as { inputSchema: Record<string, z.ZodType> }
+		).inputSchema;
+		const toolInputObject = z.object(inputShape);
+
+		const validStepParse = toolInputObject.safeParse({
+			action: "continue",
+			_meta: { flow: { step: "ask_contact_info" } },
+		});
+		expect(validStepParse.success).toBe(true);
+
+		const invalidStepParse = toolInputObject.safeParse({
+			action: "continue",
+			_meta: { flow: { step: "collectContact" } },
+		});
+		expect(invalidStepParse.success).toBe(false);
+
+		const started = (await handler?.({ action: "start" }, {})) as Record<
+			string,
+			unknown
+		>;
+		const startFlowMeta = (started._meta as Record<string, unknown>)?.flow as
+			| Record<string, unknown>
+			| undefined;
+
+		expect(startFlowMeta).toMatchObject({
+			step: "ask_contact_info",
+			stepNames: ["ask_contact_info", "complete_contact"],
+			resumeSteps: ["ask_contact_info"],
+		});
+
+		// Simulate ChatGPT renaming the step while echoing protocol-level _meta.
+		const continued = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { contact: "ops@example.com" },
+			},
+			{
+				_meta: {
+					flow: {
+						...startFlowMeta,
+						step: "collectContact",
+					},
+				},
+			},
+		)) as Record<string, unknown>;
+		const continuedPayload = JSON.parse(
+			(continued.content as Array<{ text: string }>)[0]?.text ?? "",
+		) as Record<string, unknown>;
+
+		expect(continuedPayload.status).toBe("complete");
+	});
+
 	test("multi-question interrupt loops with unanswered questions when user answers partially", async () => {
 		const flow = createFlow({
 			id: "multi_q_flow",
