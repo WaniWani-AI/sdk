@@ -7,6 +7,8 @@ import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatBaseProps } from "../@types";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
+import type { VisitorContext } from "../lib/visitor-context";
+import { collectVisitorContext } from "../lib/visitor-context";
 
 const SESSION_STORAGE_KEY = "waniwani-chat-session-id";
 const SESSION_HEADER_NAME = "x-session-id";
@@ -66,6 +68,7 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	const headersRef = useRef(userHeaders);
 	const bodyRef = useRef(body);
+	const visitorContextRef = useRef<VisitorContext | null>(null);
 	const [sessionId, setSessionIdState] = useState<string | undefined>(() =>
 		readSessionIdFromStorage(),
 	);
@@ -107,6 +110,16 @@ export function useChatEngine(props: ChatBaseProps) {
 	useEffect(() => {
 		bodyRef.current = body;
 	}, [body]);
+
+	useEffect(() => {
+		collectVisitorContext()
+			.then((ctx) => {
+				visitorContextRef.current = ctx;
+			})
+			.catch(() => {
+				// Best-effort — silently ignore failures
+			});
+	}, []);
 
 	const transportRef = useRef(
 		new DefaultChatTransport({
