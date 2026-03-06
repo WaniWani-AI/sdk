@@ -88,23 +88,27 @@ export function buildMcpAppsResourceMeta(config: {
 // ---- Tool metadata (references resource URIs) ----
 
 export function buildToolMeta(config: {
-	openaiTemplateUri: string;
-	mcpTemplateUri: string;
+	openaiTemplateUri?: string;
+	mcpTemplateUri?: string;
 	invoking: string;
 	invoked: string;
 	autoHeight?: boolean;
 }) {
 	return {
 		// OpenAI metadata
-		"openai/outputTemplate": config.openaiTemplateUri,
+		...(config.openaiTemplateUri && {
+			"openai/outputTemplate": config.openaiTemplateUri,
+		}),
 		"openai/toolInvocation/invoking": config.invoking,
 		"openai/toolInvocation/invoked": config.invoked,
 		"openai/widgetAccessible": true,
 		"openai/resultCanProduceWidget": true,
 		// MCP Apps metadata
-		ui: {
-			resourceUri: config.mcpTemplateUri,
-			...(config.autoHeight && { autoHeight: true }),
-		},
-	} as const;
+		...(config.mcpTemplateUri && {
+			ui: {
+				resourceUri: config.mcpTemplateUri,
+				...(config.autoHeight && { autoHeight: true }),
+			},
+		}),
+	};
 }
