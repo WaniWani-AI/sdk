@@ -7,6 +7,19 @@ import { createResourceHandler } from "./handle-resource";
 import { createMcpConfigResolver } from "./mcp-config-resolver";
 
 /**
+ * Create a JSON response with the given data and status code.
+ * @param data - The data to be serialized to JSON.
+ * @param status - The HTTP status code to be returned.
+ * @returns A Response object with the JSON data and the given status code.
+ */
+function jsonResponse(data: object, status: number): Response {
+	return new Response(JSON.stringify(data), {
+		headers: { "Content-Type": "application/json" },
+		status,
+	});
+}
+
+/**
  * Create a framework-agnostic API handler for chat and MCP resources.
  *
  * Returns an object with handler methods that can be wired into
@@ -61,7 +74,7 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 	});
 
 	async function handleConfig(): Promise<Response> {
-		return Response.json({ debug });
+		return jsonResponse({ debug }, 200);
 	}
 
 	async function routeGet(request: Request): Promise<Response> {
@@ -90,13 +103,13 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 			}
 
 			log("← 404 no matching sub-route for", subRoute);
-			return Response.json({ error: "Not found" }, { status: 404 });
+			return jsonResponse({ error: "Not found" }, 404);
 		} catch (error) {
 			console.error("[waniwani:router] GET handler error:", error);
 			const message =
 				error instanceof Error ? error.message : "Unknown error occurred";
 			log("← 500 from caught error");
-			return Response.json({ error: message }, { status: 500 });
+			return jsonResponse({ error: message }, 500);
 		}
 	}
 
