@@ -1,4 +1,3 @@
-import type { RegisteredResource } from "../resources/types";
 import type {
 	ConditionFn,
 	Edge,
@@ -6,9 +5,8 @@ import type {
 	NodeConfig,
 	NodeHandler,
 	RegisteredFlow,
-	WidgetNodeConfig,
 } from "./@types";
-import { END, START, showWidget } from "./@types";
+import { END, START } from "./@types";
 import { compileFlow } from "./compile";
 
 /**
@@ -34,7 +32,6 @@ export class StateGraph<TState extends Record<string, unknown>> {
 	private nodeConfigs = new Map<string, NodeConfig<TState>>();
 	private edges = new Map<string, Edge<TState>>();
 	private config: FlowConfig;
-	private resources: RegisteredResource[] = [];
 
 	constructor(config: FlowConfig) {
 		this.config = config;
@@ -53,27 +50,9 @@ export class StateGraph<TState extends Record<string, unknown>> {
 		config: NodeConfig<TState>,
 		handler: NodeHandler<TState>,
 	): this;
-	/**
-	 * Declarative widget node — show a widget without writing a handler.
-	 * Resource is declared once; no `showWidget()` call needed.
-	 *
-	 * @example
-	 * ```ts
-	 * .addNode("show_pricing", {
-	 *   resource: pricingResource,
-	 *   field: "selectedPlan",
-	 *   description: "Show the pricing tiers.",
-	 *   data: (state) => ({ offers: computeOffers(state.idcc) }),
-	 * })
-	 * ```
-	 */
-	addNode(name: string, config: WidgetNodeConfig<TState>): this;
 	addNode(
 		name: string,
-		configOrHandler:
-			| NodeConfig<TState>
-			| NodeHandler<TState>
-			| WidgetNodeConfig<TState>,
+		configOrHandler: NodeConfig<TState> | NodeHandler<TState>,
 		maybeHandler?: NodeHandler<TState>,
 	): this {
 		if (name === START || name === END) {
@@ -96,17 +75,7 @@ export class StateGraph<TState extends Record<string, unknown>> {
 			handler = maybeHandler;
 			nodeConfig = configOrHandler as NodeConfig<TState>;
 		} else {
-			// Declarative widget node
-			const cfg = configOrHandler as WidgetNodeConfig<TState>;
-			this.resources.push(cfg.resource);
-			nodeConfig = { field: cfg.field };
-			handler = (state) =>
-				showWidget(cfg.resource, {
-					data:
-						typeof cfg.data === "function" ? cfg.data(state) : (cfg.data ?? {}),
-					description: cfg.description,
-					field: cfg.field,
-				});
+			throw new Error(`Node "${name}" requires a handler function.`);
 		}
 
 		this.nodes.set(name, handler);
@@ -156,7 +125,6 @@ export class StateGraph<TState extends Record<string, unknown>> {
 			nodes: new Map(this.nodes),
 			nodeConfigs: new Map(this.nodeConfigs),
 			edges: new Map(this.edges),
-			resources: [...this.resources],
 		});
 	}
 

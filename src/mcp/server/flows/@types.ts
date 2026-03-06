@@ -155,39 +155,19 @@ export type NodeConfig<
 	 * the node is auto-skipped. (Alternatively, pass `field` to `showWidget()`.)
 	 */
 	field?: Extract<keyof TState, string>;
+	/**
+	 * Mark this node as conversational — the AI will engage in back-and-forth
+	 * conversation before advancing to the next node.
+	 *
+	 * - `true` — generic conversational behavior
+	 * - `string` — specific guidance for the AI (e.g., "Help the user compare plans")
+	 */
+	conversational?: boolean | string;
 };
 
 // ============================================================================
 // Declarative node configs — shorthand for common patterns, no handler needed
 // ============================================================================
-
-/**
- * Declarative widget node config — show a widget without writing a handler.
- * Eliminates duplicate resource references: declare it once, not in both addNode and showWidget.
- *
- * `data` can be a static object or a function receiving current state for dynamic data.
- * `field` enables auto-skip when the field is already in state.
- *
- * @example
- * ```ts
- * .addNode("show_pricing", {
- *   resource: pricingTableResource,
- *   field: "selectedPlan",
- *   description: "Show the 3 pricing tiers.",
- *   data: (state) => ({ ccnName: state.ccnName, offers: computeOffers(state.idcc) }),
- * })
- * ```
- */
-export type WidgetNodeConfig<
-	TState extends Record<string, unknown> = Record<string, unknown>,
-> = {
-	resource: RegisteredResource;
-	field?: Extract<keyof TState, string>;
-	description?: string;
-	data?:
-		| Record<string, unknown>
-		| ((state: Partial<TState>) => Record<string, unknown>);
-};
 
 /**
  * Node handler — a single function type for all node kinds.

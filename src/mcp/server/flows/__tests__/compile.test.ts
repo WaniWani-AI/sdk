@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import type { McpServer } from "../@types";
-import { END, interrupt, START } from "../@types";
+import { END, interrupt, START, showWidget } from "../@types";
 import { createFlow } from "../create-flow";
 
 type Handler = (input: unknown, extra: unknown) => Promise<unknown>;
@@ -524,12 +524,12 @@ describe("compileFlow response contract", () => {
 				result: z.string().describe("Final result"),
 			},
 		})
-			.addNode("show_info", {
-				resource,
-				// no field — widget is informational only
-				data: { message: "Hello" },
-				description: "Show info panel",
-			})
+			.addNode("show_info", () =>
+				showWidget(resource, {
+					data: { message: "Hello" },
+					description: "Show info panel",
+				}),
+			)
 			.addNode("done", () => ({ result: "finished" }))
 			.addEdge(START, "show_info")
 			.addEdge("show_info", "done")
@@ -597,12 +597,13 @@ describe("compileFlow response contract", () => {
 				plan: z.string().describe("Selected plan"),
 			},
 		})
-			.addNode("pick_plan", {
-				resource,
-				field: "plan",
-				data: { plans: ["starter", "pro"] },
-				description: "Pick your plan",
-			})
+			.addNode("pick_plan", () =>
+				showWidget(resource, {
+					data: { plans: ["starter", "pro"] },
+					description: "Pick your plan",
+					field: "plan",
+				}),
+			)
 			.addEdge(START, "pick_plan")
 			.addEdge("pick_plan", END)
 			.compile();
