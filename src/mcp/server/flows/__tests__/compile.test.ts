@@ -14,6 +14,7 @@ function mockServer() {
 		registerTool: (...args: unknown[]) => {
 			registered.push(args as RegisterToolArgs);
 		},
+		registerResource: () => {},
 	};
 	return { server: server as unknown as McpServer, registered };
 }

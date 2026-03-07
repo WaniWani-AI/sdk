@@ -5,7 +5,11 @@ import type {
 	ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { buildToolMeta } from "../resources/meta";
+import {
+	buildToolMeta,
+	MIME_TYPE_MCP,
+	MIME_TYPE_OPENAI,
+} from "../resources/meta";
 import type {
 	Edge,
 	FlowConfig,
@@ -17,6 +21,23 @@ import type {
 import { END, isInterrupt, isWidget, START } from "./@types";
 import type { FlowTokenData } from "./flow-token";
 import { decodeFlowToken, encodeFlowToken } from "./flow-token";
+
+// ============================================================================
+// Default flow widget — invisible 0-height iframe for non-widget steps
+// ============================================================================
+
+const FLOW_DEFAULT_HTML = `<!DOCTYPE html>
+<html><head><style>html,body{margin:0;padding:0;height:0;overflow:hidden}</style></head>
+<body><script>
+window.addEventListener('message',function(e){
+var d=e.data;
+if(!d||d.jsonrpc!=='2.0')return;
+if(d.method==='ui/initialize'){
+e.source.postMessage({jsonrpc:'2.0',id:d.id,result:{capabilities:{}}},'*');
+e.source.postMessage({jsonrpc:'2.0',method:'ui/notifications/size-changed',params:{height:0}},'*');
+}
+});
+</script></body></html>`;
 
 // ============================================================================
 // Types
@@ -540,6 +561,46 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		description: fullDescription,
 
 		async register(server: McpServer): Promise<void> {
+			// Register default flow widget resources (invisible 0-height for non-widget steps)
+			const openaiFlowUri = `ui://widgets/apps-sdk/${config.id}_flow.html`;
+			const mcpFlowUri = `ui://widgets/ext-apps/${config.id}_flow.html`;
+
+			server.registerResource(
+				`${config.id}-flow-openai-widget`,
+				openaiFlowUri,
+				{
+					mimeType: MIME_TYPE_OPENAI,
+					_meta: { "openai/widgetPrefersBorder": false },
+				},
+				async (uri) => ({
+					contents: [
+						{
+							uri: uri.href,
+							mimeType: MIME_TYPE_OPENAI,
+							text: FLOW_DEFAULT_HTML,
+						},
+					],
+				}),
+			);
+
+			server.registerResource(
+				`${config.id}-flow-mcp-widget`,
+				mcpFlowUri,
+				{
+					mimeType: MIME_TYPE_MCP,
+					_meta: { ui: { prefersBorder: false } },
+				},
+				async (uri) => ({
+					contents: [
+						{
+							uri: uri.href,
+							mimeType: MIME_TYPE_MCP,
+							text: FLOW_DEFAULT_HTML,
+						},
+					],
+				}),
+			);
+
 			server.registerTool(
 				config.id,
 				{
@@ -547,10 +608,12 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					description: fullDescription,
 					inputSchema,
 					annotations: config.annotations,
-					_meta: {
-						"openai/widgetAccessible": true,
-						"openai/resultCanProduceWidget": true,
-					},
+					_meta: buildToolMeta({
+						openaiTemplateUri: openaiFlowUri,
+						mcpTemplateUri: mcpFlowUri,
+						invoking: "Loading...",
+						invoked: "Loaded",
+					}),
 				},
 				(async (args: FlowToolInput, extra: unknown) => {
 					const requestExtra = extra as RequestHandlerExtra<
