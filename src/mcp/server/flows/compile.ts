@@ -547,6 +547,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					description: fullDescription,
 					inputSchema,
 					annotations: config.annotations,
+					_meta: {
+						"openai/widgetAccessible": true,
+						"openai/resultCanProduceWidget": true,
+					},
 				},
 				(async (args: FlowToolInput, extra: unknown) => {
 					const requestExtra = extra as RequestHandlerExtra<
