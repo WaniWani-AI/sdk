@@ -4,18 +4,14 @@ import { useCallback, useRef, useState } from "react";
 import { detectPlatform } from "../widgets/platform";
 import type { ToolCallResult } from "../widgets/widget-client";
 import { useToolOutput } from "./use-tool-output";
-import { useToolResponseMetadata } from "./use-tool-response-metadata";
 import { useWidgetClient } from "./use-widget";
 
 // ── Types ────────────────────────────────────────────────────
 
-/** Flow metadata embedded in response _meta.flow */
-type FlowMeta = {
+/** Flow routing info extracted from the text content payload */
+type FlowRouting = {
 	flowId: string;
-	step: string;
-	state: Record<string, unknown>;
-	field?: string;
-	widgetId?: string;
+	flowToken: string;
 };
 
 /** Parsed response text from a flow tool call */
@@ -24,6 +20,8 @@ type FlowResponseText = {
 	description?: string;
 	question?: string;
 	error?: string;
+	flowToken?: string;
+	flowId?: string;
 };
 
 /** Return type of the useFlowAction hook */
@@ -42,13 +40,22 @@ export type FlowActionResult<T> = {
 
 // ── Helpers ──────────────────────────────────────────────────
 
-function extractFlowMeta(
-	meta: Record<string, unknown> | null | undefined,
-): FlowMeta | null {
-	if (!meta?.flow) return null;
-	const flow = meta.flow as FlowMeta;
-	if (!flow.flowId || !flow.step || !flow.state) return null;
-	return flow;
+function extractFlowRouting(result: ToolCallResult): FlowRouting | null {
+	const parsed = parseResponseText(result);
+	if (!parsed?.flowToken || !parsed?.flowId) return null;
+	return { flowId: parsed.flowId, flowToken: parsed.flowToken };
+}
+
+function decodeFlowTokenSafe(token: string): { widgetId?: string } | null {
+	try {
+		return JSON.parse(
+			typeof Buffer !== "undefined"
+				? Buffer.from(token, "base64").toString("utf-8")
+				: atob(token),
+		) as { widgetId?: string };
+	} catch {
+		return null;
+	}
 }
 
 function parseResponseText(result: ToolCallResult): FlowResponseText | null {
@@ -90,25 +97,13 @@ export function useFlowAction<T extends Record<string, unknown>>(
 ): FlowActionResult<T> {
 	const client = useWidgetClient();
 	const initialData = useToolOutput<T>();
-	const initialMeta = useToolResponseMetadata();
 
 	// Local data state for inline transitions. When null, we use initialData.
 	const [localData, setLocalData] = useState<T | null>(null);
-	const [localMeta, setLocalMeta] = useState<Record<string, unknown> | null>(
-		null,
-	);
 	const [isAdvancing, setIsAdvancing] = useState(false);
 
-	// Track flow metadata across inline transitions via ref (no re-renders needed).
-	const flowMetaRef = useRef<FlowMeta | null>(null);
-
-	// Keep flowMetaRef in sync with the latest metadata source.
-	const currentMeta =
-		localMeta ?? (initialMeta as Record<string, unknown> | null);
-	const currentFlowMeta = currentMeta ? extractFlowMeta(currentMeta) : null;
-	if (currentFlowMeta) {
-		flowMetaRef.current = currentFlowMeta;
-	}
+	// Track flow routing across inline transitions via ref (no re-renders needed).
+	const flowRoutingRef = useRef<FlowRouting | null>(null);
 
 	const advance = useCallback(
 		async (
@@ -125,38 +120,36 @@ export function useFlowAction<T extends Record<string, unknown>>(
 			}
 
 			// MCP Apps: call the flow tool directly via callTool.
-			const flowMeta = flowMetaRef.current;
+			const routing = flowRoutingRef.current;
 
-			if (!flowMeta) return;
+			if (!routing) return;
 
 			setIsAdvancing(true);
 			try {
-				const result = await client.callTool(flowMeta.flowId, {
-					action: "widget_result",
-					_meta: {
-						flow: {
-							step: flowMeta.step,
-							state: flowMeta.state,
-						},
+				const result = await client.callTool(routing.flowId, {
+					action: "continue",
+					flowToken: routing.flowToken,
+					stateUpdates: {
+						...(stateUpdates ?? {}),
 					},
-					answer: value,
-					...(stateUpdates ? { stateUpdates } : {}),
 				});
 
 				const parsed = parseResponseText(result);
 				if (!parsed) return;
 
-				// Same-widget inline transition: widgetId is now in _meta.flow
+				// Update routing from new response
+				const newRouting = extractFlowRouting(result);
+				if (newRouting) {
+					flowRoutingRef.current = newRouting;
+				}
+
+				// Same-widget inline transition: decode token to check widgetId
 				if (parsed.status === "widget" && result.structuredContent) {
-					const newFlowMeta = extractFlowMeta(
-						result._meta as Record<string, unknown> | undefined,
-					);
-					if (newFlowMeta?.widgetId === resourceId) {
-						flowMetaRef.current = newFlowMeta;
+					const tokenData = newRouting?.flowToken
+						? decodeFlowTokenSafe(newRouting.flowToken)
+						: null;
+					if (!tokenData?.widgetId || tokenData.widgetId === resourceId) {
 						setLocalData(result.structuredContent as T);
-						if (result._meta) {
-							setLocalMeta(result._meta as Record<string, unknown>);
-						}
 					}
 				}
 			} catch (err) {

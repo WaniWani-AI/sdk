@@ -2,7 +2,7 @@
 
 LangGraph-inspired multi-step conversational flows for MCP tools.
 
-You define a state graph, compile it into a tool, and the model advances it step-by-step by passing `_meta.flow` between calls.
+You define a state graph, compile it into a tool, and the model advances it step-by-step by passing an opaque `flowToken` between calls.
 
 ## How it works
 
@@ -12,9 +12,9 @@ You define a state graph, compile it into a tool, and the model advances it step
 4. Interrupt nodes pause and ask a question.
 5. Widget nodes pause and render a widget.
 
-State is carried in tool call metadata (`_meta.flow`) instead of server storage.
+State is carried in an opaque base64 `flowToken` included in the tool response text. The model passes it back on `continue` calls without needing to understand it.
 
-## Contract (v-next)
+## Contract
 
 ### Tool input
 
@@ -22,16 +22,9 @@ Flow tools accept:
 
 ```ts
 {
-  action: "start" | "continue" | "widget_result";
-  answer?: string;
-  widgetResult?: Record<string, unknown>;
+  action: "start" | "continue";
   stateUpdates?: Record<string, unknown>;
-  _meta?: {
-    flow?: {
-      step?: string;
-      state?: Record<string, unknown>;
-    };
-  };
+  flowToken?: string; // opaque token from previous response
 }
 ```
 
@@ -41,20 +34,15 @@ Flow tools return:
 
 ```ts
 {
-  content: [{ type: "text", text: JSON.stringify({ status: "...", ... }) }],
+  content: [{ type: "text", text: JSON.stringify({ status: "...", flowToken: "...", flowId: "...", ... }) }],
   structuredContent?: Record<string, unknown>, // for widget steps
   _meta?: {
-    flow?: {
-      flowId: string;
-      step: string;
-      state: Record<string, unknown>;
-    };
-    // plus host/tool metadata (for example waniwani, ui, session keys)
+    // host/tool metadata (for example waniwani, ui, session keys)
   }
 }
 ```
 
-Flow state/routing lives in `_meta.flow`. The model-facing response JSON is in `content[0].text`.
+Flow state lives in `flowToken` inside `content[0].text`. The model sees it and echoes it back.
 
 ## Quick start
 
@@ -105,12 +93,8 @@ Start call:
 ```json
 {
   "action": "start",
-  "_meta": {
-    "flow": {
-      "state": {
-        "email": "maxime@antoinedev.com"
-      }
-    }
+  "stateUpdates": {
+    "email": "maxime@antoinedev.com"
   }
 }
 ```
@@ -122,20 +106,9 @@ Interrupt response shape:
   "content": [
     {
       "type": "text",
-      "text": "{\n  \"status\": \"interrupt\",\n  \"question\": \"What's your primary use case?\",\n  \"context\": \"Hidden assistant guidance\"\n}"
+      "text": "{\n  \"status\": \"interrupt\",\n  \"question\": \"What's your primary use case?\",\n  \"field\": \"useCase\",\n  \"flowToken\": \"eyJzdGVwIjoiYXNrX3VzZV9jYXNlIiwic3RhdGUiOnsiZW1haWwiOiJtYXhpbWVAYW50b2luZWRldi5jb20iLCJyb2xlIjoiQ0VPIn0sImZpZWxkIjoidXNlQ2FzZSJ9\",\n  \"flowId\": \"demo_qualification\"\n}"
     }
-  ],
-  "_meta": {
-    "flow": {
-      "flowId": "demo_qualification",
-      "step": "ask_use_case",
-      "state": {
-        "email": "maxime@antoinedev.com",
-        "role": "CEO"
-      },
-      "field": "useCase"
-    }
-  }
+  ]
 }
 ```
 
@@ -144,16 +117,8 @@ Continue call:
 ```json
 {
   "action": "continue",
-  "answer": "Lead qualification",
-  "_meta": {
-    "flow": {
-      "step": "ask_use_case",
-      "state": {
-        "email": "maxime@antoinedev.com",
-        "role": "CEO"
-      }
-    }
-  }
+  "flowToken": "eyJzdGVwIjoiYXNrX3VzZV9jYXNlIiwic3RhdGUiOnsiZW1haWwiOiJtYXhpbWVAYW50b2luZWRldi5jb20iLCJyb2xlIjoiQ0VPIn0sImZpZWxkIjoidXNlQ2FzZSJ9",
+  "stateUpdates": { "useCase": "Lead qualification" }
 }
 ```
 
@@ -214,52 +179,7 @@ const flow = createFlow({
 await flow.register(server);
 ```
 
-Widget-side callback (manual):
-
-```tsx
-import {
-  useCallTool,
-  useToolOutput,
-  useToolResponseMetadata,
-} from "@waniwani/sdk/mcp/react";
-
-function PricingTable() {
-  const data = useToolOutput<{ prices: Array<{ plan: string; price: number }> }>();
-  const meta = useToolResponseMetadata() as {
-    flow?: { flowId: string; step: string; state: Record<string, unknown> };
-  } | null;
-  const callTool = useCallTool();
-
-  const onSelect = (plan: string) => {
-    if (!meta?.flow) return;
-
-    callTool(meta.flow.flowId, {
-      action: "widget_result",
-      _meta: {
-        flow: {
-          step: meta.flow.step,
-          state: meta.flow.state,
-        },
-      },
-      widgetResult: { selectedPlan: plan },
-      // Optional cross-field updates at the current step:
-      // stateUpdates: { role: "CTO" },
-    });
-  };
-
-  return (
-    <div>
-      {data?.prices.map((p) => (
-        <button key={p.plan} onClick={() => onSelect(p.plan)}>
-          {p.plan}: {p.price}
-        </button>
-      ))}
-    </div>
-  );
-}
-```
-
-Widget-side callback (simpler):
+Widget-side callback (using `useFlowAction`):
 
 ```tsx
 import { useFlowAction } from "@waniwani/sdk/mcp/react";

@@ -79,7 +79,7 @@ const flow = createFlow({
 })
 ```
 
-At every step, the engine stores the current `field` in `_meta.flow.field` — routing metadata the AI echoes back, not something displayed to the user.
+At every step, the engine encodes the current flow state (step, field, state values, cached questions) into an opaque `flowToken` string included in the text response. The AI echoes this token back on the next `continue` call — it does not need to understand or modify it.
 
 ## Pre-filling answers
 
@@ -342,5 +342,5 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 - **Forgetting `START`/`END` edges** — Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`
 - **Action nodes returning interrupt/widget** — If a node returns `interrupt()` or `showWidget()`, it becomes an interrupt/widget node, not an action node
 - **Forgetting to register the resource** — Call `await resource.register(server)` before registering the flow
-- **Widget callback shape** — The `callTool` call must use `action: "continue"`, include `_meta.flow.step`, `_meta.flow.state`, and pass the result via `stateUpdates: { [field]: value }`
+- **Widget callback shape** — The `callTool` call must use `action: "continue"`, include the `flowToken` from the previous response, and pass the result via `stateUpdates: { [field]: value }`
 - **Resource declared twice** — Use the declarative widget node `{ resource, field, data }` to avoid repeating the resource in both `addNode` and `showWidget()`

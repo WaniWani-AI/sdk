@@ -15,6 +15,8 @@ import type {
 	RegisteredFlow,
 } from "./@types";
 import { END, isInterrupt, isWidget, START } from "./@types";
+import type { FlowTokenData } from "./flow-token";
+import { decodeFlowToken, encodeFlowToken } from "./flow-token";
 
 // ============================================================================
 // Types
@@ -30,23 +32,7 @@ interface CompileInput<TState extends Record<string, unknown>> {
 type FlowToolInput = {
 	action: "start" | "continue";
 	stateUpdates?: Record<string, unknown>;
-	_meta?: {
-		flow?: {
-			step?: string;
-			state?: Record<string, unknown>;
-			field?: string;
-			widgetId?: string;
-			/** Cached interrupt questions from the previous response — used to avoid re-executing the handler */
-			questions?: Array<{
-				question: string;
-				field: string;
-				suggestions?: string[];
-				context?: string;
-			}>;
-			/** Cached overall interrupt context */
-			interruptContext?: string;
-		};
-	};
+	flowToken?: string;
 };
 
 type FlowPayload = {
@@ -130,16 +116,16 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"        in one conversational message, collect all answers.",
 		"     `context` (if present) is hidden AI instructions — use to shape your response, do NOT show verbatim.",
 		"     Then call again with:",
-		'     `action: "continue"`, `state` = the returned `state`,',
+		'     `action: "continue"`, `flowToken` = the `flowToken` from the response (pass back exactly as received),',
 		"     `stateUpdates` = answers keyed by their `field` names, plus any other fields the user mentioned.",
 		'   - `"widget"`: A widget UI is being shown. The user will interact with the widget.',
 		"     When the user makes a choice, call again with:",
-		'     `action: "continue"`, `state` = the returned `state`,',
-		"     `stateUpdates` = `{ [_meta.flow.field]: <user's selection> }` plus any other fields the user mentioned.",
+		'     `action: "continue"`, `flowToken` = the `flowToken` from the response,',
+		"     `stateUpdates` = `{ [field]: <user's selection> }` plus any other fields the user mentioned.",
 		'   - `"complete"`: The flow is done. Present the result to the user.',
 		'   - `"error"`: Something went wrong. Show the `error` message.',
 		"",
-		"3. ALWAYS pass back the `state` object exactly as received.",
+		"3. ALWAYS pass back the `flowToken` string exactly as received — it is an opaque token, do not modify it.",
 		"4. Do NOT invent state values. Only use `stateUpdates` for information the user explicitly provided.",
 		"5. Include only the fields the user actually answered in `stateUpdates` — do NOT guess missing ones.",
 		"   If the user did not answer all pending questions, the engine will re-prompt for the remaining ones.",
@@ -157,26 +143,14 @@ function buildFlowProtocol(config: FlowConfig): string {
 	return lines.join("\n");
 }
 
-function getInputMeta(args: FlowToolInput): {
-	step?: string;
+function getInputMeta(args: FlowToolInput): FlowTokenData & {
 	state: Record<string, unknown>;
-	field?: string;
-	widgetId?: string;
-	questions?: Array<{
-		question: string;
-		field: string;
-		suggestions?: string[];
-		context?: string;
-	}>;
-	interruptContext?: string;
 } {
-	const state = args._meta?.flow?.state ?? {};
-	const step = args._meta?.flow?.step;
-	const field = args._meta?.flow?.field;
-	const widgetId = args._meta?.flow?.widgetId;
-	const questions = args._meta?.flow?.questions;
-	const interruptContext = args._meta?.flow?.interruptContext;
-	return { step, state, field, widgetId, questions, interruptContext };
+	if (args.flowToken) {
+		const decoded = decodeFlowToken(args.flowToken);
+		if (decoded) return decoded;
+	}
+	return { step: undefined as unknown as string, state: {} };
 }
 
 // ============================================================================
@@ -440,40 +414,13 @@ const inputSchema = {
 		.record(z.string(), z.unknown())
 		.optional()
 		.describe(
-			"State field values to set before processing the next node. Use this to pass the user's answer (keyed by the field name from _meta.flow.field) and any other values the user mentioned.",
+			"State field values to set before processing the next node. Use this to pass the user's answer (keyed by the field name from the response) and any other values the user mentioned.",
 		),
-	_meta: z
-		.object({
-			flow: z
-				.object({
-					step: z
-						.string()
-						.optional()
-						.describe("Current step name (from the previous response)"),
-					state: z
-						.record(z.string(), z.unknown())
-						.optional()
-						.describe("Flow state — pass back exactly as received"),
-					field: z.string().optional(),
-					widgetId: z.string().optional(),
-					questions: z
-						.array(
-							z.object({
-								question: z.string(),
-								field: z.string(),
-								suggestions: z.array(z.string()).optional(),
-								context: z.string().optional(),
-							}),
-						)
-						.optional(),
-					interruptContext: z.string().optional(),
-				})
-				.optional()
-				.describe("Flow routing data. Pass back exactly as received."),
-		})
+	flowToken: z
+		.string()
 		.optional()
 		.describe(
-			"Internal flow routing data. Pass back the _meta object from the previous response exactly as received.",
+			"Opaque flow token from the previous response. Pass back exactly as received.",
 		),
 };
 
@@ -607,21 +554,39 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					const _meta: Record<string, unknown> = requestExtra._meta ?? {};
 
 					const result = await handleToolCall(args, _meta);
-					const responseMeta = {
-						...(result.widgetMeta ?? {}),
-						..._meta,
-						...(result.flowMeta
-							? { flow: { flowId: config.id, ...result.flowMeta } }
-							: {}),
+
+					// Encode flow state as opaque token for the model to pass back
+					const flowToken = result.flowMeta
+						? encodeFlowToken({
+								step: result.flowMeta.step ?? "",
+								state: result.flowMeta.state,
+								field: result.flowMeta.field,
+								widgetId: result.flowMeta.widgetId,
+								questions: result.flowMeta.questions,
+								interruptContext: result.flowMeta.interruptContext,
+							})
+						: undefined;
+
+					// Text content includes the payload + flowToken for the model
+					// Also includes flowId so widget iframes can call back into the flow
+					const textPayload = {
+						...result.payload,
+						...(flowToken ? { flowToken, flowId: config.id } : {}),
 					};
 					const content = [
 						{
 							type: "text" as const,
-							text: JSON.stringify(result.payload, null, 2),
+							text: JSON.stringify(textPayload, null, 2),
 						},
 					];
 
-					// Widget response — include structuredContent + widget metadata + flow in _meta
+					// _meta carries widget URIs and tracking config for the host/iframe
+					const responseMeta = {
+						...(result.widgetMeta ?? {}),
+						..._meta,
+					};
+
+					// Widget response — include structuredContent + widget metadata
 					if (result.widgetMeta) {
 						return {
 							content,
