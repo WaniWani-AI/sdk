@@ -22,6 +22,7 @@ type FlowResponseText = {
 	error?: string;
 	flowToken?: string;
 	flowId?: string;
+	widgetId?: string;
 };
 
 /** Return type of the useFlowAction hook */
@@ -44,18 +45,6 @@ function extractFlowRouting(result: ToolCallResult): FlowRouting | null {
 	const parsed = parseResponseText(result);
 	if (!parsed?.flowToken || !parsed?.flowId) return null;
 	return { flowId: parsed.flowId, flowToken: parsed.flowToken };
-}
-
-function decodeFlowTokenSafe(token: string): { widgetId?: string } | null {
-	try {
-		return JSON.parse(
-			typeof Buffer !== "undefined"
-				? Buffer.from(token, "base64").toString("utf-8")
-				: atob(token),
-		) as { widgetId?: string };
-	} catch {
-		return null;
-	}
 }
 
 function parseResponseText(result: ToolCallResult): FlowResponseText | null {
@@ -143,12 +132,9 @@ export function useFlowAction<T extends Record<string, unknown>>(
 					flowRoutingRef.current = newRouting;
 				}
 
-				// Same-widget inline transition: decode token to check widgetId
+				// Same-widget inline transition: check widgetId from text payload
 				if (parsed.status === "widget" && result.structuredContent) {
-					const tokenData = newRouting?.flowToken
-						? decodeFlowTokenSafe(newRouting.flowToken)
-						: null;
-					if (!tokenData?.widgetId || tokenData.widgetId === resourceId) {
+					if (!parsed.widgetId || parsed.widgetId === resourceId) {
 						setLocalData(result.structuredContent as T);
 					}
 				}

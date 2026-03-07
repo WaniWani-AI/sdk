@@ -471,7 +471,9 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				return {
 					payload: {
 						status: "error",
-						error: 'Missing "_meta.flow.step" for continue action',
+						error:
+							'Missing or invalid "flowToken" for continue action.' +
+							" Pass back the flowToken from the previous response exactly as received.",
 					},
 				};
 			}
@@ -568,10 +570,18 @@ export function compileFlow<TState extends Record<string, unknown>>(
 						: undefined;
 
 					// Text content includes the payload + flowToken for the model
-					// Also includes flowId so widget iframes can call back into the flow
+					// Also includes flowId and widgetId so widget iframes can use them directly
 					const textPayload = {
 						...result.payload,
-						...(flowToken ? { flowToken, flowId: config.id } : {}),
+						...(flowToken
+							? {
+									flowToken,
+									flowId: config.id,
+									...(result.flowMeta?.widgetId
+										? { widgetId: result.flowMeta.widgetId }
+										: {}),
+								}
+							: {}),
 					};
 					const content = [
 						{
