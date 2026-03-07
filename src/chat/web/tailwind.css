@@ -98,3 +98,375 @@
 	--ww-radius: var(--ww-radius, 16px);
 	--ww-font-sans: var(--ww-font, system-ui, -apple-system, "Segoe UI", sans-serif);
 }
+
+/* ─── Streamdown overrides ─────────────────────────────────────────────
+   Streamdown uses unprefixed Tailwind classes internally, but our CSS is
+   compiled with prefix(ww). We re-apply the styles via data-streamdown
+   selectors so everything renders correctly inside the chat widget.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* Tables */
+[data-waniwani-chat] [data-streamdown="table-wrapper"] {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin-top: 1rem;
+	margin-bottom: 1rem;
+}
+
+[data-waniwani-chat] [data-streamdown="table-wrapper"] > div:first-child:has(button) {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.25rem;
+}
+
+[data-waniwani-chat] [data-streamdown="table-wrapper"] > div:last-child {
+	overflow-x: auto;
+}
+
+[data-waniwani-chat] [data-streamdown="table"] {
+	width: 100%;
+	border-collapse: collapse;
+	border: 1px solid var(--ww-color-border);
+	border-radius: 0.75rem;
+	overflow: hidden;
+}
+
+[data-waniwani-chat] [data-streamdown="table-header"] {
+	background-color: color-mix(in srgb, var(--ww-color-accent) 80%, transparent);
+}
+
+[data-waniwani-chat] [data-streamdown="table-body"] {
+	background-color: color-mix(in srgb, var(--ww-color-accent) 40%, transparent);
+}
+
+[data-waniwani-chat] [data-streamdown="table-body"] > tr + tr {
+	border-top: 1px solid var(--ww-color-border);
+}
+
+[data-waniwani-chat] [data-streamdown="table-row"] {
+	border-bottom: 1px solid var(--ww-color-border);
+}
+
+[data-waniwani-chat] [data-streamdown="table-header-cell"] {
+	white-space: nowrap;
+	padding: 0.5rem 1rem;
+	text-align: left;
+	font-weight: 600;
+	font-size: 0.875rem;
+}
+
+[data-waniwani-chat] [data-streamdown="table-cell"] {
+	padding: 0.5rem 1rem;
+	font-size: 0.875rem;
+}
+
+/* Links */
+[data-waniwani-chat] [data-streamdown="link"] {
+	color: var(--ww-color-primary);
+	text-decoration: underline;
+	font-weight: 500;
+	overflow-wrap: anywhere;
+	cursor: pointer;
+}
+
+/* Link safety modal */
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] {
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: color-mix(in srgb, var(--ww-color-background) 50%, transparent);
+	backdrop-filter: blur(4px);
+}
+
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	width: 100%;
+	max-width: 28rem;
+	margin: 0 1rem;
+	padding: 1.5rem;
+	border-radius: 0.75rem;
+	border: 1px solid var(--ww-color-border);
+	background-color: var(--ww-color-background);
+	box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+	color: var(--ww-color-foreground);
+}
+
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] button {
+	cursor: pointer;
+}
+
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div > button:first-child {
+	position: absolute;
+	top: 1rem;
+	right: 1rem;
+	padding: 0.25rem;
+	border-radius: 0.375rem;
+	color: var(--ww-color-muted-foreground);
+	background: transparent;
+	border: none;
+	transition: background-color 0.15s, color 0.15s;
+}
+
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div > button:first-child:hover {
+	background-color: var(--ww-color-accent);
+	color: var(--ww-color-foreground);
+}
+
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div > div:first-of-type {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div > div:first-of-type > div {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-weight: 600;
+	font-size: 1.125rem;
+}
+
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div > div:first-of-type > p {
+	color: var(--ww-color-muted-foreground);
+	font-size: 0.875rem;
+}
+
+/* URL display */
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div > div:nth-child(3) {
+	word-break: break-all;
+	padding: 0.75rem;
+	border-radius: 0.375rem;
+	background-color: var(--ww-color-accent);
+	font-family: ui-monospace, monospace;
+	font-size: 0.875rem;
+	max-height: 8rem;
+	overflow-y: auto;
+}
+
+/* Action buttons row */
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div > div:last-child {
+	display: flex;
+	gap: 0.5rem;
+}
+
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div > div:last-child > button {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	padding: 0.5rem 1rem;
+	border-radius: 0.375rem;
+	font-weight: 500;
+	font-size: 0.875rem;
+	transition: background-color 0.15s;
+	border: none;
+}
+
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div > div:last-child > button:first-child {
+	border: 1px solid var(--ww-color-border);
+	background-color: var(--ww-color-background);
+	color: var(--ww-color-foreground);
+}
+
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div > div:last-child > button:first-child:hover {
+	background-color: var(--ww-color-accent);
+}
+
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div > div:last-child > button:last-child {
+	background-color: var(--ww-color-primary);
+	color: white;
+}
+
+[data-waniwani-chat] [data-streamdown="link-safety-modal"] > div > div:last-child > button:last-child:hover {
+	opacity: 0.9;
+}
+
+/* Lists */
+[data-waniwani-chat] [data-streamdown="ordered-list"] {
+	list-style-type: decimal;
+	list-style-position: inside;
+	white-space: normal;
+}
+
+[data-waniwani-chat] li [data-streamdown="ordered-list"] {
+	padding-left: 1.5rem;
+}
+
+[data-waniwani-chat] [data-streamdown="unordered-list"] {
+	list-style-type: disc;
+	list-style-position: inside;
+	white-space: normal;
+}
+
+[data-waniwani-chat] li [data-streamdown="unordered-list"] {
+	padding-left: 1.5rem;
+}
+
+[data-waniwani-chat] [data-streamdown="list-item"] {
+	padding-top: 0.25rem;
+	padding-bottom: 0.25rem;
+}
+
+[data-waniwani-chat] [data-streamdown="list-item"] > p {
+	display: inline;
+}
+
+/* Inline code */
+[data-waniwani-chat] [data-streamdown="inline-code"] {
+	border-radius: 0.25rem;
+	background-color: var(--ww-color-accent);
+	padding: 0.125rem 0.375rem;
+	font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+	font-size: 0.875rem;
+}
+
+/* Headings */
+[data-waniwani-chat] [data-streamdown="heading-1"] {
+	margin-top: 1.5rem;
+	margin-bottom: 0.5rem;
+	font-weight: 600;
+	font-size: 1.875rem;
+	line-height: 2.25rem;
+}
+
+[data-waniwani-chat] [data-streamdown="heading-2"] {
+	margin-top: 1.5rem;
+	margin-bottom: 0.5rem;
+	font-weight: 600;
+	font-size: 1.5rem;
+	line-height: 2rem;
+}
+
+[data-waniwani-chat] [data-streamdown="heading-3"] {
+	margin-top: 1.5rem;
+	margin-bottom: 0.5rem;
+	font-weight: 600;
+	font-size: 1.25rem;
+	line-height: 1.75rem;
+}
+
+[data-waniwani-chat] [data-streamdown="heading-4"] {
+	margin-top: 1.5rem;
+	margin-bottom: 0.5rem;
+	font-weight: 600;
+	font-size: 1.125rem;
+	line-height: 1.75rem;
+}
+
+[data-waniwani-chat] [data-streamdown="heading-5"] {
+	margin-top: 1.5rem;
+	margin-bottom: 0.5rem;
+	font-weight: 600;
+	font-size: 1rem;
+	line-height: 1.5rem;
+}
+
+[data-waniwani-chat] [data-streamdown="heading-6"] {
+	margin-top: 1.5rem;
+	margin-bottom: 0.5rem;
+	font-weight: 600;
+	font-size: 0.875rem;
+	line-height: 1.25rem;
+}
+
+/* Blockquote */
+[data-waniwani-chat] [data-streamdown="blockquote"] {
+	margin-top: 1rem;
+	margin-bottom: 1rem;
+	border-left: 4px solid color-mix(in srgb, var(--ww-color-muted-foreground) 30%, transparent);
+	padding-left: 1rem;
+	color: var(--ww-color-muted-foreground);
+	font-style: italic;
+}
+
+/* Horizontal rule */
+[data-waniwani-chat] [data-streamdown="horizontal-rule"] {
+	margin-top: 1.5rem;
+	margin-bottom: 1.5rem;
+	border-color: var(--ww-color-border);
+}
+
+/* Strong */
+[data-waniwani-chat] [data-streamdown="strong"] {
+	font-weight: 600;
+}
+
+/* Images */
+[data-waniwani-chat] [data-streamdown="image-wrapper"] {
+	position: relative;
+	display: inline-block;
+	margin-top: 1rem;
+	margin-bottom: 1rem;
+}
+
+[data-waniwani-chat] [data-streamdown="image"] {
+	max-width: 100%;
+	border-radius: 0.5rem;
+}
+
+/* Code blocks */
+[data-waniwani-chat] [data-streamdown="code-block"] {
+	margin-top: 1rem;
+	margin-bottom: 1rem;
+	width: 100%;
+	overflow: hidden;
+	border-radius: 0.75rem;
+	border: 1px solid var(--ww-color-border);
+}
+
+[data-waniwani-chat] [data-streamdown="code-block-header"] {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	background-color: color-mix(in srgb, var(--ww-color-accent) 80%, transparent);
+	padding: 0.75rem;
+	color: var(--ww-color-muted-foreground);
+	font-size: 0.75rem;
+}
+
+[data-waniwani-chat] [data-streamdown="code-block-body"] {
+	padding: 1rem;
+	font-size: 0.875rem;
+	overflow-x: auto;
+}
+
+/* Streamdown control buttons (copy, download, etc.) */
+[data-waniwani-chat] [data-streamdown="code-block-copy-button"],
+[data-waniwani-chat] [data-streamdown="code-block-download-button"] {
+	cursor: pointer;
+	padding: 0.25rem;
+	color: var(--ww-color-muted-foreground);
+	background: transparent;
+	border: none;
+	transition: color 0.15s;
+}
+
+[data-waniwani-chat] [data-streamdown="code-block-copy-button"]:hover,
+[data-waniwani-chat] [data-streamdown="code-block-download-button"]:hover {
+	color: var(--ww-color-foreground);
+}
+
+/* Mermaid */
+[data-waniwani-chat] [data-streamdown="mermaid-block"] {
+	position: relative;
+	margin-top: 1rem;
+	margin-bottom: 1rem;
+	height: auto;
+	border-radius: 0.75rem;
+	border: 1px solid var(--ww-color-border);
+	padding: 1rem;
+}
+
+[data-waniwani-chat] [data-streamdown="mermaid"] {
+	width: 100%;
+	height: 100%;
+}
