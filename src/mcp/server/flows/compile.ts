@@ -5,30 +5,30 @@ import type {
 	ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import {
-	buildToolMeta,
-	MIME_TYPE_MCP,
-	MIME_TYPE_OPENAI,
-} from "../resources/meta";
+import { buildToolMeta } from "../resources/meta";
 import type {
+	CompileInput,
 	Edge,
+	ExecutionResult,
 	FlowConfig,
+	FlowContent,
+	FlowTokenContent,
+	FlowToolInput,
 	McpServer,
 	NodeConfig,
 	NodeHandler,
 	RegisteredFlow,
 } from "./@types";
 import { END, isInterrupt, isWidget, START } from "./@types";
-import type { FlowTokenData } from "./flow-token";
 import { decodeFlowToken, encodeFlowToken } from "./flow-token";
 
 // ============================================================================
 // Default flow widget — invisible 0-height iframe for non-widget steps
 // ============================================================================
 
-const FLOW_DEFAULT_HTML = `<!DOCTYPE html>
+const _FLOW_DEFAULT_HTML = `<!DOCTYPE html>
 <html><head><style>html,body{margin:0;padding:0;height:0;overflow:hidden}</style></head>
-<body><script>
+<body>_FLOW_DEFAULT_HTML
 window.addEventListener('message',function(e){
 var d=e.data;
 if(!d||d.jsonrpc!=='2.0')return;
@@ -38,49 +38,6 @@ e.source.postMessage({jsonrpc:'2.0',method:'ui/notifications/size-changed',param
 }
 });
 </script></body></html>`;
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface CompileInput<TState extends Record<string, unknown>> {
-	config: FlowConfig;
-	nodes: Map<string, NodeHandler<TState>>;
-	nodeConfigs: Map<string, NodeConfig<TState>>;
-	edges: Map<string, Edge<TState>>;
-}
-
-type FlowToolInput = {
-	action: "start" | "continue";
-	stateUpdates?: Record<string, unknown>;
-	flowToken?: string;
-};
-
-type FlowPayload = {
-	status: "widget" | "interrupt" | "complete" | "error";
-	[key: string]: unknown;
-};
-
-type ExecutionResult = {
-	payload: FlowPayload;
-	data?: Record<string, unknown>;
-	widgetMeta?: Record<string, unknown>;
-	flowMeta?: {
-		step?: string;
-		state: Record<string, unknown>;
-		field?: string;
-		widgetId?: string;
-		/** Cached interrupt questions — avoids re-executing the handler on partial answers */
-		questions?: Array<{
-			question: string;
-			field: string;
-			suggestions?: string[];
-			context?: string;
-		}>;
-		/** Cached overall interrupt context */
-		interruptContext?: string;
-	};
-};
 
 // ============================================================================
 // Flow protocol — embedded in tool description
@@ -164,7 +121,7 @@ function buildFlowProtocol(config: FlowConfig): string {
 	return lines.join("\n");
 }
 
-function getInputMeta(args: FlowToolInput): FlowTokenData & {
+function getInputMeta(args: FlowToolInput): FlowTokenContent & {
 	state: Record<string, unknown>;
 } {
 	if (args.flowToken) {
@@ -260,8 +217,8 @@ function buildInterruptResult<TState extends Record<string, unknown>>(
 				};
 
 	return {
-		payload,
-		flowMeta: {
+		content: payload,
+		flowTokenContent: {
 			step: currentNode,
 			state,
 			...(isSingle && q0 ? { field: q0.field } : {}),
@@ -284,6 +241,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 	nodeConfigs: Map<string, NodeConfig<TState>>,
 	edges: Map<string, Edge<TState>>,
 	meta?: Record<string, unknown>,
+	containerResource?: import("../resources/types").RegisteredResource,
 ): Promise<ExecutionResult> {
 	let currentNode = startNodeName;
 	let state = { ...startState };
@@ -296,15 +254,15 @@ async function executeFrom<TState extends Record<string, unknown>>(
 		// Reached END
 		if (currentNode === END) {
 			return {
-				payload: { status: "complete" },
-				flowMeta: { state },
+				content: { status: "complete" },
+				flowTokenContent: { state },
 			};
 		}
 
 		const handler = nodes.get(currentNode);
 		if (!handler) {
 			return {
-				payload: {
+				content: {
 					status: "error",
 					error: `Unknown node: "${currentNode}"`,
 				},
@@ -329,7 +287,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 				const edge = edges.get(currentNode);
 				if (!edge) {
 					return {
-						payload: {
+						content: {
 							status: "error",
 							error: `No outgoing edge from node "${currentNode}"`,
 						},
@@ -348,7 +306,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 						const edge = edges.get(currentNode);
 						if (!edge) {
 							return {
-								payload: {
+								content: {
 									status: "error",
 									error: `No outgoing edge from node "${currentNode}"`,
 								},
@@ -359,34 +317,28 @@ async function executeFrom<TState extends Record<string, unknown>>(
 					}
 				}
 
-				const resource = result.resource;
-				const nodeConversational = nodeConfigs.get(currentNode)?.conversational;
+				const widgetResource = result.resource;
+				const templateResource = containerResource ?? widgetResource;
 				return {
-					payload: {
+					content: {
 						status: "widget",
 						description: result.description,
-						...(nodeConversational
-							? {
-									conversational:
-										typeof nodeConversational === "string"
-											? nodeConversational
-											: true,
-								}
-							: {}),
 					},
-					data: result.data,
-					widgetMeta: buildToolMeta({
-						openaiTemplateUri: resource.openaiUri,
-						mcpTemplateUri: resource.mcpUri,
+					structuredContent: containerResource
+						? { __widgetId: widgetResource.id, ...result.data }
+						: result.data,
+					_meta: buildToolMeta({
+						openaiTemplateUri: templateResource.openaiUri,
+						mcpTemplateUri: templateResource.mcpUri,
 						invoking: "Loading...",
 						invoked: "Loaded",
-						autoHeight: resource.autoHeight,
+						autoHeight: templateResource.autoHeight,
 					}),
-					flowMeta: {
+					flowTokenContent: {
 						step: currentNode,
 						state,
 						field: widgetField,
-						widgetId: resource.id,
+						widgetId: widgetResource.id,
 					},
 				};
 			}
@@ -397,7 +349,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 			const edge = edges.get(currentNode);
 			if (!edge) {
 				return {
-					payload: {
+					content: {
 						status: "error",
 						error: `No outgoing edge from node "${currentNode}"`,
 					},
@@ -407,14 +359,14 @@ async function executeFrom<TState extends Record<string, unknown>>(
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			return {
-				payload: { status: "error", error: message },
-				flowMeta: { step: currentNode, state },
+				content: { status: "error", error: message },
+				flowTokenContent: { step: currentNode, state },
 			};
 		}
 	}
 
 	return {
-		payload: {
+		content: {
 			status: "error",
 			error: "Flow exceeded maximum iterations (possible infinite loop)",
 		},
@@ -462,7 +414,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			const startEdge = edges.get(START);
 			if (!startEdge) {
 				return {
-					payload: {
+					content: {
 						status: "error",
 						error: "No start edge",
 					},
@@ -483,6 +435,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				nodeConfigs,
 				edges,
 				meta,
+				config.resource,
 			);
 		}
 
@@ -490,7 +443,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			const step = inputMeta.step;
 			if (!step) {
 				return {
-					payload: {
+					content: {
 						status: "error",
 						error:
 							'Missing or invalid "flowToken" for continue action.' +
@@ -527,7 +480,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				const edge = edges.get(step);
 				if (!edge) {
 					return {
-						payload: {
+						content: {
 							status: "error",
 							error: `No edge from step "${step}"`,
 						},
@@ -541,14 +494,23 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					nodeConfigs,
 					edges,
 					meta,
+					config.resource,
 				);
 			}
 
-			return executeFrom(step, updatedState, nodes, nodeConfigs, edges, meta);
+			return executeFrom(
+				step,
+				updatedState,
+				nodes,
+				nodeConfigs,
+				edges,
+				meta,
+				config.resource,
+			);
 		}
 
 		return {
-			payload: {
+			content: {
 				status: "error",
 				error: `Unknown action: "${args.action}"`,
 			},
@@ -561,46 +523,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		description: fullDescription,
 
 		async register(server: McpServer): Promise<void> {
-			// Register default flow widget resources (invisible 0-height for non-widget steps)
-			const openaiFlowUri = `ui://widgets/apps-sdk/${config.id}_flow.html`;
-			const mcpFlowUri = `ui://widgets/ext-apps/${config.id}_flow.html`;
-
-			server.registerResource(
-				`${config.id}-flow-openai-widget`,
-				openaiFlowUri,
-				{
-					mimeType: MIME_TYPE_OPENAI,
-					_meta: { "openai/widgetPrefersBorder": false },
-				},
-				async (uri) => ({
-					contents: [
-						{
-							uri: uri.href,
-							mimeType: MIME_TYPE_OPENAI,
-							text: FLOW_DEFAULT_HTML,
-						},
-					],
-				}),
-			);
-
-			server.registerResource(
-				`${config.id}-flow-mcp-widget`,
-				mcpFlowUri,
-				{
-					mimeType: MIME_TYPE_MCP,
-					_meta: { ui: { prefersBorder: false } },
-				},
-				async (uri) => ({
-					contents: [
-						{
-							uri: uri.href,
-							mimeType: MIME_TYPE_MCP,
-							text: FLOW_DEFAULT_HTML,
-						},
-					],
-				}),
-			);
-
 			server.registerTool(
 				config.id,
 				{
@@ -608,12 +530,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					description: fullDescription,
 					inputSchema,
 					annotations: config.annotations,
-					_meta: buildToolMeta({
-						openaiTemplateUri: openaiFlowUri,
-						mcpTemplateUri: mcpFlowUri,
-						invoking: "Loading...",
-						invoked: "Loaded",
-					}),
 				},
 				(async (args: FlowToolInput, extra: unknown) => {
 					const requestExtra = extra as RequestHandlerExtra<
@@ -625,59 +541,38 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					const result = await handleToolCall(args, _meta);
 
 					// Encode flow state as opaque token for the model to pass back
-					const flowToken = result.flowMeta
-						? encodeFlowToken({
-								step: result.flowMeta.step ?? "",
-								state: result.flowMeta.state,
-								field: result.flowMeta.field,
-								widgetId: result.flowMeta.widgetId,
-								questions: result.flowMeta.questions,
-								interruptContext: result.flowMeta.interruptContext,
-							})
+					const flowToken = result.flowTokenContent
+						? encodeFlowToken(result.flowTokenContent)
 						: undefined;
 
 					// Text content includes the payload + flowToken for the model
-					// Also includes flowId and widgetId so widget iframes can use them directly
-					const textPayload = {
-						...result.payload,
-						...(flowToken
-							? {
-									flowToken,
-									flowId: config.id,
-									...(result.flowMeta?.widgetId
-										? { widgetId: result.flowMeta.widgetId }
-										: {}),
-								}
-							: {}),
+					const contentResponse: FlowContent = {
+						...result.content,
+						...(flowToken ? { flowToken } : {}),
 					};
 					const content = [
 						{
 							type: "text" as const,
-							text: JSON.stringify(textPayload, null, 2),
+							text: JSON.stringify(contentResponse, null, 2),
 						},
 					];
 
-					// _meta carries widget URIs and tracking config for the host/iframe
-					const responseMeta = {
-						...(result.widgetMeta ?? {}),
-						..._meta,
-					};
-
 					// Widget response — include structuredContent + widget metadata
-					if (result.widgetMeta) {
+					if (contentResponse.status === "widget") {
 						return {
 							content,
-							structuredContent: result.data,
-							_meta: responseMeta,
+							structuredContent: result.structuredContent,
+							_meta: {
+								..._meta,
+								...result._meta,
+							},
 						};
 					}
 
 					// Non-widget response (interrupt, complete, error)
 					return {
 						content,
-						...(Object.keys(responseMeta).length > 0
-							? { _meta: responseMeta }
-							: {}),
+						..._meta,
 					};
 				}) as unknown as ToolCallback<typeof inputSchema>,
 			);

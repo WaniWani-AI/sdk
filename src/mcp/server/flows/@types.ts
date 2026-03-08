@@ -223,6 +223,12 @@ export type FlowConfig = {
 	 * ```
 	 */
 	state: Record<string, z.ZodType>;
+	/**
+	 * Container resource — when set, ALL widget steps use this single resource
+	 * as the output template, and `__widgetId` is injected into `structuredContent`
+	 * so the container can route to the correct sub-widget.
+	 */
+	resource?: RegisteredResource;
 	/** Optional tool annotations */
 	annotations?: {
 		readOnlyHint?: boolean;
@@ -259,4 +265,49 @@ export type RegisteredFlow = {
 	title: string;
 	description: string;
 	register: (server: McpServer) => Promise<void>;
+};
+
+export interface CompileInput<TState extends Record<string, unknown>> {
+	config: FlowConfig;
+	nodes: Map<string, NodeHandler<TState>>;
+	nodeConfigs: Map<string, NodeConfig<TState>>;
+	edges: Map<string, Edge<TState>>;
+}
+
+export type FlowToolInput = {
+	action: "start" | "continue";
+	stateUpdates?: Record<string, unknown>;
+	flowToken?: string;
+};
+
+export type FlowTokenContent = {
+	step?: string;
+	state: Record<string, unknown>;
+	field?: string;
+	widgetId?: string;
+	/** Cached interrupt questions — avoids re-executing the handler on partial answers */
+	questions?: Array<{
+		question: string;
+		field: string;
+		suggestions?: string[];
+		context?: string;
+	}>;
+	/** Cached overall interrupt context */
+	interruptContext?: string;
+};
+
+/** Parsed response text from a flow tool call */
+export type FlowContent = {
+	status: "widget" | "interrupt" | "complete" | "error";
+	description?: string;
+	question?: string;
+	error?: string;
+	flowToken?: string;
+};
+
+export type ExecutionResult = {
+	content: FlowContent;
+	structuredContent?: Record<string, unknown>;
+	_meta?: Record<string, unknown>;
+	flowTokenContent?: FlowTokenContent;
 };

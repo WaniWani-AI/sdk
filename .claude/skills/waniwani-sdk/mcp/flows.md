@@ -317,6 +317,7 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 | `title` | `string` | yes | Display title |
 | `description` | `string` | yes | Tells the AI when to use this flow |
 | `state` | `Record<string, z.ZodType>` | yes | State schema — defines all fields the flow collects. Keys match `interrupt({ field })` names, values are Zod schemas with `.describe()` |
+| `resource` | `RegisteredResource` | no | Container resource — when set, all widget steps use this single resource and `__widgetId` is injected into `structuredContent` |
 
 ### `StateGraph` methods
 
@@ -336,6 +337,87 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 | `interrupt({ question, field, suggestions?, context? })` | Pause and ask the user a single question. `context` provides hidden AI instructions. |
 | `interrupt({ questions: [...], context? })` | Pause and ask several questions at once in one message. |
 | `showWidget(resource, { data, field?, description? })` | Pause and render a widget. `field` enables auto-skip when already set. |
+
+## Container widget pattern
+
+Use a single "container" resource for all widget steps in a flow. The container receives `__widgetId` in `structuredContent` and routes to the correct sub-widget. Non-widget steps (interrupts) return `widgetId: null` — the container renders nothing (0 height).
+
+### Server-side — add `resource` to flow config
+
+```ts
+import { createResource, createFlow, showWidget, START, END } from "@waniwani/sdk/mcp";
+
+// 1. Create a container resource (the single iframe for all widget steps)
+const containerWidget = createResource({
+  id: "my_flow_container",
+  title: "Flow Container",
+  baseUrl: "https://my-app.com",
+  htmlPath: "/widgets/flow-container",
+  widgetDomain: "my-app.com",
+});
+
+await containerWidget.register(server);
+
+// 2. Create sub-widget resources (for showWidget calls)
+const contractChooser = createResource({ id: "contract_chooser", /* ... */ });
+const pricingTable = createResource({ id: "pricing_table", /* ... */ });
+await contractChooser.register(server);
+await pricingTable.register(server);
+
+// 3. Pass container resource in flow config
+const flow = createFlow({
+  id: "guided_quote",
+  title: "Guided Quote",
+  description: "Walk users through getting a quote.",
+  resource: containerWidget,  // ← container resource
+  state: {
+    contractId: z.string().describe("Selected contract"),
+    selectedPlan: z.string().describe("Selected plan"),
+  },
+})
+  .addNode("choose_contract", (state) =>
+    showWidget(contractChooser, { data: { contracts: state.contracts }, field: "contractId" })
+  )
+  .addNode("show_pricing", (state) =>
+    showWidget(pricingTable, { data: { offers: getOffers(state) }, field: "selectedPlan" })
+  )
+  .addEdge(START, "choose_contract")
+  .addEdge("choose_contract", "show_pricing")
+  .addEdge("show_pricing", END)
+  .compile();
+```
+
+When `resource` is set:
+- All widget steps use the container resource's URIs (single iframe stays mounted)
+- `__widgetId` is injected into `structuredContent` (e.g. `"contract_chooser"`)
+- Non-widget steps behave identically to flows without `resource`
+
+### Client-side — container widget page
+
+```tsx
+import { useFlowAction } from "@waniwani/sdk/mcp/react";
+
+function FlowContainer() {
+  const { widgetId, data, advance, isAdvancing } = useFlowAction("my_flow_container");
+  if (!widgetId || !data) return null; // 0 height for interrupts
+
+  switch (widgetId) {
+    case "contract_chooser":
+      return <ContractChooser data={data} advance={advance} isAdvancing={isAdvancing} />;
+    case "pricing_table":
+      return <PricingTable data={data} advance={advance} isAdvancing={isAdvancing} />;
+    default:
+      return null;
+  }
+}
+```
+
+`useFlowAction` returns:
+- `widgetId: string | null` — the sub-widget ID (from `__widgetId`), `null` for non-widget steps
+- `data` — structured content with `__widgetId` stripped
+- `advance` / `isAdvancing` — same as before
+
+When `resource` is NOT set on the flow config, `widgetId` is always `null` and behavior is unchanged (non-breaking).
 
 ## Common Mistakes
 

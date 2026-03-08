@@ -14,7 +14,6 @@ function mockServer() {
 		registerTool: (...args: unknown[]) => {
 			registered.push(args as RegisterToolArgs);
 		},
-		registerResource: () => {},
 	};
 	return { server: server as unknown as McpServer, registered };
 }
@@ -78,12 +77,8 @@ describe("compileFlow response contract", () => {
 			field: "useCase",
 		});
 
-		// _meta carries client-injected metadata (not flow state)
-		expect(result._meta).toMatchObject({
-			requestId: "req-1",
-		});
-		// flow object should NOT be in _meta
-		expect((result._meta as Record<string, unknown>).flow).toBe(undefined);
+		// Client-injected metadata is spread into the response
+		expect(result.requestId).toBe("req-1");
 	});
 
 	test("accepts flowToken input for continue action", async () => {
@@ -450,7 +445,6 @@ describe("compileFlow response contract", () => {
 			description: "Pick your plan",
 		});
 		expect(parsed.flowToken).toBeDefined();
-		expect(parsed.flowId).toBe("widget_flow");
 		expect(result.structuredContent).toEqual({ plans: ["starter", "pro"] });
 		// Decode token to verify widget metadata
 		const tokenData = decodeFlowToken(parsed.flowToken as string);
