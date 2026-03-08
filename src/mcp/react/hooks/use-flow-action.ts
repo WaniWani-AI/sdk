@@ -4,36 +4,49 @@ import { useToolOutput } from "./use-tool-output";
 
 // ── Types ────────────────────────────────────────────────────
 
+type FlowStatus = "widget" | "interrupt" | "complete" | "error";
+
 /** Return type of the useFlowAction hook */
 export type FlowActionResult<T> = {
-	/** Sub-widget identifier — only set in container mode (from __widgetId in structuredContent). */
+	/** Current flow status — null when structuredContent is absent or not a flow response. */
+	status: FlowStatus | null;
+	/** Widget identifier — only set when status is "widget". */
 	widgetId: string | null;
-	/** Current widget data. */
+	/** Widget data (structuredContent minus internal __ fields). */
 	data: T | null;
 };
 
 // ── Helpers ──────────────────────────────────────────────────
 
-function extractWidgetId<T extends Record<string, unknown>>(
-	data: T | null,
-): { widgetId: string | null; cleanData: T | null } {
-	if (!data || !("__widgetId" in data)) {
-		return { widgetId: null, cleanData: data };
+function parseFlowOutput<T extends Record<string, unknown>>(
+	raw: Record<string, unknown> | null,
+): FlowActionResult<T> {
+	if (!raw || !("__status" in raw)) {
+		return { status: null, widgetId: null, data: null };
 	}
-	const { __widgetId, ...rest } = data;
-	return { widgetId: __widgetId as string, cleanData: rest as T };
+
+	const { __status, __widgetId, ...rest } = raw;
+
+	return {
+		status: __status as FlowStatus,
+		widgetId: (__widgetId as string) ?? null,
+		data: (Object.keys(rest).length > 0 ? rest : null) as T | null,
+	};
 }
 
 // ── Hook ─────────────────────────────────────────────────────
 
 /**
- * Hook for reading flow widget data. Extracts `__widgetId` from
- * structuredContent when using the container widget pattern.
+ * Hook for reading flow widget data from structuredContent.
+ *
+ * Extracts `__status` and `__widgetId` from the flow's structuredContent,
+ * returning clean data for the widget component.
  *
  * @example
  * ```tsx
- * const { widgetId, data } = useFlowAction<MyData>();
- * if (!widgetId || !data) return null;
+ * const { status, widgetId, data } = useFlowAction<MyData>();
+ *
+ * if (status !== "widget" || !widgetId) return null;
  *
  * switch (widgetId) {
  *   case "pricing_table": return <PricingTable {...data} />;
@@ -44,8 +57,6 @@ function extractWidgetId<T extends Record<string, unknown>>(
 export function useFlowAction<
 	T extends Record<string, unknown>,
 >(): FlowActionResult<T> {
-	const initialData = useToolOutput<T>();
-	const { widgetId, cleanData } = extractWidgetId(initialData as T | null);
-
-	return { widgetId, data: cleanData };
+	const raw = useToolOutput<Record<string, unknown>>();
+	return parseFlowOutput<T>(raw);
 }

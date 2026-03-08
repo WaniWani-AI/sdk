@@ -5,6 +5,7 @@ import type {
 	ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { buildToolMeta } from "../resources/meta";
 import type {
 	CompileInput,
 	Edge,
@@ -78,10 +79,9 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"     Then call again with:",
 		'     `action: "continue"`, `flowToken` = the `flowToken` from the response (pass back exactly as received),',
 		"     `stateUpdates` = answers keyed by their `field` names, plus any other fields the user mentioned.",
-		'   - `"widget"`: The flow wants to show a UI widget. Call the tool named in the `tool`',
-		"     field, passing the `data` object as the tool's input.",
-		"     Present the widget result to the user. When the user makes a choice or interacts",
-		"     with the widget, call THIS flow tool again with:",
+		'   - `"widget"`: A UI widget is being displayed inline to the user.',
+		"     Present the `description` to the user and wait for their interaction.",
+		"     When the user responds with their selection, call THIS tool again with:",
 		'     `action: "continue"`, `flowToken` = the `flowToken` from the response,',
 		"     `stateUpdates` = `{ [field]: <user's selection> }` plus any other fields the user mentioned.",
 		'   - `"complete"`: The flow is done. Present the result to the user.',
@@ -260,7 +260,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 				continue;
 			}
 
-			// Widget signal — delegate to display tool
+			// Widget signal — render inline widget
 			if (isWidget(result)) {
 				// Auto-skip: use field from the signal, fall back to nodeConfig
 				const widgetField = result.field ?? nodeConfigs.get(currentNode)?.field;
@@ -283,15 +283,18 @@ async function executeFrom<TState extends Record<string, unknown>>(
 				return {
 					content: {
 						status: "widget",
-						tool: result.tool.id,
-						data: result.data,
 						description: result.description,
 					},
 					flowTokenContent: {
 						step: currentNode,
 						state,
 						field: widgetField,
-						widgetId: result.tool.id,
+						widgetId: result.widgetId,
+					},
+					structuredContent: {
+						__status: "widget" as const,
+						__widgetId: result.widgetId,
+						...result.data,
 					},
 				};
 			}
@@ -356,6 +359,18 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	const { config, nodes, nodeConfigs, edges } = input;
 	const protocol = buildFlowProtocol(config);
 	const fullDescription = `${config.description}\n${protocol}`;
+
+	// Build widget metadata when a resource is attached to the flow
+	const toolMeta = config.resource
+		? buildToolMeta({
+				openaiTemplateUri: config.resource.openaiUri,
+				mcpTemplateUri: config.resource.mcpUri,
+				invoking: "Loading...",
+				invoked: "Loaded",
+				autoHeight: config.resource.autoHeight,
+			})
+		: undefined;
+
 	async function handleToolCall(
 		args: FlowToolInput,
 		meta?: Record<string, unknown>,
@@ -472,6 +487,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					description: fullDescription,
 					inputSchema,
 					annotations: config.annotations,
+					...(toolMeta && { _meta: toolMeta }),
 				},
 				(async (args: FlowToolInput, extra: unknown) => {
 					const requestExtra = extra as RequestHandlerExtra<
@@ -499,9 +515,21 @@ export function compileFlow<TState extends Record<string, unknown>>(
 						},
 					];
 
+					// When resource is present, return structuredContent for the widget
+					const structuredContent = config.resource
+						? {
+								__status: result.content.status,
+								...(result.structuredContent ?? {}),
+							}
+						: undefined;
+
 					return {
 						content,
-						..._meta,
+						...(structuredContent && { structuredContent }),
+						_meta: {
+							...(toolMeta ?? {}),
+							..._meta,
+						},
 					};
 				}) as unknown as ToolCallback<typeof inputSchema>,
 			);

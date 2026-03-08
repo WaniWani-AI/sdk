@@ -1,6 +1,5 @@
 import type { z } from "zod";
-import type { McpServer } from "../resources/types";
-import type { RegisteredTool } from "../tools/types";
+import type { McpServer, RegisteredResource } from "../resources/types";
 
 export type { McpServer };
 
@@ -44,9 +43,9 @@ export type InterruptSignal = {
 
 export type WidgetSignal = {
 	readonly __type: typeof WIDGET;
-	/** The display tool to delegate rendering to */
-	tool: RegisteredTool;
-	/** Data to pass to the display tool */
+	/** Identifier for the widget component to render on the client */
+	widgetId: string;
+	/** Data to pass to the widget component */
 	data: Record<string, unknown>;
 	/** Description of what the widget does (for the AI's context) */
 	description?: string;
@@ -101,23 +100,23 @@ export function interrupt(
 }
 
 /**
- * Create a widget signal — pauses the flow and delegates rendering to a display tool.
+ * Create a widget signal — pauses the flow and renders a widget inline.
  *
- * The display tool is a regular `createTool()` with a resource attached.
- * The flow engine will instruct the model to call the display tool separately.
+ * The `widgetId` identifies which component to render on the client side
+ * via the `FlowWidget` factory component.
  *
  * Pass `field` to enable auto-skip: if the field is already in state, the widget
  * step will be skipped automatically.
  */
 export function showWidget(
-	tool: RegisteredTool,
+	widgetId: string,
 	config: {
 		data: Record<string, unknown>;
 		description?: string;
 		field?: string;
 	},
 ): WidgetSignal {
-	return { __type: WIDGET, tool, ...config };
+	return { __type: WIDGET, widgetId, ...config };
 }
 
 export function isInterrupt(value: unknown): value is InterruptSignal {
@@ -219,6 +218,15 @@ export type FlowConfig = {
 	 * ```
 	 */
 	state: Record<string, z.ZodType>;
+	/**
+	 * Widget resource for this flow. When set, the flow tool returns
+	 * `structuredContent` on every response so the client renders a single
+	 * widget that dynamically switches based on the current node.
+	 *
+	 * Widget nodes render via `FlowWidget`; interrupt/complete/error nodes
+	 * render an empty 0-height widget.
+	 */
+	resource?: RegisteredResource;
 	/** Optional tool annotations */
 	annotations?: {
 		readOnlyHint?: boolean;
@@ -293,13 +301,11 @@ export type FlowContent = {
 	question?: string;
 	error?: string;
 	flowToken?: string;
-	/** Display tool to call (widget status only) */
-	tool?: string;
-	/** Data to pass to the display tool (widget status only) */
-	data?: Record<string, unknown>;
 };
 
 export type ExecutionResult = {
 	content: FlowContent;
 	flowTokenContent?: FlowTokenContent;
+	/** Structured data for the widget (only set for widget nodes) */
+	structuredContent?: Record<string, unknown>;
 };

@@ -77,8 +77,8 @@ describe("compileFlow response contract", () => {
 			field: "useCase",
 		});
 
-		// Client-injected metadata is spread into the response
-		expect(result.requestId).toBe("req-1");
+		// Client-injected metadata is in the _meta field
+		expect((result._meta as Record<string, unknown>)?.requestId).toBe("req-1");
 	});
 
 	test("accepts flowToken input for continue action", async () => {
@@ -343,13 +343,6 @@ describe("compileFlow response contract", () => {
 	});
 
 	test("widget continue without field advances to next node (no stuck loop)", async () => {
-		const displayTool = {
-			id: "info_panel",
-			title: "Info Panel",
-			description: "Display info",
-			register: async () => {},
-		};
-
 		const flow = createFlow({
 			id: "widget_no_field_flow",
 			title: "Widget No Field Flow",
@@ -359,7 +352,7 @@ describe("compileFlow response contract", () => {
 			},
 		})
 			.addNode("show_info", () =>
-				showWidget(displayTool, {
+				showWidget("info_panel", {
 					data: { message: "Hello" },
 					description: "Show info panel",
 				}),
@@ -397,14 +390,7 @@ describe("compileFlow response contract", () => {
 		expect(p2.status).toBe("complete");
 	});
 
-	test("returns widget JSON content with tool and data for widget steps", async () => {
-		const displayTool = {
-			id: "plan_picker",
-			title: "Plan Picker",
-			description: "Pick a plan",
-			register: async () => {},
-		};
-
+	test("returns widget JSON content for widget steps (no resource — text only)", async () => {
 		const flow = createFlow({
 			id: "widget_flow",
 			title: "Widget Flow",
@@ -414,7 +400,7 @@ describe("compileFlow response contract", () => {
 			},
 		})
 			.addNode("pick_plan", () =>
-				showWidget(displayTool, {
+				showWidget("plan_picker", {
 					data: { plans: ["starter", "pro"] },
 					description: "Pick your plan",
 					field: "plan",
@@ -436,12 +422,10 @@ describe("compileFlow response contract", () => {
 
 		expect(parsed).toMatchObject({
 			status: "widget",
-			tool: "plan_picker",
-			data: { plans: ["starter", "pro"] },
 			description: "Pick your plan",
 		});
 		expect(parsed.flowToken).toBeDefined();
-		// No structuredContent on the result — display tool handles rendering
+		// No structuredContent when resource is absent
 		expect(result.structuredContent).toBe(undefined);
 		// Decode token to verify widget metadata
 		const tokenData = decodeFlowToken(parsed.flowToken as string);
@@ -451,5 +435,117 @@ describe("compileFlow response contract", () => {
 			field: "plan",
 			widgetId: "plan_picker",
 		});
+	});
+
+	test("returns structuredContent when resource is present", async () => {
+		const mockResource = {
+			id: "flow_widget",
+			title: "Flow Widget",
+			description: "Dynamic flow widget",
+			openaiUri: "ui://widgets/apps-sdk/flow_widget.html",
+			mcpUri: "ui://widgets/ext-apps/flow_widget.html",
+			autoHeight: true,
+			register: async () => {},
+		};
+
+		const flow = createFlow({
+			id: "widget_resource_flow",
+			title: "Widget Resource Flow",
+			description: "Flow with a resource.",
+			state: {
+				plan: z.string().describe("Selected plan"),
+			},
+			resource: mockResource,
+		})
+			.addNode("pick_plan", () =>
+				showWidget("plan_picker", {
+					data: { plans: ["starter", "pro"] },
+					description: "Pick your plan",
+					field: "plan",
+				}),
+			)
+			.addEdge(START, "pick_plan")
+			.addEdge("pick_plan", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Widget step — structuredContent includes widget data
+		const r1 = (await handler?.({ action: "start" }, {})) as Record<
+			string,
+			unknown
+		>;
+		const p1 = parsePayload(r1);
+		expect(p1.status).toBe("widget");
+
+		expect(r1.structuredContent).toMatchObject({
+			__status: "widget",
+			__widgetId: "plan_picker",
+			plans: ["starter", "pro"],
+		});
+
+		// Continue → complete — structuredContent has __status only
+		const r2 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { plan: "pro" },
+				flowToken: extractFlowToken(p1),
+			},
+			{},
+		)) as Record<string, unknown>;
+		const p2 = parsePayload(r2);
+		expect(p2.status).toBe("complete");
+		expect(r2.structuredContent).toMatchObject({
+			__status: "complete",
+		});
+	});
+
+	test("interrupt step with resource returns structuredContent with interrupt status", async () => {
+		const mockResource = {
+			id: "flow_widget",
+			title: "Flow Widget",
+			description: "Dynamic flow widget",
+			openaiUri: "ui://widgets/apps-sdk/flow_widget.html",
+			mcpUri: "ui://widgets/ext-apps/flow_widget.html",
+			autoHeight: true,
+			register: async () => {},
+		};
+
+		const flow = createFlow({
+			id: "interrupt_resource_flow",
+			title: "Interrupt Resource Flow",
+			description: "Interrupt flow with resource.",
+			state: {
+				email: z.string().describe("Email"),
+			},
+			resource: mockResource,
+		})
+			.addNode("ask_email", () =>
+				interrupt({ question: "Email?", field: "email" }),
+			)
+			.addEdge(START, "ask_email")
+			.addEdge("ask_email", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.({ action: "start" }, {})) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+		expect(parsed.status).toBe("interrupt");
+
+		// structuredContent should only have __status (empty widget)
+		expect(result.structuredContent).toMatchObject({
+			__status: "interrupt",
+		});
+		expect(
+			Object.keys(result.structuredContent as Record<string, unknown>),
+		).toEqual(["__status"]);
 	});
 });
