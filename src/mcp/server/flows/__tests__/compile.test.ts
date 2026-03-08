@@ -343,13 +343,10 @@ describe("compileFlow response contract", () => {
 	});
 
 	test("widget continue without field advances to next node (no stuck loop)", async () => {
-		const resource = {
+		const displayTool = {
 			id: "info_panel",
 			title: "Info Panel",
 			description: "Display info",
-			openaiUri: "ui://widgets/apps-sdk/info_panel.html",
-			mcpUri: "ui://widgets/ext-apps/info_panel.html",
-			autoHeight: true,
 			register: async () => {},
 		};
 
@@ -362,7 +359,7 @@ describe("compileFlow response contract", () => {
 			},
 		})
 			.addNode("show_info", () =>
-				showWidget(resource, {
+				showWidget(displayTool, {
 					data: { message: "Hello" },
 					description: "Show info panel",
 				}),
@@ -400,14 +397,11 @@ describe("compileFlow response contract", () => {
 		expect(p2.status).toBe("complete");
 	});
 
-	test("returns widget JSON content with flowToken for widget steps", async () => {
-		const resource = {
+	test("returns widget JSON content with tool and data for widget steps", async () => {
+		const displayTool = {
 			id: "plan_picker",
 			title: "Plan Picker",
 			description: "Pick a plan",
-			openaiUri: "ui://widgets/apps-sdk/plan_picker.html",
-			mcpUri: "ui://widgets/ext-apps/plan_picker.html",
-			autoHeight: true,
 			register: async () => {},
 		};
 
@@ -420,7 +414,7 @@ describe("compileFlow response contract", () => {
 			},
 		})
 			.addNode("pick_plan", () =>
-				showWidget(resource, {
+				showWidget(displayTool, {
 					data: { plans: ["starter", "pro"] },
 					description: "Pick your plan",
 					field: "plan",
@@ -442,10 +436,13 @@ describe("compileFlow response contract", () => {
 
 		expect(parsed).toMatchObject({
 			status: "widget",
+			tool: "plan_picker",
+			data: { plans: ["starter", "pro"] },
 			description: "Pick your plan",
 		});
 		expect(parsed.flowToken).toBeDefined();
-		expect(result.structuredContent).toEqual({ plans: ["starter", "pro"] });
+		// No structuredContent on the result — display tool handles rendering
+		expect(result.structuredContent).toBe(undefined);
 		// Decode token to verify widget metadata
 		const tokenData = decodeFlowToken(parsed.flowToken as string);
 		expect(tokenData).toMatchObject({

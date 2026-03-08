@@ -1,5 +1,6 @@
 import type { z } from "zod";
-import type { McpServer, RegisteredResource } from "../resources/types";
+import type { McpServer } from "../resources/types";
+import type { RegisteredTool } from "../tools/types";
 
 export type { McpServer };
 
@@ -43,9 +44,9 @@ export type InterruptSignal = {
 
 export type WidgetSignal = {
 	readonly __type: typeof WIDGET;
-	/** The resource to display */
-	resource: RegisteredResource;
-	/** Data to pass to the widget as structuredContent */
+	/** The display tool to delegate rendering to */
+	tool: RegisteredTool;
+	/** Data to pass to the display tool */
 	data: Record<string, unknown>;
 	/** Description of what the widget does (for the AI's context) */
 	description?: string;
@@ -100,20 +101,23 @@ export function interrupt(
 }
 
 /**
- * Create a widget signal — pauses the flow and renders a widget UI.
+ * Create a widget signal — pauses the flow and delegates rendering to a display tool.
+ *
+ * The display tool is a regular `createTool()` with a resource attached.
+ * The flow engine will instruct the model to call the display tool separately.
  *
  * Pass `field` to enable auto-skip: if the field is already in state, the widget
  * step will be skipped automatically.
  */
 export function showWidget(
-	resource: RegisteredResource,
+	tool: RegisteredTool,
 	config: {
 		data: Record<string, unknown>;
 		description?: string;
 		field?: string;
 	},
 ): WidgetSignal {
-	return { __type: WIDGET, resource, ...config };
+	return { __type: WIDGET, tool, ...config };
 }
 
 export function isInterrupt(value: unknown): value is InterruptSignal {
@@ -215,12 +219,6 @@ export type FlowConfig = {
 	 * ```
 	 */
 	state: Record<string, z.ZodType>;
-	/**
-	 * Container resource — when set, ALL widget steps use this single resource
-	 * as the output template, and `__widgetId` is injected into `structuredContent`
-	 * so the container can route to the correct sub-widget.
-	 */
-	resource?: RegisteredResource;
 	/** Optional tool annotations */
 	annotations?: {
 		readOnlyHint?: boolean;
@@ -295,11 +293,13 @@ export type FlowContent = {
 	question?: string;
 	error?: string;
 	flowToken?: string;
+	/** Display tool to call (widget status only) */
+	tool?: string;
+	/** Data to pass to the display tool (widget status only) */
+	data?: Record<string, unknown>;
 };
 
 export type ExecutionResult = {
 	content: FlowContent;
-	structuredContent?: Record<string, unknown>;
-	_meta?: Record<string, unknown>;
 	flowTokenContent?: FlowTokenContent;
 };

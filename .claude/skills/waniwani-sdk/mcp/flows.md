@@ -102,29 +102,16 @@ The flow skips the "which country?" question and proceeds to the next unanswered
 
 ## Node types
 
-### Declarative widget node — no handler needed
-
-Show a widget without a handler. Resource is declared once (no duplication).
-`data` can be static or a function of current state. `field` enables auto-skip:
-```ts
-.addNode("show_pricing", {
-  resource: pricingTableResource,
-  field: "selectedPlan",          // optional — enables auto-skip
-  description: "Show pricing.",
-  data: (state) => ({ offers: computeOffers(state.idcc) }),
-})
-```
-
 ### Handler-based nodes
 
-All interrupt nodes use a handler. Use `interrupt()` for questions, `showWidget()` for widgets, or return a plain object for action nodes.
+Use `interrupt()` for questions, `showWidget()` for widgets, or return a plain object for action nodes.
 
 | Return value | Behavior |
 |---|---|
 | `interrupt({ question, field })` | Pause → ask user → resume with answer stored at `field` |
 | `interrupt({ question, field, context })` | Same, but with hidden instructions for the assistant to enrich its response |
 | `interrupt({ questions: [...], context? })` | Pause → ask ALL questions in one message → resume with all answers |
-| `showWidget(resource, { data, field?, description? })` | Pause → render widget → resume when widget calls back. `field` enables auto-skip. |
+| `showWidget(displayTool, { data, field?, description? })` | Pause → instruct AI to call the display tool → resume when user interacts. `field` enables auto-skip. |
 | `{ key: value, ... }` | Action node → merge into state → auto-advance to next node |
 
 **`interrupt()` — single or multi-question:**
@@ -150,10 +137,24 @@ All interrupt nodes use a handler. Use `interrupt()` for questions, `showWidget(
 )
 ```
 
-**`showWidget()` — with field for auto-skip:**
+**`showWidget()` — delegates rendering to a display tool:**
+
+`showWidget` takes a `RegisteredTool` (created via `createTool` with a resource). The flow engine instructs the AI to call the display tool separately, then continue the flow.
+
 ```ts
+// 1. Create a display tool with typed schema
+const showPricing = createTool({
+  resource: pricingResource,
+  description: "Display pricing options",
+  inputSchema: { offers: z.array(z.object({ plan: z.string(), price: z.number() })) },
+}, async ({ offers }) => ({
+  text: "Pricing loaded",
+  data: { offers },
+}));
+
+// 2. Use it in the flow
 .addNode("choose_plan", (state) =>
-  showWidget(pricingResource, {
+  showWidget(showPricing, {
     data: { offers: computeOffers(state.idcc) },
     description: "Showing pricing options.",
     field: "selectedPlan",  // enables auto-skip when already set
@@ -199,7 +200,7 @@ const flow = createFlow({
 
 ## Widget steps
 
-Show a widget UI at a specific step. The widget calls back into the flow with its result.
+Show a widget UI at a specific step. The flow delegates rendering to a separate display tool — the AI calls the display tool, then continues the flow.
 
 ```ts
 import { createResource, createFlow, createTool, interrupt, showWidget, registerTools, START, END } from "@waniwani/sdk/mcp";
@@ -217,8 +218,8 @@ const pricingUI = createResource({
 
 await pricingUI.register(server);
 
-// 2. Optionally create a standalone tool for the same resource
-const pricingTool = createTool({
+// 2. Create a display tool with typed input schema
+const showPricing = createTool({
   resource: pricingUI,
   description: "Show pricing comparison",
   inputSchema: { postalCode: z.string(), sqm: z.number() },
@@ -227,7 +228,7 @@ const pricingTool = createTool({
   data: { postalCode, sqm, prices: [/* ... */] },
 }));
 
-// 3. Reference the resource in a flow (declarative widget node — no handler boilerplate)
+// 3. Use the display tool in a flow via showWidget
 const flow = createFlow({
   id: "guided_quote",
   title: "Guided Quote",
@@ -238,16 +239,15 @@ const flow = createFlow({
     selectedPlan: z.string().describe("The plan the user selected"),
   },
 })
-  // Declarative interrupts — no handlers, no boilerplate
-  .addNode("ask_postal", { question: "What's your postal code?", field: "postalCode" })
-  .addNode("ask_sqm", { question: "How many m² is your home?", field: "sqm" })
-  // Declarative widget — resource declared once, data is dynamic
-  .addNode("show_pricing", {
-    resource: pricingUI,
-    field: "selectedPlan",
-    description: "Showing pricing comparison. User will select a plan.",
-    data: (state) => ({ postalCode: state.postalCode, sqm: Number(state.sqm) }),
-  })
+  .addNode("ask_postal", () => interrupt({ question: "What's your postal code?", field: "postalCode" }))
+  .addNode("ask_sqm", () => interrupt({ question: "How many m² is your home?", field: "sqm" }))
+  .addNode("show_pricing", (state) =>
+    showWidget(showPricing, {
+      data: { postalCode: state.postalCode!, sqm: Number(state.sqm) },
+      description: "Showing pricing comparison. User will select a plan.",
+      field: "selectedPlan",
+    })
+  )
   .addNode("confirm", (state) => ({
     summary: `Selected ${state.selectedPlan} for ${state.postalCode}`,
   }))
@@ -259,7 +259,7 @@ const flow = createFlow({
   .compile();
 
 // 4. Register
-await registerTools(server, [pricingTool, flow]);
+await registerTools(server, [showPricing, flow]);
 ```
 
 ### Widget callback (client-side)
@@ -317,13 +317,11 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 | `title` | `string` | yes | Display title |
 | `description` | `string` | yes | Tells the AI when to use this flow |
 | `state` | `Record<string, z.ZodType>` | yes | State schema — defines all fields the flow collects. Keys match `interrupt({ field })` names, values are Zod schemas with `.describe()` |
-| `resource` | `RegisteredResource` | no | Container resource — when set, all widget steps use this single resource and `__widgetId` is injected into `structuredContent` |
 
 ### `StateGraph` methods
 
 | Method | Description |
 |--------|-------------|
-| `.addNode(name, { resource, field?, description?, data? })` | **Declarative widget** — show a widget, no handler. `data` can be static or `(state) => ({...})` |
 | `.addNode(name, handler)` | Handler node — return `interrupt()`, `showWidget()`, or a plain object |
 | `.addNode(name, { field? }, handler)` | Handler node with config. `field` enables auto-skip. |
 | `.addEdge(from, to)` | Static edge (`START` and `END` are valid) |
@@ -336,92 +334,12 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 |----------|-------------|
 | `interrupt({ question, field, suggestions?, context? })` | Pause and ask the user a single question. `context` provides hidden AI instructions. |
 | `interrupt({ questions: [...], context? })` | Pause and ask several questions at once in one message. |
-| `showWidget(resource, { data, field?, description? })` | Pause and render a widget. `field` enables auto-skip when already set. |
-
-## Container widget pattern
-
-Use a single "container" resource for all widget steps in a flow. The container receives `__widgetId` in `structuredContent` and routes to the correct sub-widget. Non-widget steps (interrupts) return `widgetId: null` — the container renders nothing (0 height).
-
-### Server-side — add `resource` to flow config
-
-```ts
-import { createResource, createFlow, showWidget, START, END } from "@waniwani/sdk/mcp";
-
-// 1. Create a container resource (the single iframe for all widget steps)
-const containerWidget = createResource({
-  id: "my_flow_container",
-  title: "Flow Container",
-  baseUrl: "https://my-app.com",
-  htmlPath: "/widgets/flow-container",
-  widgetDomain: "my-app.com",
-});
-
-await containerWidget.register(server);
-
-// 2. Create sub-widget resources (for showWidget calls)
-const contractChooser = createResource({ id: "contract_chooser", /* ... */ });
-const pricingTable = createResource({ id: "pricing_table", /* ... */ });
-await contractChooser.register(server);
-await pricingTable.register(server);
-
-// 3. Pass container resource in flow config
-const flow = createFlow({
-  id: "guided_quote",
-  title: "Guided Quote",
-  description: "Walk users through getting a quote.",
-  resource: containerWidget,  // ← container resource
-  state: {
-    contractId: z.string().describe("Selected contract"),
-    selectedPlan: z.string().describe("Selected plan"),
-  },
-})
-  .addNode("choose_contract", (state) =>
-    showWidget(contractChooser, { data: { contracts: state.contracts }, field: "contractId" })
-  )
-  .addNode("show_pricing", (state) =>
-    showWidget(pricingTable, { data: { offers: getOffers(state) }, field: "selectedPlan" })
-  )
-  .addEdge(START, "choose_contract")
-  .addEdge("choose_contract", "show_pricing")
-  .addEdge("show_pricing", END)
-  .compile();
-```
-
-When `resource` is set:
-- All widget steps use the container resource's URIs (single iframe stays mounted)
-- `__widgetId` is injected into `structuredContent` (e.g. `"contract_chooser"`)
-- Non-widget steps behave identically to flows without `resource`
-
-### Client-side — container widget page
-
-```tsx
-import { useFlowAction } from "@waniwani/sdk/mcp/react";
-
-function FlowContainer() {
-  const { widgetId, data } = useFlowAction<MyData>();
-  if (!widgetId || !data) return null; // 0 height for interrupts
-
-  switch (widgetId) {
-    case "contract_chooser":
-      return <ContractChooser data={data} />;
-    case "pricing_table":
-      return <PricingTable data={data} />;
-    default:
-      return null;
-  }
-}
-```
-
-`useFlowAction` returns:
-- `widgetId: string | null` — the sub-widget ID (from `__widgetId`), `null` for non-widget steps
-- `data: T | null` — structured content with `__widgetId` stripped
-
-When `resource` is NOT set on the flow config, `widgetId` is always `null` and behavior is unchanged (non-breaking).
+| `showWidget(displayTool, { data, field?, description? })` | Pause and delegate rendering to a display tool. `field` enables auto-skip when already set. |
 
 ## Common Mistakes
 
 - **Forgetting `START`/`END` edges** — Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`
 - **Action nodes returning interrupt/widget** — If a node returns `interrupt()` or `showWidget()`, it becomes an interrupt/widget node, not an action node
-- **Forgetting to register the resource** — Call `await resource.register(server)` before registering the flow
+- **Forgetting to register the display tool** — The `RegisteredTool` passed to `showWidget()` must be registered on the server via `registerTools(server, [displayTool, flow])`
+- **Passing a resource to `showWidget()`** — `showWidget()` takes a `RegisteredTool` (from `createTool`), not a `RegisteredResource`
 - **Widget callback shape** — The `callTool` call must use `action: "continue"`, include the `flowToken` from the previous response, and pass the result via `stateUpdates: { [field]: value }`
-- **Resource declared twice** — Use the declarative widget node `{ resource, field, data }` to avoid repeating the resource in both `addNode` and `showWidget()`

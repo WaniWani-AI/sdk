@@ -5,7 +5,6 @@ import type {
 	ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { buildToolMeta } from "../resources/meta";
 import type {
 	CompileInput,
 	Edge,
@@ -21,23 +20,6 @@ import type {
 } from "./@types";
 import { END, isInterrupt, isWidget, START } from "./@types";
 import { decodeFlowToken, encodeFlowToken } from "./flow-token";
-
-// ============================================================================
-// Default flow widget — invisible 0-height iframe for non-widget steps
-// ============================================================================
-
-const _FLOW_DEFAULT_HTML = `<!DOCTYPE html>
-<html><head><style>html,body{margin:0;padding:0;height:0;overflow:hidden}</style></head>
-<body>_FLOW_DEFAULT_HTML
-window.addEventListener('message',function(e){
-var d=e.data;
-if(!d||d.jsonrpc!=='2.0')return;
-if(d.method==='ui/initialize'){
-e.source.postMessage({jsonrpc:'2.0',id:d.id,result:{capabilities:{}}},'*');
-e.source.postMessage({jsonrpc:'2.0',method:'ui/notifications/size-changed',params:{height:0}},'*');
-}
-});
-</script></body></html>`;
 
 // ============================================================================
 // Flow protocol — embedded in tool description
@@ -96,8 +78,10 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"     Then call again with:",
 		'     `action: "continue"`, `flowToken` = the `flowToken` from the response (pass back exactly as received),',
 		"     `stateUpdates` = answers keyed by their `field` names, plus any other fields the user mentioned.",
-		'   - `"widget"`: A widget UI is being shown. The user will interact with the widget.',
-		"     When the user makes a choice, call again with:",
+		'   - `"widget"`: The flow wants to show a UI widget. Call the tool named in the `tool`',
+		"     field, passing the `data` object as the tool's input.",
+		"     Present the widget result to the user. When the user makes a choice or interacts",
+		"     with the widget, call THIS flow tool again with:",
 		'     `action: "continue"`, `flowToken` = the `flowToken` from the response,',
 		"     `stateUpdates` = `{ [field]: <user's selection> }` plus any other fields the user mentioned.",
 		'   - `"complete"`: The flow is done. Present the result to the user.',
@@ -222,7 +206,6 @@ async function executeFrom<TState extends Record<string, unknown>>(
 	nodeConfigs: Map<string, NodeConfig<TState>>,
 	edges: Map<string, Edge<TState>>,
 	meta?: Record<string, unknown>,
-	containerResource?: import("../resources/types").RegisteredResource,
 ): Promise<ExecutionResult> {
 	let currentNode = startNodeName;
 	let state = { ...startState };
@@ -277,7 +260,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 				continue;
 			}
 
-			// Widget signal — pause and show widget
+			// Widget signal — delegate to display tool
 			if (isWidget(result)) {
 				// Auto-skip: use field from the signal, fall back to nodeConfig
 				const widgetField = result.field ?? nodeConfigs.get(currentNode)?.field;
@@ -297,28 +280,18 @@ async function executeFrom<TState extends Record<string, unknown>>(
 					}
 				}
 
-				const widgetResource = result.resource;
-				const templateResource = containerResource ?? widgetResource;
 				return {
 					content: {
 						status: "widget",
+						tool: result.tool.id,
+						data: result.data,
 						description: result.description,
 					},
-					structuredContent: containerResource
-						? { __widgetId: widgetResource.id, ...result.data }
-						: result.data,
-					_meta: buildToolMeta({
-						openaiTemplateUri: templateResource.openaiUri,
-						mcpTemplateUri: templateResource.mcpUri,
-						invoking: "Loading...",
-						invoked: "Loaded",
-						autoHeight: templateResource.autoHeight,
-					}),
 					flowTokenContent: {
 						step: currentNode,
 						state,
 						field: widgetField,
-						widgetId: widgetResource.id,
+						widgetId: result.tool.id,
 					},
 				};
 			}
@@ -415,7 +388,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				nodeConfigs,
 				edges,
 				meta,
-				config.resource,
 			);
 		}
 
@@ -473,19 +445,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					nodeConfigs,
 					edges,
 					meta,
-					config.resource,
 				);
 			}
 
-			return executeFrom(
-				step,
-				updatedState,
-				nodes,
-				nodeConfigs,
-				edges,
-				meta,
-				config.resource,
-			);
+			return executeFrom(step, updatedState, nodes, nodeConfigs, edges, meta);
 		}
 
 		return {
@@ -536,19 +499,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 						},
 					];
 
-					// Widget response — include structuredContent + widget metadata
-					if (contentResponse.status === "widget") {
-						return {
-							content,
-							structuredContent: result.structuredContent,
-							_meta: {
-								..._meta,
-								...result._meta,
-							},
-						};
-					}
-
-					// Non-widget response (interrupt, complete, error)
 					return {
 						content,
 						..._meta,
