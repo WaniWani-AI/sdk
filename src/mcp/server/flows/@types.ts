@@ -155,14 +155,6 @@ export type NodeConfig<
 	 * the node is auto-skipped. (Alternatively, pass `field` to `showWidget()`.)
 	 */
 	field?: Extract<keyof TState, string>;
-	/**
-	 * Mark this node as conversational — the AI will engage in back-and-forth
-	 * conversation before advancing to the next node.
-	 *
-	 * - `true` — generic conversational behavior
-	 * - `string` — specific guidance for the AI (e.g., "Help the user compare plans")
-	 */
-	conversational?: boolean | string;
 };
 
 // ============================================================================

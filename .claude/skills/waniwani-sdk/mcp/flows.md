@@ -398,14 +398,14 @@ When `resource` is set:
 import { useFlowAction } from "@waniwani/sdk/mcp/react";
 
 function FlowContainer() {
-  const { widgetId, data, advance, isAdvancing } = useFlowAction("my_flow_container");
+  const { widgetId, data } = useFlowAction<MyData>();
   if (!widgetId || !data) return null; // 0 height for interrupts
 
   switch (widgetId) {
     case "contract_chooser":
-      return <ContractChooser data={data} advance={advance} isAdvancing={isAdvancing} />;
+      return <ContractChooser data={data} />;
     case "pricing_table":
-      return <PricingTable data={data} advance={advance} isAdvancing={isAdvancing} />;
+      return <PricingTable data={data} />;
     default:
       return null;
   }
@@ -414,8 +414,7 @@ function FlowContainer() {
 
 `useFlowAction` returns:
 - `widgetId: string | null` — the sub-widget ID (from `__widgetId`), `null` for non-widget steps
-- `data` — structured content with `__widgetId` stripped
-- `advance` / `isAdvancing` — same as before
+- `data: T | null` — structured content with `__widgetId` stripped
 
 When `resource` is NOT set on the flow config, `widgetId` is always `null` and behavior is unchanged (non-breaking).
 

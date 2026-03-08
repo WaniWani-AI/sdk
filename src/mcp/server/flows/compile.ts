@@ -109,13 +109,6 @@ function buildFlowProtocol(config: FlowConfig): string {
 		"   If the user did not answer all pending questions, the engine will re-prompt for the remaining ones.",
 		"   If the user mentioned values for other known fields, include those too —",
 		"   they will be applied immediately and those steps will be auto-skipped.",
-		'6. CONVERSATIONAL STEPS: When a response includes a `"conversational"` field:',
-		"   - Do NOT immediately call `continue`. Instead, engage in back-and-forth conversation.",
-		"   - The user may ask follow-up questions, explore options, or request changes.",
-		'   - Only call `action: "continue"` when the user explicitly wants to move on',
-		'     (e.g., "looks good", "let\'s continue", "I\'ll go with X", or selects an option).',
-		"   - If `conversational` is a string, use it as guidance for what topics to discuss.",
-		"   - While conversing, do NOT call the tool — just respond naturally to the user.",
 	);
 
 	return lines.join("\n");
@@ -175,7 +168,6 @@ function buildInterruptResult<TState extends Record<string, unknown>>(
 	context: string | undefined,
 	currentNode: string,
 	state: TState,
-	conversational?: boolean | string,
 ): ExecutionResult | null {
 	// All filled — caller should advance to the next node
 	if (questions.every((q) => isFilled(state[q.field as keyof TState]))) {
@@ -190,11 +182,6 @@ function buildInterruptResult<TState extends Record<string, unknown>>(
 	// Single-question shorthand: unwrap for cleaner AI payload
 	const isSingle = unanswered.length === 1;
 	const q0 = unanswered[0];
-	const conversationalValue = conversational
-		? typeof conversational === "string"
-			? conversational
-			: true
-		: undefined;
 	const payload =
 		isSingle && q0
 			? {
@@ -203,17 +190,11 @@ function buildInterruptResult<TState extends Record<string, unknown>>(
 					field: q0.field,
 					...(q0.suggestions ? { suggestions: q0.suggestions } : {}),
 					...(q0.context || context ? { context: q0.context ?? context } : {}),
-					...(conversationalValue
-						? { conversational: conversationalValue }
-						: {}),
 				}
 			: {
 					status: "interrupt" as const,
 					questions: unanswered,
 					...(context ? { context } : {}),
-					...(conversationalValue
-						? { conversational: conversationalValue }
-						: {}),
 				};
 
 	return {
@@ -279,7 +260,6 @@ async function executeFrom<TState extends Record<string, unknown>>(
 					result.context,
 					currentNode,
 					state,
-					nodeConfigs.get(currentNode)?.conversational,
 				);
 				if (interruptResult) return interruptResult;
 
@@ -465,7 +445,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					inputMeta.interruptContext,
 					step,
 					updatedState,
-					nodeConfigs.get(step)?.conversational,
 				);
 				if (interruptResult) return interruptResult;
 				// All questions answered — fall through to advance
