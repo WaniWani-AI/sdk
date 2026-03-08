@@ -10,7 +10,7 @@ You define a state graph, compile it into a tool, and the model advances it step
 2. `compile()` turns the graph into an MCP tool.
 3. Action nodes auto-advance.
 4. Interrupt nodes pause and ask a question.
-5. Widget nodes pause and render a widget.
+5. Widget nodes pause and delegate rendering to a display tool.
 
 State is carried in an opaque base64 `flowToken` included in the tool response text. The model passes it back on `continue` calls without needing to understand it.
 
@@ -34,15 +34,11 @@ Flow tools return:
 
 ```ts
 {
-  content: [{ type: "text", text: JSON.stringify({ status: "...", flowToken: "...", flowId: "...", ... }) }],
-  structuredContent?: Record<string, unknown>, // for widget steps
-  _meta?: {
-    // host/tool metadata (for example waniwani, ui, session keys)
-  }
+  content: [{ type: "text", text: JSON.stringify({ status: "...", flowToken: "...", tool?: "...", data?: {...}, ... }) }],
 }
 ```
 
-Flow state lives in `flowToken` inside `content[0].text`. The model sees it and echoes it back.
+For widget steps, the response includes `tool` (display tool name) and `data` (data to pass to it). The model calls the display tool separately.
 
 ## Quick start
 
@@ -86,55 +82,22 @@ const flow = createFlow({
 await flow.register(server);
 ```
 
-## Interrupt loop example
-
-Start call:
-
-```json
-{
-  "action": "start",
-  "stateUpdates": {
-    "email": "maxime@antoinedev.com"
-  }
-}
-```
-
-Interrupt response shape:
-
-```json
-{
-  "content": [
-    {
-      "type": "text",
-      "text": "{\n  \"status\": \"interrupt\",\n  \"question\": \"What's your primary use case?\",\n  \"field\": \"useCase\",\n  \"flowToken\": \"eyJzdGVwIjoiYXNrX3VzZV9jYXNlIiwic3RhdGUiOnsiZW1haWwiOiJtYXhpbWVAYW50b2luZWRldi5jb20iLCJyb2xlIjoiQ0VPIn0sImZpZWxkIjoidXNlQ2FzZSJ9\",\n  \"flowId\": \"demo_qualification\"\n}"
-    }
-  ]
-}
-```
-
-Continue call:
-
-```json
-{
-  "action": "continue",
-  "flowToken": "eyJzdGVwIjoiYXNrX3VzZV9jYXNlIiwic3RhdGUiOnsiZW1haWwiOiJtYXhpbWVAYW50b2luZWRldi5jb20iLCJyb2xlIjoiQ0VPIn0sImZpZWxkIjoidXNlQ2FzZSJ9",
-  "stateUpdates": { "useCase": "Lead qualification" }
-}
-```
-
 ## Widget step example
 
 ```ts
 import {
   createFlow,
   createResource,
+  createTool,
   interrupt,
   showWidget,
+  registerTools,
   START,
   END,
 } from "@waniwani/sdk/mcp";
 import { z } from "zod";
 
+// 1. Create and register a resource
 const pricingUI = createResource({
   id: "pricing_table",
   title: "Pricing Table",
@@ -146,6 +109,17 @@ const pricingUI = createResource({
 
 await pricingUI.register(server);
 
+// 2. Create a display tool with typed schema
+const showPricing = createTool({
+  resource: pricingUI,
+  description: "Show pricing comparison",
+  inputSchema: { postalCode: z.string(), sqm: z.number() },
+}, async ({ postalCode, sqm }) => ({
+  text: "Pricing loaded",
+  data: { postalCode, sqm, prices: [/* ... */] },
+}));
+
+// 3. Use the display tool in a flow via showWidget
 const flow = createFlow({
   id: "guided_quote",
   title: "Guided Quote",
@@ -162,10 +136,11 @@ const flow = createFlow({
   .addNode("ask_sqm", () =>
     interrupt({ question: "How many m² is your home?", field: "sqm" }),
   )
-  .addNode("show_pricing", { resource: pricingUI, field: "selectedPlan" }, (state) =>
-    showWidget(pricingUI, {
-      data: { postalCode: state.postalCode, sqm: Number(state.sqm) },
+  .addNode("show_pricing", (state) =>
+    showWidget(showPricing, {
+      data: { postalCode: state.postalCode!, sqm: Number(state.sqm) },
       description: "User must pick a plan.",
+      field: "selectedPlan",
     }),
   )
   .addNode("done", (state) => ({ summary: `Selected ${state.selectedPlan}` }))
@@ -176,33 +151,8 @@ const flow = createFlow({
   .addEdge("done", END)
   .compile();
 
-await flow.register(server);
-```
-
-Widget-side callback (using `useFlowAction`):
-
-```tsx
-import { useFlowAction } from "@waniwani/sdk/mcp/react";
-
-function PricingTable() {
-  const { data, advance, isAdvancing } = useFlowAction<{
-    prices: Array<{ plan: string; price: number }>;
-  }>("pricing_table");
-
-  return (
-    <div>
-      {data?.prices.map((p) => (
-        <button
-          key={p.plan}
-          disabled={isAdvancing}
-          onClick={() => advance(p.plan, p.plan)}
-        >
-          {p.plan}: {p.price}
-        </button>
-      ))}
-    </div>
-  );
-}
+// 4. Register display tool + flow
+await registerTools(server, [showPricing, flow]);
 ```
 
 ## Conditional edges
@@ -246,7 +196,7 @@ const flow = createFlow({
 |---|---|
 | `interrupt({ question, field })` | Pause -> ask user -> resume with answer stored at `field` |
 | `interrupt({ question, field, context })` | Same, plus hidden guidance for the assistant |
-| `showWidget(resource, { data })` | Pause -> render widget -> resume on widget callback |
+| `showWidget(displayTool, { data, field? })` | Pause -> instruct AI to call display tool -> resume on continue |
 | `{ key: value, ... }` | Action node -> merge into state -> auto-advance |
 
 ## API
@@ -266,7 +216,7 @@ Config fields:
 ### `StateGraph` methods
 
 - `.addNode(name, handler)`
-- `.addNode(name, { resource?, field? }, handler)`
+- `.addNode(name, { field? }, handler)`
 - `.addEdge(from, to)`
 - `.addConditionalEdge(from, condition)`
 - `.compile()`
