@@ -8,6 +8,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import type { ModelContextUpdate } from "../../../shared/model-context";
 import type { ChatCardProps, ChatHandle } from "../@types";
 import {
 	Conversation,
@@ -107,12 +108,19 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			(message: {
 				role: string;
 				content: Array<{ type: string; text?: string }>;
+				modelContext?: ModelContextUpdate;
 			}) => {
 				const text = message.content
 					.map((c) => c.text ?? "")
 					.join("")
 					.trim();
-				if (text) engine.handleSubmit({ text, files: [] });
+				if (text) {
+					engine.handleSubmit({
+						text,
+						files: [],
+						modelContext: message.modelContext,
+					});
+				}
 			},
 			[engine.handleSubmit],
 		);

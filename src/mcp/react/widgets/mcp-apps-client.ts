@@ -1,5 +1,6 @@
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { App, PostMessageTransport } from "@modelcontextprotocol/ext-apps";
+import type { ModelContextUpdate } from "../../../shared/model-context";
 import type {
 	DisplayMode,
 	SafeArea,
@@ -191,6 +192,17 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 			.catch((err: unknown) => {
 				console.error("Failed to send follow-up message:", err);
 			});
+	}
+
+	updateModelContext(context: ModelContextUpdate): Promise<void> {
+		return this.app
+			.updateModelContext({
+				...(context.content ? { content: context.content } : {}),
+				...(context.structuredContent
+					? { structuredContent: context.structuredContent }
+					: {}),
+			})
+			.then(() => undefined);
 	}
 
 	getTheme(): Theme {

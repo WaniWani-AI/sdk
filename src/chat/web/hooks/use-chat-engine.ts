@@ -5,6 +5,8 @@ import type { FileUIPart } from "ai";
 import { DefaultChatTransport } from "ai";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ModelContextUpdate } from "../../../shared/model-context";
+import { hasModelContext } from "../../../shared/model-context";
 import type { ChatBaseProps } from "../@types";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
 import type { VisitorContext } from "../lib/visitor-context";
@@ -55,7 +57,12 @@ export interface QueuedMessage {
 	id: string;
 	text: string;
 	files: FileUIPart[];
+	modelContext?: ModelContextUpdate;
 }
+
+type ChatEngineMessage = PromptInputMessage & {
+	modelContext?: ModelContextUpdate;
+};
 
 export function useChatEngine(props: ChatBaseProps) {
 	const {
@@ -68,6 +75,9 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	const headersRef = useRef(userHeaders);
 	const bodyRef = useRef(body);
+	const pendingModelContextRef = useRef<ModelContextUpdate | undefined>(
+		undefined,
+	);
 	const visitorContextRef = useRef<VisitorContext | null>(null);
 	const [sessionId, setSessionIdState] = useState<string | undefined>(() =>
 		readSessionIdFromStorage(),
@@ -137,23 +147,25 @@ export function useChatEngine(props: ChatBaseProps) {
 				if (bodySessionId) {
 					setSessionId(bodySessionId);
 					resolvedBody.sessionId = bodySessionId;
-					return resolvedBody;
-				}
-				if (hasExplicitSessionId) {
+				} else if (hasExplicitSessionId) {
 					clearSessionId();
 					delete resolvedBody.sessionId;
-					return resolvedBody;
+				} else {
+					const storedSessionId = getSessionId();
+					if (storedSessionId) {
+						resolvedBody.sessionId = storedSessionId;
+					}
 				}
 
-				const storedSessionId = getSessionId();
-				if (storedSessionId) {
-					resolvedBody.sessionId = storedSessionId;
+				if (hasModelContext(pendingModelContextRef.current)) {
+					resolvedBody.modelContext = pendingModelContextRef.current;
 				}
 
 				return resolvedBody;
 			},
 			fetch: async (input, init) => {
 				const response = await fetch(input, init);
+				pendingModelContextRef.current = undefined;
 				setSessionId(response.headers.get(SESSION_HEADER_NAME));
 				return response;
 			},
@@ -182,7 +194,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	const queueFull = isLoading && queuedMessages.length > 0;
 
 	const handleSubmit = useCallback(
-		(message: PromptInputMessage) => {
+		(message: ChatEngineMessage) => {
 			const hasText = Boolean(message.text?.trim());
 			const hasFiles = Boolean(message.files?.length);
 			if (!(hasText || hasFiles)) return;
@@ -197,12 +209,14 @@ export function useChatEngine(props: ChatBaseProps) {
 						id: nanoid(),
 						text: message.text || "",
 						files: message.files ?? [],
+						modelContext: message.modelContext,
 					},
 				]);
 				setText("");
 				return;
 			}
 
+			pendingModelContextRef.current = message.modelContext;
 			sendMessage({
 				text: message.text || "",
 				files: message.files,
@@ -222,6 +236,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		const [first, ...rest] = queuedMessages;
 		setQueuedMessages(rest);
 
+		pendingModelContextRef.current = first.modelContext;
 		sendMessage({
 			text: first.text,
 			files: first.files.length > 0 ? first.files : undefined,

@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type ModelContextUpdate,
+	mergeModelContext,
+} from "../../../shared/model-context";
 import { cn } from "../lib/utils";
 
 const DEFAULT_RESOURCE_ENDPOINT = "/api/mcp/resource";
@@ -40,6 +44,7 @@ export interface McpAppFrameProps {
 	onFollowUp?: (message: {
 		role: string;
 		content: Array<{ type: string; text?: string }>;
+		modelContext?: ModelContextUpdate;
 	}) => void;
 	/** Called when a widget calls a tool via `tools/call` (MCP Apps standard). */
 	onCallTool?: (params: {
@@ -138,6 +143,7 @@ export function McpAppFrame({
 
 		let disposed = false;
 		let handshakeReceived = false;
+		let pendingModelContext: ModelContextUpdate | null = null;
 		let pendingToolResult: {
 			text: string;
 			timer: ReturnType<typeof setTimeout>;
@@ -183,8 +189,14 @@ export function McpAppFrame({
 						hostInfo: { name: "WaniWani Chat", version: "1.0.0" },
 						hostCapabilities: {
 							openLinks: {},
-							message: {},
+							message: {
+								text: {},
+							},
 							tools: {},
+							updateModelContext: {
+								text: {},
+								structuredContent: {},
+							},
 						},
 						hostContext: {
 							theme: isDarkRef.current ? "dark" : "light",
@@ -333,6 +345,8 @@ export function McpAppFrame({
 			if (method === "ui/message" && id != null) {
 				if (onFollowUpRef.current && data.params) {
 					let params = data.params;
+					const modelContext = pendingModelContext;
+					pendingModelContext = null;
 					// Merge pending tool result into the follow-up message
 					if (pendingToolResult) {
 						clearTimeout(pendingToolResult.timer);
@@ -349,8 +363,21 @@ export function McpAppFrame({
 							],
 						};
 					}
-					onFollowUpRef.current(params);
+					onFollowUpRef.current({
+						...params,
+						...(modelContext ? { modelContext } : {}),
+					});
 				}
+				postToIframe({ jsonrpc: "2.0", id, result: {} });
+				return;
+			}
+
+			// ui/update-model-context — widget updates hidden model context
+			if (method === "ui/update-model-context" && id != null) {
+				pendingModelContext = mergeModelContext(
+					pendingModelContext,
+					data.params as ModelContextUpdate,
+				);
 				postToIframe({ jsonrpc: "2.0", id, result: {} });
 				return;
 			}
@@ -373,23 +400,26 @@ export function McpAppFrame({
 					.then((result) => {
 						postToIframe({ jsonrpc: "2.0", id, result });
 
-						// Schedule auto-injection of tool result text. If the widget
-						// sends its own follow-up (ui/message) before the timer fires,
-						// the text is merged into that message instead.
+						// Schedule auto-injection of tool result text only for plain
+						// text responses. Structured results are intended for the widget
+						// itself and should not be dumped into the visible transcript.
 						const text = result.content
 							?.map((c) => c.text ?? "")
 							.join("")
 							.trim();
-						if (text) {
+						if (text && !result.structuredContent) {
 							if (pendingToolResult) clearTimeout(pendingToolResult.timer);
 							pendingToolResult = {
 								text,
 								timer: setTimeout(() => {
 									if (disposed) return;
+									const modelContext = pendingModelContext;
+									pendingModelContext = null;
 									pendingToolResult = null;
 									onFollowUpRef.current?.({
 										role: "user",
 										content: [{ type: "text", text }],
+										...(modelContext ? { modelContext } : {}),
 									});
 								}, 500),
 							};

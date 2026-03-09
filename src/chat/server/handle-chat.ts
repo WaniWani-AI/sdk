@@ -3,6 +3,7 @@
 import { WaniWaniError } from "../../error";
 import { createLogger } from "../../utils/logger.js";
 import type { ApiHandlerDeps } from "./@types";
+import { applyModelContextToSystemPrompt } from "./model-context";
 
 export function createChatRequestHandler(deps: ApiHandlerDeps) {
 	const {
@@ -25,6 +26,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 			const body = await request.json();
 			let messages = body.messages ?? [];
 			let sessionId: string | undefined = body.sessionId;
+			let modelContext = body.modelContext;
 			let effectiveSystemPrompt = systemPrompt;
 
 			log(
@@ -41,6 +43,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 					const result = await beforeRequest({
 						messages,
 						sessionId,
+						modelContext,
 						request,
 					});
 
@@ -49,6 +52,8 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 						if (result.systemPrompt !== undefined)
 							effectiveSystemPrompt = result.systemPrompt;
 						if (result.sessionId !== undefined) sessionId = result.sessionId;
+						if (result.modelContext !== undefined)
+							modelContext = result.modelContext;
 					}
 					log(
 						"beforeRequest hook done — messages:",
@@ -71,6 +76,10 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 			const mcpServerUrl =
 				mcpServerUrlOverride ?? (await resolveConfig()).mcpServerUrl;
 			log("mcpServerUrl:", mcpServerUrl);
+			effectiveSystemPrompt = applyModelContextToSystemPrompt(
+				effectiveSystemPrompt,
+				modelContext,
+			);
 
 			// 4. Forward to WaniWani API
 			const upstreamUrl = `${baseUrl}/api/mcp/chat`;

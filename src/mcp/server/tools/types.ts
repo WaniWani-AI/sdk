@@ -49,7 +49,7 @@ export type ToolHandler<TInput extends ZodRawShapeCompat> = (
 ) => Promise<{
 	/** Text content to return */
 	text: string;
-	/** Structured data to pass to the widget. Only meaningful when resource is present. */
+	/** Structured data returned as MCP `structuredContent`. */
 	data?: Record<string, unknown>;
 }>;
 

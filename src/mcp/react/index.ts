@@ -25,6 +25,9 @@ export type {
 // Hooks and provider
 export type {
 	FlowActionResult,
+	ModelContextContentBlock,
+	ModelContextUpdate,
+	SendFollowUpOptions,
 	UseWaniwaniOptions,
 	WaniwaniWidget,
 } from "./hooks/index";
@@ -42,6 +45,7 @@ export {
 	useTheme,
 	useToolOutput,
 	useToolResponseMetadata,
+	useUpdateModelContext,
 	useWaniwani,
 	useWidgetClient,
 	useWidgetState,

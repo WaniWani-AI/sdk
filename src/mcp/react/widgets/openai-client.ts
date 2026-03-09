@@ -1,3 +1,8 @@
+import {
+	formatModelContextForPrompt,
+	type ModelContextUpdate,
+	mergeModelContext,
+} from "../../../shared/model-context";
 import type {
 	DisplayMode,
 	SafeArea,
@@ -18,6 +23,8 @@ type GlobalsKey = keyof SetGlobalsEvent["detail"]["globals"];
  * Uses window.openai global object injected by ChatGPT.
  */
 export class OpenAIWidgetClient implements UnifiedWidgetClient {
+	private pendingModelContext: ModelContextUpdate | null = null;
+
 	private getGlobal<T>(
 		key: keyof NonNullable<typeof window.openai>,
 		fallback: T,
@@ -87,8 +94,20 @@ export class OpenAIWidgetClient implements UnifiedWidgetClient {
 
 	sendFollowUp(prompt: string): void {
 		if (typeof window !== "undefined" && window.openai?.sendFollowUpMessage) {
-			window.openai.sendFollowUpMessage({ prompt });
+			const hiddenContext = formatModelContextForPrompt(
+				this.pendingModelContext,
+			);
+			this.pendingModelContext = null;
+			const message = hiddenContext ? `${prompt}\n\n${hiddenContext}` : prompt;
+			window.openai.sendFollowUpMessage({ prompt: message });
 		}
+	}
+
+	updateModelContext(context: ModelContextUpdate): void {
+		this.pendingModelContext = mergeModelContext(
+			this.pendingModelContext,
+			context,
+		);
 	}
 
 	getTheme(): Theme {

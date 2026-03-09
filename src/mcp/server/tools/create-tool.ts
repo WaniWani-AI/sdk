@@ -17,8 +17,8 @@ import type {
 /**
  * Creates an MCP tool with minimal boilerplate.
  *
- * When `config.resource` is provided, the tool returns `structuredContent` + widget metadata.
- * Without a resource, the tool returns plain text content.
+ * When `handler()` returns `data`, the tool includes it as MCP `structuredContent`.
+ * When `config.resource` is provided, the tool also returns widget metadata.
  *
  * @example
  * ```ts
@@ -110,9 +110,10 @@ export function createTool<TInput extends z.ZodRawShape>(
 						};
 					}
 
-					// Plain tool: return text content only
+					// Plain tool: return text content, plus structuredContent when provided.
 					return {
 						content: [{ type: "text" as const, text: result.text }],
+						...(result.data ? { structuredContent: result.data } : {}),
 					};
 				}) as unknown as ToolCallback<TInput>,
 			);
