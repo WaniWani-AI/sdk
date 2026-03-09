@@ -47,7 +47,13 @@ export function createTool<TInput extends z.ZodRawShape>(
 	config: ToolConfig<TInput>,
 	handler: ToolHandler<TInput>,
 ): RegisteredTool {
-	const { resource, description, inputSchema, annotations } = config;
+	const {
+		resource,
+		description,
+		inputSchema,
+		annotations,
+		autoInjectResultText = true,
+	} = config;
 
 	const id = config.id ?? resource?.id;
 	const title = config.title ?? resource?.title;
@@ -106,6 +112,9 @@ export function createTool<TInput extends z.ZodRawShape>(
 							_meta: {
 								...toolMeta,
 								..._meta,
+								...(autoInjectResultText === false
+									? { "waniwani/autoInjectResultText": false }
+									: {}),
 							},
 						};
 					}
@@ -114,6 +123,13 @@ export function createTool<TInput extends z.ZodRawShape>(
 					return {
 						content: [{ type: "text" as const, text: result.text }],
 						...(result.data ? { structuredContent: result.data } : {}),
+						...(autoInjectResultText === false
+							? {
+									_meta: {
+										"waniwani/autoInjectResultText": false,
+									},
+								}
+							: {}),
 					};
 				}) as unknown as ToolCallback<TInput>,
 			);

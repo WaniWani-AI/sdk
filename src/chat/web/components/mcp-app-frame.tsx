@@ -40,6 +40,13 @@ export function resultProducesWidget(result: {
 	return Boolean(resourceUri);
 }
 
+function shouldAutoInjectToolResultText(result: {
+	_meta?: Record<string, unknown>;
+}): boolean {
+	if (resultProducesWidget(result)) return false;
+	return result._meta?.["waniwani/autoInjectResultText"] !== false;
+}
+
 export type McpAppDisplayMode = "inline" | "pip" | "fullscreen";
 
 export interface McpAppFrameProps {
@@ -425,7 +432,7 @@ export function McpAppFrame({
 							?.map((c) => c.text ?? "")
 							.join("")
 							.trim();
-						if (text && !resultProducesWidget(result)) {
+						if (text && shouldAutoInjectToolResultText(result)) {
 							if (pendingToolResult) clearTimeout(pendingToolResult.timer);
 							pendingToolResult = {
 								text,

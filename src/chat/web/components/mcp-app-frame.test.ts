@@ -33,4 +33,14 @@ describe("resultProducesWidget", () => {
 			}),
 		).toBe(true);
 	});
+
+	test("returns false for helper-tool opt-out metadata", () => {
+		expect(
+			resultProducesWidget({
+				_meta: {
+					"waniwani/autoInjectResultText": false,
+				},
+			}),
+		).toBe(false);
+	});
 });

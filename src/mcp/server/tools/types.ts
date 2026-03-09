@@ -34,6 +34,13 @@ export type ToolConfig<TInput extends ZodRawShapeCompat> = {
 	invoking?: string;
 	/** Optional loaded message (defaults to "Loaded"). Only relevant when resource is present. */
 	invoked?: string;
+	/**
+	 * When a widget calls this tool via `tools/call`, should the host auto-inject
+	 * the tool's text result into the next follow-up message if the widget does
+	 * not send one itself. Defaults to true. Set false for helper tools whose
+	 * result is consumed programmatically by the widget.
+	 */
+	autoInjectResultText?: boolean;
 	/** Annotations describe the tool's potential impact. */
 	annotations?: {
 		readOnlyHint?: boolean;
