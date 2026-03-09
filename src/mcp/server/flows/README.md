@@ -196,7 +196,7 @@ const flow = createFlow({
 |---|---|
 | `interrupt({ question, field })` | Pause -> ask user -> resume with answer stored at `field` |
 | `interrupt({ question, field, context })` | Same, plus hidden guidance for the assistant |
-| `showWidget(displayTool, { data, field? })` | Pause -> instruct AI to call display tool -> resume on continue |
+| `showWidget(displayTool, { data, field?, interactive? })` | Pause -> instruct AI to call display tool -> resume on continue |
 | `{ key: value, ... }` | Action node -> merge into state -> auto-advance |
 
 ## API

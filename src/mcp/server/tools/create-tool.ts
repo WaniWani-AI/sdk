@@ -17,8 +17,8 @@ import type {
 /**
  * Creates an MCP tool with minimal boilerplate.
  *
- * When `config.resource` is provided, the tool returns `structuredContent` + widget metadata.
- * Without a resource, the tool returns plain text content.
+ * When `handler()` returns `data`, the tool includes it as MCP `structuredContent`.
+ * When `config.resource` is provided, the tool also returns widget metadata.
  *
  * @example
  * ```ts
@@ -47,7 +47,13 @@ export function createTool<TInput extends z.ZodRawShape>(
 	config: ToolConfig<TInput>,
 	handler: ToolHandler<TInput>,
 ): RegisteredTool {
-	const { resource, description, inputSchema, annotations } = config;
+	const {
+		resource,
+		description,
+		inputSchema,
+		annotations,
+		autoInjectResultText = true,
+	} = config;
 
 	const id = config.id ?? resource?.id;
 	const title = config.title ?? resource?.title;
@@ -106,13 +112,24 @@ export function createTool<TInput extends z.ZodRawShape>(
 							_meta: {
 								...toolMeta,
 								..._meta,
+								...(autoInjectResultText === false
+									? { "waniwani/autoInjectResultText": false }
+									: {}),
 							},
 						};
 					}
 
-					// Plain tool: return text content only
+					// Plain tool: return text content, plus structuredContent when provided.
 					return {
 						content: [{ type: "text" as const, text: result.text }],
+						...(result.data ? { structuredContent: result.data } : {}),
+						...(autoInjectResultText === false
+							? {
+									_meta: {
+										"waniwani/autoInjectResultText": false,
+									},
+								}
+							: {}),
 					};
 				}) as unknown as ToolCallback<TInput>,
 			);

@@ -47,7 +47,7 @@ export function toNextJsHandler(
 	});
 
 	return {
-		POST: handler.handleChat,
+		POST: handler.routePost,
 		GET: handler.routeGet,
 	};
 }

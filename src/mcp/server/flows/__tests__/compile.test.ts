@@ -455,4 +455,44 @@ describe("compileFlow response contract", () => {
 			widgetId: "plan_picker",
 		});
 	});
+
+	test("marks display-only widget steps as non-interactive", async () => {
+		const flow = createFlow({
+			id: "display_only_widget_flow",
+			title: "Display Only Widget Flow",
+			description: "Show a display-only widget, then continue immediately.",
+			state: {
+				done: z.boolean().describe("Whether the flow is done"),
+			},
+		})
+			.addNode("show_teaser", () =>
+				showWidget(mockInfoPanelTool, {
+					data: { message: "Savings teaser" },
+					description: "Display a savings teaser, then continue immediately.",
+					interactive: false,
+				}),
+			)
+			.addNode("done", () => ({ done: true }))
+			.addEdge(START, "show_teaser")
+			.addEdge("show_teaser", "done")
+			.addEdge("done", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.({ action: "start" }, {})) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed).toMatchObject({
+			status: "widget",
+			tool: "info_panel",
+			interactive: false,
+		});
+		expect(parsed.flowToken).toBeDefined();
+	});
 });

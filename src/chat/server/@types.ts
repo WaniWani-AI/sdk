@@ -1,6 +1,7 @@
 // WaniWani SDK - Chat Server Types
 
 import type { UIMessage } from "ai";
+import type { ModelContextUpdate } from "../../shared/model-context";
 
 // ============================================================================
 // Before Request Hook
@@ -11,6 +12,8 @@ export interface BeforeRequestContext {
 	messages: UIMessage[];
 	/** Session identifier for conversation continuity */
 	sessionId?: string;
+	/** Hidden widget-provided model context for the next assistant turn */
+	modelContext?: ModelContextUpdate;
 	/** The original HTTP Request object */
 	request: Request;
 }
@@ -22,6 +25,8 @@ export type BeforeRequestResult = {
 	systemPrompt?: string;
 	/** Override sessionId */
 	sessionId?: string;
+	/** Override hidden widget-provided model context */
+	modelContext?: ModelContextUpdate;
 };
 
 // ============================================================================
@@ -87,8 +92,12 @@ export interface ApiHandler {
 	handleChat: (request: Request) => Promise<Response>;
 	/** Serves MCP resource content (HTML widgets) */
 	handleResource: (url: URL) => Promise<Response>;
+	/** Calls an MCP server tool and returns JSON */
+	handleTool: (request: Request) => Promise<Response>;
 	/** Routes GET sub-paths (e.g. /resource) */
 	routeGet: (request: Request) => Promise<Response>;
+	/** Routes POST sub-paths (e.g. /tool), defaults to chat */
+	routePost: (request: Request) => Promise<Response>;
 }
 
 // ============================================================================

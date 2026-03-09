@@ -1,6 +1,7 @@
 "use client";
 
 import type { ChatStatus, ReasoningUIPart, ToolUIPart, UIMessage } from "ai";
+import type { ModelContextUpdate } from "../../../shared/model-context";
 
 import { Attachments } from "../ai-elements/attachments";
 import { Loader } from "../ai-elements/loader";
@@ -50,6 +51,7 @@ interface MessageListProps {
 	onFollowUp?: (message: {
 		role: string;
 		content: Array<{ type: string; text?: string }>;
+		modelContext?: ModelContextUpdate;
 	}) => void;
 	onCallTool?: (params: {
 		name: string;

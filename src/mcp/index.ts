@@ -24,6 +24,7 @@ export type {
 export {
 	createFlow,
 	END,
+	encodeFlowToken,
 	interrupt,
 	START,
 	StateGraph,

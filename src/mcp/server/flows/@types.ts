@@ -51,6 +51,12 @@ export type WidgetSignal = {
 	/** Description of what the widget does (for the AI's context) */
 	description?: string;
 	/**
+	 * Whether the user is expected to interact with the widget before the flow continues.
+	 * Defaults to true. Set to false for informational widgets that should render and then
+	 * immediately advance to the next flow step.
+	 */
+	interactive?: boolean;
+	/**
 	 * State key this widget fills — enables auto-skip when the field is already in state.
 	 * Pass this so the engine can skip the widget step when the answer is already known.
 	 */
@@ -114,6 +120,7 @@ export function showWidget(
 	config: {
 		data: Record<string, unknown>;
 		description?: string;
+		interactive?: boolean;
 		field?: string;
 	},
 ): WidgetSignal {
@@ -293,6 +300,8 @@ export type FlowContent = {
 	question?: string;
 	error?: string;
 	flowToken?: string;
+	/** Whether a widget step expects user interaction before continuing */
+	interactive?: boolean;
 	/** Display tool to call (widget status only) */
 	tool?: string;
 	/** Data to pass to the display tool (widget status only) */

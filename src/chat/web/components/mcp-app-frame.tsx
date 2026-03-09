@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type ModelContextUpdate,
+	mergeModelContext,
+} from "../../../shared/model-context";
 import { cn } from "../lib/utils";
 
 const DEFAULT_RESOURCE_ENDPOINT = "/api/mcp/resource";
@@ -16,6 +20,31 @@ function normalizeString(value: unknown): string | undefined {
 	if (typeof value !== "string") return undefined;
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
+}
+
+export function resultProducesWidget(result: {
+	_meta?: Record<string, unknown>;
+}): boolean {
+	const meta = result._meta;
+	if (!meta || typeof meta !== "object") return false;
+
+	const openaiTemplate = normalizeString(meta["openai/outputTemplate"]);
+	if (openaiTemplate) return true;
+
+	const uiMeta = meta.ui;
+	if (!uiMeta || typeof uiMeta !== "object") return false;
+
+	const resourceUri = normalizeString(
+		(uiMeta as Record<string, unknown>).resourceUri,
+	);
+	return Boolean(resourceUri);
+}
+
+function shouldAutoInjectToolResultText(result: {
+	_meta?: Record<string, unknown>;
+}): boolean {
+	if (resultProducesWidget(result)) return false;
+	return result._meta?.["waniwani/autoInjectResultText"] !== false;
 }
 
 export type McpAppDisplayMode = "inline" | "pip" | "fullscreen";
@@ -40,6 +69,7 @@ export interface McpAppFrameProps {
 	onFollowUp?: (message: {
 		role: string;
 		content: Array<{ type: string; text?: string }>;
+		modelContext?: ModelContextUpdate;
 	}) => void;
 	/** Called when a widget calls a tool via `tools/call` (MCP Apps standard). */
 	onCallTool?: (params: {
@@ -138,6 +168,11 @@ export function McpAppFrame({
 
 		let disposed = false;
 		let handshakeReceived = false;
+		let pendingModelContext: ModelContextUpdate | null = null;
+		let pendingToolResult: {
+			text: string;
+			timer: ReturnType<typeof setTimeout>;
+		} | null = null;
 
 		// Retry: reload iframe if handshake doesn't arrive in time
 		const handshakeTimer = setTimeout(() => {
@@ -179,8 +214,14 @@ export function McpAppFrame({
 						hostInfo: { name: "WaniWani Chat", version: "1.0.0" },
 						hostCapabilities: {
 							openLinks: {},
-							message: {},
+							message: {
+								text: {},
+							},
 							tools: {},
+							updateModelContext: {
+								text: {},
+								structuredContent: {},
+							},
 						},
 						hostContext: {
 							theme: isDarkRef.current ? "dark" : "light",
@@ -328,8 +369,40 @@ export function McpAppFrame({
 			// ui/message — widget sends a chat message
 			if (method === "ui/message" && id != null) {
 				if (onFollowUpRef.current && data.params) {
-					onFollowUpRef.current(data.params);
+					let params = data.params;
+					const modelContext = pendingModelContext;
+					pendingModelContext = null;
+					// Merge pending tool result into the follow-up message
+					if (pendingToolResult) {
+						clearTimeout(pendingToolResult.timer);
+						const toolText = pendingToolResult.text;
+						pendingToolResult = null;
+						const existingText = (params.content ?? [])
+							.map((c: { text?: string }) => c.text ?? "")
+							.join("")
+							.trim();
+						params = {
+							...params,
+							content: [
+								{ type: "text", text: `${existingText}\n\n${toolText}` },
+							],
+						};
+					}
+					onFollowUpRef.current({
+						...params,
+						...(modelContext ? { modelContext } : {}),
+					});
 				}
+				postToIframe({ jsonrpc: "2.0", id, result: {} });
+				return;
+			}
+
+			// ui/update-model-context — widget updates hidden model context
+			if (method === "ui/update-model-context" && id != null) {
+				pendingModelContext = mergeModelContext(
+					pendingModelContext,
+					data.params as ModelContextUpdate,
+				);
 				postToIframe({ jsonrpc: "2.0", id, result: {} });
 				return;
 			}
@@ -352,17 +425,29 @@ export function McpAppFrame({
 					.then((result) => {
 						postToIframe({ jsonrpc: "2.0", id, result });
 
-						// Feed the tool result into the conversation so the AI can
-						// respond — mirrors real MCP Apps host behavior.
+						// Schedule auto-injection for non-widget tool results. Plain
+						// tools may still return structuredContent, so the presence of
+						// structuredContent alone is not enough to decide this.
 						const text = result.content
 							?.map((c) => c.text ?? "")
 							.join("")
 							.trim();
-						if (text && onFollowUpRef.current) {
-							onFollowUpRef.current({
-								role: "user",
-								content: [{ type: "text", text }],
-							});
+						if (text && shouldAutoInjectToolResultText(result)) {
+							if (pendingToolResult) clearTimeout(pendingToolResult.timer);
+							pendingToolResult = {
+								text,
+								timer: setTimeout(() => {
+									if (disposed) return;
+									const modelContext = pendingModelContext;
+									pendingModelContext = null;
+									pendingToolResult = null;
+									onFollowUpRef.current?.({
+										role: "user",
+										content: [{ type: "text", text }],
+										...(modelContext ? { modelContext } : {}),
+									});
+								}, 500),
+							};
 						}
 					})
 					.catch((err: unknown) => {
@@ -420,6 +505,7 @@ export function McpAppFrame({
 		return () => {
 			disposed = true;
 			clearTimeout(handshakeTimer);
+			if (pendingToolResult) clearTimeout(pendingToolResult.timer);
 			window.removeEventListener("message", handleMessage);
 		};
 	}, [autoHeight, clampHeight]);

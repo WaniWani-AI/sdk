@@ -1,4 +1,5 @@
 import type { CallToolResult as McpCallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { ModelContextUpdate } from "../../../shared/model-context";
 import type {
 	DisplayMode,
 	SafeArea,
@@ -93,7 +94,14 @@ export interface UnifiedWidgetClient {
 	 * On OpenAI: openai.sendFollowUpMessage({ prompt })
 	 * On MCP Apps: app.sendMessages([{ role: 'user', content: { type: 'text', text: prompt } }])
 	 */
-	sendFollowUp(prompt: string): void;
+	sendFollowUp(prompt: string): void | Promise<void>;
+
+	/**
+	 * Update hidden model context for the next assistant turn.
+	 * On MCP Apps this uses the standard `ui/update-model-context` request.
+	 * On other hosts this may fall back to best-effort behavior.
+	 */
+	updateModelContext(context: ModelContextUpdate): Promise<void> | void;
 
 	/**
 	 * Get the current theme.
