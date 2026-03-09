@@ -207,53 +207,8 @@ Lifecycle notes:
 - The singleton is reinitialized when resolved tracking config changes
   (`endpoint`, `token`, or `sessionId`).
 
-## `FlowWidget` — Dynamic Flow Widget Factory
-
-Renders the active widget for a flow based on `structuredContent`. Non-widget states (interrupt, complete, error) render an invisible 0-height div.
-
-```tsx
-import { WidgetProvider, FlowWidget } from "@waniwani/sdk/mcp/react";
-import { PricingTable } from "./widgets/pricing-table";
-import { PlanPicker } from "./widgets/plan-picker";
-
-const widgets = {
-  pricing_table: PricingTable,
-  plan_picker: PlanPicker,
-};
-
-// Single page for the entire flow
-export default function FlowPage() {
-  return (
-    <WidgetProvider>
-      <FlowWidget widgets={widgets} />
-    </WidgetProvider>
-  );
-}
-```
-
-Each widget component receives `{ data }` prop with the widget data from `showWidget()`:
-
-```tsx
-function PricingTable({ data }: { data: { plans: string[]; prices: number[] } }) {
-  const sendFollowUp = useSendFollowUp();
-
-  return (
-    <div>
-      {data.plans.map((plan, i) => (
-        <button key={plan} onClick={() => sendFollowUp(`I selected the ${plan} plan`)}>
-          {plan}: ${data.prices[i]}/mo
-        </button>
-      ))}
-    </div>
-  );
-}
-```
-
-Widget callbacks use `sendFollowUp` to communicate the user's selection back to the AI, which then continues the flow.
-
 ## Components
 
-- **`FlowWidget`** — Factory component for dynamic flow widgets. Maps `widgetId` from `structuredContent` to registered widget components.
 - **`InitializeNextJsInChatGpt`** — Required in Next.js layout for ChatGPT iframe compatibility. Takes `baseUrl` prop.
 - **`LoadingWidget`** — Pre-built loading spinner for widget loading states.
 

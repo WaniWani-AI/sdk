@@ -111,7 +111,7 @@ Use `interrupt()` for questions, `showWidget()` for widgets, or return a plain o
 | `interrupt({ question, field })` | Pause → ask user → resume with answer stored at `field` |
 | `interrupt({ question, field, context })` | Same, but with hidden instructions for the assistant to enrich its response |
 | `interrupt({ questions: [...], context? })` | Pause → ask ALL questions in one message → resume with all answers |
-| `showWidget(widgetId, { data, field?, description? })` | Pause → render inline widget identified by `widgetId` → resume when user interacts. `field` enables auto-skip. |
+| `showWidget(tool, { data, field?, description? })` | Pause → instruct AI to call display tool → resume when user interacts. `field` enables auto-skip. |
 | `{ key: value, ... }` | Action node → merge into state → auto-advance to next node |
 
 **`interrupt()` — single or multi-question:**
@@ -137,13 +137,13 @@ Use `interrupt()` for questions, `showWidget()` for widgets, or return a plain o
 )
 ```
 
-**`showWidget()` — renders an inline widget:**
+**`showWidget()` — delegates rendering to a display tool:**
 
-`showWidget` takes a `widgetId` string that maps to a React component on the client via `FlowWidget`. The widget is rendered inline — no separate tool call needed.
+`showWidget` takes a `RegisteredTool` (created via `createTool()` with a `resource`). The flow engine returns the tool name and data in the text response, and the AI calls the display tool separately.
 
 ```ts
 .addNode("choose_plan", (state) =>
-  showWidget("pricing_table", {
+  showWidget(showPricingTool, {
     data: { offers: computeOffers(state.idcc) },
     description: "Showing pricing options.",
     field: "selectedPlan",  // enables auto-skip when already set
@@ -189,25 +189,37 @@ const flow = createFlow({
 
 ## Widget steps
 
-Show a widget UI at a specific step. Attach a `resource` to the flow so the tool returns `structuredContent` — ChatGPT and Claude render the widget inline. Use `FlowWidget` on the client to dynamically switch between widget components based on the current node.
+Show a widget UI at a specific step. Create a display tool with `createTool()` (attached to its own resource), then reference it in `showWidget()`. The flow returns the tool name + data in text content — the AI calls the display tool separately.
+
+This follows ChatGPT's recommended "decoupled pattern": data tools (flow) and render tools (display tool) are separate. The flow is a data-only tool; each widget has its own render tool and widget page.
 
 ```ts
-import { createResource, createFlow, interrupt, showWidget, registerTools, START, END } from "@waniwani/sdk/mcp";
+import { createResource, createFlow, createTool, interrupt, showWidget, registerTools, START, END } from "@waniwani/sdk/mcp";
 import { z } from "zod";
 
-// 1. Create and register a single resource for the flow
-const flowUI = createResource({
-  id: "guided_quote_widget",
-  title: "Guided Quote Widget",
-  description: "Dynamic widget for the guided quote flow",
+// 1. Create and register a resource for the widget
+const pricingUI = createResource({
+  id: "pricing_table",
+  title: "Pricing Table",
+  description: "Interactive pricing comparison",
   baseUrl: "https://my-app.com",
-  htmlPath: "/widgets/guided-quote",
+  htmlPath: "/widgets/pricing",
   widgetDomain: "my-app.com",
 });
 
-await flowUI.register(server);
+await pricingUI.register(server);
 
-// 2. Create the flow with the resource attached
+// 2. Create a display tool with typed schema
+const showPricing = createTool({
+  resource: pricingUI,
+  description: "Show pricing comparison",
+  inputSchema: { postalCode: z.string(), sqm: z.number() },
+}, async ({ postalCode, sqm }) => ({
+  text: "Pricing loaded",
+  data: { postalCode, sqm, prices: [/* ... */] },
+}));
+
+// 3. Use the display tool in a flow via showWidget
 const flow = createFlow({
   id: "guided_quote",
   title: "Guided Quote",
@@ -217,14 +229,13 @@ const flow = createFlow({
     sqm: z.string().describe("Home size in square meters"),
     selectedPlan: z.string().describe("The plan the user selected"),
   },
-  resource: flowUI,  // Single widget for the entire flow
 })
   .addNode("ask_postal", () => interrupt({ question: "What's your postal code?", field: "postalCode" }))
   .addNode("ask_sqm", () => interrupt({ question: "How many m² is your home?", field: "sqm" }))
   .addNode("show_pricing", (state) =>
-    showWidget("pricing_table", {
-      data: { postalCode: state.postalCode!, sqm: Number(state.sqm), prices: [/* ... */] },
-      description: "Showing pricing comparison. User will select a plan.",
+    showWidget(showPricing, {
+      data: { postalCode: state.postalCode!, sqm: Number(state.sqm) },
+      description: "User must pick a plan.",
       field: "selectedPlan",
     })
   )
@@ -238,40 +249,22 @@ const flow = createFlow({
   .addEdge("confirm", END)
   .compile();
 
-// 3. Register — only the flow, no separate display tool needed
-await registerTools(server, [flow]);
+// 4. Register display tool + flow
+await registerTools(server, [showPricing, flow]);
 ```
 
 ### Widget page (client-side)
 
-A single page renders all widget states via `FlowWidget`. Non-widget steps (interrupts, complete) render an invisible 0-height div.
+Each display tool has its own widget page. Use `useToolOutput` to read the data:
 
 ```tsx
-import { WidgetProvider, FlowWidget } from "@waniwani/sdk/mcp/react";
-import { PricingTable } from "./widgets/pricing-table";
+import { WidgetProvider, useToolOutput, useSendFollowUp } from "@waniwani/sdk/mcp/react";
 
-const widgets = {
-  pricing_table: PricingTable,
-};
-
-export default function GuidedQuotePage() {
-  return (
-    <WidgetProvider>
-      <FlowWidget widgets={widgets} />
-    </WidgetProvider>
-  );
-}
-```
-
-### Widget callback (client-side)
-
-Inside individual widget components, use `sendFollowUp` to communicate the user's selection back to the AI:
-
-```tsx
-import { useSendFollowUp } from "@waniwani/sdk/mcp/react";
-
-function PricingTable({ data }: { data: { prices: Array<{ plan: string; price: number }> } }) {
+function PricingTable() {
+  const data = useToolOutput<{ prices: Array<{ plan: string; price: number }> }>();
   const sendFollowUp = useSendFollowUp();
+
+  if (!data) return null;
 
   return (
     <div>
@@ -281,6 +274,14 @@ function PricingTable({ data }: { data: { prices: Array<{ plan: string; price: n
         </button>
       ))}
     </div>
+  );
+}
+
+export default function PricingPage() {
+  return (
+    <WidgetProvider>
+      <PricingTable />
+    </WidgetProvider>
   );
 }
 ```
@@ -297,8 +298,6 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 | `title` | `string` | yes | Display title |
 | `description` | `string` | yes | Tells the AI when to use this flow |
 | `state` | `Record<string, z.ZodType>` | yes | State schema — defines all fields the flow collects. Keys match `interrupt({ field })` names, values are Zod schemas with `.describe()` |
-| `resource` | `RegisteredResource` | no | Widget resource for inline rendering. When set, the flow returns `structuredContent` on every response for dynamic widget switching. |
-
 ### `StateGraph` methods
 
 | Method | Description |
@@ -315,12 +314,12 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 |----------|-------------|
 | `interrupt({ question, field, suggestions?, context? })` | Pause and ask the user a single question. `context` provides hidden AI instructions. |
 | `interrupt({ questions: [...], context? })` | Pause and ask several questions at once in one message. |
-| `showWidget(widgetId, { data, field?, description? })` | Pause and render an inline widget. `widgetId` maps to a component in the `FlowWidget` registry. `field` enables auto-skip when already set. |
+| `showWidget(tool, { data, field?, description? })` | Pause and delegate to a display tool. `tool` is a `RegisteredTool` (from `createTool()`). `field` enables auto-skip when already set. |
 
 ## Common Mistakes
 
 - **Forgetting `START`/`END` edges** — Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`
 - **Action nodes returning interrupt/widget** — If a node returns `interrupt()` or `showWidget()`, it becomes an interrupt/widget node, not an action node
-- **Missing `resource` on flow config** — Flows with `showWidget()` nodes need `resource` in `createFlow()` config for widgets to render
-- **Missing `FlowWidget` on client** — The widget page must use `<FlowWidget widgets={...} />` to render widgets dynamically
+- **Passing a string to `showWidget()`** — `showWidget` takes a `RegisteredTool` reference, not a string ID
+- **Missing display tool registration** — The display tool must be registered alongside the flow via `registerTools(server, [displayTool, flow])`
 - **Widget callback** — Use `sendFollowUp` to communicate the user's selection back to the AI

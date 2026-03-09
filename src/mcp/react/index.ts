@@ -1,8 +1,6 @@
 // Client-side React hooks and components for MCP widgets
 
-export type { FlowWidgetRegistry } from "./components/flow-widget";
 // Components
-export { FlowWidget } from "./components/flow-widget";
 export { InitializeNextJsInChatGpt } from "./components/initialize-next-in-chat-gpt";
 // Dev tools
 export {

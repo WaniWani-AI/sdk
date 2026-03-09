@@ -1,9 +1,24 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
+import type { RegisteredTool } from "../../tools/types";
 import type { McpServer } from "../@types";
 import { END, interrupt, START, showWidget } from "../@types";
 import { createFlow } from "../create-flow";
 import { decodeFlowToken } from "../flow-token";
+
+const mockPlanPickerTool: RegisteredTool = {
+	id: "plan_picker",
+	title: "Plan Picker",
+	description: "Show plan picker widget",
+	register: async () => {},
+};
+
+const mockInfoPanelTool: RegisteredTool = {
+	id: "info_panel",
+	title: "Info Panel",
+	description: "Show info panel widget",
+	register: async () => {},
+};
 
 type Handler = (input: unknown, extra: unknown) => Promise<unknown>;
 type RegisterToolArgs = [string, Record<string, unknown>, Handler];
@@ -352,7 +367,7 @@ describe("compileFlow response contract", () => {
 			},
 		})
 			.addNode("show_info", () =>
-				showWidget("info_panel", {
+				showWidget(mockInfoPanelTool, {
 					data: { message: "Hello" },
 					description: "Show info panel",
 				}),
@@ -390,7 +405,7 @@ describe("compileFlow response contract", () => {
 		expect(p2.status).toBe("complete");
 	});
 
-	test("returns widget JSON content for widget steps (no resource — text only)", async () => {
+	test("returns widget JSON content with tool and data for widget steps", async () => {
 		const flow = createFlow({
 			id: "widget_flow",
 			title: "Widget Flow",
@@ -400,7 +415,7 @@ describe("compileFlow response contract", () => {
 			},
 		})
 			.addNode("pick_plan", () =>
-				showWidget("plan_picker", {
+				showWidget(mockPlanPickerTool, {
 					data: { plans: ["starter", "pro"] },
 					description: "Pick your plan",
 					field: "plan",
@@ -422,11 +437,15 @@ describe("compileFlow response contract", () => {
 
 		expect(parsed).toMatchObject({
 			status: "widget",
+			tool: "plan_picker",
+			data: { plans: ["starter", "pro"] },
 			description: "Pick your plan",
 		});
 		expect(parsed.flowToken).toBeDefined();
-		// No structuredContent when resource is absent
-		expect(result.structuredContent).toBe(undefined);
+		// structuredContent contains the raw widget data
+		expect(result.structuredContent).toMatchObject({
+			plans: ["starter", "pro"],
+		});
 		// Decode token to verify widget metadata
 		const tokenData = decodeFlowToken(parsed.flowToken as string);
 		expect(tokenData).toMatchObject({
@@ -435,117 +454,5 @@ describe("compileFlow response contract", () => {
 			field: "plan",
 			widgetId: "plan_picker",
 		});
-	});
-
-	test("returns structuredContent when resource is present", async () => {
-		const mockResource = {
-			id: "flow_widget",
-			title: "Flow Widget",
-			description: "Dynamic flow widget",
-			openaiUri: "ui://widgets/apps-sdk/flow_widget.html",
-			mcpUri: "ui://widgets/ext-apps/flow_widget.html",
-			autoHeight: true,
-			register: async () => {},
-		};
-
-		const flow = createFlow({
-			id: "widget_resource_flow",
-			title: "Widget Resource Flow",
-			description: "Flow with a resource.",
-			state: {
-				plan: z.string().describe("Selected plan"),
-			},
-			resource: mockResource,
-		})
-			.addNode("pick_plan", () =>
-				showWidget("plan_picker", {
-					data: { plans: ["starter", "pro"] },
-					description: "Pick your plan",
-					field: "plan",
-				}),
-			)
-			.addEdge(START, "pick_plan")
-			.addEdge("pick_plan", END)
-			.compile();
-
-		const { server, registered } = mockServer();
-		await flow.register(server);
-		const handler = registered[0]?.[2];
-
-		// Widget step — structuredContent includes widget data
-		const r1 = (await handler?.({ action: "start" }, {})) as Record<
-			string,
-			unknown
-		>;
-		const p1 = parsePayload(r1);
-		expect(p1.status).toBe("widget");
-
-		expect(r1.structuredContent).toMatchObject({
-			__status: "widget",
-			__widgetId: "plan_picker",
-			plans: ["starter", "pro"],
-		});
-
-		// Continue → complete — structuredContent has __status only
-		const r2 = (await handler?.(
-			{
-				action: "continue",
-				stateUpdates: { plan: "pro" },
-				flowToken: extractFlowToken(p1),
-			},
-			{},
-		)) as Record<string, unknown>;
-		const p2 = parsePayload(r2);
-		expect(p2.status).toBe("complete");
-		expect(r2.structuredContent).toMatchObject({
-			__status: "complete",
-		});
-	});
-
-	test("interrupt step with resource returns structuredContent with interrupt status", async () => {
-		const mockResource = {
-			id: "flow_widget",
-			title: "Flow Widget",
-			description: "Dynamic flow widget",
-			openaiUri: "ui://widgets/apps-sdk/flow_widget.html",
-			mcpUri: "ui://widgets/ext-apps/flow_widget.html",
-			autoHeight: true,
-			register: async () => {},
-		};
-
-		const flow = createFlow({
-			id: "interrupt_resource_flow",
-			title: "Interrupt Resource Flow",
-			description: "Interrupt flow with resource.",
-			state: {
-				email: z.string().describe("Email"),
-			},
-			resource: mockResource,
-		})
-			.addNode("ask_email", () =>
-				interrupt({ question: "Email?", field: "email" }),
-			)
-			.addEdge(START, "ask_email")
-			.addEdge("ask_email", END)
-			.compile();
-
-		const { server, registered } = mockServer();
-		await flow.register(server);
-		const handler = registered[0]?.[2];
-
-		const result = (await handler?.({ action: "start" }, {})) as Record<
-			string,
-			unknown
-		>;
-		const parsed = parsePayload(result);
-		expect(parsed.status).toBe("interrupt");
-
-		// structuredContent should only have __status (empty widget)
-		expect(result.structuredContent).toMatchObject({
-			__status: "interrupt",
-		});
-		expect(
-			Object.keys(result.structuredContent as Record<string, unknown>),
-		).toEqual(["__status"]);
 	});
 });
