@@ -22,6 +22,24 @@ function normalizeString(value: unknown): string | undefined {
 	return trimmed.length > 0 ? trimmed : undefined;
 }
 
+export function resultProducesWidget(result: {
+	_meta?: Record<string, unknown>;
+}): boolean {
+	const meta = result._meta;
+	if (!meta || typeof meta !== "object") return false;
+
+	const openaiTemplate = normalizeString(meta["openai/outputTemplate"]);
+	if (openaiTemplate) return true;
+
+	const uiMeta = meta.ui;
+	if (!uiMeta || typeof uiMeta !== "object") return false;
+
+	const resourceUri = normalizeString(
+		(uiMeta as Record<string, unknown>).resourceUri,
+	);
+	return Boolean(resourceUri);
+}
+
 export type McpAppDisplayMode = "inline" | "pip" | "fullscreen";
 
 export interface McpAppFrameProps {
@@ -400,14 +418,14 @@ export function McpAppFrame({
 					.then((result) => {
 						postToIframe({ jsonrpc: "2.0", id, result });
 
-						// Schedule auto-injection of tool result text only for plain
-						// text responses. Structured results are intended for the widget
-						// itself and should not be dumped into the visible transcript.
+						// Schedule auto-injection for non-widget tool results. Plain
+						// tools may still return structuredContent, so the presence of
+						// structuredContent alone is not enough to decide this.
 						const text = result.content
 							?.map((c) => c.text ?? "")
 							.join("")
 							.trim();
-						if (text && !result.structuredContent) {
+						if (text && !resultProducesWidget(result)) {
 							if (pendingToolResult) clearTimeout(pendingToolResult.timer);
 							pendingToolResult = {
 								text,
