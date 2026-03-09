@@ -14,5 +14,6 @@ export type {
 export { END, interrupt, START, showWidget } from "./@types";
 // Convenience factory
 export { createFlow } from "./create-flow";
+export { encodeFlowToken } from "./flow-token";
 // Builder
 export { StateGraph } from "./state-graph";

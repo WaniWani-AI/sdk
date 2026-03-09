@@ -87,8 +87,12 @@ export interface ApiHandler {
 	handleChat: (request: Request) => Promise<Response>;
 	/** Serves MCP resource content (HTML widgets) */
 	handleResource: (url: URL) => Promise<Response>;
+	/** Calls an MCP server tool and returns JSON */
+	handleTool: (request: Request) => Promise<Response>;
 	/** Routes GET sub-paths (e.g. /resource) */
 	routeGet: (request: Request) => Promise<Response>;
+	/** Routes POST sub-paths (e.g. /tool), defaults to chat */
+	routePost: (request: Request) => Promise<Response>;
 }
 
 // ============================================================================

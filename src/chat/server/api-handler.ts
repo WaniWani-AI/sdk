@@ -4,6 +4,7 @@ import { createLogger } from "../../utils/logger.js";
 import type { ApiHandler, ApiHandlerOptions } from "./@types";
 import { createChatRequestHandler } from "./handle-chat";
 import { createResourceHandler } from "./handle-resource";
+import { createToolHandler } from "./handle-tool";
 import { createMcpConfigResolver } from "./mcp-config-resolver";
 
 /**
@@ -73,6 +74,12 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		debug,
 	});
 
+	const handleTool = createToolHandler({
+		mcpServerUrl,
+		resolveConfig,
+		debug,
+	});
+
 	async function handleConfig(): Promise<Response> {
 		return jsonResponse({ debug }, 200);
 	}
@@ -113,5 +120,35 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		}
 	}
 
-	return { handleChat, handleResource, routeGet };
+	async function routePost(request: Request): Promise<Response> {
+		log("→ POST", request.url);
+		try {
+			const url = new URL(request.url);
+			const segments = url.pathname
+				.replace(/\/$/, "")
+				.split("/")
+				.filter(Boolean);
+			const subRoute = segments.at(-1);
+			log("pathname:", url.pathname, "subRoute:", subRoute);
+
+			if (subRoute === "tool") {
+				log("dispatching to tool handler");
+				const response = await handleTool(request);
+				log("← tool handler returned", response.status);
+				return response;
+			}
+
+			// Default: treat as chat request
+			log("dispatching to chat handler");
+			return handleChat(request);
+		} catch (error) {
+			console.error("[waniwani:router] POST handler error:", error);
+			const message =
+				error instanceof Error ? error.message : "Unknown error occurred";
+			log("← 500 from caught error");
+			return jsonResponse({ error: message }, 500);
+		}
+	}
+
+	return { handleChat, handleResource, handleTool, routeGet, routePost };
 }

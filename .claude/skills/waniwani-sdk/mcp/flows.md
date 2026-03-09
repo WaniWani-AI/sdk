@@ -15,7 +15,7 @@ The AI carries the state between steps — no server-side storage needed.
 ## Import
 
 ```ts
-import { createResource, createFlow, createTool, interrupt, showWidget, registerTools, START, END } from "@waniwani/sdk/mcp";
+import { createResource, createFlow, createTool, encodeFlowToken, interrupt, showWidget, registerTools, START, END } from "@waniwani/sdk/mcp";
 ```
 
 ## Quick start
@@ -315,6 +315,7 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 | `interrupt({ question, field, suggestions?, context? })` | Pause and ask the user a single question. `context` provides hidden AI instructions. |
 | `interrupt({ questions: [...], context? })` | Pause and ask several questions at once in one message. |
 | `showWidget(tool, { data, field?, description? })` | Pause and delegate to a display tool. `tool` is a `RegisteredTool` (from `createTool()`). `field` enables auto-skip when already set. |
+| `encodeFlowToken(data)` | Encode a `FlowTokenContent` object into an opaque compressed base64 token. Useful for manually constructing flow state tokens server-side. |
 
 ## Common Mistakes
 

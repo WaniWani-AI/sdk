@@ -138,6 +138,10 @@ export function McpAppFrame({
 
 		let disposed = false;
 		let handshakeReceived = false;
+		let pendingToolResult: {
+			text: string;
+			timer: ReturnType<typeof setTimeout>;
+		} | null = null;
 
 		// Retry: reload iframe if handshake doesn't arrive in time
 		const handshakeTimer = setTimeout(() => {
@@ -328,7 +332,24 @@ export function McpAppFrame({
 			// ui/message — widget sends a chat message
 			if (method === "ui/message" && id != null) {
 				if (onFollowUpRef.current && data.params) {
-					onFollowUpRef.current(data.params);
+					let params = data.params;
+					// Merge pending tool result into the follow-up message
+					if (pendingToolResult) {
+						clearTimeout(pendingToolResult.timer);
+						const toolText = pendingToolResult.text;
+						pendingToolResult = null;
+						const existingText = (params.content ?? [])
+							.map((c: { text?: string }) => c.text ?? "")
+							.join("")
+							.trim();
+						params = {
+							...params,
+							content: [
+								{ type: "text", text: `${existingText}\n\n${toolText}` },
+							],
+						};
+					}
+					onFollowUpRef.current(params);
 				}
 				postToIframe({ jsonrpc: "2.0", id, result: {} });
 				return;
@@ -352,17 +373,26 @@ export function McpAppFrame({
 					.then((result) => {
 						postToIframe({ jsonrpc: "2.0", id, result });
 
-						// Feed the tool result into the conversation so the AI can
-						// respond — mirrors real MCP Apps host behavior.
+						// Schedule auto-injection of tool result text. If the widget
+						// sends its own follow-up (ui/message) before the timer fires,
+						// the text is merged into that message instead.
 						const text = result.content
 							?.map((c) => c.text ?? "")
 							.join("")
 							.trim();
-						if (text && onFollowUpRef.current) {
-							onFollowUpRef.current({
-								role: "user",
-								content: [{ type: "text", text }],
-							});
+						if (text) {
+							if (pendingToolResult) clearTimeout(pendingToolResult.timer);
+							pendingToolResult = {
+								text,
+								timer: setTimeout(() => {
+									if (disposed) return;
+									pendingToolResult = null;
+									onFollowUpRef.current?.({
+										role: "user",
+										content: [{ type: "text", text }],
+									});
+								}, 500),
+							};
 						}
 					})
 					.catch((err: unknown) => {
@@ -420,6 +450,7 @@ export function McpAppFrame({
 		return () => {
 			disposed = true;
 			clearTimeout(handshakeTimer);
+			if (pendingToolResult) clearTimeout(pendingToolResult.timer);
 			window.removeEventListener("message", handleMessage);
 		};
 	}, [autoHeight, clampHeight]);
