@@ -41,6 +41,14 @@ const client = waniwani({
 });
 ```
 
+### `client.identify(userId, properties?)`
+
+Sends a one-shot `"user.identified"` event. `userId` is a loose string (email, internal ID, etc.).
+
+```typescript
+await client.identify("user@example.com", { plan: "pro", company: "Acme" });
+```
+
 ### `client.track(event)`
 
 Enqueues an event for batched delivery to `POST /api/mcp/events/v2/batch`.
