@@ -60,6 +60,19 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 		: undefined;
 
 	const client: TrackingClient = {
+		async identify(
+			userId: string,
+			properties?: Record<string, unknown>,
+		): Promise<{ eventId: string }> {
+			requireApiKey();
+			const mappedEvent = mapTrackEventToV2({
+				event: "user.identified",
+				externalUserId: userId,
+				properties,
+			});
+			transport?.enqueue(mappedEvent);
+			return { eventId: mappedEvent.id };
+		},
 		async track(event: TrackInput): Promise<{ eventId: string }> {
 			requireApiKey();
 			const mappedEvent = mapTrackEventToV2(event);

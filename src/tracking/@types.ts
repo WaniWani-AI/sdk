@@ -19,7 +19,8 @@ export type EventType =
 	| "widget_error"
 	| "widget_scroll"
 	| "widget_form_field"
-	| "widget_form_submit";
+	| "widget_form_submit"
+	| "user.identified";
 
 // ============================================
 // Event Properties
@@ -98,7 +99,8 @@ export type TrackEvent =
 	| ({
 			event: "purchase.completed";
 			properties?: PurchaseCompletedProperties;
-	  } & BaseTrackEvent);
+	  } & BaseTrackEvent)
+	| ({ event: "user.identified" } & BaseTrackEvent);
 
 /**
  * Legacy tracking shape supported for existing integrations.
@@ -160,6 +162,14 @@ export interface TrackingShutdownResult {
  * Tracking module methods for WaniWaniClient.
  */
 export interface TrackingClient {
+	/**
+	 * Send a one-shot identify event for a user.
+	 * userId can be any string: an email, an internal ID, etc.
+	 */
+	identify: (
+		userId: string,
+		properties?: Record<string, unknown>,
+	) => Promise<{ eventId: string }>;
 	/**
 	 * Track an event using modern or legacy input shape.
 	 * Returns a deterministic event id immediately after enqueue.
