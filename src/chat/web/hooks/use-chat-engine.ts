@@ -161,6 +161,18 @@ export function useChatEngine(props: ChatBaseProps) {
 					resolvedBody.modelContext = pendingModelContextRef.current;
 				}
 
+				if (visitorContextRef.current) {
+					const vc = visitorContextRef.current;
+					resolvedBody.visitorContext = {
+						timezone: vc.timezone,
+						language: vc.language,
+						languages: vc.languages,
+						deviceType: vc.deviceType,
+						referrer: vc.referrer,
+						visitorId: vc.visitorId,
+					};
+				}
+
 				return resolvedBody;
 			},
 			fetch: async (input, init) => {

@@ -142,6 +142,8 @@ export function withWaniwani(
 					);
 				}
 
+				injectUserLocation(result, extra);
+
 				return result;
 			} catch (error) {
 				const durationMs = Math.round(performance.now() - startTime);
@@ -277,4 +279,32 @@ function toError(error: unknown): Error {
 		return error;
 	}
 	return new Error(String(error));
+}
+
+const USER_LOCATION_KEY = "waniwani/userLocation";
+
+/**
+ * Pass-through `waniwani/userLocation` from request `_meta` to response `_meta`.
+ * This ensures widgets always receive location data, even for custom handlers
+ * that don't use `createTool` (which already spreads request `_meta`).
+ */
+function injectUserLocation(result: unknown, extra: unknown): void {
+	const requestMeta = extractMeta(extra);
+	if (!requestMeta) return;
+
+	const userLocation = requestMeta[USER_LOCATION_KEY];
+	if (!userLocation) return;
+
+	if (!isRecord(result)) return;
+
+	if (!isRecord(result._meta)) {
+		(result as UnknownRecord)._meta = {};
+	}
+
+	const resultMeta = (result as UnknownRecord)._meta as UnknownRecord;
+
+	// Don't overwrite if the handler already set it
+	if (!resultMeta[USER_LOCATION_KEY]) {
+		resultMeta[USER_LOCATION_KEY] = userLocation;
+	}
 }

@@ -2,7 +2,12 @@
 
 import { WaniWaniError } from "../../error";
 import { createLogger } from "../../utils/logger.js";
-import type { ApiHandlerDeps } from "./@types";
+import type {
+	ApiHandlerDeps,
+	ClientVisitorContext,
+	VisitorMeta,
+} from "./@types";
+import { extractGeoFromHeaders } from "./geo";
 import { applyModelContextToSystemPrompt } from "./model-context";
 
 export function createChatRequestHandler(deps: ApiHandlerDeps) {
@@ -29,11 +34,19 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 			let modelContext = body.modelContext;
 			let effectiveSystemPrompt = systemPrompt;
 
+			// Extract visitor context (client-side + server-side geo)
+			const clientVisitorContext: ClientVisitorContext | null =
+				body.visitorContext ?? null;
+			const geo = extractGeoFromHeaders(request);
+			const visitor: VisitorMeta = { geo, client: clientVisitorContext };
+
 			log(
 				"body parsed — messages:",
 				messages.length,
 				"sessionId:",
 				sessionId ?? "(none)",
+				"geo:",
+				JSON.stringify(geo),
 			);
 
 			// 2. Run beforeRequest hook
@@ -45,6 +58,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 						sessionId,
 						modelContext,
 						request,
+						visitor,
 					});
 
 					if (result) {
@@ -96,6 +110,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 					sessionId,
 					systemPrompt: effectiveSystemPrompt,
 					maxSteps,
+					visitor,
 				}),
 				signal: request.signal,
 			});

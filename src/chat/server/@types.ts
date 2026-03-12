@@ -2,6 +2,27 @@
 
 import type { UIMessage } from "ai";
 import type { ModelContextUpdate } from "../../shared/model-context";
+import type { GeoLocation } from "./geo";
+
+// ============================================================================
+// Visitor Context
+// ============================================================================
+
+/** Client-side visitor context sent in the request body */
+export interface ClientVisitorContext {
+	timezone: string;
+	language: string;
+	languages: string[];
+	deviceType: "mobile" | "tablet" | "desktop";
+	referrer: string;
+	visitorId: string;
+}
+
+/** Combined visitor context: server geo + client context */
+export interface VisitorMeta {
+	geo: GeoLocation;
+	client: ClientVisitorContext | null;
+}
 
 // ============================================================================
 // Before Request Hook
@@ -16,6 +37,8 @@ export interface BeforeRequestContext {
 	modelContext?: ModelContextUpdate;
 	/** The original HTTP Request object */
 	request: Request;
+	/** Server-extracted geo location + client-provided visitor context */
+	visitor: VisitorMeta;
 }
 
 export type BeforeRequestResult = {
