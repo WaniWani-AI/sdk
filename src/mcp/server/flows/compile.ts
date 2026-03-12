@@ -299,7 +299,6 @@ async function executeFrom<TState extends Record<string, unknown>>(
 						field: widgetField,
 						widgetId: result.tool.id,
 					},
-					structuredContent: result.data,
 				};
 			}
 
@@ -509,9 +508,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 					return {
 						content,
-						...(result.structuredContent && {
-							structuredContent: result.structuredContent,
-						}),
 						_meta,
 					};
 				}) as unknown as ToolCallback<typeof inputSchema>,

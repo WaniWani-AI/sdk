@@ -189,9 +189,9 @@ const flow = createFlow({
 
 ## Widget steps
 
-Show a widget UI at a specific step. Create a display tool with `createTool()` (attached to its own resource), then reference it in `showWidget()`. The flow returns the tool name + data in text content — the AI calls the display tool separately.
+Show a widget UI at a specific step. Create a display tool with `createTool()` (attached to its own resource), then reference it in `showWidget()`.
 
-This follows ChatGPT's recommended "decoupled pattern": data tools (flow) and render tools (display tool) are separate. The flow is a data-only tool; each widget has its own render tool and widget page.
+**Important: The flow is a data-only tool.** It never returns `structuredContent` or renders widgets itself. When a `showWidget()` node is reached, the flow returns the tool name and data as text content for the LLM. The LLM then calls the display/render tool separately — that render tool is the one that returns `structuredContent` and the widget template (`resourceUri`). This follows the decoupled pattern: data tools (flow) handle logic and state, render tools (display tool) handle presentation.
 
 ```ts
 import { createResource, createFlow, createTool, interrupt, showWidget, registerTools, START, END } from "@waniwani/sdk/mcp";

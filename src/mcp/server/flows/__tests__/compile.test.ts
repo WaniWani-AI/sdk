@@ -442,10 +442,6 @@ describe("compileFlow response contract", () => {
 			description: "Pick your plan",
 		});
 		expect(parsed.flowToken).toBeDefined();
-		// structuredContent contains the raw widget data
-		expect(result.structuredContent).toMatchObject({
-			plans: ["starter", "pro"],
-		});
 		// Decode token to verify widget metadata
 		const tokenData = decodeFlowToken(parsed.flowToken as string);
 		expect(tokenData).toMatchObject({

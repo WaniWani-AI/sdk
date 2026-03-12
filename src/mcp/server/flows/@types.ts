@@ -311,6 +311,4 @@ export type FlowContent = {
 export type ExecutionResult = {
 	content: FlowContent;
 	flowTokenContent?: FlowTokenContent;
-	/** Structured data for the widget — returned so the model can pass it to the render tool */
-	structuredContent?: Record<string, unknown>;
 };
