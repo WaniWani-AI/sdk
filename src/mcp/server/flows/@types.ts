@@ -69,32 +69,42 @@ export type WidgetSignal = {
 /**
  * Create an interrupt signal — pauses the flow and asks the user a question.
  * Used internally by the engine. Flow authors use the typed `interrupt` from the node context.
+ *
+ * Accepts an object where each key is a field name and the value describes the question.
+ * The only reserved key is `context` (string) for overall hidden AI instructions.
  */
 export function interrupt(
-	config:
-		| {
+	fields: Record<string, unknown>,
+	config?: { context?: string },
+): InterruptSignal {
+	const context = config?.context;
+	const questions: InterruptQuestion[] = [];
+
+	for (const [key, value] of Object.entries(fields)) {
+		if (typeof value === "object" && value !== null && "question" in value) {
+			const q = value as {
 				question: string;
-				field: string;
 				suggestions?: string[];
 				context?: string;
 				validate?: (
 					value: unknown,
 					// biome-ignore lint/suspicious/noConfusingVoidType: void is needed so `async () => {}` compiles
 				) => MaybePromise<Record<string, unknown> | void>;
-		  }
-		| { questions: InterruptQuestion[]; context?: string },
-): InterruptSignal {
-	if ("questions" in config) {
-		return {
-			__type: INTERRUPT,
-			questions: config.questions,
-			context: config.context,
-		};
+			};
+			questions.push({
+				question: q.question,
+				field: key,
+				suggestions: q.suggestions,
+				context: q.context,
+				validate: q.validate,
+			});
+		}
 	}
-	const { question, field, context, suggestions, validate } = config;
+
 	return {
 		__type: INTERRUPT,
-		questions: [{ question, field, context, suggestions, validate }],
+		questions,
+		context,
 	};
 }
 
@@ -140,30 +150,50 @@ export type MaybePromise<T> = T | Promise<T>;
 
 /**
  * Typed interrupt function — available on the node context.
- * The `field` parameter is typed as `keyof TState`, and `validate` receives
- * the field's value typed from the Zod schema.
+ *
+ * First argument: an object where each key is a state field name and each value
+ * describes the question for that field. `validate` receives the field's value
+ * typed from the Zod schema.
+ *
+ * Second argument (optional): config with overall hidden AI instructions.
+ *
+ * @example
+ * ```ts
+ * // Single question
+ * interrupt({ breed: { question: "What breed is your pet?" } })
+ *
+ * // Multiple questions with context
+ * interrupt(
+ *   {
+ *     breed: {
+ *       question: "What breed?",
+ *       validate: async (breed) => {
+ *         const result = await lookupBreed(breed);
+ *         if (!result) throw new Error("Unknown breed");
+ *         return { breedId: result.id };
+ *       },
+ *     },
+ *     age: { question: "How old is your pet?" },
+ *   },
+ *   { context: "Ask both questions naturally." },
+ * )
+ * ```
  */
-export type TypedInterrupt<TState> = {
-	/** Single question — field and validate are typed from the state schema */
-	<F extends Extract<keyof TState, string>>(config: {
-		question: string;
-		field: F;
-		// biome-ignore lint/suspicious/noConfusingVoidType: void is needed so `async () => {}` compiles
-		validate?: (value: TState[F]) => MaybePromise<Partial<TState> | void>;
-		suggestions?: string[];
-		context?: string;
-	}): InterruptSignal;
-	/** Multiple questions asked together in one conversational message */
-	(config: {
-		questions: Array<{
+export type TypedInterrupt<TState> = (
+	fields: {
+		[F in Extract<keyof TState, string>]?: {
 			question: string;
-			field: Extract<keyof TState, string>;
+			// biome-ignore lint/suspicious/noConfusingVoidType: void is needed so `async () => {}` compiles
+			validate?: (value: TState[F]) => MaybePromise<Partial<TState> | void>;
 			suggestions?: string[];
 			context?: string;
-		}>;
+		};
+	},
+	config?: {
+		/** Overall hidden context/instructions for the assistant (not shown to user directly) */
 		context?: string;
-	}): InterruptSignal;
-};
+	},
+) => InterruptSignal;
 
 /**
  * Typed showWidget function — available on the node context.

@@ -56,8 +56,7 @@ describe("compileFlow response contract", () => {
 		})
 			.addNode("ask_use_case", ({ interrupt }) =>
 				interrupt({
-					question: "What's your primary use case?",
-					field: "useCase",
+					useCase: { question: "What's your primary use case?" },
 				}),
 			)
 			.addEdge(START, "ask_use_case")
@@ -107,8 +106,7 @@ describe("compileFlow response contract", () => {
 		})
 			.addNode("ask_use_case", ({ interrupt }) =>
 				interrupt({
-					question: "What's your primary use case?",
-					field: "useCase",
+					useCase: { question: "What's your primary use case?" },
 				}),
 			)
 			.addEdge(START, "ask_use_case")
@@ -158,14 +156,14 @@ describe("compileFlow response contract", () => {
 			},
 		})
 			.addNode("ask_details", ({ interrupt }) =>
-				interrupt({
-					questions: [
-						{ question: "What's your name?", field: "name" },
-						{ question: "What's your email?", field: "email" },
-						{ question: "What's your company?", field: "company" },
-					],
-					context: "Ask all questions together.",
-				}),
+				interrupt(
+					{
+						name: { question: "What's your name?" },
+						email: { question: "What's your email?" },
+						company: { question: "What's your company?" },
+					},
+					{ context: "Ask all questions together." },
+				),
 			)
 			.addEdge(START, "ask_details")
 			.addEdge("ask_details", END)
@@ -255,10 +253,8 @@ describe("compileFlow response contract", () => {
 		})
 			.addNode("ask_details", ({ interrupt }) =>
 				interrupt({
-					questions: [
-						{ question: "What's your name?", field: "name" },
-						{ question: "What's your email?", field: "email" },
-					],
+					name: { question: "What's your name?" },
+					email: { question: "What's your email?" },
 				}),
 			)
 			.addEdge(START, "ask_details")
@@ -305,10 +301,8 @@ describe("compileFlow response contract", () => {
 			.addNode("ask_details", ({ interrupt }) => {
 				handlerCallCount++;
 				return interrupt({
-					questions: [
-						{ question: "Name?", field: "name" },
-						{ question: "Email?", field: "email" },
-					],
+					name: { question: "Name?" },
+					email: { question: "Email?" },
 				});
 			})
 			.addEdge(START, "ask_details")
@@ -506,10 +500,11 @@ describe("validate on interrupt", () => {
 		})
 			.addNode("ask_breed", ({ interrupt }) =>
 				interrupt({
-					question: "What breed?",
-					field: "breed",
-					validate: async (breed) => {
-						return { breedId: `id-${breed}` };
+					breed: {
+						question: "What breed?",
+						validate: async (breed) => {
+							return { breedId: `id-${breed}` };
+						},
 					},
 				}),
 			)
@@ -557,10 +552,11 @@ describe("validate on interrupt", () => {
 		})
 			.addNode("ask_email", ({ interrupt }) =>
 				interrupt({
-					question: "Email?",
-					field: "email",
-					validate: async () => {
-						// no-op, just validates
+					email: {
+						question: "Email?",
+						validate: async () => {
+							// no-op, just validates
+						},
 					},
 				}),
 			)
@@ -606,14 +602,15 @@ describe("validate on interrupt", () => {
 		})
 			.addNode("ask_code", ({ interrupt }) =>
 				interrupt({
-					question: "Postal code?",
-					field: "code",
-					context: "Enter a valid code.",
-					validate: async (code) => {
-						validateCallCount++;
-						if (code === "invalid") {
-							throw new Error("Invalid postal code");
-						}
+					code: {
+						question: "Postal code?",
+						context: "Enter a valid code.",
+						validate: async (code) => {
+							validateCallCount++;
+							if (code === "invalid") {
+								throw new Error("Invalid postal code");
+							}
+						},
 					},
 				}),
 			)
@@ -680,17 +677,10 @@ describe("validate on interrupt", () => {
 		})
 			.addNode("ask_details", ({ interrupt }) =>
 				interrupt({
-					questions: [
-						{
-							question: "Name?",
-							field: "name",
-						},
-						{ question: "Email?", field: "email" },
-					],
+					name: { question: "Name?" },
+					email: { question: "Email?" },
 				}),
 			)
-			// Separate node to test that validate on a multi-question interrupt
-			// is not supported (validate is per-question in single-question form)
 			.addEdge(START, "ask_details")
 			.addEdge("ask_details", END)
 			.compile();
@@ -776,7 +766,7 @@ describe("isError on error responses", () => {
 			},
 		})
 			.addNode("ask", ({ interrupt }) =>
-				interrupt({ question: "Name?", field: "name" }),
+				interrupt({ name: { question: "Name?" } }),
 			)
 			.addEdge(START, "ask")
 			.addEdge("ask", END)

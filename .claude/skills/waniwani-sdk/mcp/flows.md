@@ -15,8 +15,10 @@ The AI carries the state between steps — no server-side storage needed.
 ## Import
 
 ```ts
-import { createResource, createFlow, createTool, encodeFlowToken, interrupt, showWidget, registerTools, START, END } from "@waniwani/sdk/mcp";
+import { createFlow, encodeFlowToken, registerTools, START, END } from "@waniwani/sdk/mcp";
 ```
+
+> **Note:** `interrupt` and `showWidget` are **not** imported directly. They are provided on the handler's context object (see [Node handlers](#node-handlers)).
 
 ## Quick start
 
@@ -34,18 +36,27 @@ const flow = createFlow({
     useCase: z.string().describe("Primary use case for the product"),
   },
 })
-  .addNode("ask_email", () => interrupt({ question: "What is your work email address?", field: "email" }))
-  .addNode("ask_role", (state) =>
+  .addNode("ask_email", ({ interrupt }) =>
+    interrupt({ email: { question: "What is your work email address?" } })
+
+  )
+  .addNode("ask_role", ({ state, interrupt }) =>
     interrupt({
-      question: "What is your role?",
-      field: "role",
-      context: `The user's email is ${state.email}. Reference their company domain naturally.`,
+      role: {
+        question: "What is your role?",
+        context: `The user's email is ${state.email}. Reference their company domain naturally.`,
+      },
     })
   )
-  .addNode("ask_use_case", () =>
-    interrupt({ question: "What's your main use case?", field: "useCase", suggestions: ["Analytics", "Lead gen", "Support"] })
+  .addNode("ask_use_case", ({ interrupt }) =>
+    interrupt({
+      useCase: {
+        question: "What's your main use case?",
+        suggestions: ["Analytics", "Lead gen", "Support"],
+      },
+    })
   )
-  .addNode("complete", (state) => ({
+  .addNode("complete", ({ state }) => ({
     summary: `Lead: ${state.email}, ${state.role}, ${state.useCase}`,
   }))
   .addEdge(START, "ask_email")
@@ -93,62 +104,189 @@ If a user says "I want to open a bank account in France", the AI calls:
 The flow skips the "which country?" question and proceeds to the next unanswered step.
 
 **Rules:**
-- Interrupt nodes are auto-skipped when their `field` is already filled in state.
-- Multi-question nodes are auto-skipped when **all** of their `questions[].field` values are already filled.
+- Interrupt nodes are auto-skipped when their field(s) are already filled in state.
 - Widget nodes are auto-skipped when their `field` is already filled in state.
 - Action nodes between skipped steps still execute (their logic may be needed for conditional edges).
 - Fields with `undefined`, `null`, or `""` are NOT considered pre-filled.
 - The AI should only extract values the user explicitly stated — never guess.
 
-## Node types
+## Node handlers
 
-### Handler-based nodes
+Every handler receives a **context object** with four properties:
 
-Use `interrupt()` for questions, `showWidget()` for widgets, or return a plain object for action nodes.
+```ts
+.addNode("my_node", ({ state, meta, interrupt, showWidget }) => {
+  // state      — Partial<TState>, current flow state
+  // meta       — Record<string, unknown> | undefined, MCP request metadata
+  // interrupt  — typed helper to pause and ask questions
+  // showWidget — typed helper to pause and show a UI widget
+})
+```
+
+### Handler context type
+
+```ts
+type NodeContext<TState> = {
+  state: Partial<TState>;
+  meta?: Record<string, unknown>;
+  interrupt: TypedInterrupt<TState>;
+  showWidget: TypedShowWidget<TState>;
+};
+```
+
+### Return values
 
 | Return value | Behavior |
 |---|---|
-| `interrupt({ question, field })` | Pause → ask user → resume with answer stored at `field` |
-| `interrupt({ question, field, context })` | Same, but with hidden instructions for the assistant to enrich its response |
-| `interrupt({ questions: [...], context? })` | Pause → ask ALL questions in one message → resume with all answers |
+| `interrupt({ ... })` | Pause → ask user one or more questions → resume with answers |
 | `showWidget(tool, { data, field?, description? })` | Pause → instruct AI to call display tool → resume when user interacts. `field` enables auto-skip. |
 | `{ key: value, ... }` | Action node → merge into state → auto-advance to next node |
 
-**`interrupt()` — single or multi-question:**
-```ts
-// Single question
-.addNode("ask_role", (state) =>
-  interrupt({
-    question: "What is your role?",
-    field: "role",
-    context: `User's email domain: ${state.email?.split("@")[1]}`,
-  })
-)
+## Interrupt API
 
-// Multiple questions (asked in one message)
-.addNode("ask_details", () =>
+`interrupt()` takes two arguments:
+
+1. **`fields`** — an object where each key is a state field name, each value describes the question for that field
+2. **`config`** (optional) — `{ context?: string }` for overall hidden AI instructions
+
+One field = single question. Multiple fields = multiple questions asked together.
+
+```ts
+interrupt(fields, config?)
+```
+
+### Single question
+
+```ts
+.addNode("ask_breed", ({ interrupt }) =>
+  interrupt({ breed: { question: "What breed is your pet?" } })
+)
+```
+
+### Single question with suggestions and per-question context
+
+```ts
+.addNode("ask_animal", ({ interrupt }) =>
   interrupt({
-    questions: [
-      { question: "How many employees?", field: "headcount" },
-      { question: "Average age?", field: "averageAge" },
-    ],
-    context: "Ask conversationally, one friendly message.",
+    animalType: {
+      question: "Is your pet a dog or a cat?",
+      suggestions: ["Dog", "Cat"],
+      context: "Only accept dog or cat.",
+    },
   })
 )
 ```
 
-**`showWidget()` — delegates rendering to a display tool:**
-
-`showWidget` takes a `RegisteredTool` (created via `createTool()` with a `resource`). The flow engine returns the tool name and data in the text response, and the AI calls the display tool separately.
+### Multiple questions in one message
 
 ```ts
-.addNode("choose_plan", (state) =>
-  showWidget(showPricingTool, {
-    data: { offers: computeOffers(state.idcc) },
-    description: "Showing pricing options.",
-    field: "selectedPlan",  // enables auto-skip when already set
+.addNode("ask_details", ({ interrupt }) =>
+  interrupt(
+    {
+      name: { question: "What's your name?" },
+      email: { question: "What's your email?" },
+    },
+    { context: "Ask both questions naturally in one conversational message." },
+  )
+)
+```
+
+### Dynamic questions (conditional fields)
+
+Because the API uses object spread, you can conditionally include questions:
+
+```ts
+.addNode("ask_pet_info", ({ state, interrupt }) =>
+  interrupt(
+    {
+      ...(!state.petName ? { petName: { question: "What's your pet's name?" } } : {}),
+      ...(!state.breed ? { breed: { question: "What breed?" } } : {}),
+      ...(!state.age ? { age: { question: "How old?" } } : {}),
+    },
+    { context: "Ask conversationally, not like a form." },
+  )
+)
+```
+
+### Typing
+
+Both `interrupt` and `showWidget` are **typed end-to-end** from the Zod state schema:
+- `interrupt({ breed: { ... } })` — TypeScript enforces `breed` is a key of `TState`
+- `validate: (value) => ...` — `value` is typed as `TState["breed"]` (e.g. `string` if `breed: z.string()`)
+- `showWidget(tool, { field: "plan" })` — `"plan"` must be a key of `TState`
+
+## Validation on interrupts
+
+Add a `validate` function to any question. It runs **after** the user answers and **before** advancing to the next node.
+
+```ts
+.addNode("ask_breed", ({ state, interrupt }) =>
+  interrupt({
+    breed: {
+      question: "What breed is your pet?",
+      validate: async (breed) => {
+        // `breed` is typed as `string` (from z.string() in state schema)
+        const result = await resolveBreed(state.animalType!, breed);
+        if (!result) {
+          throw new Error("Couldn't find that breed. Could you check the spelling?");
+        }
+        // Return state updates to enrich the state
+        return { breedId: result.id };
+      },
+    },
   })
 )
+```
+
+### Validate return types
+
+| Return | Behavior |
+|--------|----------|
+| `Partial<TState>` (object) | Validated. Merge into state, advance to next node. |
+| `void` / `undefined` | Validated, no enrichment. Advance to next node. |
+| `throw new Error(msg)` | Failed. Clear the field, re-present the interrupt with `ERROR: msg` prepended to context. |
+
+### How it works under the hood
+
+- Validate functions are stored in a `Map<"nodeName:fieldName", ValidateFn>` inside the compiled flow closure. They are **not** serialized into the flow token.
+- For multi-question interrupts, validators only run **after all questions are answered**. If the user provides partial answers, validators do not fire until every question's field is filled.
+- When validation fails (throws), the error message is prepended to that specific question's `context` as `ERROR: <message>`, so the AI can relay it naturally. The field is cleared and the interrupt is re-presented.
+
+### Validate replaces the old ask-validate-reset pattern
+
+**Before** (3 nodes + 3 edges):
+```ts
+.addNode("ask_breed", ({ interrupt }) =>
+  interrupt({ breed: { question: "What breed?" } })
+)
+.addNode("validate_breed", async ({ state }) => {
+  const result = await resolveBreed(state.animalType!, state.breed!);
+  if (!result) return { breed: undefined }; // reset to re-ask
+  return { breedId: result.id };
+})
+.addNode("after_breed", ({ state }) => ({ ... }))
+.addEdge("ask_breed", "validate_breed")
+.addConditionalEdge("validate_breed", (state) =>
+  state.breed ? "after_breed" : "ask_breed"
+)
+.addEdge("after_breed", END)
+```
+
+**After** (1 node + 1 edge):
+```ts
+.addNode("ask_breed", ({ state, interrupt }) =>
+  interrupt({
+    breed: {
+      question: "What breed?",
+      validate: async (breed) => {
+        const result = await resolveBreed(state.animalType!, breed);
+        if (!result) throw new Error("Couldn't find that breed.");
+        return { breedId: result.id };
+      },
+    },
+  })
+)
+.addEdge("ask_breed", END)
 ```
 
 ## Conditional edges
@@ -168,13 +306,17 @@ const flow = createFlow({
     companyName: z.string().describe("Company name"),
   },
 })
-  .addNode("ask_email", () => interrupt({ question: "What's your email?", field: "email" }))
+  .addNode("ask_email", ({ interrupt }) =>
+    interrupt({ email: { question: "What's your email?" } })
+  )
   // Action node — runs silently, auto-advances
-  .addNode("analyze_email", (state) => {
+  .addNode("analyze_email", ({ state }) => {
     const domain = state.email!.split("@")[1];
     return { isCompanyEmail: !GENERIC_DOMAINS.has(domain) };
   })
-  .addNode("ask_company", () => interrupt({ question: "What company are you with?", field: "companyName" }))
+  .addNode("ask_company", ({ interrupt }) =>
+    interrupt({ companyName: { question: "What company are you with?" } })
+  )
   .addNode("done", () => ({ ready: true }))
   .addEdge(START, "ask_email")
   .addEdge("ask_email", "analyze_email")
@@ -189,12 +331,12 @@ const flow = createFlow({
 
 ## Widget steps
 
-Show a widget UI at a specific step. Create a display tool with `createTool()` (attached to its own resource), then reference it in `showWidget()`.
+Show a widget UI at a specific step. Create a display tool with `createTool()` (attached to its own resource), then reference it with `showWidget()` from the handler context.
 
 **Important: The flow is a data-only tool.** It never returns `structuredContent` or renders widgets itself. When a `showWidget()` node is reached, the flow returns the tool name and data as text content for the LLM. The LLM then calls the display/render tool separately — that render tool is the one that returns `structuredContent` and the widget template (`resourceUri`). This follows the decoupled pattern: data tools (flow) handle logic and state, render tools (display tool) handle presentation.
 
 ```ts
-import { createResource, createFlow, createTool, interrupt, showWidget, registerTools, START, END } from "@waniwani/sdk/mcp";
+import { createResource, createFlow, createTool, registerTools, START, END } from "@waniwani/sdk/mcp";
 import { z } from "zod";
 
 // 1. Create and register a resource for the widget
@@ -219,7 +361,7 @@ const showPricing = createTool({
   data: { postalCode, sqm, prices: [/* ... */] },
 }));
 
-// 3. Use the display tool in a flow via showWidget
+// 3. Use the display tool in a flow via showWidget from the handler context
 const flow = createFlow({
   id: "guided_quote",
   title: "Guided Quote",
@@ -230,16 +372,20 @@ const flow = createFlow({
     selectedPlan: z.string().describe("The plan the user selected"),
   },
 })
-  .addNode("ask_postal", () => interrupt({ question: "What's your postal code?", field: "postalCode" }))
-  .addNode("ask_sqm", () => interrupt({ question: "How many m² is your home?", field: "sqm" }))
-  .addNode("show_pricing", (state) =>
+  .addNode("ask_postal", ({ interrupt }) =>
+    interrupt({ postalCode: { question: "What's your postal code?" } })
+  )
+  .addNode("ask_sqm", ({ interrupt }) =>
+    interrupt({ sqm: { question: "How many m² is your home?" } })
+  )
+  .addNode("show_pricing", ({ state, showWidget }) =>
     showWidget(showPricing, {
       data: { postalCode: state.postalCode!, sqm: Number(state.sqm) },
       description: "User must pick a plan.",
       field: "selectedPlan",
     })
   )
-  .addNode("confirm", (state) => ({
+  .addNode("confirm", ({ state }) => ({
     summary: `Selected ${state.selectedPlan} for ${state.postalCode}`,
   }))
   .addEdge(START, "ask_postal")
@@ -286,6 +432,106 @@ export default function PricingPage() {
 }
 ```
 
+## Error handling
+
+When a flow node throws an error or the engine encounters an issue, the response includes `isError: true` at the top level of the MCP tool response (alongside `content`). This signals to the MCP client that the tool call failed, following the MCP protocol convention.
+
+```ts
+// Error response shape:
+{
+  content: [{ type: "text", text: '{ "status": "error", "error": "..." }' }],
+  isError: true,  // set at response level for MCP protocol compliance
+  _meta: { ... },
+}
+```
+
+## Complete example: insurance quote with validation
+
+```ts
+import { createFlow, START, END, registerTools } from "@waniwani/sdk/mcp";
+import { z } from "zod";
+
+const flow = createFlow({
+  id: "pet_insurance_quote",
+  title: "Pet Insurance Quote",
+  description: "Get a pet insurance quote. Use when a user wants to insure their pet.",
+  state: {
+    animalType: z.enum(["dog", "cat"]).describe("Type of animal"),
+    breed: z.string().describe("Breed of the pet"),
+    breedId: z.string().describe("Resolved breed ID"),
+    age: z.number().describe("Age of the pet in years"),
+    name: z.string().describe("Pet's name"),
+    email: z.string().describe("Owner's email"),
+  },
+})
+  // Simple question with suggestions
+  .addNode("ask_animal", ({ interrupt }) =>
+    interrupt({
+      animalType: {
+        question: "Is your pet a dog or a cat?",
+        suggestions: ["Dog", "Cat"],
+      },
+    })
+  )
+  // Question with validation + state enrichment
+  .addNode("ask_breed", ({ state, interrupt }) =>
+    interrupt({
+      breed: {
+        question: "What breed is your pet?",
+        context: `The user has a ${state.animalType}. Only suggest breeds for that animal type.`,
+        validate: async (breed) => {
+          const result = await lookupBreed(state.animalType!, breed);
+          if (!result) {
+            throw new Error(`"${breed}" doesn't match any known ${state.animalType} breed. Try again?`);
+          }
+          return { breedId: result.id };
+        },
+      },
+    })
+  )
+  // Multiple questions in one message
+  .addNode("ask_details", ({ interrupt }) =>
+    interrupt(
+      {
+        age: { question: "How old is your pet?" },
+        name: { question: "What's your pet's name?" },
+      },
+      { context: "Ask both questions naturally in one conversational message." },
+    )
+  )
+  // Question with simple validation (no enrichment)
+  .addNode("ask_email", ({ interrupt }) =>
+    interrupt({
+      email: {
+        question: "What's your email for the quote?",
+        validate: (email) => {
+          if (!email.includes("@")) {
+            throw new Error("That doesn't look like a valid email address.");
+          }
+          // void return = validated, no enrichment
+        },
+      },
+    })
+  )
+  // Action node — runs silently
+  .addNode("generate_quote", async ({ state }) => {
+    const quote = await generateQuote({
+      breedId: state.breedId!,
+      age: state.age!,
+    });
+    return { quote };
+  })
+  .addEdge(START, "ask_animal")
+  .addEdge("ask_animal", "ask_breed")
+  .addEdge("ask_breed", "ask_details")
+  .addEdge("ask_details", "ask_email")
+  .addEdge("ask_email", "generate_quote")
+  .addEdge("generate_quote", END)
+  .compile();
+
+await registerTools(server, [flow]);
+```
+
 ## API Reference
 
 ### `createFlow(config)`
@@ -297,30 +543,57 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 | `id` | `string` | yes | MCP tool name |
 | `title` | `string` | yes | Display title |
 | `description` | `string` | yes | Tells the AI when to use this flow |
-| `state` | `Record<string, z.ZodType>` | yes | State schema — defines all fields the flow collects. Keys match `interrupt({ field })` names, values are Zod schemas with `.describe()` |
+| `state` | `Record<string, z.ZodType>` | yes | State schema — defines all fields the flow collects. Keys match interrupt field names, values are Zod schemas with `.describe()` |
+
 ### `StateGraph` methods
 
 | Method | Description |
 |--------|-------------|
-| `.addNode(name, handler)` | Handler node — return `interrupt()`, `showWidget()`, or a plain object |
-| `.addNode(name, { field? }, handler)` | Handler node with config. `field` enables auto-skip. |
+| `.addNode(name, handler)` | Add a node. Handler receives `{ state, meta, interrupt, showWidget }` context. Return `interrupt(...)`, `showWidget(...)`, or a plain object. |
 | `.addEdge(from, to)` | Static edge (`START` and `END` are valid) |
-| `.addConditionalEdge(from, condition)` | Dynamic routing based on state |
+| `.addConditionalEdge(from, condition)` | Dynamic routing — `condition(state)` returns the next node name |
 | `.compile()` | Validate graph and return a `RegisteredFlow` |
 
-### Helper functions (for handler-based nodes)
+### `interrupt(fields, config?)` (from handler context)
 
-| Function | Description |
-|----------|-------------|
-| `interrupt({ question, field, suggestions?, context? })` | Pause and ask the user a single question. `context` provides hidden AI instructions. |
-| `interrupt({ questions: [...], context? })` | Pause and ask several questions at once in one message. |
-| `showWidget(tool, { data, field?, description? })` | Pause and delegate to a display tool. `tool` is a `RegisteredTool` (from `createTool()`). `field` enables auto-skip when already set. |
+**`fields`** — each key is a state field name, each value is a question config:
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `question` | `string` | yes | The question to ask the user |
+| `validate` | `(value: TState[F]) => Partial<TState> \| void` | no | Validation function. Throw to reject, return object to enrich state, return void to accept. |
+| `suggestions` | `string[]` | no | Suggested answers |
+| `context` | `string` | no | Hidden AI instructions for this specific question |
+
+**`config`** (optional):
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `context` | `string` | Overall hidden AI instructions across all questions |
+
+### `showWidget(tool, config)` (from handler context)
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `tool` | `RegisteredTool` | yes | The display tool (from `createTool()`) |
+| `data` | `Record<string, unknown>` | yes | Data to pass to the display tool |
+| `field` | `keyof TState` | no | State field this widget fills — enables auto-skip |
+| `description` | `string` | no | Description for the AI |
+| `interactive` | `boolean` | no | Set to `false` for display-only widgets that auto-advance |
+
+### Other exports
+
+| Export | Description |
+|--------|-------------|
 | `encodeFlowToken(data)` | Encode a `FlowTokenContent` object into an opaque compressed base64 token. Useful for manually constructing flow state tokens server-side. |
 
 ## Common Mistakes
 
-- **Forgetting `START`/`END` edges** — Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`
-- **Action nodes returning interrupt/widget** — If a node returns `interrupt()` or `showWidget()`, it becomes an interrupt/widget node, not an action node
-- **Passing a string to `showWidget()`** — `showWidget` takes a `RegisteredTool` reference, not a string ID
-- **Missing display tool registration** — The display tool must be registered alongside the flow via `registerTools(server, [displayTool, flow])`
-- **Widget callback** — Use `sendFollowUp` to communicate the user's selection back to the AI
+- **Importing `interrupt` or `showWidget` directly** — These are NOT exported. Use them from the handler context: `({ interrupt }) => interrupt(...)`.
+- **Using the old handler signature** — Handlers receive a context object, not `(state, meta?)`. Use `({ state }) => ...` instead of `(state) => ...`.
+- **Using the old `interrupt({ question, field })` syntax** — Use the object-key syntax: `interrupt({ fieldName: { question: "..." } })`. Context goes in the second argument: `interrupt({...}, { context: "..." })`.
+- **Forgetting `START`/`END` edges** — Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`.
+- **Passing a string to `showWidget()`** — `showWidget` takes a `RegisteredTool` reference, not a string ID.
+- **Missing display tool registration** — The display tool must be registered alongside the flow via `registerTools(server, [displayTool, flow])`.
+- **Widget callback** — Use `sendFollowUp` to communicate the user's selection back to the AI.
+- **Validate returning an error string** — `validate` must **throw** an `Error` to signal failure, not return a string. Return `void` or an object for success.
