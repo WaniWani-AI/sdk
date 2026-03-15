@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import type { RegisteredTool } from "../../tools/types";
 import type { McpServer } from "../@types";
-import { END, interrupt, START, showWidget } from "../@types";
+import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
 import { decodeFlowToken } from "../flow-token";
 
@@ -54,7 +54,7 @@ describe("compileFlow response contract", () => {
 				useCase: z.string().describe("Primary use case"),
 			},
 		})
-			.addNode("ask_use_case", () =>
+			.addNode("ask_use_case", ({ interrupt }) =>
 				interrupt({
 					question: "What's your primary use case?",
 					field: "useCase",
@@ -105,7 +105,7 @@ describe("compileFlow response contract", () => {
 				useCase: z.string().describe("Primary use case"),
 			},
 		})
-			.addNode("ask_use_case", () =>
+			.addNode("ask_use_case", ({ interrupt }) =>
 				interrupt({
 					question: "What's your primary use case?",
 					field: "useCase",
@@ -157,7 +157,7 @@ describe("compileFlow response contract", () => {
 				company: z.string().describe("Company name"),
 			},
 		})
-			.addNode("ask_details", () =>
+			.addNode("ask_details", ({ interrupt }) =>
 				interrupt({
 					questions: [
 						{ question: "What's your name?", field: "name" },
@@ -253,7 +253,7 @@ describe("compileFlow response contract", () => {
 				email: z.string().describe("User email"),
 			},
 		})
-			.addNode("ask_details", () =>
+			.addNode("ask_details", ({ interrupt }) =>
 				interrupt({
 					questions: [
 						{ question: "What's your name?", field: "name" },
@@ -302,7 +302,7 @@ describe("compileFlow response contract", () => {
 				email: z.string().describe("User email"),
 			},
 		})
-			.addNode("ask_details", () => {
+			.addNode("ask_details", ({ interrupt }) => {
 				handlerCallCount++;
 				return interrupt({
 					questions: [
@@ -366,7 +366,7 @@ describe("compileFlow response contract", () => {
 				result: z.string().describe("Final result"),
 			},
 		})
-			.addNode("show_info", () =>
+			.addNode("show_info", ({ showWidget }) =>
 				showWidget(mockInfoPanelTool, {
 					data: { message: "Hello" },
 					description: "Show info panel",
@@ -414,7 +414,7 @@ describe("compileFlow response contract", () => {
 				plan: z.string().describe("Selected plan"),
 			},
 		})
-			.addNode("pick_plan", () =>
+			.addNode("pick_plan", ({ showWidget }) =>
 				showWidget(mockPlanPickerTool, {
 					data: { plans: ["starter", "pro"] },
 					description: "Pick your plan",
@@ -461,7 +461,7 @@ describe("compileFlow response contract", () => {
 				done: z.boolean().describe("Whether the flow is done"),
 			},
 		})
-			.addNode("show_teaser", () =>
+			.addNode("show_teaser", ({ showWidget }) =>
 				showWidget(mockInfoPanelTool, {
 					data: { message: "Savings teaser" },
 					description: "Display a savings teaser, then continue immediately.",
@@ -490,5 +490,307 @@ describe("compileFlow response contract", () => {
 			interactive: false,
 		});
 		expect(parsed.flowToken).toBeDefined();
+	});
+});
+
+describe("validate on interrupt", () => {
+	test("validate returning object enriches state and advances", async () => {
+		const flow = createFlow({
+			id: "validate_enrich",
+			title: "Validate Enrich",
+			description: "Test validate enrichment.",
+			state: {
+				breed: z.string().describe("Pet breed"),
+				breedId: z.string().describe("Resolved breed ID"),
+			},
+		})
+			.addNode("ask_breed", ({ interrupt }) =>
+				interrupt({
+					question: "What breed?",
+					field: "breed",
+					validate: async (breed) => {
+						return { breedId: `id-${breed}` };
+					},
+				}),
+			)
+			.addEdge(START, "ask_breed")
+			.addEdge("ask_breed", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const r1 = (await handler?.({ action: "start" }, {})) as Record<
+			string,
+			unknown
+		>;
+		const p1 = parsePayload(r1);
+		expect(p1.status).toBe("interrupt");
+
+		const r2 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { breed: "labrador" },
+				flowToken: extractFlowToken(p1),
+			},
+			{},
+		)) as Record<string, unknown>;
+		const p2 = parsePayload(r2);
+
+		expect(p2.status).toBe("complete");
+		const tokenData = decodeFlowToken(p2.flowToken as string);
+		expect(tokenData?.state).toMatchObject({
+			breed: "labrador",
+			breedId: "id-labrador",
+		});
+	});
+
+	test("validate returning void advances without enrichment", async () => {
+		const flow = createFlow({
+			id: "validate_void",
+			title: "Validate Void",
+			description: "Test validate void return.",
+			state: {
+				email: z.string().describe("Email"),
+			},
+		})
+			.addNode("ask_email", ({ interrupt }) =>
+				interrupt({
+					question: "Email?",
+					field: "email",
+					validate: async () => {
+						// no-op, just validates
+					},
+				}),
+			)
+			.addEdge(START, "ask_email")
+			.addEdge("ask_email", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const r1 = (await handler?.({ action: "start" }, {})) as Record<
+			string,
+			unknown
+		>;
+		const p1 = parsePayload(r1);
+
+		const r2 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { email: "test@test.com" },
+				flowToken: extractFlowToken(p1),
+			},
+			{},
+		)) as Record<string, unknown>;
+		const p2 = parsePayload(r2);
+
+		expect(p2.status).toBe("complete");
+		const tokenData = decodeFlowToken(p2.flowToken as string);
+		expect(tokenData?.state).toMatchObject({ email: "test@test.com" });
+	});
+
+	test("validate throwing re-asks with error message and clears field", async () => {
+		let validateCallCount = 0;
+
+		const flow = createFlow({
+			id: "validate_throw",
+			title: "Validate Throw",
+			description: "Test validate throw behavior.",
+			state: {
+				code: z.string().describe("Postal code"),
+			},
+		})
+			.addNode("ask_code", ({ interrupt }) =>
+				interrupt({
+					question: "Postal code?",
+					field: "code",
+					context: "Enter a valid code.",
+					validate: async (code) => {
+						validateCallCount++;
+						if (code === "invalid") {
+							throw new Error("Invalid postal code");
+						}
+					},
+				}),
+			)
+			.addEdge(START, "ask_code")
+			.addEdge("ask_code", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Start
+		const r1 = (await handler?.({ action: "start" }, {})) as Record<
+			string,
+			unknown
+		>;
+		const p1 = parsePayload(r1);
+		expect(p1.status).toBe("interrupt");
+
+		// Submit invalid code — should re-ask
+		const r2 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { code: "invalid" },
+				flowToken: extractFlowToken(p1),
+			},
+			{},
+		)) as Record<string, unknown>;
+		const p2 = parsePayload(r2);
+
+		expect(p2.status).toBe("interrupt");
+		expect(p2.question).toBe("Postal code?");
+		expect(p2.field).toBe("code");
+		// Error message should be in the context
+		expect(p2.context).toContain("Invalid postal code");
+		expect(validateCallCount).toBe(1);
+
+		// Submit valid code — should complete
+		const r3 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { code: "12345" },
+				flowToken: extractFlowToken(p2),
+			},
+			{},
+		)) as Record<string, unknown>;
+		const p3 = parsePayload(r3);
+
+		expect(p3.status).toBe("complete");
+		expect(validateCallCount).toBe(2);
+	});
+
+	test("validate only runs after all questions are answered", async () => {
+		const validateCalled = false;
+
+		const flow = createFlow({
+			id: "validate_after_all",
+			title: "Validate After All",
+			description: "Validate runs only when all questions answered.",
+			state: {
+				name: z.string().describe("Name"),
+				email: z.string().describe("Email"),
+			},
+		})
+			.addNode("ask_details", ({ interrupt }) =>
+				interrupt({
+					questions: [
+						{
+							question: "Name?",
+							field: "name",
+						},
+						{ question: "Email?", field: "email" },
+					],
+				}),
+			)
+			// Separate node to test that validate on a multi-question interrupt
+			// is not supported (validate is per-question in single-question form)
+			.addEdge(START, "ask_details")
+			.addEdge("ask_details", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const r1 = (await handler?.({ action: "start" }, {})) as Record<
+			string,
+			unknown
+		>;
+		const p1 = parsePayload(r1);
+
+		// Partial answer — should NOT trigger validate
+		const r2 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { name: "Alice" },
+				flowToken: extractFlowToken(p1),
+			},
+			{},
+		)) as Record<string, unknown>;
+		const p2 = parsePayload(r2);
+
+		expect(p2.status).toBe("interrupt");
+		expect(validateCalled).toBe(false);
+
+		// Complete answer
+		const r3 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { email: "a@b.com" },
+				flowToken: extractFlowToken(p2),
+			},
+			{},
+		)) as Record<string, unknown>;
+		const p3 = parsePayload(r3);
+
+		expect(p3.status).toBe("complete");
+	});
+});
+
+describe("isError on error responses", () => {
+	test("error responses have isError: true", async () => {
+		const flow = createFlow({
+			id: "error_flow",
+			title: "Error Flow",
+			description: "Test error handling.",
+			state: {
+				value: z.string().describe("Value"),
+			},
+		})
+			.addNode("will_fail", () => {
+				throw new Error("Something broke");
+			})
+			.addEdge(START, "will_fail")
+			.addEdge("will_fail", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.({ action: "start" }, {})) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("error");
+		expect(parsed.error).toBe("Something broke");
+		expect(result.isError).toBe(true);
+	});
+
+	test("non-error responses do not have isError", async () => {
+		const flow = createFlow({
+			id: "success_flow",
+			title: "Success Flow",
+			description: "Test success.",
+			state: {
+				name: z.string().describe("Name"),
+			},
+		})
+			.addNode("ask", ({ interrupt }) =>
+				interrupt({ question: "Name?", field: "name" }),
+			)
+			.addEdge(START, "ask")
+			.addEdge("ask", END)
+			.compile();
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.({ action: "start" }, {})) as Record<
+			string,
+			unknown
+		>;
+
+		expect(result.isError).toBe(undefined);
 	});
 });

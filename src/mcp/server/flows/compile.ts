@@ -13,12 +13,19 @@ import type {
 	FlowContent,
 	FlowTokenContent,
 	FlowToolInput,
+	MaybePromise,
 	McpServer,
-	NodeConfig,
 	NodeHandler,
 	RegisteredFlow,
 } from "./@types";
-import { END, isInterrupt, isWidget, START } from "./@types";
+import {
+	END,
+	interrupt,
+	isInterrupt,
+	isWidget,
+	START,
+	showWidget,
+} from "./@types";
 import { decodeFlowToken, encodeFlowToken } from "./flow-token";
 
 // ============================================================================
@@ -201,6 +208,15 @@ function buildInterruptResult<TState extends Record<string, unknown>>(
 }
 
 // ============================================================================
+// Validator type
+// ============================================================================
+
+type ValidateFn = (
+	value: unknown,
+	// biome-ignore lint/suspicious/noConfusingVoidType: void needed for async () => {} validators
+) => MaybePromise<Record<string, unknown> | void>;
+
+// ============================================================================
 // Execution engine
 // ============================================================================
 
@@ -208,8 +224,8 @@ async function executeFrom<TState extends Record<string, unknown>>(
 	startNodeName: string,
 	startState: TState,
 	nodes: Map<string, NodeHandler<TState>>,
-	nodeConfigs: Map<string, NodeConfig<TState>>,
 	edges: Map<string, Edge<TState>>,
+	validators: Map<string, ValidateFn>,
 	meta?: Record<string, unknown>,
 ): Promise<ExecutionResult> {
 	let currentNode = startNodeName;
@@ -239,17 +255,38 @@ async function executeFrom<TState extends Record<string, unknown>>(
 		}
 
 		try {
-			const result = await handler(state, meta);
+			// Build context object for the handler
+			const ctx = {
+				state,
+				meta,
+				interrupt: interrupt as NodeHandler<TState> extends never
+					? never
+					: typeof interrupt,
+				showWidget: showWidget as NodeHandler<TState> extends never
+					? never
+					: typeof showWidget,
+			};
+			const result = await handler(ctx as Parameters<typeof handler>[0]);
 
 			// Interrupt signal — pause and ask the user one or more questions
 			if (isInterrupt(result)) {
+				// Extract and store any validate functions from the interrupt questions
+				for (const q of result.questions) {
+					if (q.validate) {
+						validators.set(`${currentNode}:${q.field}`, q.validate);
+					}
+				}
+
 				const interruptResult = buildInterruptResult(
 					result.questions,
 					result.context,
 					currentNode,
 					state,
 				);
-				if (interruptResult) return interruptResult;
+
+				if (interruptResult) {
+					return interruptResult;
+				}
 
 				// All questions filled — auto-skip to next node
 				const edge = edges.get(currentNode);
@@ -267,8 +304,7 @@ async function executeFrom<TState extends Record<string, unknown>>(
 
 			// Widget signal — delegate to display tool
 			if (isWidget(result)) {
-				// Auto-skip: use field from the signal, fall back to nodeConfig
-				const widgetField = result.field ?? nodeConfigs.get(currentNode)?.field;
+				const widgetField = result.field;
 				if (widgetField) {
 					if (isFilled(state[widgetField as keyof TState])) {
 						const edge = edges.get(currentNode);
@@ -359,9 +395,13 @@ const inputSchema = {
 export function compileFlow<TState extends Record<string, unknown>>(
 	input: CompileInput<TState>,
 ): RegisteredFlow {
-	const { config, nodes, nodeConfigs, edges } = input;
+	const { config, nodes, edges } = input;
 	const protocol = buildFlowProtocol(config);
 	const fullDescription = `${config.description}\n${protocol}`;
+
+	// Validator storage — populated when handlers return interrupts with validate functions.
+	// Keyed by "nodeName:fieldName", persists across tool calls within the same server.
+	const validators = new Map<string, ValidateFn>();
 
 	async function handleToolCall(
 		args: FlowToolInput,
@@ -388,14 +428,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			} as TState;
 
 			const firstNode = await resolveNextNode(startEdge, startState);
-			return executeFrom(
-				firstNode,
-				startState,
-				nodes,
-				nodeConfigs,
-				edges,
-				meta,
-			);
+			return executeFrom(firstNode, startState, nodes, edges, validators, meta);
 		}
 
 		if (args.action === "continue") {
@@ -411,7 +444,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
-			const updatedState = {
+			let updatedState = {
 				...state,
 				...(args.stateUpdates ?? {}),
 			} as TState;
@@ -425,8 +458,58 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					step,
 					updatedState,
 				);
-				if (interruptResult) return interruptResult;
-				// All questions answered — fall through to advance
+
+				// results = the user has not answered all questions
+				if (interruptResult) {
+					return interruptResult;
+				}
+
+				// All questions answered — run validators before advancing
+				const fieldValidators = inputMeta.questions
+					.map((q) => ({
+						field: q.field,
+						fn: validators.get(`${step}:${q.field}`),
+					}))
+					.filter((v): v is { field: string; fn: ValidateFn } => v.fn != null);
+
+				for (const { field, fn } of fieldValidators) {
+					try {
+						const value = updatedState[field as keyof TState];
+						const vResult = await fn(value);
+						if (vResult && typeof vResult === "object") {
+							updatedState = {
+								...updatedState,
+								...vResult,
+							} as TState;
+						}
+					} catch (err) {
+						// Validation failed — clear field and re-present interrupt
+						const msg = err instanceof Error ? err.message : String(err);
+						delete (updatedState as Record<string, unknown>)[field];
+						// Prepend error to the specific question's context so it's visible
+						// even when the question has its own context (which takes precedence
+						// over the overall interrupt context in single-question shorthand).
+						const questionsWithError = inputMeta.questions.map((q) =>
+							q.field === field
+								? {
+										...q,
+										context: q.context
+											? `ERROR: ${msg}\n\n${q.context}`
+											: `ERROR: ${msg}`,
+									}
+								: q,
+						);
+						const result = buildInterruptResult(
+							questionsWithError,
+							inputMeta.interruptContext,
+							step,
+							updatedState,
+						);
+						if (result) return result;
+						// Should never happen — we just cleared the field
+						break;
+					}
+				}
 			}
 
 			// Advance to next node when: all cached questions are answered, or
@@ -449,13 +532,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					nextNode,
 					updatedState,
 					nodes,
-					nodeConfigs,
 					edges,
+					validators,
 					meta,
 				);
 			}
 
-			return executeFrom(step, updatedState, nodes, nodeConfigs, edges, meta);
+			return executeFrom(step, updatedState, nodes, edges, validators, meta);
 		}
 
 		return {
@@ -509,8 +592,9 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					return {
 						content,
 						_meta,
+						...(result.content.status === "error" ? { isError: true } : {}),
 					};
-				}) as unknown as ToolCallback<typeof inputSchema>,
+				}) satisfies ToolCallback<typeof inputSchema>,
 			);
 		},
 	};

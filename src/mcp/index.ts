@@ -16,19 +16,19 @@ export type {
 	FlowConfig,
 	InferFlowState,
 	InterruptSignal,
-	NodeConfig,
+	NodeContext,
 	NodeHandler,
 	RegisteredFlow,
+	TypedInterrupt,
+	TypedShowWidget,
 	WidgetSignal,
 } from "./server/flows";
 export {
 	createFlow,
 	END,
 	encodeFlowToken,
-	interrupt,
 	START,
 	StateGraph,
-	showWidget,
 } from "./server/flows";
 export type {
 	RegisteredResource,

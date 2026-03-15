@@ -28,6 +28,9 @@ export type InterruptQuestion = {
 	suggestions?: string[];
 	/** Hidden context/instructions for this specific question (not shown to user directly) */
 	context?: string;
+	/** Validation function — runs after the user answers, before advancing to the next node */
+	// biome-ignore lint/suspicious/noConfusingVoidType: void is needed so `async () => {}` compiles
+	validate?: (value: unknown) => MaybePromise<Record<string, unknown> | void>;
 };
 
 /**
@@ -65,22 +68,7 @@ export type WidgetSignal = {
 
 /**
  * Create an interrupt signal — pauses the flow and asks the user a question.
- *
- * Accepts a single question (shorthand) or multiple questions (array form).
- * Both produce the same signal type.
- *
- * @example Single question
- * ```ts
- * return interrupt({ question: "Your email?", field: "email" })
- * ```
- *
- * @example Multiple questions (asked together in one message)
- * ```ts
- * return interrupt({ questions: [
- *   { question: "How many employees?", field: "headcount" },
- *   { question: "Average age?", field: "averageAge" },
- * ]})
- * ```
+ * Used internally by the engine. Flow authors use the typed `interrupt` from the node context.
  */
 export function interrupt(
 	config:
@@ -89,6 +77,10 @@ export function interrupt(
 				field: string;
 				suggestions?: string[];
 				context?: string;
+				validate?: (
+					value: unknown,
+					// biome-ignore lint/suspicious/noConfusingVoidType: void is needed so `async () => {}` compiles
+				) => MaybePromise<Record<string, unknown> | void>;
 		  }
 		| { questions: InterruptQuestion[]; context?: string },
 ): InterruptSignal {
@@ -99,21 +91,16 @@ export function interrupt(
 			context: config.context,
 		};
 	}
-	const { question, field, context, suggestions } = config;
+	const { question, field, context, suggestions, validate } = config;
 	return {
 		__type: INTERRUPT,
-		questions: [{ question, field, context, suggestions }],
+		questions: [{ question, field, context, suggestions, validate }],
 	};
 }
 
 /**
  * Create a widget signal — pauses the flow and delegates rendering to a display tool.
- *
- * The display tool is a regular `createTool()` with a resource attached.
- * The flow engine will instruct the model to call the display tool separately.
- *
- * Pass `field` to enable auto-skip: if the field is already in state, the widget
- * step will be skipped automatically.
+ * Used internally by the engine. Flow authors use the typed `showWidget` from the node context.
  */
 export function showWidget(
 	tool: RegisteredTool,
@@ -146,42 +133,76 @@ export function isWidget(value: unknown): value is WidgetSignal {
 }
 
 // ============================================================================
-// Node & edge definitions
+// Node context & handler
 // ============================================================================
 
 export type MaybePromise<T> = T | Promise<T>;
 
 /**
- * Optional config for handler-based nodes.
- * Provides metadata used by the engine (e.g., auto-skip on widget steps).
- *
- * For declarative nodes, config is inferred automatically — no need to pass this.
+ * Typed interrupt function — available on the node context.
+ * The `field` parameter is typed as `keyof TState`, and `validate` receives
+ * the field's value typed from the Zod schema.
  */
-export type NodeConfig<
-	TState extends Record<string, unknown> = Record<string, unknown>,
-> = {
-	/**
-	 * State key this node fills.
-	 * When set on a handler-based widget node and the field is already in state,
-	 * the node is auto-skipped. (Alternatively, pass `field` to `showWidget()`.)
-	 */
-	field?: Extract<keyof TState, string>;
+export type TypedInterrupt<TState> = {
+	/** Single question — field and validate are typed from the state schema */
+	<F extends Extract<keyof TState, string>>(config: {
+		question: string;
+		field: F;
+		// biome-ignore lint/suspicious/noConfusingVoidType: void is needed so `async () => {}` compiles
+		validate?: (value: TState[F]) => MaybePromise<Partial<TState> | void>;
+		suggestions?: string[];
+		context?: string;
+	}): InterruptSignal;
+	/** Multiple questions asked together in one conversational message */
+	(config: {
+		questions: Array<{
+			question: string;
+			field: Extract<keyof TState, string>;
+			suggestions?: string[];
+			context?: string;
+		}>;
+		context?: string;
+	}): InterruptSignal;
 };
 
-// ============================================================================
-// Declarative node configs — shorthand for common patterns, no handler needed
-// ============================================================================
+/**
+ * Typed showWidget function — available on the node context.
+ * The `field` parameter is typed as `keyof TState`.
+ */
+export type TypedShowWidget<TState> = (
+	tool: RegisteredTool,
+	config: {
+		data: Record<string, unknown>;
+		description?: string;
+		interactive?: boolean;
+		field?: Extract<keyof TState, string>;
+	},
+) => WidgetSignal;
 
 /**
- * Node handler — a single function type for all node kinds.
+ * Context object passed to node handlers.
+ * Provides state, metadata, and typed helper functions for creating signals.
+ */
+export type NodeContext<TState> = {
+	/** Current flow state (partial — fields are filled as the flow progresses) */
+	state: Partial<TState>;
+	/** Request metadata from the MCP call */
+	meta?: Record<string, unknown>;
+	/** Create an interrupt signal — pause and ask the user questions */
+	interrupt: TypedInterrupt<TState>;
+	/** Create a widget signal — pause and show a UI widget */
+	showWidget: TypedShowWidget<TState>;
+};
+
+/**
+ * Node handler — receives a context object and returns a signal or state updates.
  * The return value determines behavior:
  * - `Partial<TState>` → action node (state merged, auto-advance)
  * - `InterruptSignal` → interrupt (pause, ask user one or more questions)
  * - `WidgetSignal` → widget step (pause, show widget)
  */
 export type NodeHandler<TState> = (
-	state: Partial<TState>,
-	meta?: Record<string, unknown>,
+	ctx: NodeContext<TState>,
 ) => MaybePromise<Partial<TState> | InterruptSignal | WidgetSignal>;
 
 /**
@@ -209,7 +230,7 @@ export type FlowConfig = {
 	description: string;
 	/**
 	 * Define the flow's state — each field the flow collects.
-	 * Keys are the field names used in `interrupt({ field })` or `NodeConfig.field`,
+	 * Keys are the field names used in `interrupt({ field })`,
 	 * values are Zod schemas with `.describe()`.
 	 *
 	 * The state definition serves two purposes:
@@ -267,7 +288,6 @@ export type RegisteredFlow = {
 export interface CompileInput<TState extends Record<string, unknown>> {
 	config: FlowConfig;
 	nodes: Map<string, NodeHandler<TState>>;
-	nodeConfigs: Map<string, NodeConfig<TState>>;
 	edges: Map<string, Edge<TState>>;
 }
 

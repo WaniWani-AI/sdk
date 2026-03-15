@@ -5,13 +5,14 @@ export type {
 	FlowConfig,
 	InferFlowState,
 	InterruptSignal,
-	NodeConfig,
+	NodeContext,
 	NodeHandler,
 	RegisteredFlow,
+	TypedInterrupt,
+	TypedShowWidget,
 	WidgetSignal,
 } from "./@types";
-// Types
-export { END, interrupt, START, showWidget } from "./@types";
+export { END, START } from "./@types";
 // Convenience factory
 export { createFlow } from "./create-flow";
 export { encodeFlowToken } from "./flow-token";
