@@ -14,6 +14,7 @@ export type {
 export type {
 	ConditionFn,
 	FlowConfig,
+	FlowTestResult,
 	InferFlowState,
 	InterruptSignal,
 	NodeContext,
@@ -25,6 +26,8 @@ export type {
 } from "./server/flows";
 export {
 	createFlow,
+	createFlowTestHarness,
+	decodeFlowToken,
 	END,
 	encodeFlowToken,
 	START,

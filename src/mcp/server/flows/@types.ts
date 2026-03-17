@@ -343,20 +343,54 @@ export type FlowTokenContent = {
 	interruptContext?: string;
 };
 
-/** Parsed response text from a flow tool call */
-export type FlowContent = {
-	status: "widget" | "interrupt" | "complete" | "error";
-	description?: string;
-	question?: string;
-	error?: string;
-	flowToken?: string;
-	/** Whether a widget step expects user interaction before continuing */
-	interactive?: boolean;
-	/** Display tool to call (widget status only) */
-	tool?: string;
-	/** Data to pass to the display tool (widget status only) */
-	data?: Record<string, unknown>;
+export type InterruptQuestionData = {
+	question: string;
+	field: string;
+	suggestions?: string[];
+	context?: string;
 };
+
+type FlowContentBase = {
+	flowToken?: string;
+};
+
+export type FlowInterruptContent = FlowContentBase & {
+	status: "interrupt";
+	/** Single-question shorthand */
+	question?: string;
+	field?: string;
+	suggestions?: string[];
+	/** Multi-question */
+	questions?: InterruptQuestionData[];
+	context?: string;
+};
+
+export type FlowWidgetContent = FlowContentBase & {
+	status: "widget";
+	/** Display tool to call */
+	tool: string;
+	/** Data to pass to the display tool */
+	data: Record<string, unknown>;
+	description?: string;
+	/** Whether the widget expects user interaction before continuing */
+	interactive?: boolean;
+};
+
+export type FlowCompleteContent = FlowContentBase & {
+	status: "complete";
+};
+
+export type FlowErrorContent = FlowContentBase & {
+	status: "error";
+	error: string;
+};
+
+/** Parsed response text from a flow tool call */
+export type FlowContent =
+	| FlowInterruptContent
+	| FlowWidgetContent
+	| FlowCompleteContent
+	| FlowErrorContent;
 
 export type ExecutionResult = {
 	content: FlowContent;

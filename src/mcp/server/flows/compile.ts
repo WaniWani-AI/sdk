@@ -13,6 +13,7 @@ import type {
 	FlowContent,
 	FlowTokenContent,
 	FlowToolInput,
+	InterruptQuestionData,
 	MaybePromise,
 	McpServer,
 	NodeHandler,
@@ -144,13 +145,6 @@ function isFilled(v: unknown): boolean {
 // ============================================================================
 // Interrupt result builder
 // ============================================================================
-
-type InterruptQuestionData = {
-	question: string;
-	field: string;
-	suggestions?: string[];
-	context?: string;
-};
 
 /**
  * Build an interrupt ExecutionResult from a list of questions and current state.

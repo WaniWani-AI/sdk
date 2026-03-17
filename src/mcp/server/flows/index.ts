@@ -15,6 +15,10 @@ export type {
 export { END, START } from "./@types";
 // Convenience factory
 export { createFlow } from "./create-flow";
-export { encodeFlowToken } from "./flow-token";
+// Token utilities
+export { decodeFlowToken, encodeFlowToken } from "./flow-token";
 // Builder
 export { StateGraph } from "./state-graph";
+// Test utilities
+export type { FlowTestResult } from "./test-utils";
+export { createFlowTestHarness } from "./test-utils";
