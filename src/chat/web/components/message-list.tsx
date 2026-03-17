@@ -92,7 +92,7 @@ export function MessageList({
 
 	return (
 		<>
-			{welcomeMessage && !fullscreenToolCallId && (
+			{welcomeMessage && (
 				<Message from="assistant">
 					<MessageContent>
 						<MessageResponse>{welcomeMessage}</MessageResponse>
@@ -120,22 +120,13 @@ export function MessageList({
 					message === lastMessage && message.role === "assistant";
 				const hasTextContent = textParts.length > 0;
 
-				// Skip messages that don't contain the fullscreen widget
-				const hasFullscreenWidget =
-					fullscreenToolCallId &&
-					toolParts.some((p) => p.toolCallId === fullscreenToolCallId);
-				if (fullscreenToolCallId && !hasFullscreenWidget) return null;
-
 				return (
 					<Message from={message.role} key={message.id}>
-						{/* Hide reasoning when a widget is fullscreen */}
 						{reasoningParts.map((part, i) => (
-							<div
+							<Reasoning
 								key={`reasoning-${message.id}-${i}`}
-								style={fullscreenToolCallId ? { display: "none" } : undefined}
-							>
-								<Reasoning text={part.text} />
-							</div>
+								text={part.text}
+							/>
 						))}
 						{toolParts.map((part) => {
 							const output = "output" in part ? part.output : undefined;
@@ -144,25 +135,21 @@ export function MessageList({
 							const autoHeight =
 								output !== undefined ? getAutoHeight(output) : false;
 							const isFullscreen = part.toolCallId === fullscreenToolCallId;
-							const isHidden = fullscreenToolCallId != null && !isFullscreen;
 
 							return (
 								<div
 									key={part.toolCallId}
 									style={
-										isHidden
-											? { display: "none" }
-											: isFullscreen
-												? {
-														position: "absolute" as const,
-														inset: 0,
-														zIndex: 10,
-													}
-												: undefined
+										isFullscreen
+											? {
+													position: "absolute" as const,
+													inset: 0,
+													zIndex: 10,
+												}
+											: undefined
 									}
 								>
-									{/* Keep Tool in tree but hide when fullscreen (preserves child positions) */}
-									<div style={isFullscreen ? { display: "none" } : undefined}>
+									<div>
 										<Tool defaultOpen={part.state === "output-available"}>
 											<ToolHeader
 												title={part.title ?? formatToolName(part.toolName)}
@@ -249,8 +236,7 @@ export function MessageList({
 								</div>
 							);
 						})}
-						{/* Hide text content when fullscreen */}
-						<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
+						<div>
 							<MessageContent>
 								{fileParts.length > 0 && <Attachments files={fileParts} />}
 								{hasTextContent
@@ -265,7 +251,7 @@ export function MessageList({
 					</Message>
 				);
 			})}
-			{showLoaderBubble && !fullscreenToolCallId && (
+			{showLoaderBubble && (
 				<Message from="assistant">
 					<MessageContent>
 						<Loader />

@@ -215,7 +215,10 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 
 					{/* Messages */}
 					<Conversation
-						className="ww:flex-1"
+						className={cn(
+							"ww:flex-1",
+							fullscreenToolCallId && "[&>div]:ww:!overflow-hidden",
+						)}
 						style={{ height: expandedHeight }}
 					>
 						<ConversationContent>
@@ -236,25 +239,25 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 								}}
 							/>
 						</ConversationContent>
-						{!fullscreenToolCallId && <ConversationScrollButton />}
+						<ConversationScrollButton />
 					</Conversation>
 
 					{/* Suggestions */}
-					{!fullscreenToolCallId && (
+					<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
 						<Suggestions
 							suggestions={suggestionsState.suggestions}
 							isLoading={suggestionsState.isLoading}
 							onSelect={handleSuggestionSelect}
 						/>
-					)}
+					</div>
 
 					{/* Queue */}
-					{!fullscreenToolCallId && (
+					<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
 						<ChatQueue
 							queuedMessages={engine.queuedMessages}
 							onRemove={engine.removeQueuedMessage}
 						/>
-					)}
+					</div>
 				</div>
 
 				{/* Input section — always visible, joins card when expanded */}

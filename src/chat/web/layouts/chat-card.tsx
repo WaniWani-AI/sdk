@@ -212,28 +212,28 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 							}}
 						/>
 					</ConversationContent>
-					{!fullscreenToolCallId && <ConversationScrollButton />}
+					<ConversationScrollButton />
 				</Conversation>
 
 				{/* Suggestions — hide when fullscreen */}
-				{!fullscreenToolCallId && (
+				<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
 					<Suggestions
 						suggestions={suggestionsState.suggestions}
 						isLoading={suggestionsState.isLoading}
 						onSelect={handleSuggestionSelect}
 					/>
-				)}
+				</div>
 
 				{/* Queue — hide when fullscreen */}
-				{!fullscreenToolCallId && (
+				<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
 					<ChatQueue
 						queuedMessages={engine.queuedMessages}
 						onRemove={engine.removeQueuedMessage}
 					/>
-				)}
+				</div>
 
 				{/* Input — hide when fullscreen */}
-				{!fullscreenToolCallId && (
+				<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
 					<div className="ww:shrink-0 ww:px-4 ww:pb-8 ww:pt-2 ww:bg-background">
 						<div className="ww:mx-auto ww:w-full ww:max-w-3xl">
 							<PromptInput
@@ -258,7 +258,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 							</PromptInput>
 						</div>
 					</div>
-				)}
+				</div>
 			</div>
 		);
 	},
