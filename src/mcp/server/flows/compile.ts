@@ -27,7 +27,34 @@ import {
 	START,
 	showWidget,
 } from "./@types";
-import { decodeFlowToken, encodeFlowToken } from "./flow-token";
+import {
+	type FlowStore,
+	generateFlowKey,
+	WaniwaniFlowStore,
+} from "./flow-store";
+import { decodeFlowToken } from "./flow-token";
+
+// ============================================================================
+// Session ID extraction — same priority as tracking mapper
+// ============================================================================
+
+const SESSION_ID_KEYS = [
+	"openai/sessionId",
+	"sessionId",
+	"conversationId",
+	"anthropic/sessionId",
+] as const;
+
+function extractSessionId(
+	meta: Record<string, unknown> | undefined,
+): string | undefined {
+	if (!meta) return undefined;
+	for (const key of SESSION_ID_KEYS) {
+		const value = meta[key];
+		if (typeof value === "string" && value.length > 0) return value;
+	}
+	return undefined;
+}
 
 // ============================================================================
 // Flow protocol — embedded in tool description
@@ -111,14 +138,28 @@ function buildFlowProtocol(config: FlowConfig): string {
 	return lines.join("\n");
 }
 
-function getInputMeta(args: FlowToolInput): FlowTokenContent & {
-	state: Record<string, unknown>;
-} {
+async function getFlowTokenContent(
+	args: FlowToolInput,
+	store: FlowStore,
+	sessionId: string | undefined,
+): Promise<FlowTokenContent | null> {
+	// Primary: look up by session ID — no LLM round-tripping
+	if (sessionId) {
+		const stored = await store.get(sessionId);
+		if (stored) {
+			return stored;
+		}
+	}
+
+	// Fallback: flowToken is either a store key (short hex) or a legacy base64 token
 	if (args.flowToken) {
+		const stored = await store.get(args.flowToken);
+		if (stored) return stored;
 		const decoded = decodeFlowToken(args.flowToken);
 		if (decoded) return decoded;
 	}
-	return { step: undefined as unknown as string, state: {} };
+
+	return null;
 }
 
 // ============================================================================
@@ -193,10 +234,6 @@ function buildInterruptResult<TState extends Record<string, unknown>>(
 			step: currentNode,
 			state,
 			...(isSingle && q0 ? { field: q0.field } : {}),
-			// Cache the full question list so partial-answer continues
-			// can filter without re-executing the node handler.
-			questions,
-			...(context ? { interruptContext: context } : {}),
 		},
 	};
 }
@@ -282,7 +319,42 @@ async function executeFrom<TState extends Record<string, unknown>>(
 					return interruptResult;
 				}
 
-				// All questions filled — auto-skip to next node
+				// All questions filled — run validators before advancing
+				for (const q of result.questions) {
+					const fn = validators.get(`${currentNode}:${q.field}`);
+					if (fn) {
+						try {
+							const value = state[q.field as keyof TState];
+							const vResult = await fn(value);
+							if (vResult && typeof vResult === "object") {
+								state = { ...state, ...vResult } as TState;
+							}
+						} catch (err) {
+							const msg = err instanceof Error ? err.message : String(err);
+							delete (state as Record<string, unknown>)[q.field];
+							const questionsWithError = result.questions.map((qq) =>
+								qq.field === q.field
+									? {
+											...qq,
+											context: qq.context
+												? `ERROR: ${msg}\n\n${qq.context}`
+												: `ERROR: ${msg}`,
+										}
+									: qq,
+							);
+							const errResult = buildInterruptResult(
+								questionsWithError,
+								result.context,
+								currentNode,
+								state,
+							);
+							if (errResult) return errResult;
+							break;
+						}
+					}
+				}
+
+				// All questions filled and validated — advance to next node
 				const edge = edges.get(currentNode);
 				if (!edge) {
 					return {
@@ -393,17 +465,18 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	const protocol = buildFlowProtocol(config);
 	const fullDescription = `${config.description}\n${protocol}`;
 
+	// Server-side state store — keyed by sessionId, backed by WaniWani API.
+	const store: FlowStore = input.store ?? new WaniwaniFlowStore();
+
 	// Validator storage — populated when handlers return interrupts with validate functions.
 	// Keyed by "nodeName:fieldName", persists across tool calls within the same server.
 	const validators = new Map<string, ValidateFn>();
 
 	async function handleToolCall(
 		args: FlowToolInput,
+		sessionId: string | undefined,
 		meta?: Record<string, unknown>,
 	): Promise<ExecutionResult> {
-		const inputMeta = getInputMeta(args);
-		const state = inputMeta.state as TState;
-
 		if (args.action === "start") {
 			const startEdge = edges.get(START);
 			if (!startEdge) {
@@ -415,103 +488,48 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
-			// Merge pre-filled answers and any stateUpdates
-			const startState = {
-				...state,
-				...(args.stateUpdates ?? {}),
-			} as TState;
-
+			const startState = { ...(args.stateUpdates ?? {}) } as TState;
 			const firstNode = await resolveNextNode(startEdge, startState);
 			return executeFrom(firstNode, startState, nodes, edges, validators, meta);
 		}
 
 		if (args.action === "continue") {
-			const step = inputMeta.step;
-			if (!step) {
+			const flowTokenContent = await getFlowTokenContent(
+				args,
+				store,
+				sessionId,
+			);
+
+			if (!flowTokenContent) {
 				return {
 					content: {
 						status: "error",
 						error:
-							'Missing or invalid "flowToken" for continue action.' +
+							"Flow state not found for continue action." +
 							" Pass back the flowToken from the previous response exactly as received.",
 					},
 				};
 			}
 
-			let updatedState = {
+			const state = flowTokenContent.state as TState;
+			const step = flowTokenContent.step;
+			if (!step) {
+				return {
+					content: {
+						status: "error",
+						error:
+							"Flow state is missing the current step. The flow may have expired.",
+					},
+				};
+			}
+
+			const updatedState = {
 				...state,
 				...(args.stateUpdates ?? {}),
 			} as TState;
 
-			// If cached interrupt questions exist, check for unanswered questions
-			// without re-executing the node handler (avoids side-effect replay).
-			if (inputMeta.questions) {
-				const interruptResult = buildInterruptResult(
-					inputMeta.questions,
-					inputMeta.interruptContext,
-					step,
-					updatedState,
-				);
-
-				// results = the user has not answered all questions
-				if (interruptResult) {
-					return interruptResult;
-				}
-
-				// All questions answered — run validators before advancing
-				const fieldValidators = inputMeta.questions
-					.map((q) => ({
-						field: q.field,
-						fn: validators.get(`${step}:${q.field}`),
-					}))
-					.filter((v): v is { field: string; fn: ValidateFn } => v.fn != null);
-
-				for (const { field, fn } of fieldValidators) {
-					try {
-						const value = updatedState[field as keyof TState];
-						const vResult = await fn(value);
-						if (vResult && typeof vResult === "object") {
-							updatedState = {
-								...updatedState,
-								...vResult,
-							} as TState;
-						}
-					} catch (err) {
-						// Validation failed — clear field and re-present interrupt
-						const msg = err instanceof Error ? err.message : String(err);
-						delete (updatedState as Record<string, unknown>)[field];
-						// Prepend error to the specific question's context so it's visible
-						// even when the question has its own context (which takes precedence
-						// over the overall interrupt context in single-question shorthand).
-						const questionsWithError = inputMeta.questions.map((q) =>
-							q.field === field
-								? {
-										...q,
-										context: q.context
-											? `ERROR: ${msg}\n\n${q.context}`
-											: `ERROR: ${msg}`,
-									}
-								: q,
-						);
-						const result = buildInterruptResult(
-							questionsWithError,
-							inputMeta.interruptContext,
-							step,
-							updatedState,
-						);
-						if (result) return result;
-						// Should never happen — we just cleared the field
-						break;
-					}
-				}
-			}
-
-			// Advance to next node when: all cached questions are answered, or
-			// this is a widget continue (widgets never have cached questions and
-			// re-executing the handler would cause a stuck loop for field-less widgets).
-			// Otherwise the AI may have dropped _meta.flow.questions — re-execute
-			// from the current step so the handler can re-check unanswered questions.
-			if (inputMeta.questions || inputMeta.widgetId) {
+			// Widget continue: advance past the widget step (don't re-show it)
+			if (flowTokenContent.widgetId) {
 				const edge = edges.get(step);
 				if (!edge) {
 					return {
@@ -532,6 +550,9 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				);
 			}
 
+			// Interrupt continue: re-execute from current step.
+			// The handler re-runs, filters answered questions, and runs
+			// validators if all questions are filled.
 			return executeFrom(step, updatedState, nodes, edges, validators, meta);
 		}
 
@@ -563,13 +584,22 @@ export function compileFlow<TState extends Record<string, unknown>>(
 						ServerNotification
 					>;
 					const _meta: Record<string, unknown> = requestExtra._meta ?? {};
+					const sessionId = extractSessionId(_meta);
 
-					const result = await handleToolCall(args, _meta);
+					const result = await handleToolCall(args, sessionId, _meta);
 
-					// Encode flow state as opaque token for the model to pass back
-					const flowToken = result.flowTokenContent
-						? encodeFlowToken(result.flowTokenContent)
-						: undefined;
+					let flowToken: string | undefined;
+					if (result.flowTokenContent) {
+						if (sessionId) {
+							await store.set(sessionId, result.flowTokenContent);
+							flowToken = sessionId;
+						} else {
+							// No session ID available — fall back to random key
+							const key = generateFlowKey();
+							await store.set(key, result.flowTokenContent);
+							flowToken = key;
+						}
+					}
 
 					// Text content includes the payload + flowToken for the model
 					const contentResponse: FlowContent = {

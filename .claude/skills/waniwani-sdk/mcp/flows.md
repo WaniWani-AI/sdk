@@ -10,12 +10,12 @@ LangGraph-inspired multi-step conversational flows for MCP tools. Define a state
 4. **Interrupt nodes** pause the flow and ask the user one or more questions
 5. **Widget nodes** pause the flow and render a widget UI
 
-The AI carries the state between steps — no server-side storage needed.
+Flow state is stored **server-side** via the WaniWani API. The AI receives a short opaque key instead of a compressed token — this is much more reliable for LLM round-tripping.
 
 ## Import
 
 ```ts
-import { createFlow, encodeFlowToken, registerTools, START, END } from "@waniwani/sdk/mcp";
+import { createFlow, registerTools, START, END } from "@waniwani/sdk/mcp";
 ```
 
 > **Note:** `interrupt` and `showWidget` are **not** imported directly. They are provided on the handler's context object (see [Node handlers](#node-handlers)).
@@ -90,7 +90,35 @@ const flow = createFlow({
 })
 ```
 
-At every step, the engine encodes the current flow state (step, field, state values, cached questions) into an opaque `flowToken` string included in the text response. The AI echoes this token back on the next `continue` call — it does not need to understand or modify it.
+At every step, the engine stores the current flow state (step, field, state values) server-side and includes a short opaque key (`flowToken`) in the text response. The AI echoes this key back on the next `continue` call — it does not need to understand or modify it.
+
+By default, a `WaniwaniFlowStore` is used — it stores flow state via the WaniWani API using your `WANIWANI_API_KEY` and `WANIWANI_BASE_URL` env vars. This works seamlessly in serverless environments (Vercel) with no extra infrastructure. Tenant isolation is handled by the API key.
+
+```ts
+// Default — zero config, uses WANIWANI_API_KEY env var
+const flow = createFlow({ ... }).compile();
+
+// Explicit store (rare — only if you need custom options)
+import { WaniwaniFlowStore } from "@waniwani/sdk/mcp";
+const store = new WaniwaniFlowStore({ apiKey: "...", baseUrl: "..." });
+const flow = createFlow({ ... }).compile({ store });
+```
+
+If no API key is available, the store gracefully degrades: `set()`/`delete()` are no-ops and `get()` returns `null`, falling back to the legacy `flowToken` round-trip.
+
+When a session ID is available in `_meta` (e.g., `openai/sessionId`, `sessionId`, `anthropic/sessionId`), the engine uses it directly as the store key. The LLM doesn't need to round-trip any token — state is recovered automatically from the MCP client metadata on every call. When no session ID is present, it falls back to a random short hex key included in the response as `flowToken`.
+
+You can also pass a custom store to `compile({ store })`. It must satisfy the `FlowStore` interface:
+
+```ts
+import type { FlowStore } from "@waniwani/sdk/mcp";
+
+class MyStore implements FlowStore {
+  async get(key: string) { ... }
+  async set(key: string, value: FlowTokenContent) { ... }
+  async delete(key: string) { ... }
+}
+```
 
 ## Pre-filling answers
 
@@ -552,7 +580,7 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 | `.addNode(name, handler)` | Add a node. Handler receives `{ state, meta, interrupt, showWidget }` context. Return `interrupt(...)`, `showWidget(...)`, or a plain object. |
 | `.addEdge(from, to)` | Static edge (`START` and `END` are valid) |
 | `.addConditionalEdge(from, condition)` | Dynamic routing — `condition(state)` returns the next node name |
-| `.compile()` | Validate graph and return a `RegisteredFlow` |
+| `.compile(options?)` | Validate graph and return a `RegisteredFlow`. Options: `{ store?: FlowStore }` |
 
 ### `interrupt(fields, config?)` (from handler context)
 
@@ -585,7 +613,9 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 
 | Export | Description |
 |--------|-------------|
-| `encodeFlowToken(data)` | Encode a `FlowTokenContent` object into an opaque compressed base64 token. Useful for manually constructing flow state tokens server-side. |
+| `WaniwaniFlowStore` | Default API-backed state store. Stores flow state via the WaniWani API. Options: `{ apiKey?: string, baseUrl?: string }`. Falls back to `WANIWANI_API_KEY` / `WANIWANI_BASE_URL` env vars. |
+| `FlowStore` | Interface for custom store implementations. |
+| `encodeFlowToken(data)` | Legacy: encode a `FlowTokenContent` into a compressed base64 token. Kept for backward compatibility. |
 
 ## Common Mistakes
 

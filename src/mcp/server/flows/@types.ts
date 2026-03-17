@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { McpServer } from "../resources/types";
 import type { RegisteredTool } from "../tools/types";
+import type { FlowStore } from "./flow-store";
 
 export type { McpServer };
 
@@ -319,6 +320,7 @@ export interface CompileInput<TState extends Record<string, unknown>> {
 	config: FlowConfig;
 	nodes: Map<string, NodeHandler<TState>>;
 	edges: Map<string, Edge<TState>>;
+	store?: FlowStore;
 }
 
 export type FlowToolInput = {
@@ -332,15 +334,6 @@ export type FlowTokenContent = {
 	state: Record<string, unknown>;
 	field?: string;
 	widgetId?: string;
-	/** Cached interrupt questions — avoids re-executing the handler on partial answers */
-	questions?: Array<{
-		question: string;
-		field: string;
-		suggestions?: string[];
-		context?: string;
-	}>;
-	/** Cached overall interrupt context */
-	interruptContext?: string;
 };
 
 export type InterruptQuestionData = {

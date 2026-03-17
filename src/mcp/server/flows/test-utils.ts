@@ -8,6 +8,7 @@ import type {
 	FlowWidgetContent,
 	RegisteredFlow,
 } from "./@types";
+import type { FlowStore } from "./flow-store";
 import { decodeFlowToken } from "./flow-token";
 
 // ============================================================================
@@ -30,7 +31,27 @@ function parsePayload(result: Record<string, unknown>): FlowContent {
 	return JSON.parse(content[0]?.text ?? "") as FlowContent;
 }
 
-export async function createFlowTestHarness(flow: RegisteredFlow) {
+async function resolveState(
+	token: string | undefined,
+	store?: FlowStore,
+): Promise<FlowTokenContent | null> {
+	if (!token) return null;
+
+	// Try server-side store first (short key)
+	if (store) {
+		const stored = await store.get(token);
+		if (stored) return stored;
+	}
+
+	// Fallback: legacy compressed base64 token
+	return decodeFlowToken(token);
+}
+
+export async function createFlowTestHarness(
+	flow: RegisteredFlow,
+	options?: { stateStore?: FlowStore },
+) {
+	const store = options?.stateStore;
 	const registered: RegisterToolArgs[] = [];
 
 	// We don't need to implement the server, we just need to register the tool
@@ -47,11 +68,11 @@ export async function createFlowTestHarness(flow: RegisteredFlow) {
 
 	let lastFlowToken: string | undefined;
 
-	function toResult(parsed: FlowContent): FlowTestResult {
+	async function toResult(parsed: FlowContent): Promise<FlowTestResult> {
 		lastFlowToken = parsed.flowToken;
 		return {
 			...parsed,
-			decodedState: lastFlowToken ? decodeFlowToken(lastFlowToken) : null,
+			decodedState: await resolveState(lastFlowToken, store),
 		} satisfies FlowTestResult;
 	}
 
@@ -81,9 +102,8 @@ export async function createFlowTestHarness(flow: RegisteredFlow) {
 			return toResult(parsePayload(result));
 		},
 
-		lastState(): FlowTokenContent | null {
-			if (!lastFlowToken) return null;
-			return decodeFlowToken(lastFlowToken);
+		async lastState(): Promise<FlowTokenContent | null> {
+			return resolveState(lastFlowToken, store);
 		},
 	};
 }

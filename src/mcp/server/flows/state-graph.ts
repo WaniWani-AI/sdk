@@ -7,6 +7,7 @@ import type {
 } from "./@types";
 import { END, START } from "./@types";
 import { compileFlow } from "./compile";
+import type { FlowStore } from "./flow-store";
 
 /**
  * A LangGraph-inspired state graph builder for MCP tools.
@@ -88,13 +89,14 @@ export class StateGraph<TState extends Record<string, unknown>> {
 	 *
 	 * Validates the graph structure and returns a registration-compatible object.
 	 */
-	compile(): RegisteredFlow {
+	compile(options?: { store?: FlowStore }): RegisteredFlow {
 		this.validate();
 
 		return compileFlow<TState>({
 			config: this.config,
 			nodes: new Map(this.nodes),
 			edges: new Map(this.edges),
+			store: options?.store,
 		});
 	}
 

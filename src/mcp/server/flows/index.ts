@@ -15,7 +15,10 @@ export type {
 export { END, START } from "./@types";
 // Convenience factory
 export { createFlow } from "./create-flow";
-// Token utilities
+// State store
+export type { FlowStore } from "./flow-store";
+export { WaniwaniFlowStore } from "./flow-store";
+// Token utilities (legacy — kept for backward compat)
 export { decodeFlowToken, encodeFlowToken } from "./flow-token";
 // Builder
 export { StateGraph } from "./state-graph";

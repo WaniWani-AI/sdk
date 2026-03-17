@@ -1,10 +1,22 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import type { RegisteredTool } from "../../tools/types";
-import type { McpServer } from "../@types";
+import type { FlowTokenContent, McpServer } from "../@types";
 import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
-import { decodeFlowToken } from "../flow-token";
+
+class TestFlowStateStore {
+	private readonly map = new Map<string, FlowTokenContent>();
+	async get(key: string): Promise<FlowTokenContent | null> {
+		return this.map.get(key) ?? null;
+	}
+	async set(key: string, value: FlowTokenContent): Promise<void> {
+		this.map.set(key, value);
+	}
+	async delete(key: string): Promise<void> {
+		this.map.delete(key);
+	}
+}
 
 const mockPlanPickerTool: RegisteredTool = {
 	id: "plan_picker",
@@ -46,6 +58,7 @@ function extractFlowToken(parsed: Record<string, unknown>): string {
 
 describe("compileFlow response contract", () => {
 	test("returns interrupt JSON content with flowToken", async () => {
+		const store = new TestFlowStateStore();
 		const flow = createFlow({
 			id: "lead_flow",
 			title: "Lead Flow",
@@ -61,7 +74,7 @@ describe("compileFlow response contract", () => {
 			)
 			.addEdge(START, "ask_use_case")
 			.addEdge("ask_use_case", END)
-			.compile();
+			.compile({ store });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);
@@ -83,8 +96,8 @@ describe("compileFlow response contract", () => {
 		expect(parsed.flowToken).toBeDefined();
 		expect(typeof parsed.flowToken).toBe("string");
 
-		// Decode token to verify its contents
-		const tokenData = decodeFlowToken(parsed.flowToken as string);
+		// Look up state from store to verify its contents
+		const tokenData = await store.get(parsed.flowToken as string);
 		expect(tokenData).toMatchObject({
 			step: "ask_use_case",
 			state: {},
@@ -96,6 +109,7 @@ describe("compileFlow response contract", () => {
 	});
 
 	test("accepts flowToken input for continue action", async () => {
+		const store = new TestFlowStateStore();
 		const flow = createFlow({
 			id: "lead_flow_continue",
 			title: "Lead Flow Continue",
@@ -111,7 +125,7 @@ describe("compileFlow response contract", () => {
 			)
 			.addEdge(START, "ask_use_case")
 			.addEdge("ask_use_case", END)
-			.compile();
+			.compile({ store });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);
@@ -138,13 +152,14 @@ describe("compileFlow response contract", () => {
 
 		expect(parsed).toMatchObject({ status: "complete" });
 		// Verify final state is in the flowToken
-		const tokenData = decodeFlowToken(parsed.flowToken as string);
+		const tokenData = await store.get(parsed.flowToken as string);
 		expect(tokenData?.state).toMatchObject({
 			useCase: "Lead qualification",
 		});
 	});
 
 	test("multi-question interrupt loops with unanswered questions when user answers partially", async () => {
+		const store = new TestFlowStateStore();
 		const flow = createFlow({
 			id: "multi_q_flow",
 			title: "Multi Question Flow",
@@ -167,7 +182,7 @@ describe("compileFlow response contract", () => {
 			)
 			.addEdge(START, "ask_details")
 			.addEdge("ask_details", END)
-			.compile();
+			.compile({ store });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);
@@ -232,8 +247,8 @@ describe("compileFlow response contract", () => {
 		const p4 = parsePayload(r4);
 
 		expect(p4.status).toBe("complete");
-		// Verify final state is in the flowToken
-		const tokenData = decodeFlowToken(p4.flowToken as string);
+		// Verify final state is in the store
+		const tokenData = await store.get(p4.flowToken as string);
 		expect(tokenData?.state).toMatchObject({
 			name: "Alice",
 			email: "alice@example.com",
@@ -259,7 +274,7 @@ describe("compileFlow response contract", () => {
 			)
 			.addEdge(START, "ask_details")
 			.addEdge("ask_details", END)
-			.compile();
+			.compile({ store: new TestFlowStateStore() });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);
@@ -286,13 +301,13 @@ describe("compileFlow response contract", () => {
 		expect(p2.status).toBe("complete");
 	});
 
-	test("partial-answer continue does not re-execute the node handler (no side-effect replay)", async () => {
+	test("partial-answer continue re-executes handler and filters answered questions", async () => {
 		let handlerCallCount = 0;
 
 		const flow = createFlow({
 			id: "side_effect_flow",
 			title: "Side Effect Flow",
-			description: "Test handler is not re-called on partial answers.",
+			description: "Test handler re-executes on partial answers.",
 			state: {
 				name: z.string().describe("User name"),
 				email: z.string().describe("User email"),
@@ -307,7 +322,7 @@ describe("compileFlow response contract", () => {
 			})
 			.addEdge(START, "ask_details")
 			.addEdge("ask_details", END)
-			.compile();
+			.compile({ store: new TestFlowStateStore() });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);
@@ -321,7 +336,7 @@ describe("compileFlow response contract", () => {
 		const p1 = parsePayload(r1);
 		expect(handlerCallCount).toBe(1);
 
-		// Partial answer — handler should NOT be called again (questions cached in flowToken)
+		// Partial answer — handler re-executes to filter answered questions
 		const r2 = (await handler?.(
 			{
 				action: "continue",
@@ -330,13 +345,13 @@ describe("compileFlow response contract", () => {
 			},
 			{},
 		)) as Record<string, unknown>;
-		expect(handlerCallCount).toBe(1); // Still 1 — no replay
+		expect(handlerCallCount).toBe(2);
 
 		const p2 = parsePayload(r2);
 		expect(p2.status).toBe("interrupt");
 		expect(p2.field).toBe("email");
 
-		// Final answer — should complete without re-executing handler
+		// Final answer — handler re-executes, all filled, completes
 		const r3 = (await handler?.(
 			{
 				action: "continue",
@@ -345,7 +360,7 @@ describe("compileFlow response contract", () => {
 			},
 			{},
 		)) as Record<string, unknown>;
-		expect(handlerCallCount).toBe(1); // Still 1 — resolved from cache
+		expect(handlerCallCount).toBe(3);
 
 		const p3 = parsePayload(r3);
 		expect(p3.status).toBe("complete");
@@ -370,7 +385,7 @@ describe("compileFlow response contract", () => {
 			.addEdge(START, "show_info")
 			.addEdge("show_info", "done")
 			.addEdge("done", END)
-			.compile();
+			.compile({ store: new TestFlowStateStore() });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);
@@ -400,6 +415,7 @@ describe("compileFlow response contract", () => {
 	});
 
 	test("returns widget JSON content with tool and data for widget steps", async () => {
+		const store = new TestFlowStateStore();
 		const flow = createFlow({
 			id: "widget_flow",
 			title: "Widget Flow",
@@ -417,7 +433,7 @@ describe("compileFlow response contract", () => {
 			)
 			.addEdge(START, "pick_plan")
 			.addEdge("pick_plan", END)
-			.compile();
+			.compile({ store });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);
@@ -436,8 +452,8 @@ describe("compileFlow response contract", () => {
 			description: "Pick your plan",
 		});
 		expect(parsed.flowToken).toBeDefined();
-		// Decode token to verify widget metadata
-		const tokenData = decodeFlowToken(parsed.flowToken as string);
+		// Look up state from store to verify widget metadata
+		const tokenData = await store.get(parsed.flowToken as string);
 		expect(tokenData).toMatchObject({
 			step: "pick_plan",
 			state: {},
@@ -489,6 +505,7 @@ describe("compileFlow response contract", () => {
 
 describe("validate on interrupt", () => {
 	test("validate returning object enriches state and advances", async () => {
+		const store = new TestFlowStateStore();
 		const flow = createFlow({
 			id: "validate_enrich",
 			title: "Validate Enrich",
@@ -510,7 +527,7 @@ describe("validate on interrupt", () => {
 			)
 			.addEdge(START, "ask_breed")
 			.addEdge("ask_breed", END)
-			.compile();
+			.compile({ store });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);
@@ -534,7 +551,7 @@ describe("validate on interrupt", () => {
 		const p2 = parsePayload(r2);
 
 		expect(p2.status).toBe("complete");
-		const tokenData = decodeFlowToken(p2.flowToken as string);
+		const tokenData = await store.get(p2.flowToken as string);
 		expect(tokenData?.state).toMatchObject({
 			breed: "labrador",
 			breedId: "id-labrador",
@@ -542,6 +559,7 @@ describe("validate on interrupt", () => {
 	});
 
 	test("validate returning void advances without enrichment", async () => {
+		const store = new TestFlowStateStore();
 		const flow = createFlow({
 			id: "validate_void",
 			title: "Validate Void",
@@ -562,7 +580,7 @@ describe("validate on interrupt", () => {
 			)
 			.addEdge(START, "ask_email")
 			.addEdge("ask_email", END)
-			.compile();
+			.compile({ store });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);
@@ -585,7 +603,7 @@ describe("validate on interrupt", () => {
 		const p2 = parsePayload(r2);
 
 		expect(p2.status).toBe("complete");
-		const tokenData = decodeFlowToken(p2.flowToken as string);
+		const tokenData = await store.get(p2.flowToken as string);
 		expect(tokenData?.state).toMatchObject({ email: "test@test.com" });
 	});
 
@@ -616,7 +634,7 @@ describe("validate on interrupt", () => {
 			)
 			.addEdge(START, "ask_code")
 			.addEdge("ask_code", END)
-			.compile();
+			.compile({ store: new TestFlowStateStore() });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);
@@ -683,7 +701,7 @@ describe("validate on interrupt", () => {
 			)
 			.addEdge(START, "ask_details")
 			.addEdge("ask_details", END)
-			.compile();
+			.compile({ store: new TestFlowStateStore() });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);
