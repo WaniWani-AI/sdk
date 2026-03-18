@@ -5,6 +5,7 @@ import type {
 	ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { extractSessionId } from "../utils";
 import type {
 	CompileInput,
 	FlowContent,
@@ -20,7 +21,7 @@ import {
 	WaniwaniFlowStore,
 } from "./flow-store";
 import { buildFlowProtocol } from "./protocol";
-import { extractSessionId, getFlowTokenContent } from "./session";
+import { getFlowTokenContent } from "./session";
 
 // ============================================================================
 // Input schema

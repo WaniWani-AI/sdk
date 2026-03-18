@@ -2,29 +2,6 @@ import type { FlowTokenContent, FlowToolInput } from "./@types";
 import type { FlowStore } from "./flow-store";
 import { decodeFlowToken } from "./flow-token";
 
-const SESSION_ID_KEYS = [
-	"waniwani/sessionId",
-	"openai/sessionId",
-	"sessionId",
-	"conversationId",
-	"anthropic/sessionId",
-] as const;
-
-export function extractSessionId(
-	meta: Record<string, unknown> | undefined,
-): string | undefined {
-	if (!meta) {
-		return undefined;
-	}
-	for (const key of SESSION_ID_KEYS) {
-		const value = meta[key];
-		if (typeof value === "string" && value.length > 0) {
-			return value;
-		}
-	}
-	return undefined;
-}
-
 export async function getFlowTokenContent(
 	args: FlowToolInput,
 	store: FlowStore,
