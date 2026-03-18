@@ -73,7 +73,11 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 		}, [effectiveApi]);
 
 		const engine = useChatEngine({ ...props, api: effectiveApi });
-		const handleCallTool = useCallTool({ ...props, api: effectiveApi });
+		const handleCallTool = useCallTool({
+			...props,
+			api: effectiveApi,
+			sessionId: engine.sessionId,
+		});
 
 		const animatedPlaceholder = useTypingPlaceholder(placeholder, !engine.text);
 

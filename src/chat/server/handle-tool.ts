@@ -17,13 +17,21 @@ export function createToolHandler(deps: ResourceHandlerDeps) {
 				name: string;
 				arguments: Record<string, unknown>;
 			};
+			const requestSessionId = request.headers.get("x-session-id")?.trim();
 
 			if (!name || typeof name !== "string") {
 				log("← 400 missing tool name");
 				return Response.json({ error: "Missing tool name" }, { status: 400 });
 			}
 
-			log("tool:", name, "args:", JSON.stringify(args));
+			log(
+				"tool:",
+				name,
+				"args:",
+				JSON.stringify(args),
+				"sessionId:",
+				requestSessionId || "(none)",
+			);
 
 			const mcpServerUrl =
 				mcpServerUrlOverride ?? (await resolveConfig()).mcpServerUrl;
@@ -65,6 +73,17 @@ export function createToolHandler(deps: ResourceHandlerDeps) {
 				const result = await client.callTool({
 					name,
 					arguments: args ?? {},
+					...(requestSessionId
+						? {
+								_meta: {
+									"waniwani/sessionId": requestSessionId,
+								},
+							}
+						: {}),
+				} as {
+					name: string;
+					arguments: Record<string, unknown>;
+					_meta?: Record<string, unknown>;
 				});
 				log("tool result received");
 
