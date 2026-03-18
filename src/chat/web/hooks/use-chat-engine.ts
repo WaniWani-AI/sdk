@@ -12,7 +12,6 @@ import type { PromptInputMessage } from "../ai-elements/prompt-input";
 import type { VisitorContext } from "../lib/visitor-context";
 import { collectVisitorContext } from "../lib/visitor-context";
 
-const SESSION_STORAGE_KEY = "waniwani-chat-session-id";
 const SESSION_HEADER_NAME = "x-session-id";
 
 function normalizeSessionId(value: unknown): string | undefined {
@@ -21,30 +20,6 @@ function normalizeSessionId(value: unknown): string | undefined {
 	}
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function writeSessionIdToStorage(sessionId: string): void {
-	if (typeof window === "undefined") {
-		return;
-	}
-
-	try {
-		window.sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
-	} catch {
-		// Ignore storage failures (private mode, security policy, etc.)
-	}
-}
-
-function removeSessionIdFromStorage(): void {
-	if (typeof window === "undefined") {
-		return;
-	}
-
-	try {
-		window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
-	} catch {
-		// Ignore storage failures (private mode, security policy, etc.)
-	}
 }
 
 export interface QueuedMessage {
@@ -93,13 +68,11 @@ export function useChatEngine(props: ChatBaseProps) {
 
 		sessionIdRef.current = sessionId;
 		setSessionIdState(sessionId);
-		writeSessionIdToStorage(sessionId);
 	}, []);
 
 	const clearSessionId = useCallback(() => {
 		sessionIdRef.current = undefined;
 		setSessionIdState(undefined);
-		removeSessionIdFromStorage();
 	}, []);
 
 	useEffect(() => {
