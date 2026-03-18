@@ -169,6 +169,7 @@ export interface TrackingClient {
 	identify: (
 		userId: string,
 		properties?: Record<string, unknown>,
+		meta?: Record<string, unknown>,
 	) => Promise<{ eventId: string }>;
 	/**
 	 * Track an event using modern or legacy input shape.
