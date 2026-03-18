@@ -326,7 +326,6 @@ export interface CompileInput<TState extends Record<string, unknown>> {
 export type FlowToolInput = {
 	action: "start" | "continue";
 	stateUpdates?: Record<string, unknown>;
-	flowToken?: string;
 };
 
 export type FlowTokenContent = {
@@ -343,11 +342,7 @@ export type InterruptQuestionData = {
 	context?: string;
 };
 
-type FlowContentBase = {
-	flowToken?: string;
-};
-
-export type FlowInterruptContent = FlowContentBase & {
+export type FlowInterruptContent = {
 	status: "interrupt";
 	/** Single-question shorthand */
 	question?: string;
@@ -358,7 +353,7 @@ export type FlowInterruptContent = FlowContentBase & {
 	context?: string;
 };
 
-export type FlowWidgetContent = FlowContentBase & {
+export type FlowWidgetContent = {
 	status: "widget";
 	/** Display tool to call */
 	tool: string;
@@ -369,11 +364,11 @@ export type FlowWidgetContent = FlowContentBase & {
 	interactive?: boolean;
 };
 
-export type FlowCompleteContent = FlowContentBase & {
+export type FlowCompleteContent = {
 	status: "complete";
 };
 
-export type FlowErrorContent = FlowContentBase & {
+export type FlowErrorContent = {
 	status: "error";
 	error: string;
 };

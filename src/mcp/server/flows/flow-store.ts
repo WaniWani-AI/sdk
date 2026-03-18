@@ -10,7 +10,6 @@
  * The `FlowStore` interface is exported for custom implementations.
  */
 
-import { randomBytes } from "node:crypto";
 import type { FlowTokenContent } from "./@types";
 
 // ============================================================================
@@ -29,10 +28,6 @@ export interface FlowStore {
 
 const SDK_NAME = "@waniwani/sdk";
 const DEFAULT_BASE_URL = "https://app.waniwani.ai";
-
-export function generateFlowKey(): string {
-	return randomBytes(4).toString("hex");
-}
 
 export class WaniwaniFlowStore implements FlowStore {
 	private readonly baseUrl: string;
@@ -69,7 +64,7 @@ export class WaniwaniFlowStore implements FlowStore {
 		try {
 			await this.request("/api/mcp/redis/set", { key, value });
 		} catch {
-			// Non-fatal — flow continues via flowToken fallback
+			// Non-fatal
 		}
 	}
 

@@ -8,20 +8,14 @@ import { z } from "zod";
 import { extractSessionId } from "../utils";
 import type {
 	CompileInput,
-	FlowContent,
 	FlowToolInput,
 	McpServer,
 	RegisteredFlow,
 } from "./@types";
 import { START } from "./@types";
 import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
-import {
-	type FlowStore,
-	generateFlowKey,
-	WaniwaniFlowStore,
-} from "./flow-store";
+import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
 import { buildFlowProtocol } from "./protocol";
-import { getFlowTokenContent } from "./session";
 
 // ============================================================================
 // Input schema
@@ -38,12 +32,6 @@ const inputSchema = {
 		.optional()
 		.describe(
 			"State field values to set before processing the next node. Use this to pass the user's answer (keyed by the field name from the response) and any other values the user mentioned.",
-		),
-	flowToken: z
-		.string()
-		.optional()
-		.describe(
-			"Opaque flow token from the previous response. Pass back exactly as received.",
 		),
 };
 
@@ -84,25 +72,28 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		}
 
 		if (args.action === "continue") {
-			const flowTokenContent = await getFlowTokenContent(
-				args,
-				store,
-				sessionId,
-			);
-
-			if (!flowTokenContent) {
+			if (!sessionId) {
 				return {
 					content: {
 						status: "error" as const,
-						error:
-							"Flow state not found for continue action." +
-							" Pass back the flowToken from the previous response exactly as received.",
+						error: "No session ID available for continue action.",
 					},
 				};
 			}
 
-			const state = flowTokenContent.state as TState;
-			const step = flowTokenContent.step;
+			const flowState = await store.get(sessionId);
+
+			if (!flowState) {
+				return {
+					content: {
+						status: "error" as const,
+						error: "Flow state not found. The flow may have expired.",
+					},
+				};
+			}
+
+			const state = flowState.state as TState;
+			const step = flowState.step;
 			if (!step) {
 				return {
 					content: {
@@ -119,7 +110,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			} as TState;
 
 			// Widget continue: advance past the widget step (don't re-show it)
-			if (flowTokenContent.widgetId) {
+			if (flowState.widgetId) {
 				const edge = edges.get(step);
 				if (!edge) {
 					return {
@@ -178,28 +169,15 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 					const result = await handleToolCall(args, sessionId, _meta);
 
-					let flowToken: string | undefined;
-					if (result.flowTokenContent) {
-						if (sessionId) {
-							await store.set(sessionId, result.flowTokenContent);
-							flowToken = sessionId;
-						} else {
-							// No session ID available — fall back to random key
-							const key = generateFlowKey();
-							await store.set(key, result.flowTokenContent);
-							flowToken = key;
-						}
+					// Persist flow state under session ID
+					if (result.flowTokenContent && sessionId) {
+						await store.set(sessionId, result.flowTokenContent);
 					}
 
-					// Text content includes the payload + flowToken for the model
-					const contentResponse: FlowContent = {
-						...result.content,
-						...(flowToken ? { flowToken } : {}),
-					};
 					const content = [
 						{
 							type: "text" as const,
-							text: JSON.stringify(contentResponse, null, 2),
+							text: JSON.stringify(result.content, null, 2),
 						},
 					];
 

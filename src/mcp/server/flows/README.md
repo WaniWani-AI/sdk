@@ -2,7 +2,7 @@
 
 LangGraph-inspired multi-step conversational flows for MCP tools.
 
-You define a state graph, compile it into a tool, and the model advances it step-by-step by passing an opaque `flowToken` between calls.
+You define a state graph, compile it into a tool, and the engine advances it step-by-step. Flow state is stored server-side in a key-value store, keyed by session ID.
 
 ## How it works
 
@@ -12,7 +12,7 @@ You define a state graph, compile it into a tool, and the model advances it step
 4. Interrupt nodes pause and ask a question.
 5. Widget nodes pause and delegate rendering to a display tool.
 
-State is carried in an opaque base64 `flowToken` included in the tool response text. The model passes it back on `continue` calls without needing to understand it.
+State is stored server-side via the WaniWani API, keyed by the session ID from `_meta`. The model doesn't need to round-trip any token — state is recovered automatically on every call.
 
 ## Contract
 
@@ -24,7 +24,6 @@ Flow tools accept:
 {
   action: "start" | "continue";
   stateUpdates?: Record<string, unknown>;
-  flowToken?: string; // opaque token from previous response
 }
 ```
 
@@ -34,7 +33,7 @@ Flow tools return:
 
 ```ts
 {
-  content: [{ type: "text", text: JSON.stringify({ status: "...", flowToken: "...", tool?: "...", data?: {...}, ... }) }],
+  content: [{ type: "text", text: JSON.stringify({ status: "...", tool?: "...", data?: {...}, ... }) }],
 }
 ```
 

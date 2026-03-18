@@ -14,7 +14,7 @@ describe("applyModelContextToSystemPrompt", () => {
 			content: [
 				{
 					type: "text",
-					text: "Continue the flow with the provided flowToken.",
+					text: "Continue the flow.",
 				},
 			],
 			structuredContent: {
@@ -22,7 +22,6 @@ describe("applyModelContextToSystemPrompt", () => {
 					tool: "demo_flow",
 					input: {
 						action: "continue",
-						flowToken: "abc123",
 					},
 				},
 			},
@@ -30,8 +29,7 @@ describe("applyModelContextToSystemPrompt", () => {
 
 		expect(result).toContain("Base prompt");
 		expect(result).toContain("Widget Model Context");
-		expect(result).toContain("Continue the flow with the provided flowToken.");
+		expect(result).toContain("Continue the flow.");
 		expect(result).toContain('"tool": "demo_flow"');
-		expect(result).toContain('"flowToken": "abc123"');
 	});
 });

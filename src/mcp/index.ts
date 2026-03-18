@@ -27,9 +27,7 @@ export type {
 export {
 	createFlow,
 	createFlowTestHarness,
-	decodeFlowToken,
 	END,
-	encodeFlowToken,
 	START,
 	StateGraph,
 } from "./server/flows";

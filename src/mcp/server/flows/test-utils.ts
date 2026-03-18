@@ -9,7 +9,6 @@ import type {
 	RegisteredFlow,
 } from "./@types";
 import type { FlowStore } from "./flow-store";
-import { decodeFlowToken } from "./flow-token";
 
 // ============================================================================
 // Test harness for compiled flows
@@ -31,34 +30,14 @@ function parsePayload(result: Record<string, unknown>): FlowContent {
 	return JSON.parse(content[0]?.text ?? "") as FlowContent;
 }
 
-async function resolveState(
-	token: string | undefined,
-	store?: FlowStore,
-): Promise<FlowTokenContent | null> {
-	if (!token) {
-		return null;
-	}
-
-	// Try server-side store first (short key)
-	if (store) {
-		const stored = await store.get(token);
-		if (stored) {
-			return stored;
-		}
-	}
-
-	// Fallback: legacy compressed base64 token
-	return decodeFlowToken(token);
-}
-
 export async function createFlowTestHarness(
 	flow: RegisteredFlow,
 	options?: { stateStore?: FlowStore },
 ) {
 	const store = options?.stateStore;
 	const registered: RegisterToolArgs[] = [];
+	const sessionId = `test-session-${Math.random().toString(36).slice(2, 10)}`;
 
-	// We don't need to implement the server, we just need to register the tool
 	const server = {
 		registerTool: (...args: unknown[]) => {
 			registered.push(args as RegisterToolArgs);
@@ -72,13 +51,12 @@ export async function createFlowTestHarness(
 		throw new Error(`Flow "${flow.id}" did not register a handler`);
 	}
 
-	let lastFlowToken: string | undefined;
+	const extra = { _meta: { sessionId } };
 
 	async function toResult(parsed: FlowContent): Promise<FlowTestResult> {
-		lastFlowToken = parsed.flowToken;
 		return {
 			...parsed,
-			decodedState: await resolveState(lastFlowToken, store),
+			decodedState: store ? await store.get(sessionId) : null,
 		} satisfies FlowTestResult;
 	}
 
@@ -88,7 +66,7 @@ export async function createFlowTestHarness(
 		): Promise<FlowTestResult> {
 			const result = (await handler(
 				{ action: "start", ...(stateUpdates ? { stateUpdates } : {}) },
-				{},
+				extra,
 			)) as Record<string, unknown>;
 			return toResult(parsePayload(result));
 		},
@@ -96,22 +74,18 @@ export async function createFlowTestHarness(
 		async continueWith(
 			stateUpdates?: Record<string, unknown>,
 		): Promise<FlowTestResult> {
-			if (!lastFlowToken) {
-				throw new Error("No flowToken — call start() first");
-			}
 			const result = (await handler(
 				{
 					action: "continue",
-					flowToken: lastFlowToken,
 					...(stateUpdates ? { stateUpdates } : {}),
 				},
-				{},
+				extra,
 			)) as Record<string, unknown>;
 			return toResult(parsePayload(result));
 		},
 
 		async lastState(): Promise<FlowTokenContent | null> {
-			return resolveState(lastFlowToken, store);
+			return store ? store.get(sessionId) : null;
 		},
 	};
 }

@@ -10,7 +10,7 @@ LangGraph-inspired multi-step conversational flows for MCP tools. Define a state
 4. **Interrupt nodes** pause the flow and ask the user one or more questions
 5. **Widget nodes** pause the flow and render a widget UI
 
-Flow state is stored **server-side** via the WaniWani API. The AI receives a short opaque key instead of a compressed token — this is much more reliable for LLM round-tripping.
+Flow state is stored **server-side** via the WaniWani API, keyed by the session ID from `_meta`. The AI doesn't need to round-trip any token — state is recovered automatically on every call.
 
 ## Import
 
@@ -90,7 +90,7 @@ const flow = createFlow({
 })
 ```
 
-At every step, the engine stores the current flow state (step, field, state values) server-side and includes a short opaque key (`flowToken`) in the text response. The AI echoes this key back on the next `continue` call — it does not need to understand or modify it.
+At every step, the engine stores the current flow state (step, field, state values) server-side, keyed by session ID. The AI simply calls `action: "continue"` — no token round-tripping needed.
 
 By default, a `WaniwaniFlowStore` is used — it stores flow state via the WaniWani API using your `WANIWANI_API_KEY` and `WANIWANI_BASE_URL` env vars. This works seamlessly in serverless environments (Vercel) with no extra infrastructure. Tenant isolation is handled by the API key.
 
@@ -104,9 +104,9 @@ const store = new WaniwaniFlowStore({ apiKey: "...", baseUrl: "..." });
 const flow = createFlow({ ... }).compile({ store });
 ```
 
-If no API key is available, the store gracefully degrades: `set()`/`delete()` are no-ops and `get()` returns `null`, falling back to the legacy `flowToken` round-trip.
+If no API key is available, the store gracefully degrades: `set()`/`delete()` are no-ops and `get()` returns `null`.
 
-When a session ID is available in `_meta` (e.g., `openai/sessionId`, `sessionId`, `anthropic/sessionId`), the engine uses it directly as the store key. The LLM doesn't need to round-trip any token — state is recovered automatically from the MCP client metadata on every call. When no session ID is present, it falls back to a random short hex key included in the response as `flowToken`.
+The engine uses the session ID from `_meta` (e.g., `openai/sessionId`, `sessionId`, `anthropic/sessionId`) as the store key. State is recovered automatically from the MCP client metadata on every call — no token round-tripping needed.
 
 You can also pass a custom store to `compile({ store })`. It must satisfy the `FlowStore` interface:
 
@@ -276,7 +276,7 @@ Add a `validate` function to any question. It runs **after** the user answers an
 
 ### How it works under the hood
 
-- Validate functions are stored in a `Map<"nodeName:fieldName", ValidateFn>` inside the compiled flow closure. They are **not** serialized into the flow token.
+- Validate functions are stored in a `Map<"nodeName:fieldName", ValidateFn>` inside the compiled flow closure. They are **not** serialized into the store.
 - For multi-question interrupts, validators only run **after all questions are answered**. If the user provides partial answers, validators do not fire until every question's field is filled.
 - When validation fails (throws), the error message is prepended to that specific question's `context` as `ERROR: <message>`, so the AI can relay it naturally. The field is cleared and the interrupt is re-presented.
 
@@ -615,7 +615,6 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 |--------|-------------|
 | `WaniwaniFlowStore` | Default API-backed state store. Stores flow state via the WaniWani API. Options: `{ apiKey?: string, baseUrl?: string }`. Falls back to `WANIWANI_API_KEY` / `WANIWANI_BASE_URL` env vars. |
 | `FlowStore` | Interface for custom store implementations. |
-| `encodeFlowToken(data)` | Legacy: encode a `FlowTokenContent` into a compressed base64 token. Kept for backward compatibility. |
 
 ## Common Mistakes
 
