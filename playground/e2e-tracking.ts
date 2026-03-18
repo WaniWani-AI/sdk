@@ -11,7 +11,7 @@
  */
 
 import { waniwani } from "../src/waniwani.js";
-import { withWaniwani } from "../src/mcp/server/with-waniwani.js";
+import { withWaniwani } from "../src/mcp/server/with-waniwani/index.js";
 
 const baseUrl = process.env.WANIWANI_BASE_URL ?? "http://localhost:3000";
 const apiKey = process.env.WANIWANI_API_KEY ?? "playground-dev-key";

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { TrackInput } from "../../../tracking/@types.js";
-import { withWaniwani } from "../with-waniwani.js";
+import type { TrackInput } from "../../../../tracking/@types.js";
+import { withWaniwani } from "../index.js";
 
 function mockClient() {
 	const tracked: TrackInput[] = [];

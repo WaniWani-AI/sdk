@@ -53,5 +53,5 @@ export type {
 // Tracking helpers
 export type { TrackingRouteOptions } from "./server/tracking-route";
 export { createTrackingRoute } from "./server/tracking-route";
-export type { WithWaniwaniOptions } from "./server/with-waniwani";
-export { withWaniwani } from "./server/with-waniwani";
+export type { WithWaniwaniOptions } from "./server/with-waniwani/index";
+export { withWaniwani } from "./server/with-waniwani/index";

@@ -1,10 +1,19 @@
-import type { ToolCalledProperties, TrackInput } from "../../tracking/index.js";
-import type { WaniWaniClient, WaniWaniConfig } from "../../types.js";
-import { waniwani } from "../../waniwani.js";
-import type { McpServer } from "./tools/types";
-import { WidgetTokenCache } from "./widget-token.js";
+import type { ToolCalledProperties } from "../../../tracking/index.js";
+import type { WaniWaniConfig } from "../../../types.js";
+import { waniwani } from "../../../waniwani.js";
+import type { McpServer } from "../tools/types";
+import { WidgetTokenCache } from "../widget-token.js";
+import {
+	buildTrackInput,
+	extractErrorText,
+	injectUserLocation,
+	injectWidgetConfig,
+	isRecord,
+	safeFlush,
+	safeTrack,
+	type WaniwaniTracker,
+} from "./helpers.js";
 
-type WaniwaniTracker = Pick<WaniWaniClient, "flush" | "track" | "_config">;
 type UnknownRecord = Record<string, unknown>;
 
 type WrappedServer = McpServer & {
@@ -80,7 +89,6 @@ export function withWaniwani(
 	const tracker = options.client ?? waniwani(options.config);
 	const injectToken = options.injectWidgetToken !== false;
 
-	// Lazy-init token cache — only created if we have an API key
 	let tokenCache: WidgetTokenCache | null = null;
 
 	function getTokenCache(): WidgetTokenCache | null {
@@ -133,6 +141,16 @@ export function withWaniwani(
 				const result = await handler(input, extra);
 				const durationMs = Math.round(performance.now() - startTime);
 
+				const isErrorResult =
+					isRecord(result) && (result as UnknownRecord).isError === true;
+
+				if (isErrorResult) {
+					const errorText = extractErrorText(result);
+					console.error(
+						`[waniwani] Tool "${toolName}" returned error${errorText ? `: ${errorText}` : ""}`,
+					);
+				}
+
 				await safeTrack(
 					tracker,
 					buildTrackInput(
@@ -141,7 +159,10 @@ export function withWaniwani(
 						options,
 						{
 							durationMs,
-							status: "ok",
+							status: isErrorResult ? "error" : "ok",
+							...(isErrorResult && {
+								errorMessage: extractErrorText(result) ?? "Unknown tool error",
+							}),
 						},
 						clientInfo,
 					),
@@ -196,154 +217,4 @@ export function withWaniwani(
 	}) as McpServer["registerTool"];
 
 	return wrappedServer;
-}
-
-async function injectWidgetConfig(
-	result: unknown,
-	cache: WidgetTokenCache | null,
-	baseUrl: string,
-	onError?: (error: Error) => void,
-): Promise<void> {
-	if (!isRecord(result)) {
-		return;
-	}
-
-	if (!isRecord(result._meta)) {
-		(result as UnknownRecord)._meta = {};
-	}
-
-	const meta = (result as UnknownRecord)._meta as UnknownRecord;
-	const waniwaniConfig: UnknownRecord = {
-		endpoint: `${baseUrl.replace(/\/$/, "")}/api/mcp/events/v2/batch`,
-	};
-
-	if (cache) {
-		try {
-			const token = await cache.getToken();
-			if (token) {
-				waniwaniConfig.token = token;
-			}
-		} catch (error) {
-			onError?.(toError(error));
-		}
-	}
-
-	meta.waniwani = waniwaniConfig;
-}
-
-function buildTrackInput(
-	toolName: string,
-	extra: unknown,
-	options: WithWaniwaniOptions,
-	timing?: { durationMs: number; status: string; errorMessage?: string },
-	clientInfo?: { name: string; version: string },
-): TrackInput {
-	const toolType = resolveToolType(toolName, options.toolType);
-	const meta = extractMeta(extra);
-
-	return {
-		event: "tool.called",
-		properties: {
-			name: toolName,
-			type: toolType,
-			...(timing ?? {}),
-		},
-		meta,
-		metadata: {
-			source: "withWaniwani",
-			...(options.metadata ?? {}),
-			...(clientInfo && { clientInfo }),
-		},
-	};
-}
-
-function resolveToolType(
-	toolName: string,
-	toolTypeOption: WithWaniwaniOptions["toolType"],
-): ToolCalledProperties["type"] {
-	if (typeof toolTypeOption === "function") {
-		return toolTypeOption(toolName) ?? "other";
-	}
-	return toolTypeOption ?? "other";
-}
-
-function extractMeta(extra: unknown): UnknownRecord | undefined {
-	if (!isRecord(extra)) {
-		return undefined;
-	}
-
-	const meta = extra._meta;
-	if (!isRecord(meta)) {
-		return undefined;
-	}
-
-	return meta;
-}
-
-function isRecord(value: unknown): value is UnknownRecord {
-	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-async function safeTrack(
-	tracker: Pick<WaniWaniClient, "track">,
-	input: TrackInput,
-	onError?: (error: Error) => void,
-): Promise<void> {
-	try {
-		await tracker.track(input);
-	} catch (error) {
-		onError?.(toError(error));
-	}
-}
-
-async function safeFlush(
-	tracker: Pick<WaniWaniClient, "flush">,
-	onError?: (error: Error) => void,
-): Promise<void> {
-	try {
-		await tracker.flush();
-	} catch (error) {
-		onError?.(toError(error));
-	}
-}
-
-function toError(error: unknown): Error {
-	if (error instanceof Error) {
-		return error;
-	}
-	return new Error(String(error));
-}
-
-const USER_LOCATION_KEY = "waniwani/userLocation";
-
-/**
- * Pass-through `waniwani/userLocation` from request `_meta` to response `_meta`.
- * This ensures widgets always receive location data, even for custom handlers
- * that don't use `createTool` (which already spreads request `_meta`).
- */
-function injectUserLocation(result: unknown, extra: unknown): void {
-	const requestMeta = extractMeta(extra);
-	if (!requestMeta) {
-		return;
-	}
-
-	const userLocation = requestMeta[USER_LOCATION_KEY];
-	if (!userLocation) {
-		return;
-	}
-
-	if (!isRecord(result)) {
-		return;
-	}
-
-	if (!isRecord(result._meta)) {
-		(result as UnknownRecord)._meta = {};
-	}
-
-	const resultMeta = (result as UnknownRecord)._meta as UnknownRecord;
-
-	// Don't overwrite if the handler already set it
-	if (!resultMeta[USER_LOCATION_KEY]) {
-		resultMeta[USER_LOCATION_KEY] = userLocation;
-	}
 }
