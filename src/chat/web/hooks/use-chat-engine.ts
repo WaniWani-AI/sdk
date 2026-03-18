@@ -23,19 +23,6 @@ function normalizeSessionId(value: unknown): string | undefined {
 	return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function readSessionIdFromStorage(): string | undefined {
-	if (typeof window === "undefined") {
-		return undefined;
-	}
-
-	try {
-		return normalizeSessionId(
-			window.sessionStorage.getItem(SESSION_STORAGE_KEY),
-		);
-	} catch {
-		return undefined;
-	}
-}
 
 function writeSessionIdToStorage(sessionId: string): void {
 	if (typeof window === "undefined") {
@@ -87,24 +74,13 @@ export function useChatEngine(props: ChatBaseProps) {
 		undefined,
 	);
 	const visitorContextRef = useRef<VisitorContext | null>(null);
-	const [sessionId, setSessionIdState] = useState<string | undefined>(() =>
-		readSessionIdFromStorage(),
+	const [sessionId, setSessionIdState] = useState<string | undefined>(
+		undefined,
 	);
 	const sessionIdRef = useRef<string | undefined>(sessionId);
 
 	const getSessionId = useCallback((): string | undefined => {
-		if (sessionIdRef.current) {
-			return sessionIdRef.current;
-		}
-
-		const storedSessionId = readSessionIdFromStorage();
-		if (storedSessionId) {
-			sessionIdRef.current = storedSessionId;
-			setSessionIdState((prev) =>
-				prev === storedSessionId ? prev : storedSessionId,
-			);
-		}
-		return storedSessionId;
+		return sessionIdRef.current;
 	}, []);
 
 	const setSessionId = useCallback((value: unknown) => {
