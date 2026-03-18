@@ -59,7 +59,10 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 		const isDark = isDarkTheme(resolvedTheme);
 
 		const engine = useChatEngine(props);
-		const handleCallTool = useCallTool(props);
+		const handleCallTool = useCallTool({
+			...props,
+			sessionId: engine.sessionId,
+		});
 
 		const suggestionsState = useSuggestions({
 			messages: engine.messages,
