@@ -104,11 +104,16 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 			// 4. Forward to WaniWani API
 			const upstreamUrl = `${baseUrl}/api/mcp/chat`;
 			log("forwarding to", upstreamUrl);
+			const clientUserAgent = request.headers.get("user-agent");
+
 			const response = await fetch(upstreamUrl, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 					...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+					...(clientUserAgent
+						? { "X-Client-User-Agent": clientUserAgent }
+						: {}),
 				},
 				body: JSON.stringify({
 					messages,

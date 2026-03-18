@@ -120,16 +120,31 @@ export function withWaniwani(
 
 		const wrappedHandler = async (input: unknown, extra: unknown) => {
 			const startTime = performance.now();
+			const clientInfo = (
+				server as {
+					server?: {
+						getClientVersion?: () =>
+							| { name: string; version: string }
+							| undefined;
+					};
+				}
+			).server?.getClientVersion?.();
 			try {
 				const result = await handler(input, extra);
 				const durationMs = Math.round(performance.now() - startTime);
 
 				await safeTrack(
 					tracker,
-					buildTrackInput(toolName, extra, options, {
-						durationMs,
-						status: "ok",
-					}),
+					buildTrackInput(
+						toolName,
+						extra,
+						options,
+						{
+							durationMs,
+							status: "ok",
+						},
+						clientInfo,
+					),
 					options.onError,
 				);
 
@@ -154,12 +169,18 @@ export function withWaniwani(
 
 				await safeTrack(
 					tracker,
-					buildTrackInput(toolName, extra, options, {
-						durationMs,
-						status: "error",
-						errorMessage:
-							error instanceof Error ? error.message : String(error),
-					}),
+					buildTrackInput(
+						toolName,
+						extra,
+						options,
+						{
+							durationMs,
+							status: "error",
+							errorMessage:
+								error instanceof Error ? error.message : String(error),
+						},
+						clientInfo,
+					),
 					options.onError,
 				);
 
@@ -215,6 +236,7 @@ function buildTrackInput(
 	extra: unknown,
 	options: WithWaniwaniOptions,
 	timing?: { durationMs: number; status: string; errorMessage?: string },
+	clientInfo?: { name: string; version: string },
 ): TrackInput {
 	const toolType = resolveToolType(toolName, options.toolType);
 	const meta = extractMeta(extra);
@@ -230,6 +252,7 @@ function buildTrackInput(
 		metadata: {
 			source: "withWaniwani",
 			...(options.metadata ?? {}),
+			...(clientInfo && { clientInfo }),
 		},
 	};
 }
