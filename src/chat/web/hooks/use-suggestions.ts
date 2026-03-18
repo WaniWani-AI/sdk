@@ -67,7 +67,9 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 			const lastAssistant = [...messages]
 				.reverse()
 				.find((m) => m.role === "assistant");
-			if (!lastAssistant) return;
+			if (!lastAssistant) {
+				return;
+			}
 
 			console.log("[WaniWani] Assistant parts:", lastAssistant.parts);
 

@@ -391,7 +391,9 @@ function SegmentedControl<T extends string>({
 
 function DevControls({ defaultProps }: DevControlsProps) {
 	const [isOpen, setIsOpen] = useState(() => {
-		if (typeof window === "undefined") return false;
+		if (typeof window === "undefined") {
+			return false;
+		}
 		return localStorage.getItem("dev-controls-open") === "true";
 	});
 	const [isAnimating, setIsAnimating] = useState(false);
@@ -416,7 +418,9 @@ function DevControls({ defaultProps }: DevControlsProps) {
 
 	// Update safeArea when toggled
 	useEffect(() => {
-		if (typeof window === "undefined") return;
+		if (typeof window === "undefined") {
+			return;
+		}
 		if (!window.openai) {
 			// biome-ignore lint/suspicious/noExplicitAny: window.openai may not exist yet
 			(window as any).openai = {};
@@ -485,7 +489,9 @@ function DevControls({ defaultProps }: DevControlsProps) {
 
 	// Click outside to close
 	useEffect(() => {
-		if (!isOpen) return;
+		if (!isOpen) {
+			return;
+		}
 
 		const handleClickOutside = (e: MouseEvent) => {
 			if (

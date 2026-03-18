@@ -18,7 +18,9 @@ export const Attachments = ({
 	className,
 	...props
 }: AttachmentsProps) => {
-	if (files.length === 0) return null;
+	if (files.length === 0) {
+		return null;
+	}
 
 	return (
 		<div

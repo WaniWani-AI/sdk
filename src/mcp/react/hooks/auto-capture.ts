@@ -44,7 +44,9 @@ function parseAttr(raw: string): {
 	const props: Record<string, string | number> = {};
 	for (let i = 1; i < tokens.length; i++) {
 		const idx = tokens[i].indexOf(":");
-		if (idx === -1) continue;
+		if (idx === -1) {
+			continue;
+		}
 		const key = tokens[i].slice(0, idx);
 		const val = tokens[i].slice(idx + 1);
 		const num = Number(val);
@@ -151,12 +153,16 @@ export function initAutoCapture(
 	const onConversionClick = (ev: MouseEvent) => {
 		const target = ev.target as HTMLElement | null;
 		const el = target?.closest?.("[data-ww-conversion]") as HTMLElement | null;
-		if (!el) return;
+		if (!el) {
+			return;
+		}
 
 		const { name, props } = parseAttr(
 			el.getAttribute("data-ww-conversion") || "",
 		);
-		if (!name) return;
+		if (!name) {
+			return;
+		}
 
 		enqueue([
 			baseFields(config, "conversion", {
@@ -178,10 +184,14 @@ export function initAutoCapture(
 	const onStepClick = (ev: MouseEvent) => {
 		const target = ev.target as HTMLElement | null;
 		const el = target?.closest?.("[data-ww-step]") as HTMLElement | null;
-		if (!el) return;
+		if (!el) {
+			return;
+		}
 
 		const { name, props } = parseAttr(el.getAttribute("data-ww-step") || "");
-		if (!name) return;
+		if (!name) {
+			return;
+		}
 
 		stepSequence++;
 		enqueue([
@@ -200,7 +210,9 @@ export function initAutoCapture(
 	// ── widget_link_click ──────────────────────────────────────────────
 	const onLinkClick = (ev: MouseEvent) => {
 		const anchor = (ev.target as HTMLElement)?.closest?.("a");
-		if (!anchor) return;
+		if (!anchor) {
+			return;
+		}
 		const href = anchor.getAttribute("href") ?? "";
 		const isExternal =
 			href.startsWith("http") && !href.startsWith(window.location.origin);
@@ -225,7 +237,9 @@ export function initAutoCapture(
 	let scrollTimer: ReturnType<typeof setTimeout> | null = null;
 	let lastScrollY = window.scrollY || 0;
 	const onScroll = () => {
-		if (scrollTimer) return;
+		if (scrollTimer) {
+			return;
+		}
 		scrollTimer = setTimeout(() => {
 			scrollTimer = null;
 			const scrollTop = window.scrollY || document.documentElement.scrollTop;
@@ -250,7 +264,9 @@ export function initAutoCapture(
 	window.addEventListener("scroll", onScroll, { passive: true });
 	cleanups.push(() => {
 		window.removeEventListener("scroll", onScroll);
-		if (scrollTimer) clearTimeout(scrollTimer);
+		if (scrollTimer) {
+			clearTimeout(scrollTimer);
+		}
 	});
 
 	// ── widget_form_field ──────────────────────────────────────────────
@@ -258,12 +274,16 @@ export function initAutoCapture(
 
 	const onFocusIn = (ev: FocusEvent) => {
 		const target = ev.target as HTMLElement | null;
-		if (!target || !isFormField(target)) return;
+		if (!target || !isFormField(target)) {
+			return;
+		}
 		fieldTimers.set(target, Date.now());
 	};
 	const onFocusOut = (ev: FocusEvent) => {
 		const target = ev.target as HTMLElement | null;
-		if (!target || !isFormField(target)) return;
+		if (!target || !isFormField(target)) {
+			return;
+		}
 		const start = fieldTimers.get(target);
 		const timeInField = start ? Date.now() - start : 0;
 		const input = target as HTMLInputElement;

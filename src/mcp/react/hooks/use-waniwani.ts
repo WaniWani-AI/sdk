@@ -87,7 +87,9 @@ function eventId(): string {
 }
 
 function normalizeString(value: unknown): string | undefined {
-	if (typeof value !== "string") return undefined;
+	if (typeof value !== "string") {
+		return undefined;
+	}
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
 }
@@ -103,16 +105,22 @@ function createNoopState(): WidgetState {
 function resolveConfigFromContext(
 	client: { getToolResponseMetadata(): Record<string, unknown> | null } | null,
 ): WaniwaniConfig | null {
-	if (!client) return null;
+	if (!client) {
+		return null;
+	}
 	const meta = client.getToolResponseMetadata();
-	if (!meta) return null;
+	if (!meta) {
+		return null;
+	}
 
 	const nestedMeta = meta._meta as Record<string, unknown> | undefined;
 	const waniwani = (meta.waniwani ?? nestedMeta?.waniwani) as
 		| WaniwaniMeta
 		| undefined;
 	const endpoint = normalizeString(waniwani?.endpoint);
-	if (!endpoint) return null;
+	if (!endpoint) {
+		return null;
+	}
 
 	return {
 		endpoint,
@@ -315,7 +323,9 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 	// All side effects (timers, DOM listeners) happen here in useEffect,
 	// making this safe in Strict Mode and concurrent rendering.
 	useEffect(() => {
-		if (typeof window === "undefined") return;
+		if (typeof window === "undefined") {
+			return;
+		}
 
 		if (!config) {
 			if (state?.config) {

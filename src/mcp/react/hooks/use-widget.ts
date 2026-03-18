@@ -95,7 +95,9 @@ export function WidgetProvider({
 
 	// Sync theme to <html> class so consumers can use html.dark { ... } or dark: variants
 	useEffect(() => {
-		if (!client) return;
+		if (!client) {
+			return;
+		}
 
 		const syncTheme = (theme: Theme) => {
 			document.documentElement.classList.toggle("dark", theme === "dark");
@@ -178,38 +180,66 @@ export function useWidgetClient<K extends WidgetKey>(key?: K) {
 	// Key selector - use useSyncExternalStore
 	const subscribe = useCallback(
 		(onChange: () => void) => {
-			if (key === "toolOutput") return client.onToolResult(() => onChange());
-			if (key === "theme") return client.onThemeChange(() => onChange());
-			if (key === "displayMode")
+			if (key === "toolOutput") {
+				return client.onToolResult(() => onChange());
+			}
+			if (key === "theme") {
+				return client.onThemeChange(() => onChange());
+			}
+			if (key === "displayMode") {
 				return client.onDisplayModeChange(() => onChange());
-			if (key === "safeArea") return client.onSafeAreaChange(() => onChange());
-			if (key === "maxHeight")
+			}
+			if (key === "safeArea") {
+				return client.onSafeAreaChange(() => onChange());
+			}
+			if (key === "maxHeight") {
 				return client.onMaxHeightChange(() => onChange());
-			if (key === "toolResponseMetadata")
+			}
+			if (key === "toolResponseMetadata") {
 				return client.onToolResponseMetadataChange(() => onChange());
-			if (key === "widgetState")
+			}
+			if (key === "widgetState") {
 				return client.onWidgetStateChange(() => onChange());
+			}
 			return () => {};
 		},
 		[client, key],
 	);
 
 	const getSnapshot = useCallback(() => {
-		if (key === "toolOutput") return client.getToolOutput();
-		if (key === "theme") return client.getTheme();
-		if (key === "displayMode") return client.getDisplayMode();
-		if (key === "locale") return client.getLocale();
-		if (key === "safeArea") return client.getSafeArea();
-		if (key === "maxHeight") return client.getMaxHeight();
-		if (key === "toolResponseMetadata") return client.getToolResponseMetadata();
-		if (key === "widgetState") return client.getWidgetState();
+		if (key === "toolOutput") {
+			return client.getToolOutput();
+		}
+		if (key === "theme") {
+			return client.getTheme();
+		}
+		if (key === "displayMode") {
+			return client.getDisplayMode();
+		}
+		if (key === "locale") {
+			return client.getLocale();
+		}
+		if (key === "safeArea") {
+			return client.getSafeArea();
+		}
+		if (key === "maxHeight") {
+			return client.getMaxHeight();
+		}
+		if (key === "toolResponseMetadata") {
+			return client.getToolResponseMetadata();
+		}
+		if (key === "widgetState") {
+			return client.getWidgetState();
+		}
 		return null;
 	}, [client, key]);
 
 	const store = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
 	// No key - return full client
-	if (!key) return client;
+	if (!key) {
+		return client;
+	}
 
 	return store;
 }

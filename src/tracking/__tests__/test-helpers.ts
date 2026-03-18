@@ -7,7 +7,9 @@ export async function waitFor(
 	const start = Date.now();
 
 	while (Date.now() - start < timeoutMs) {
-		if (predicate()) return;
+		if (predicate()) {
+			return;
+		}
 		await delay(stepMs);
 	}
 

@@ -102,7 +102,9 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 		let lastHeight = 0;
 
 		const measure = () => {
-			if (rafPending) return;
+			if (rafPending) {
+				return;
+			}
 			rafPending = true;
 			requestAnimationFrame(() => {
 				rafPending = false;

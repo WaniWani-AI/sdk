@@ -67,7 +67,9 @@ function mapWidgetEvent(ev: WidgetEventPayload): TrackInput {
 	const properties: Record<string, unknown> = {
 		...(ev.metadata ?? {}),
 	};
-	if (ev.event_name) properties.event_name = ev.event_name;
+	if (ev.event_name) {
+		properties.event_name = ev.event_name;
+	}
 
 	return {
 		event: eventName,

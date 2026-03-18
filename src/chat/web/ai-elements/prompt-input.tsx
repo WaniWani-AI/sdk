@@ -128,7 +128,9 @@ export const PromptInput = ({
 	const add = useCallback(
 		(fileList: File[] | FileList) => {
 			const incoming = [...fileList];
-			if (incoming.length === 0) return;
+			if (incoming.length === 0) {
+				return;
+			}
 
 			const withinSize = (f: File) =>
 				maxFileSize ? f.size <= maxFileSize : true;
@@ -159,7 +161,9 @@ export const PromptInput = ({
 	const remove = useCallback((id: string) => {
 		setItems((prev) => {
 			const found = prev.find((f) => f.id === id);
-			if (found?.url) URL.revokeObjectURL(found.url);
+			if (found?.url) {
+				URL.revokeObjectURL(found.url);
+			}
 			return prev.filter((f) => f.id !== id);
 		});
 	}, []);
@@ -167,7 +171,9 @@ export const PromptInput = ({
 	const clear = useCallback(() => {
 		setItems((prev) => {
 			for (const f of prev) {
-				if (f.url) URL.revokeObjectURL(f.url);
+				if (f.url) {
+					URL.revokeObjectURL(f.url);
+				}
 			}
 			return [];
 		});
@@ -177,7 +183,9 @@ export const PromptInput = ({
 	useEffect(
 		() => () => {
 			for (const f of filesRef.current) {
-				if (f.url) URL.revokeObjectURL(f.url);
+				if (f.url) {
+					URL.revokeObjectURL(f.url);
+				}
 			}
 		},
 		[],
@@ -195,12 +203,18 @@ export const PromptInput = ({
 
 	// Global drop support
 	useEffect(() => {
-		if (!globalDrop) return;
+		if (!globalDrop) {
+			return;
+		}
 		const onDragOver = (e: DragEvent) => {
-			if (e.dataTransfer?.types?.includes("Files")) e.preventDefault();
+			if (e.dataTransfer?.types?.includes("Files")) {
+				e.preventDefault();
+			}
 		};
 		const onDrop = (e: DragEvent) => {
-			if (e.dataTransfer?.types?.includes("Files")) e.preventDefault();
+			if (e.dataTransfer?.types?.includes("Files")) {
+				e.preventDefault();
+			}
 			if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
 				add(e.dataTransfer.files);
 			}
@@ -354,18 +368,26 @@ export const PromptInputTextarea = ({
 	const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = useCallback(
 		(e) => {
 			onKeyDown?.(e);
-			if (e.defaultPrevented) return;
+			if (e.defaultPrevented) {
+				return;
+			}
 
 			if (e.key === "Enter") {
-				if (isComposing || e.nativeEvent.isComposing) return;
-				if (e.shiftKey) return;
+				if (isComposing || e.nativeEvent.isComposing) {
+					return;
+				}
+				if (e.shiftKey) {
+					return;
+				}
 				e.preventDefault();
 
 				const { form } = e.currentTarget;
 				const submitButton = form?.querySelector(
 					'button[type="submit"]',
 				) as HTMLButtonElement | null;
-				if (submitButton?.disabled) return;
+				if (submitButton?.disabled) {
+					return;
+				}
 				form?.requestSubmit();
 			}
 
@@ -376,7 +398,9 @@ export const PromptInputTextarea = ({
 			) {
 				e.preventDefault();
 				const lastAttachment = attachments.files.at(-1);
-				if (lastAttachment) attachments.remove(lastAttachment.id);
+				if (lastAttachment) {
+					attachments.remove(lastAttachment.id);
+				}
 			}
 		},
 		[onKeyDown, isComposing, attachments],
@@ -385,13 +409,17 @@ export const PromptInputTextarea = ({
 	const handlePaste: ClipboardEventHandler<HTMLTextAreaElement> = useCallback(
 		(event) => {
 			const items = event.clipboardData?.items;
-			if (!items) return;
+			if (!items) {
+				return;
+			}
 
 			const files: File[] = [];
 			for (const item of items) {
 				if (item.kind === "file") {
 					const file = item.getAsFile();
-					if (file) files.push(file);
+					if (file) {
+						files.push(file);
+					}
 				}
 			}
 			if (files.length > 0) {

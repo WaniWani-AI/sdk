@@ -28,8 +28,12 @@ export function mapTrackEventToV2(
 	const mappedMetadata: Record<string, unknown> = {
 		...metadata,
 	};
-	if (Object.keys(meta).length > 0) mappedMetadata.meta = meta;
-	if (rawLegacy) mappedMetadata.rawLegacy = rawLegacy;
+	if (Object.keys(meta).length > 0) {
+		mappedMetadata.meta = meta;
+	}
+	if (rawLegacy) {
+		mappedMetadata.rawLegacy = rawLegacy;
+	}
 
 	return {
 		id: eventId,
@@ -78,8 +82,12 @@ function mapLegacyProperties(
 	switch (eventName) {
 		case "tool.called": {
 			const properties: Record<string, unknown> = {};
-			if (takeNonEmptyString(input.toolName)) properties.name = input.toolName;
-			if (takeNonEmptyString(input.toolType)) properties.type = input.toolType;
+			if (takeNonEmptyString(input.toolName)) {
+				properties.name = input.toolName;
+			}
+			if (takeNonEmptyString(input.toolType)) {
+				properties.type = input.toolType;
+			}
 			return properties;
 		}
 		case "quote.succeeded": {
@@ -94,7 +102,9 @@ function mapLegacyProperties(
 		}
 		case "link.clicked": {
 			const properties: Record<string, unknown> = {};
-			if (takeNonEmptyString(input.linkUrl)) properties.url = input.linkUrl;
+			if (takeNonEmptyString(input.linkUrl)) {
+				properties.url = input.linkUrl;
+			}
 			return properties;
 		}
 		case "purchase.completed": {
@@ -113,7 +123,9 @@ function mapLegacyProperties(
 }
 
 function resolveEventName(input: TrackInput): EventType {
-	if (isLegacyTrackEvent(input)) return input.eventType;
+	if (isLegacyTrackEvent(input)) {
+		return input.eventType;
+	}
 	return input.event;
 }
 
@@ -159,11 +171,21 @@ function resolveCorrelationIds(
 		requestId;
 
 	const correlation: V2CorrelationIds = {};
-	if (sessionId) correlation.sessionId = sessionId;
-	if (traceId) correlation.traceId = traceId;
-	if (requestId) correlation.requestId = requestId;
-	if (correlationId) correlation.correlationId = correlationId;
-	if (externalUserId) correlation.externalUserId = externalUserId;
+	if (sessionId) {
+		correlation.sessionId = sessionId;
+	}
+	if (traceId) {
+		correlation.traceId = traceId;
+	}
+	if (requestId) {
+		correlation.requestId = requestId;
+	}
+	if (correlationId) {
+		correlation.correlationId = correlationId;
+	}
+	if (externalUserId) {
+		correlation.externalUserId = externalUserId;
+	}
 	return correlation;
 }
 
@@ -171,10 +193,14 @@ function normalizeTimestamp(
 	input: string | Date | undefined,
 	now: () => Date,
 ): string {
-	if (input instanceof Date) return input.toISOString();
+	if (input instanceof Date) {
+		return input.toISOString();
+	}
 	if (typeof input === "string") {
 		const date = new Date(input);
-		if (!Number.isNaN(date.getTime())) return date.toISOString();
+		if (!Number.isNaN(date.getTime())) {
+			return date.toISOString();
+		}
 	}
 	return now().toISOString();
 }
@@ -200,8 +226,12 @@ function toRecord(value: unknown): Record<string, unknown> {
 }
 
 function takeNonEmptyString(value: unknown): string | undefined {
-	if (typeof value !== "string") return undefined;
-	if (value.trim().length === 0) return undefined;
+	if (typeof value !== "string") {
+		return undefined;
+	}
+	if (value.trim().length === 0) {
+		return undefined;
+	}
 	return value;
 }
 

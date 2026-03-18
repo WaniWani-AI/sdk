@@ -29,7 +29,9 @@ export async function resolveNextNode<TState extends Record<string, unknown>>(
 	edge: Edge<TState>,
 	state: Partial<TState>,
 ): Promise<string> {
-	if (edge.type === "direct") return edge.to;
+	if (edge.type === "direct") {
+		return edge.to;
+	}
 	return edge.condition(state);
 }
 
@@ -189,7 +191,9 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 								currentNode,
 								state,
 							);
-							if (errResult) return errResult;
+							if (errResult) {
+								return errResult;
+							}
 							break;
 						}
 					}

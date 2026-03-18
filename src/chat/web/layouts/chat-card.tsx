@@ -65,7 +65,9 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 				try {
 					const r = await fetch(`${effectiveApi}/config`);
 					const data = await r.json();
-					if (data.debug === true) setServerDebug(true);
+					if (data.debug === true) {
+						setServerDebug(true);
+					}
 				} catch {}
 			})();
 		}, [effectiveApi]);
@@ -84,7 +86,9 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 
 		const focusInput = useCallback(() => {
 			const container = cardRef.current;
-			if (!container) return;
+			if (!container) {
+				return;
+			}
 			container.scrollIntoView({ behavior: "smooth", block: "center" });
 			const textarea = container.querySelector("textarea");
 			if (textarea) {
@@ -147,7 +151,9 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 
 		// Listen for custom trigger event (e.g. "triggerDemoRequest")
 		useEffect(() => {
-			if (!triggerEvent) return;
+			if (!triggerEvent) {
+				return;
+			}
 			const handler = (e: Event) => {
 				const detail = (e as CustomEvent).detail;
 				const message =

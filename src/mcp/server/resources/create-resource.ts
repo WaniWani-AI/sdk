@@ -72,7 +72,9 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 	// Lazy HTML — fetched once, shared across all calls
 	let htmlPromise: Promise<string> | null = null;
 	const getHtml = () => {
-		if (!htmlPromise) htmlPromise = fetchHtml(baseUrl, htmlPath);
+		if (!htmlPromise) {
+			htmlPromise = fetchHtml(baseUrl, htmlPath);
+		}
 		return htmlPromise;
 	};
 

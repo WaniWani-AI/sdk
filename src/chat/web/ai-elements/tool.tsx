@@ -28,22 +28,30 @@ import { Button } from "../ui/button";
  * Arrays show their length: `Array(13)`
  */
 function truncateJSON(data: unknown, maxLength = 80): string {
-	if (data === null || data === undefined) return String(data);
-	if (typeof data !== "object") return String(data).slice(0, maxLength);
+	if (data === null || data === undefined) {
+		return String(data);
+	}
+	if (typeof data !== "object") {
+		return String(data).slice(0, maxLength);
+	}
 
 	if (Array.isArray(data)) {
 		return `Array(${data.length})`;
 	}
 
 	const stringified = JSON.stringify(data);
-	if (stringified.length <= maxLength) return stringified;
+	if (stringified.length <= maxLength) {
+		return stringified;
+	}
 
 	const entries = Object.entries(data as Record<string, unknown>);
 	const parts: string[] = [];
 	let remaining = maxLength - 2;
 
 	for (const [key, value] of entries) {
-		if (remaining <= 8) break;
+		if (remaining <= 8) {
+			break;
+		}
 		const keyAbbrev = key.length > 4 ? `${key.slice(0, 4)}\u2026` : key;
 		let valStr: string;
 		if (typeof value === "string") {
@@ -388,11 +396,17 @@ export type ToolOutputProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 function getUiMeta(output: unknown): Record<string, unknown> | undefined {
-	if (typeof output !== "object" || output === null) return undefined;
+	if (typeof output !== "object" || output === null) {
+		return undefined;
+	}
 	const meta = (output as Record<string, unknown>)._meta;
-	if (typeof meta !== "object" || meta === null) return undefined;
+	if (typeof meta !== "object" || meta === null) {
+		return undefined;
+	}
 	const ui = (meta as Record<string, unknown>).ui;
-	if (typeof ui !== "object" || ui === null) return undefined;
+	if (typeof ui !== "object" || ui === null) {
+		return undefined;
+	}
 	return ui as Record<string, unknown>;
 }
 
@@ -428,7 +442,9 @@ export function ToolOutput({
 		return output;
 	}, [output, debug]);
 
-	if (!(output || errorText)) return null;
+	if (!(output || errorText)) {
+		return null;
+	}
 
 	if (errorText) {
 		return (

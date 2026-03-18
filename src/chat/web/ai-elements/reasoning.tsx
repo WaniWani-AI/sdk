@@ -9,7 +9,9 @@ export type ReasoningProps = HTMLAttributes<HTMLPreElement> & {
 
 /** Displays reasoning text inline with muted styling. */
 export function Reasoning({ className, text, ...props }: ReasoningProps) {
-	if (!text) return null;
+	if (!text) {
+		return null;
+	}
 
 	return (
 		<pre

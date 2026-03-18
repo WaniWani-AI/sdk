@@ -12,7 +12,9 @@ export function useIsChatGptApp(): boolean {
 	return useSyncExternalStore(
 		() => () => {},
 		() => {
-			if (typeof window === "undefined") return false;
+			if (typeof window === "undefined") {
+				return false;
+			}
 			// biome-ignore lint/suspicious/noExplicitAny: __isChatGptApp is injected by ChatGPT
 			return (window as any).__isChatGptApp === true;
 		},

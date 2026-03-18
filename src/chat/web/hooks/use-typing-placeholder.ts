@@ -25,7 +25,9 @@ export function useTypingPlaceholder(text: string, active = true): string {
 		let disposed = false;
 
 		const tick = () => {
-			if (disposed) return;
+			if (disposed) {
+				return;
+			}
 
 			if (!deleting) {
 				// Typing forward

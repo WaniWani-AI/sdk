@@ -28,8 +28,12 @@ let mockState: Omit<OpenAIGlobals, "setWidgetState"> = {
 export function initializeMockOpenAI(
 	initialToolOutput?: Record<string, unknown>,
 ): void {
-	if (typeof window === "undefined") return;
-	if (window.openai) return; // Already initialized (real ChatGPT or previous mock)
+	if (typeof window === "undefined") {
+		return;
+	}
+	if (window.openai) {
+		return; // Already initialized (real ChatGPT or previous mock)
+	}
 
 	mockState = {
 		...DEFAULT_MOCK_CONFIG,
@@ -67,7 +71,9 @@ export function updateMockGlobal<K extends keyof OpenAIGlobals>(
 	key: K,
 	value: OpenAIGlobals[K],
 ): void {
-	if (typeof window === "undefined" || !window.openai) return;
+	if (typeof window === "undefined" || !window.openai) {
+		return;
+	}
 
 	(mockState as Record<string, unknown>)[key] = value;
 	(window.openai as Record<string, unknown>)[key] = value;

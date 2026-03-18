@@ -48,7 +48,9 @@ export class WaniwaniFlowStore implements FlowStore {
 	}
 
 	async get(key: string): Promise<FlowTokenContent | null> {
-		if (!this.apiKey) return null;
+		if (!this.apiKey) {
+			return null;
+		}
 		try {
 			const data = await this.request<FlowTokenContent | null>(
 				"/api/mcp/redis/get",
@@ -61,7 +63,9 @@ export class WaniwaniFlowStore implements FlowStore {
 	}
 
 	async set(key: string, value: FlowTokenContent): Promise<void> {
-		if (!this.apiKey) return;
+		if (!this.apiKey) {
+			return;
+		}
 		try {
 			await this.request("/api/mcp/redis/set", { key, value });
 		} catch {
@@ -70,7 +74,9 @@ export class WaniwaniFlowStore implements FlowStore {
 	}
 
 	async delete(key: string): Promise<void> {
-		if (!this.apiKey) return;
+		if (!this.apiKey) {
+			return;
+		}
 		try {
 			await this.request("/api/mcp/redis/delete", { key });
 		} catch {

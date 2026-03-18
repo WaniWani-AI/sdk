@@ -17,7 +17,9 @@ export function Suggestions({
 	className,
 	...props
 }: SuggestionsProps) {
-	if (suggestions.length === 0 && !isLoading) return null;
+	if (suggestions.length === 0 && !isLoading) {
+		return null;
+	}
 
 	return (
 		<div className={cn("ww:px-4 ww:py-2", className)} {...props}>

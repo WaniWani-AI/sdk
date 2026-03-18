@@ -17,7 +17,9 @@ const HANDSHAKE_TIMEOUT_MS = 3000;
 const MAX_RETRIES = 3;
 
 function normalizeString(value: unknown): string | undefined {
-	if (typeof value !== "string") return undefined;
+	if (typeof value !== "string") {
+		return undefined;
+	}
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
 }
@@ -26,13 +28,19 @@ export function resultProducesWidget(result: {
 	_meta?: Record<string, unknown>;
 }): boolean {
 	const meta = result._meta;
-	if (!meta || typeof meta !== "object") return false;
+	if (!meta || typeof meta !== "object") {
+		return false;
+	}
 
 	const openaiTemplate = normalizeString(meta["openai/outputTemplate"]);
-	if (openaiTemplate) return true;
+	if (openaiTemplate) {
+		return true;
+	}
 
 	const uiMeta = meta.ui;
-	if (!uiMeta || typeof uiMeta !== "object") return false;
+	if (!uiMeta || typeof uiMeta !== "object") {
+		return false;
+	}
 
 	const resourceUri = normalizeString(
 		(uiMeta as Record<string, unknown>).resourceUri,
@@ -43,7 +51,9 @@ export function resultProducesWidget(result: {
 function shouldAutoInjectToolResultText(result: {
 	_meta?: Record<string, unknown>;
 }): boolean {
-	if (resultProducesWidget(result)) return false;
+	if (resultProducesWidget(result)) {
+		return false;
+	}
 	return result._meta?.["waniwani/autoInjectResultText"] !== false;
 }
 
@@ -127,7 +137,9 @@ export function McpAppFrame({
 
 	const clampHeight = useCallback(
 		(h: number) => {
-			if (autoHeight) return Math.max(h + AUTOHEIGHT_PADDING, 0);
+			if (autoHeight) {
+				return Math.max(h + AUTOHEIGHT_PADDING, 0);
+			}
 			return Math.min(Math.max(h, 50), MAX_HEIGHT);
 		},
 		[autoHeight],
@@ -144,9 +156,13 @@ export function McpAppFrame({
 
 	// Send theme changes to the iframe (only after handshake is complete)
 	useEffect(() => {
-		if (!initializedRef.current) return;
+		if (!initializedRef.current) {
+			return;
+		}
 		const iframe = iframeRef.current;
-		if (!iframe?.contentWindow) return;
+		if (!iframe?.contentWindow) {
+			return;
+		}
 
 		iframe.contentWindow.postMessage(
 			{
@@ -164,7 +180,9 @@ export function McpAppFrame({
 	// Handles the MCP UI protocol (ui/initialize, notifications, etc.) directly.
 	useEffect(() => {
 		const iframe = iframeRef.current;
-		if (!iframe) return;
+		if (!iframe) {
+			return;
+		}
 
 		let disposed = false;
 		let handshakeReceived = false;
@@ -176,7 +194,9 @@ export function McpAppFrame({
 
 		// Retry: reload iframe if handshake doesn't arrive in time
 		const handshakeTimer = setTimeout(() => {
-			if (disposed || handshakeReceived) return;
+			if (disposed || handshakeReceived) {
+				return;
+			}
 			if (retryCountRef.current >= MAX_RETRIES) {
 				return;
 			}
@@ -192,12 +212,18 @@ export function McpAppFrame({
 		};
 
 		const handleMessage = (event: MessageEvent) => {
-			if (disposed) return;
-			if (event.source !== iframe.contentWindow) return;
+			if (disposed) {
+				return;
+			}
+			if (event.source !== iframe.contentWindow) {
+				return;
+			}
 
 			const data = event.data;
 
-			if (!data || typeof data !== "object" || data.jsonrpc !== "2.0") return;
+			if (!data || typeof data !== "object" || data.jsonrpc !== "2.0") {
+				return;
+			}
 
 			const method: string | undefined = data.method;
 			const id: number | string | undefined = data.id;
@@ -306,7 +332,9 @@ export function McpAppFrame({
 					newHeight !== undefined && newHeight !== last.height;
 				const widthChanged = newWidth !== undefined && newWidth !== last.width;
 
-				if (!heightChanged && !widthChanged) return;
+				if (!heightChanged && !widthChanged) {
+					return;
+				}
 
 				if (heightChanged && newHeight !== undefined) {
 					last.height = newHeight;
@@ -433,11 +461,15 @@ export function McpAppFrame({
 							.join("")
 							.trim();
 						if (text && shouldAutoInjectToolResultText(result)) {
-							if (pendingToolResult) clearTimeout(pendingToolResult.timer);
+							if (pendingToolResult) {
+								clearTimeout(pendingToolResult.timer);
+							}
 							pendingToolResult = {
 								text,
 								timer: setTimeout(() => {
-									if (disposed) return;
+									if (disposed) {
+										return;
+									}
 									const modelContext = pendingModelContext;
 									pendingModelContext = null;
 									pendingToolResult = null;
@@ -505,7 +537,9 @@ export function McpAppFrame({
 		return () => {
 			disposed = true;
 			clearTimeout(handshakeTimer);
-			if (pendingToolResult) clearTimeout(pendingToolResult.timer);
+			if (pendingToolResult) {
+				clearTimeout(pendingToolResult.timer);
+			}
 			window.removeEventListener("message", handleMessage);
 		};
 	}, [autoHeight, clampHeight]);

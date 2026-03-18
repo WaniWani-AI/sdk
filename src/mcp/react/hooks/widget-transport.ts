@@ -45,15 +45,23 @@ function toV2Envelope(ev: WidgetEvent): Record<string, unknown> {
 	const eventName = isAutoCapture ? ev.event_type : `widget_${ev.event_type}`;
 
 	const correlation: Record<string, string> = {};
-	if (ev.session_id) correlation.sessionId = ev.session_id;
-	if (ev.trace_id) correlation.traceId = ev.trace_id;
-	if (ev.user_id) correlation.externalUserId = ev.user_id;
+	if (ev.session_id) {
+		correlation.sessionId = ev.session_id;
+	}
+	if (ev.trace_id) {
+		correlation.traceId = ev.trace_id;
+	}
+	if (ev.user_id) {
+		correlation.externalUserId = ev.user_id;
+	}
 
 	// Build properties from metadata + any extra fields
 	const properties: Record<string, unknown> = {
 		...(ev.metadata ?? {}),
 	};
-	if (ev.event_name) properties.event_name = ev.event_name as string;
+	if (ev.event_name) {
+		properties.event_name = ev.event_name as string;
+	}
 
 	return {
 		id: ev.event_id,
@@ -92,7 +100,9 @@ export class WidgetTransport {
 	}
 
 	send(events: WidgetEvent[]): void {
-		if (this.stopped) return;
+		if (this.stopped) {
+			return;
+		}
 
 		this.buffer.push(...events);
 
@@ -107,7 +117,9 @@ export class WidgetTransport {
 	}
 
 	async flush(): Promise<void> {
-		if (this.stopped || this.buffer.length === 0) return;
+		if (this.stopped || this.buffer.length === 0) {
+			return;
+		}
 
 		if (this.flushing) {
 			this.pendingFlush = true;
@@ -144,7 +156,9 @@ export class WidgetTransport {
 	}
 
 	beaconFlush(): void {
-		if (this.buffer.length === 0) return;
+		if (this.buffer.length === 0) {
+			return;
+		}
 
 		const events = [...this.buffer];
 		this.buffer.length = 0;
@@ -188,7 +202,9 @@ export class WidgetTransport {
 			return;
 		}
 
-		if (events.length <= 1) return;
+		if (events.length <= 1) {
+			return;
+		}
 
 		const mid = Math.ceil(events.length / 2);
 		this.sendKeepAliveChunked(url, events.slice(0, mid), headers);
@@ -203,7 +219,9 @@ export class WidgetTransport {
 			return;
 		}
 
-		if (events.length <= 1) return;
+		if (events.length <= 1) {
+			return;
+		}
 
 		const mid = Math.ceil(events.length / 2);
 		this.sendBeaconChunked(url, events.slice(0, mid));
@@ -211,14 +229,18 @@ export class WidgetTransport {
 	}
 
 	private start(): void {
-		if (this.timer) return;
+		if (this.timer) {
+			return;
+		}
 		this.timer = setInterval(() => {
 			this.flush().catch(() => {});
 		}, FLUSH_INTERVAL_MS);
 	}
 
 	private registerTeardown(): void {
-		if (typeof document === "undefined") return;
+		if (typeof document === "undefined") {
+			return;
+		}
 
 		this.teardownVisibility = () => {
 			if (document.visibilityState === "hidden") {
@@ -250,7 +272,9 @@ export class WidgetTransport {
 					body,
 				});
 
-				if (response.status === 200 || response.status === 207) return;
+				if (response.status === 200 || response.status === 207) {
+					return;
+				}
 
 				if (response.status === 401) {
 					this.stopped = true;

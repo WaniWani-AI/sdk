@@ -50,7 +50,9 @@ export function ChatQueue({
 	onRemove,
 	className,
 }: ChatQueueProps) {
-	if (queuedMessages.length === 0) return null;
+	if (queuedMessages.length === 0) {
+		return null;
+	}
 
 	return (
 		<Queue className={cn("ww:border-t ww:border-border", className)}>

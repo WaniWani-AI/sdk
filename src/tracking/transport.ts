@@ -160,7 +160,9 @@ class BatchingV2Transport implements V2BatchTransport {
 	}
 
 	async flush(): Promise<void> {
-		if (this.flushInFlight) return this.flushInFlight;
+		if (this.flushInFlight) {
+			return this.flushInFlight;
+		}
 		this.flushInFlight = this.flushLoop().finally(() => {
 			this.flushInFlight = undefined;
 		});
@@ -206,7 +208,9 @@ class BatchingV2Transport implements V2BatchTransport {
 	}
 
 	private scheduleMicroFlush(): void {
-		if (this.flushScheduled) return;
+		if (this.flushScheduled) {
+			return;
+		}
 		this.flushScheduled = true;
 		this.flushScheduledTimer = setTimeout(() => {
 			this.flushScheduledTimer = undefined;
@@ -263,7 +267,9 @@ class BatchingV2Transport implements V2BatchTransport {
 							result.permanent.length,
 						);
 					}
-					if (result.retryable.length === 0) return;
+					if (result.retryable.length === 0) {
+						return;
+					}
 					if (attempt >= this.maxRetries) {
 						this.logger.error(
 							"[WaniWani] Dropping %d retryable event(s) after retry exhaustion",
@@ -360,7 +366,9 @@ class BatchingV2Transport implements V2BatchTransport {
 
 		for (const rejectedEvent of rejected) {
 			const event = byId.get(rejectedEvent.eventId);
-			if (!event) continue;
+			if (!event) {
+				continue;
+			}
 			if (isRetryableRejectedEvent(rejectedEvent)) {
 				retryable.push(event);
 				continue;
@@ -394,7 +402,9 @@ class BatchingV2Transport implements V2BatchTransport {
 function isRetryableRejectedEvent(
 	rejectedEvent: V2BatchRejectedEvent,
 ): boolean {
-	if (rejectedEvent.retryable === true) return true;
+	if (rejectedEvent.retryable === true) {
+		return true;
+	}
 	const code = rejectedEvent.code.toLowerCase();
 	return (
 		code.includes("timeout") ||
@@ -410,7 +420,9 @@ async function parseJsonResponse<T>(
 	response: Response,
 ): Promise<T | undefined> {
 	const body = await response.text();
-	if (!body) return undefined;
+	if (!body) {
+		return undefined;
+	}
 	try {
 		return JSON.parse(body) as T;
 	} catch {
@@ -427,6 +439,8 @@ function joinUrl(baseUrl: string, endpointPath: string): string {
 }
 
 function getErrorMessage(error: unknown): string {
-	if (error instanceof Error) return error.message;
+	if (error instanceof Error) {
+		return error.message;
+	}
 	return String(error);
 }

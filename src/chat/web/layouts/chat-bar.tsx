@@ -108,7 +108,9 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 
 		const focusInput = useCallback(() => {
 			const container = containerRef.current;
-			if (!container) return;
+			if (!container) {
+				return;
+			}
 			container.scrollIntoView({ behavior: "smooth", block: "center" });
 			const textarea = container.querySelector("textarea");
 			if (textarea) {
@@ -137,7 +139,9 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 
 		// Listen for custom trigger event (e.g. "triggerDemoRequest")
 		useEffect(() => {
-			if (!triggerEvent) return;
+			if (!triggerEvent) {
+				return;
+			}
 			const handler = (e: Event) => {
 				const detail = (e as CustomEvent).detail;
 				const message =
@@ -155,7 +159,9 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 
 		// Close on outside click
 		useEffect(() => {
-			if (!isFocused) return;
+			if (!isFocused) {
+				return;
+			}
 			const handleClickOutside = (e: MouseEvent) => {
 				if (
 					containerRef.current &&

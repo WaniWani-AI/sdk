@@ -48,7 +48,9 @@ export function parseBrowser(
 
 	for (const [name, pattern] of browsers) {
 		const version = match(ua, pattern);
-		if (version) return { name, version };
+		if (version) {
+			return { name, version };
+		}
 	}
 	return null;
 }
@@ -65,8 +67,12 @@ export function parseOS(ua: string): { name: string; version: string } | null {
 
 	for (const [name, pattern] of systems) {
 		const version = match(ua, pattern);
-		if (version) return { name, version: version.replace(/_/g, ".") };
-		if (name === "Linux" && pattern.test(ua)) return { name, version: "" };
+		if (version) {
+			return { name, version: version.replace(/_/g, ".") };
+		}
+		if (name === "Linux" && pattern.test(ua)) {
+			return { name, version: "" };
+		}
 	}
 	return null;
 }
@@ -82,8 +88,12 @@ export function detectDeviceType(ua: string): "mobile" | "tablet" | "desktop" {
 		return "mobile";
 	}
 
-	if (/iPad|tablet|PlayBook/i.test(ua)) return "tablet";
-	if (/Mobi|Android.*Mobile|iPhone|iPod/i.test(ua)) return "mobile";
+	if (/iPad|tablet|PlayBook/i.test(ua)) {
+		return "tablet";
+	}
+	if (/Mobi|Android.*Mobile|iPhone|iPod/i.test(ua)) {
+		return "mobile";
+	}
 	return "desktop";
 }
 
@@ -103,7 +113,9 @@ async function computeVisitorId(): Promise<string> {
 	// Try localStorage first
 	try {
 		const stored = localStorage.getItem(VISITOR_ID_KEY);
-		if (stored) return stored;
+		if (stored) {
+			return stored;
+		}
 	} catch {
 		// localStorage unavailable (private browsing, security policy)
 	}

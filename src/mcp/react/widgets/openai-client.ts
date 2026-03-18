@@ -29,7 +29,9 @@ export class OpenAIWidgetClient implements UnifiedWidgetClient {
 		key: keyof NonNullable<typeof window.openai>,
 		fallback: T,
 	): T {
-		if (typeof window === "undefined") return fallback;
+		if (typeof window === "undefined") {
+			return fallback;
+		}
 		return (window.openai?.[key] as T) ?? fallback;
 	}
 
@@ -41,7 +43,9 @@ export class OpenAIWidgetClient implements UnifiedWidgetClient {
 		callback: (value: T) => void,
 		transform?: (value: SetGlobalsEvent["detail"]["globals"][K]) => T,
 	): () => void {
-		if (typeof window === "undefined") return () => {};
+		if (typeof window === "undefined") {
+			return () => {};
+		}
 
 		const handler = (event: SetGlobalsEvent) => {
 			const value = event.detail.globals[key];

@@ -147,6 +147,8 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
 	}
 
 	const raw = Buffer.concat(chunks).toString("utf8");
-	if (!raw) return {};
+	if (!raw) {
+		return {};
+	}
 	return JSON.parse(raw);
 }

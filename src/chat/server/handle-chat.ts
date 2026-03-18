@@ -62,12 +62,18 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 					});
 
 					if (result) {
-						if (result.messages) messages = result.messages;
-						if (result.systemPrompt !== undefined)
+						if (result.messages) {
+							messages = result.messages;
+						}
+						if (result.systemPrompt !== undefined) {
 							effectiveSystemPrompt = result.systemPrompt;
-						if (result.sessionId !== undefined) sessionId = result.sessionId;
-						if (result.modelContext !== undefined)
+						}
+						if (result.sessionId !== undefined) {
+							sessionId = result.sessionId;
+						}
+						if (result.modelContext !== undefined) {
 							modelContext = result.modelContext;
+						}
 					}
 					log(
 						"beforeRequest hook done — messages:",

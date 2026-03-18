@@ -41,7 +41,9 @@ export class WidgetTokenCache {
 		}
 
 		// Deduplicate concurrent requests
-		if (this.pending) return this.pending;
+		if (this.pending) {
+			return this.pending;
+		}
 
 		this.pending = this.mint(sessionId, traceId).finally(() => {
 			this.pending = null;
@@ -57,8 +59,12 @@ export class WidgetTokenCache {
 		const url = joinUrl(this.config.baseUrl, "/api/mcp/widget-tokens");
 
 		const body: Record<string, string> = {};
-		if (sessionId) body.sessionId = sessionId;
-		if (traceId) body.traceId = traceId;
+		if (sessionId) {
+			body.sessionId = sessionId;
+		}
+		if (traceId) {
+			body.traceId = traceId;
+		}
 
 		try {
 			const response = await fetch(url, {
@@ -70,7 +76,9 @@ export class WidgetTokenCache {
 				body: JSON.stringify(body),
 			});
 
-			if (!response.ok) return null;
+			if (!response.ok) {
+				return null;
+			}
 
 			const json = (await response.json()) as Record<string, unknown>;
 
@@ -80,7 +88,9 @@ export class WidgetTokenCache {
 			) as WidgetTokenResult;
 
 			const expiresAtMs = new Date(result.expiresAt).getTime();
-			if (!result.token || Number.isNaN(expiresAtMs)) return null;
+			if (!result.token || Number.isNaN(expiresAtMs)) {
+				return null;
+			}
 
 			this.cached = {
 				token: result.token,

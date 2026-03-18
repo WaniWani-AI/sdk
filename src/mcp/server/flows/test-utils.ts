@@ -35,12 +35,16 @@ async function resolveState(
 	token: string | undefined,
 	store?: FlowStore,
 ): Promise<FlowTokenContent | null> {
-	if (!token) return null;
+	if (!token) {
+		return null;
+	}
 
 	// Try server-side store first (short key)
 	if (store) {
 		const stored = await store.get(token);
-		if (stored) return stored;
+		if (stored) {
+			return stored;
+		}
 	}
 
 	// Fallback: legacy compressed base64 token
@@ -64,7 +68,9 @@ export async function createFlowTestHarness(
 	await flow.register(server);
 
 	const handler = registered[0]?.[2];
-	if (!handler) throw new Error(`Flow "${flow.id}" did not register a handler`);
+	if (!handler) {
+		throw new Error(`Flow "${flow.id}" did not register a handler`);
+	}
 
 	let lastFlowToken: string | undefined;
 
@@ -90,7 +96,9 @@ export async function createFlowTestHarness(
 		async continueWith(
 			stateUpdates?: Record<string, unknown>,
 		): Promise<FlowTestResult> {
-			if (!lastFlowToken) throw new Error("No flowToken — call start() first");
+			if (!lastFlowToken) {
+				throw new Error("No flowToken — call start() first");
+			}
 			const result = (await handler(
 				{
 					action: "continue",

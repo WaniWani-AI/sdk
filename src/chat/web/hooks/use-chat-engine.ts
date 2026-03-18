@@ -16,13 +16,17 @@ const SESSION_STORAGE_KEY = "waniwani-chat-session-id";
 const SESSION_HEADER_NAME = "x-session-id";
 
 function normalizeSessionId(value: unknown): string | undefined {
-	if (typeof value !== "string") return undefined;
+	if (typeof value !== "string") {
+		return undefined;
+	}
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function readSessionIdFromStorage(): string | undefined {
-	if (typeof window === "undefined") return undefined;
+	if (typeof window === "undefined") {
+		return undefined;
+	}
 
 	try {
 		return normalizeSessionId(
@@ -34,7 +38,9 @@ function readSessionIdFromStorage(): string | undefined {
 }
 
 function writeSessionIdToStorage(sessionId: string): void {
-	if (typeof window === "undefined") return;
+	if (typeof window === "undefined") {
+		return;
+	}
 
 	try {
 		window.sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
@@ -44,7 +50,9 @@ function writeSessionIdToStorage(sessionId: string): void {
 }
 
 function removeSessionIdFromStorage(): void {
-	if (typeof window === "undefined") return;
+	if (typeof window === "undefined") {
+		return;
+	}
 
 	try {
 		window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
@@ -85,7 +93,9 @@ export function useChatEngine(props: ChatBaseProps) {
 	const sessionIdRef = useRef<string | undefined>(sessionId);
 
 	const getSessionId = useCallback((): string | undefined => {
-		if (sessionIdRef.current) return sessionIdRef.current;
+		if (sessionIdRef.current) {
+			return sessionIdRef.current;
+		}
 
 		const storedSessionId = readSessionIdFromStorage();
 		if (storedSessionId) {
@@ -99,8 +109,12 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	const setSessionId = useCallback((value: unknown) => {
 		const sessionId = normalizeSessionId(value);
-		if (!sessionId) return;
-		if (sessionIdRef.current === sessionId) return;
+		if (!sessionId) {
+			return;
+		}
+		if (sessionIdRef.current === sessionId) {
+			return;
+		}
 
 		sessionIdRef.current = sessionId;
 		setSessionIdState(sessionId);
@@ -209,11 +223,15 @@ export function useChatEngine(props: ChatBaseProps) {
 		(message: ChatEngineMessage) => {
 			const hasText = Boolean(message.text?.trim());
 			const hasFiles = Boolean(message.files?.length);
-			if (!(hasText || hasFiles)) return;
+			if (!(hasText || hasFiles)) {
+				return;
+			}
 
 			if (isLoading) {
 				// Only allow one queued message at a time
-				if (queuedMessages.length > 0) return;
+				if (queuedMessages.length > 0) {
+					return;
+				}
 
 				setQueuedMessages((prev) => [
 					...prev,
@@ -242,8 +260,12 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	// Flush first queued message once the current response finishes
 	useEffect(() => {
-		if (status !== "ready") return;
-		if (queuedMessages.length === 0) return;
+		if (status !== "ready") {
+			return;
+		}
+		if (queuedMessages.length === 0) {
+			return;
+		}
 
 		const [first, ...rest] = queuedMessages;
 		setQueuedMessages(rest);

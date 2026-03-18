@@ -10,7 +10,9 @@ export type ModelContextUpdate = {
 export function hasModelContext(
 	value: ModelContextUpdate | null | undefined,
 ): value is ModelContextUpdate {
-	if (!value) return false;
+	if (!value) {
+		return false;
+	}
 	const hasContent = Array.isArray(value.content) && value.content.length > 0;
 	const hasStructuredContent =
 		typeof value.structuredContent === "object" &&
@@ -23,7 +25,9 @@ export function mergeModelContext(
 	current: ModelContextUpdate | null | undefined,
 	next: ModelContextUpdate | null | undefined,
 ): ModelContextUpdate | null {
-	if (!hasModelContext(current) && !hasModelContext(next)) return null;
+	if (!hasModelContext(current) && !hasModelContext(next)) {
+		return null;
+	}
 	if (!hasModelContext(current)) {
 		return {
 			...(next?.content ? { content: [...next.content] } : {}),
@@ -59,7 +63,9 @@ export function mergeModelContext(
 export function formatModelContextForPrompt(
 	value: ModelContextUpdate | null | undefined,
 ): string {
-	if (!hasModelContext(value)) return "";
+	if (!hasModelContext(value)) {
+		return "";
+	}
 
 	const sections: string[] = [
 		"## Widget Model Context",

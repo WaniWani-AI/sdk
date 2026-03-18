@@ -23,7 +23,9 @@ export function useCallTool(props: {
 		async (params: CallToolParams): Promise<CallToolResult> => {
 			const { api, headers, onCallTool } = propsRef.current;
 
-			if (onCallTool) return onCallTool(params);
+			if (onCallTool) {
+				return onCallTool(params);
+			}
 
 			const endpoint = `${api ?? "/api/waniwani"}/tool`;
 			const res = await fetch(endpoint, {

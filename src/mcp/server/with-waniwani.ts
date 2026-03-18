@@ -84,9 +84,13 @@ export function withWaniwani(
 	let tokenCache: WidgetTokenCache | null = null;
 
 	function getTokenCache(): WidgetTokenCache | null {
-		if (tokenCache) return tokenCache;
+		if (tokenCache) {
+			return tokenCache;
+		}
 		const apiKey = tracker._config.apiKey;
-		if (!apiKey) return null;
+		if (!apiKey) {
+			return null;
+		}
 		tokenCache = new WidgetTokenCache({
 			baseUrl: tracker._config.baseUrl ?? DEFAULT_BASE_URL,
 			apiKey,
@@ -179,7 +183,9 @@ async function injectWidgetConfig(
 	baseUrl: string,
 	onError?: (error: Error) => void,
 ): Promise<void> {
-	if (!isRecord(result)) return;
+	if (!isRecord(result)) {
+		return;
+	}
 
 	if (!isRecord(result._meta)) {
 		(result as UnknownRecord)._meta = {};
@@ -239,10 +245,14 @@ function resolveToolType(
 }
 
 function extractMeta(extra: unknown): UnknownRecord | undefined {
-	if (!isRecord(extra)) return undefined;
+	if (!isRecord(extra)) {
+		return undefined;
+	}
 
 	const meta = extra._meta;
-	if (!isRecord(meta)) return undefined;
+	if (!isRecord(meta)) {
+		return undefined;
+	}
 
 	return meta;
 }
@@ -290,12 +300,18 @@ const USER_LOCATION_KEY = "waniwani/userLocation";
  */
 function injectUserLocation(result: unknown, extra: unknown): void {
 	const requestMeta = extractMeta(extra);
-	if (!requestMeta) return;
+	if (!requestMeta) {
+		return;
+	}
 
 	const userLocation = requestMeta[USER_LOCATION_KEY];
-	if (!userLocation) return;
+	if (!userLocation) {
+		return;
+	}
 
-	if (!isRecord(result)) return;
+	if (!isRecord(result)) {
+		return;
+	}
 
 	if (!isRecord(result._meta)) {
 		(result as UnknownRecord)._meta = {};
