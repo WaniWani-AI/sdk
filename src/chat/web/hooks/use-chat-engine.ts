@@ -23,7 +23,6 @@ function normalizeSessionId(value: unknown): string | undefined {
 	return trimmed.length > 0 ? trimmed : undefined;
 }
 
-
 function writeSessionIdToStorage(sessionId: string): void {
 	if (typeof window === "undefined") {
 		return;
