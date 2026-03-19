@@ -22,6 +22,7 @@ import {
 	PromptInputTextarea,
 } from "../ai-elements/prompt-input";
 import { ChatQueue } from "../components/chat-queue";
+import { ExportSessionButton } from "../components/export-session";
 import { MessageList } from "../components/message-list";
 import { Suggestions } from "../components/suggestions";
 import { useCallTool } from "../hooks/use-call-tool";
@@ -45,6 +46,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			triggerEvent = "triggerDemoRequest",
 			resourceEndpoint,
 			api,
+			debug,
 		} = props;
 
 		const expandedWidth =
@@ -220,6 +222,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 						<div className="ww:text-sm ww:font-semibold ww:truncate">
 							{title}
 						</div>
+						{debug && <ExportSessionButton messages={engine.messages} />}
 					</div>
 
 					{/* Messages */}
