@@ -16,13 +16,17 @@ Search the knowledge base for relevant chunks.
 
 ```typescript
 const results = await client.kb.search("How does pricing work?", { topK: 3, minScore: 0.3 });
-// Returns: SearchResult[] — { source, heading, content, score }
+// Returns: SearchResult[] — { source, heading, content, score, metadata? }
+
+// Filter by metadata (exact match on all provided key-value pairs)
+const results = await client.kb.search("pricing", { metadata: { category: "pricing" } });
 ```
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `topK` | `number` | `5` | Number of results (1-20) |
 | `minScore` | `number` | `0.3` | Minimum similarity score (0-1) |
+| `metadata` | `Record<string, string>` | — | Filter by exact metadata key-value match |
 
 ## `client.kb.ingest(files)`
 
@@ -31,12 +35,12 @@ Ingest markdown files into the knowledge base. **Destructive** — deletes all e
 ```typescript
 const result = await client.kb.ingest([
   { filename: "faq.md", content: "# FAQ\n\n## Pricing\n..." },
-  { filename: "guide.md", content: "# Guide\n\n## Setup\n..." },
+  { filename: "guide.md", content: "# Guide\n\n## Setup\n...", metadata: { category: "guides" } },
 ]);
 // Returns: { chunksIngested: number, filesProcessed: number }
 ```
 
-Files are chunked by H2 headings server-side. Max 100 files, 500KB each.
+Files are chunked by H2 headings server-side. Max 100 files, 500KB each. Optional `metadata` (key-value pairs) is attached to all chunks from that file.
 
 ## `client.kb.sources()`
 
@@ -116,11 +120,13 @@ interface SearchResult {
   heading: string;
   content: string;
   score: number;
+  metadata?: Record<string, string>;
 }
 
 interface KbIngestFile {
   filename: string;
   content: string;
+  metadata?: Record<string, string>;
 }
 
 interface KbIngestResult {
@@ -131,6 +137,7 @@ interface KbIngestResult {
 interface KbSearchOptions {
   topK?: number;
   minScore?: number;
+  metadata?: Record<string, string>;
 }
 
 interface KbSource {

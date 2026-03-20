@@ -3,6 +3,7 @@ export interface SearchResult {
 	heading: string;
 	content: string;
 	score: number;
+	metadata?: Record<string, string>;
 }
 
 /** A file to ingest into the knowledge base */
@@ -11,6 +12,8 @@ export interface KbIngestFile {
 	filename: string;
 	/** Markdown content of the file */
 	content: string;
+	/** Arbitrary key-value metadata attached to all chunks from this file */
+	metadata?: Record<string, string>;
 }
 
 /** Response from the ingest endpoint */
@@ -27,6 +30,8 @@ export interface KbSearchOptions {
 	topK?: number;
 	/** Minimum similarity score threshold (0-1, default 0.3) */
 	minScore?: number;
+	/** Filter results to chunks whose metadata contains all these key-value pairs (exact match) */
+	metadata?: Record<string, string>;
 }
 
 /** A source entry in the knowledge base */
