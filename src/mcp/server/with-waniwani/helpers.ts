@@ -3,6 +3,7 @@ import type {
 	TrackInput,
 } from "../../../tracking/index.js";
 import type { WaniWaniClient } from "../../../types.js";
+import { extractSessionId } from "../utils.js";
 import type { WidgetTokenCache } from "../widget-token.js";
 
 type UnknownRecord = Record<string, unknown>;
@@ -12,7 +13,9 @@ export type WaniwaniTracker = Pick<
 	"flush" | "track" | "_config"
 >;
 
-const USER_LOCATION_KEY = "waniwani/userLocation";
+const SESSION_ID_KEY = "waniwani/sessionId";
+const GEO_LOCATION_KEY = "waniwani/geoLocation";
+const LEGACY_USER_LOCATION_KEY = "waniwani/userLocation";
 
 export function isRecord(value: unknown): value is UnknownRecord {
 	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -123,8 +126,14 @@ export async function injectWidgetConfig(
 	}
 
 	const meta = (result as UnknownRecord)._meta as UnknownRecord;
+	const existingWaniwaniConfig = isRecord(meta.waniwani)
+		? (meta.waniwani as UnknownRecord)
+		: undefined;
 	const waniwaniConfig: UnknownRecord = {
-		endpoint: `${baseUrl.replace(/\/$/, "")}/api/mcp/events/v2/batch`,
+		...(existingWaniwaniConfig ?? {}),
+		endpoint:
+			existingWaniwaniConfig?.endpoint ??
+			`${baseUrl.replace(/\/$/, "")}/api/mcp/events/v2/batch`,
 	};
 
 	if (cache) {
@@ -138,17 +147,26 @@ export async function injectWidgetConfig(
 		}
 	}
 
+	const sessionId = extractSessionId(meta);
+	if (sessionId) {
+		if (!waniwaniConfig.sessionId) {
+			waniwaniConfig.sessionId = sessionId;
+		}
+	}
+
+	const geoLocation = extractGeoLocation(meta);
+	if (geoLocation !== undefined) {
+		if (!waniwaniConfig.geoLocation) {
+			waniwaniConfig.geoLocation = geoLocation;
+		}
+	}
+
 	meta.waniwani = waniwaniConfig;
 }
 
-export function injectUserLocation(result: unknown, extra: unknown): void {
+export function injectRequestMetadata(result: unknown, extra: unknown): void {
 	const requestMeta = extractMeta(extra);
 	if (!requestMeta) {
-		return;
-	}
-
-	const userLocation = requestMeta[USER_LOCATION_KEY];
-	if (!userLocation) {
 		return;
 	}
 
@@ -161,10 +179,38 @@ export function injectUserLocation(result: unknown, extra: unknown): void {
 	}
 
 	const resultMeta = (result as UnknownRecord)._meta as UnknownRecord;
-
-	if (!resultMeta[USER_LOCATION_KEY]) {
-		resultMeta[USER_LOCATION_KEY] = userLocation;
+	const sessionId = extractSessionId(requestMeta);
+	if (sessionId && !resultMeta[SESSION_ID_KEY]) {
+		resultMeta[SESSION_ID_KEY] = sessionId;
 	}
+
+	const geoLocation = extractGeoLocation(requestMeta);
+	if (!geoLocation) {
+		return;
+	}
+
+	if (!resultMeta[GEO_LOCATION_KEY]) {
+		resultMeta[GEO_LOCATION_KEY] = geoLocation;
+	}
+
+	if (!resultMeta[LEGACY_USER_LOCATION_KEY]) {
+		resultMeta[LEGACY_USER_LOCATION_KEY] = geoLocation;
+	}
+}
+
+function extractGeoLocation(
+	meta: UnknownRecord | undefined,
+): UnknownRecord | string | undefined {
+	if (!meta) {
+		return undefined;
+	}
+
+	const geoLocation = meta[GEO_LOCATION_KEY] ?? meta[LEGACY_USER_LOCATION_KEY];
+	if (isRecord(geoLocation) || typeof geoLocation === "string") {
+		return geoLocation;
+	}
+
+	return undefined;
 }
 
 function toError(error: unknown): Error {
