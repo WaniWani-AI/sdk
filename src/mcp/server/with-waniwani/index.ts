@@ -6,7 +6,7 @@ import {
 	buildTrackInput,
 	extractErrorText,
 	extractMeta,
-	injectUserLocation,
+	injectRequestMetadata,
 	injectWidgetConfig,
 	isRecord,
 	safeFlush,
@@ -173,6 +173,8 @@ export function withWaniwani(
 						await safeFlush(tracker, options.onError);
 					}
 
+					injectRequestMetadata(result, extra);
+
 					if (injectToken) {
 						await injectWidgetConfig(
 							result,
@@ -181,8 +183,6 @@ export function withWaniwani(
 							options.onError,
 						);
 					}
-
-					injectUserLocation(result, extra);
 
 					return result;
 				} catch (error) {

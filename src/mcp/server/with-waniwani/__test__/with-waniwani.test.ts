@@ -192,4 +192,83 @@ describe("withWaniwani", () => {
 		);
 		expect(waniwani.token).toBe(undefined);
 	});
+
+	test("injects session and geo metadata into the first widget result", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.(
+			{},
+			{
+				_meta: {
+					"waniwani/sessionId": "session-1",
+					"waniwani/geoLocation": {
+						country: "SK",
+						city: "Bratislava",
+					},
+				},
+			},
+		)) as Record<string, unknown>;
+		const meta = result._meta as Record<string, unknown>;
+		const waniwani = meta.waniwani as Record<string, unknown>;
+
+		expect(waniwani.sessionId).toBe("session-1");
+		expect(waniwani.geoLocation).toEqual({
+			country: "SK",
+			city: "Bratislava",
+		});
+		expect(meta["waniwani/sessionId"]).toBe("session-1");
+		expect(meta["waniwani/geoLocation"]).toEqual({
+			country: "SK",
+			city: "Bratislava",
+		});
+		expect(meta["waniwani/userLocation"]).toEqual({
+			country: "SK",
+			city: "Bratislava",
+		});
+	});
+
+	test("injects request metadata even when widget token injection is disabled", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, {
+			client,
+			injectWidgetToken: false,
+		});
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.(
+			{},
+			{
+				_meta: {
+					"waniwani/sessionId": "session-1",
+					"waniwani/geoLocation": {
+						country: "SK",
+					},
+				},
+			},
+		)) as Record<string, unknown>;
+		const meta = result._meta as Record<string, unknown>;
+
+		expect(meta["waniwani/sessionId"]).toBe("session-1");
+		expect(meta["waniwani/geoLocation"]).toEqual({
+			country: "SK",
+		});
+		expect(meta["waniwani/userLocation"]).toEqual({
+			country: "SK",
+		});
+		expect(meta.waniwani).toBe(undefined);
+	});
 });
