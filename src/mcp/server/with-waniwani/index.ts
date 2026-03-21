@@ -168,6 +168,7 @@ export function withWaniwani(
 							}),
 						},
 						clientInfo,
+						{ input, output: result },
 					),
 					options.onError,
 				);
@@ -204,6 +205,7 @@ export function withWaniwani(
 								error instanceof Error ? error.message : String(error),
 						},
 						clientInfo,
+						{ input },
 					),
 					options.onError,
 				);

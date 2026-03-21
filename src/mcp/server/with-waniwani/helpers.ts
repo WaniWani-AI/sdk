@@ -68,6 +68,7 @@ export function buildTrackInput(
 	},
 	timing?: { durationMs: number; status: string; errorMessage?: string },
 	clientInfo?: { name: string; version: string },
+	io?: { input?: unknown; output?: unknown },
 ): TrackInput {
 	const toolType = resolveToolType(toolName, options.toolType);
 	const meta = extractMeta(extra);
@@ -78,6 +79,8 @@ export function buildTrackInput(
 			name: toolName,
 			type: toolType,
 			...(timing ?? {}),
+			...(io?.input !== undefined && { input: io.input }),
+			...(io?.output !== undefined && { output: io.output }),
 		},
 		meta,
 		metadata: {

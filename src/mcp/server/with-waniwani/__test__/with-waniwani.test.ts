@@ -97,6 +97,8 @@ describe("withWaniwani", () => {
 				name: "pricing",
 				type: "other",
 				status: "ok",
+				input: {},
+				output: { text: "done" },
 			},
 		});
 		const props = (tracked[0] as { properties: Record<string, unknown> })
