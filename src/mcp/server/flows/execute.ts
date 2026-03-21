@@ -1,3 +1,4 @@
+import type { ScopedWaniWaniClient } from "../scoped-client";
 import type {
 	Edge,
 	ExecutionResult,
@@ -6,7 +7,6 @@ import type {
 	NodeHandler,
 } from "./@types";
 import { END, interrupt, isInterrupt, isWidget, showWidget } from "./@types";
-import type { ScopedWaniWaniClient } from "../scoped-client";
 
 // ============================================================================
 // Helpers

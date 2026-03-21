@@ -63,7 +63,7 @@ export function buildFlowProtocol(config: FlowConfig): string {
 		'       `action: "continue"`,',
 		"       `stateUpdates` = `{ [field]: <user's selection> }` plus any other fields the user mentioned.",
 		"     • `interactive: false` — The widget is display-only. Call the display tool, then immediately",
-		"       call THIS flow tool again with `action: \"continue\"`. Do NOT wait for user interaction.",
+		'       call THIS flow tool again with `action: "continue"`. Do NOT wait for user interaction.',
 		'   - `"complete"`: The flow is done. Present the result to the user.',
 		'   - `"error"`: Something went wrong. Show the `error` message.',
 		"",

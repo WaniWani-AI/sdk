@@ -47,19 +47,35 @@ export function InitializeNextJsInChatGpt({ baseUrl }: { baseUrl: string }) {
 						});
 
 						const originalReplaceState = history.replaceState.bind(history);
-						history.replaceState = (_s: unknown, unused: string, url?: string | URL | null) => {
+						history.replaceState = (
+							_s: unknown,
+							unused: string,
+							url?: string | URL | null,
+						) => {
 							try {
 								const u = new URL(String(url ?? ""), window.location.href);
-								originalReplaceState(null, unused, u.pathname + u.search + u.hash);
-							} catch { /* SecurityError in sandboxed iframe */ }
+								originalReplaceState(
+									null,
+									unused,
+									u.pathname + u.search + u.hash,
+								);
+							} catch {
+								/* SecurityError in sandboxed iframe */
+							}
 						};
 
 						const originalPushState = history.pushState.bind(history);
-						history.pushState = (_s: unknown, unused: string, url?: string | URL | null) => {
+						history.pushState = (
+							_s: unknown,
+							unused: string,
+							url?: string | URL | null,
+						) => {
 							try {
 								const u = new URL(String(url ?? ""), window.location.href);
 								originalPushState(null, unused, u.pathname + u.search + u.hash);
-							} catch { /* SecurityError in sandboxed iframe */ }
+							} catch {
+								/* SecurityError in sandboxed iframe */
+							}
 						};
 
 						const appOrigin = new URL(baseUrl).origin;
