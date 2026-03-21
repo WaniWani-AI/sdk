@@ -11,8 +11,25 @@ function mockClient() {
 				tracked.push(event);
 				return { eventId: `evt_mock_${tracked.length}` };
 			},
+			identify: async (
+				_userId: string,
+				_properties?: Record<string, unknown>,
+				_meta?: Record<string, unknown>,
+			) => {
+				return { eventId: "evt_mock_identify" };
+			},
 			flush: async () => {
 				flushed += 1;
+			},
+			kb: {
+				ingest: async () => ({
+					ingested: 0,
+					errors: [],
+					chunksIngested: 0,
+					filesProcessed: 0,
+				}),
+				search: async () => [],
+				sources: async () => [],
 			},
 			_config: {
 				baseUrl: "https://test.waniwani.ai",

@@ -7,6 +7,7 @@ import type {
 	ZodRawShapeCompat,
 } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import type { RegisteredResource } from "../resources/types";
+import type { ScopedWaniWaniClient } from "../scoped-client";
 
 export type { McpServer, ZodRawShapeCompat };
 
@@ -15,6 +16,8 @@ export type ToolHandlerContext = {
 	extra?: {
 		_meta?: Record<string, unknown>;
 	};
+	/** Session-scoped WaniWani client — available when the server is wrapped with withWaniwani() */
+	waniwani?: ScopedWaniWaniClient;
 };
 
 export type ToolConfig<TInput extends ZodRawShapeCompat> = {

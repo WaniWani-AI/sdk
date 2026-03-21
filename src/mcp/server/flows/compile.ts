@@ -5,6 +5,8 @@ import type {
 	ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import type { ScopedWaniWaniClient } from "../scoped-client";
+import { extractScopedClient } from "../scoped-client";
 import { extractSessionId } from "../utils";
 import type {
 	CompileInput,
@@ -57,6 +59,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		args: FlowToolInput,
 		sessionId: string | undefined,
 		meta?: Record<string, unknown>,
+		waniwani?: ScopedWaniWaniClient,
 	) {
 		if (args.action === "start") {
 			const startEdge = edges.get(START);
@@ -68,7 +71,15 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 			const startState = { ...(args.stateUpdates ?? {}) } as TState;
 			const firstNode = await resolveNextNode(startEdge, startState);
-			return executeFrom(firstNode, startState, nodes, edges, validators, meta);
+			return executeFrom(
+				firstNode,
+				startState,
+				nodes,
+				edges,
+				validators,
+				meta,
+				waniwani,
+			);
 		}
 
 		if (args.action === "continue") {
@@ -128,13 +139,22 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					edges,
 					validators,
 					meta,
+					waniwani,
 				);
 			}
 
 			// Interrupt continue: re-execute from current step.
 			// The handler re-runs, filters answered questions, and runs
 			// validators if all questions are filled.
-			return executeFrom(step, updatedState, nodes, edges, validators, meta);
+			return executeFrom(
+				step,
+				updatedState,
+				nodes,
+				edges,
+				validators,
+				meta,
+				waniwani,
+			);
 		}
 
 		return {
@@ -166,8 +186,9 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					>;
 					const _meta: Record<string, unknown> = requestExtra._meta ?? {};
 					const sessionId = extractSessionId(_meta);
+					const waniwani = extractScopedClient(requestExtra);
 
-					const result = await handleToolCall(args, sessionId, _meta);
+					const result = await handleToolCall(args, sessionId, _meta, waniwani);
 
 					// Persist flow state under session ID
 					if (result.flowTokenContent && sessionId) {

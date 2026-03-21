@@ -38,6 +38,8 @@ export type {
 } from "./server/resources";
 // Resources
 export { createResource } from "./server/resources";
+// Scoped client
+export type { ScopedWaniWaniClient } from "./server/scoped-client";
 // Tool creation
 export { createTool, registerTools } from "./server/tools/create-tool";
 // Types

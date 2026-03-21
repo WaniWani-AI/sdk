@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { McpServer } from "../resources/types";
+import type { ScopedWaniWaniClient } from "../scoped-client";
 import type { RegisteredTool } from "../tools/types";
 import type { FlowStore } from "./flow-store";
 
@@ -223,6 +224,8 @@ export type NodeContext<TState> = {
 	interrupt: TypedInterrupt<TState>;
 	/** Create a widget signal — pause and show a UI widget */
 	showWidget: TypedShowWidget<TState>;
+	/** Session-scoped WaniWani client — available when the server is wrapped with withWaniwani() */
+	waniwani?: ScopedWaniWaniClient;
 };
 
 /**

@@ -7,6 +7,7 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
 import { buildToolMeta } from "../resources/meta";
+import { extractScopedClient } from "../scoped-client";
 import type {
 	McpServer,
 	RegisteredTool,
@@ -101,8 +102,9 @@ export function createTool<TInput extends z.ZodRawShape>(
 						ServerNotification
 					>;
 					const _meta: Record<string, unknown> = requestExtra._meta ?? {};
+					const waniwani = extractScopedClient(requestExtra);
 
-					const result = await handler(args, { extra: { _meta } });
+					const result = await handler(args, { extra: { _meta }, waniwani });
 
 					// Widget tool: return structuredContent + widget metadata
 					if (resource && result.data) {

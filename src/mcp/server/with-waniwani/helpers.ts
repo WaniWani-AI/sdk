@@ -10,7 +10,7 @@ type UnknownRecord = Record<string, unknown>;
 
 export type WaniwaniTracker = Pick<
 	WaniWaniClient,
-	"flush" | "track" | "_config"
+	"flush" | "track" | "identify" | "kb" | "_config"
 >;
 
 const SESSION_ID_KEY = "waniwani/sessionId";

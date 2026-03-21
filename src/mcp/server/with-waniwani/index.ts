@@ -1,5 +1,5 @@
-import { requestContext } from "../../../context.js";
 import type { ToolCalledProperties } from "../../../tracking/index.js";
+import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../tools/types";
 import { WidgetTokenCache } from "../widget-token.js";
 import {
@@ -123,95 +123,97 @@ export function withWaniwani(
 		) => Promise<unknown> | unknown;
 
 		const wrappedHandler = async (input: unknown, extra: unknown) => {
+			// Inject scoped client into extra so createTool/flows can surface it
 			const meta = extractMeta(extra) ?? {};
+			const scopedClient = createScopedClient(tracker, meta);
+			if (isRecord(extra)) {
+				(extra as UnknownRecord)[SCOPED_CLIENT_KEY] = scopedClient;
+			}
 
-			return requestContext.run({ meta }, async () => {
-				const startTime = performance.now();
-				const clientInfo = (
-					server as {
-						server?: {
-							getClientVersion?: () =>
-								| { name: string; version: string }
-								| undefined;
-						};
-					}
-				).server?.getClientVersion?.();
-				try {
-					const result = await handler(input, extra);
-					const durationMs = Math.round(performance.now() - startTime);
-
-					const isErrorResult =
-						isRecord(result) && (result as UnknownRecord).isError === true;
-
-					if (isErrorResult) {
-						const errorText = extractErrorText(result);
-						console.error(
-							`[waniwani] Tool "${toolName}" returned error${errorText ? `: ${errorText}` : ""}`,
-						);
-					}
-
-					await safeTrack(
-						tracker,
-						buildTrackInput(
-							toolName,
-							extra,
-							options,
-							{
-								durationMs,
-								status: isErrorResult ? "error" : "ok",
-								...(isErrorResult && {
-									errorMessage:
-										extractErrorText(result) ?? "Unknown tool error",
-								}),
-							},
-							clientInfo,
-						),
-						options.onError,
-					);
-
-					if (options.flushAfterToolCall) {
-						await safeFlush(tracker, options.onError);
-					}
-
-					injectRequestMetadata(result, extra);
-
-					if (injectToken) {
-						await injectWidgetConfig(
-							result,
-							getTokenCache(),
-							tracker._config.baseUrl ?? DEFAULT_BASE_URL,
-							options.onError,
-						);
-					}
-
-					return result;
-				} catch (error) {
-					const durationMs = Math.round(performance.now() - startTime);
-
-					await safeTrack(
-						tracker,
-						buildTrackInput(
-							toolName,
-							extra,
-							options,
-							{
-								durationMs,
-								status: "error",
-								errorMessage:
-									error instanceof Error ? error.message : String(error),
-							},
-							clientInfo,
-						),
-						options.onError,
-					);
-
-					if (options.flushAfterToolCall) {
-						await safeFlush(tracker, options.onError);
-					}
-
-					throw error;
+			const startTime = performance.now();
+			const clientInfo = (
+				server as {
+					server?: {
+						getClientVersion?: () =>
+							| { name: string; version: string }
+							| undefined;
+					};
 				}
-			});
+			).server?.getClientVersion?.();
+			try {
+				const result = await handler(input, extra);
+				const durationMs = Math.round(performance.now() - startTime);
+
+				const isErrorResult =
+					isRecord(result) && (result as UnknownRecord).isError === true;
+
+				if (isErrorResult) {
+					const errorText = extractErrorText(result);
+					console.error(
+						`[waniwani] Tool "${toolName}" returned error${errorText ? `: ${errorText}` : ""}`,
+					);
+				}
+
+				await safeTrack(
+					tracker,
+					buildTrackInput(
+						toolName,
+						extra,
+						options,
+						{
+							durationMs,
+							status: isErrorResult ? "error" : "ok",
+							...(isErrorResult && {
+								errorMessage: extractErrorText(result) ?? "Unknown tool error",
+							}),
+						},
+						clientInfo,
+					),
+					options.onError,
+				);
+
+				if (options.flushAfterToolCall) {
+					await safeFlush(tracker, options.onError);
+				}
+
+				injectRequestMetadata(result, extra);
+
+				if (injectToken) {
+					await injectWidgetConfig(
+						result,
+						getTokenCache(),
+						tracker._config.baseUrl ?? DEFAULT_BASE_URL,
+						options.onError,
+					);
+				}
+
+				return result;
+			} catch (error) {
+				const durationMs = Math.round(performance.now() - startTime);
+
+				await safeTrack(
+					tracker,
+					buildTrackInput(
+						toolName,
+						extra,
+						options,
+						{
+							durationMs,
+							status: "error",
+							errorMessage:
+								error instanceof Error ? error.message : String(error),
+						},
+						clientInfo,
+					),
+					options.onError,
+				);
+
+				if (options.flushAfterToolCall) {
+					await safeFlush(tracker, options.onError);
+				}
+
+				throw error;
+			}
 		};
 
 		return originalRegisterTool(toolNameRaw, config, wrappedHandler);

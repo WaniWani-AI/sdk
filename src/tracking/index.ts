@@ -1,6 +1,5 @@
 // Tracking Module
 
-import { getRequestMeta } from "../context.js";
 import type { InternalConfig } from "../types.js";
 import type {
 	TrackInput,
@@ -67,20 +66,18 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 			meta?: Record<string, unknown>,
 		): Promise<{ eventId: string }> {
 			requireApiKey();
-			const mergedMeta = mergeRequestMeta(meta);
 			const mappedEvent = mapTrackEventToV2({
 				event: "user.identified",
 				externalUserId: userId,
 				properties,
-				meta: mergedMeta,
+				meta,
 			});
 			transport?.enqueue(mappedEvent);
 			return { eventId: mappedEvent.id };
 		},
 		async track(event: TrackInput): Promise<{ eventId: string }> {
 			requireApiKey();
-			const mergedMeta = mergeRequestMeta(event.meta);
-			const mappedEvent = mapTrackEventToV2({ ...event, meta: mergedMeta });
+			const mappedEvent = mapTrackEventToV2(event);
 			transport?.enqueue(mappedEvent);
 			return { eventId: mappedEvent.id };
 		},
@@ -102,26 +99,6 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 		attachShutdownHooks(client, tracking.shutdownTimeoutMs);
 	}
 	return client;
-}
-
-/**
- * Merge explicit meta with the implicit request context meta.
- * Explicit meta keys take precedence over context meta.
- */
-function mergeRequestMeta(
-	explicit?: Record<string, unknown>,
-): Record<string, unknown> | undefined {
-	const contextMeta = getRequestMeta();
-	if (!contextMeta && !explicit) {
-		return undefined;
-	}
-	if (!contextMeta) {
-		return explicit;
-	}
-	if (!explicit) {
-		return contextMeta;
-	}
-	return { ...contextMeta, ...explicit };
 }
 
 function attachShutdownHooks(

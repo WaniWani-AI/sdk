@@ -28,10 +28,11 @@ export function InitializeNextJsInChatGpt({ baseUrl }: { baseUrl: string }) {
 									mutation.target === htmlElement
 								) {
 									const attrName = mutation.attributeName;
-									// Preserve class/style so consumers can use html.dark { ... } for theming
+									// Preserve class/style for theming (html.dark) and lang for i18n
 									if (
 										attrName &&
 										attrName !== "suppresshydrationwarning" &&
+										attrName !== "lang" &&
 										attrName !== "class" &&
 										attrName !== "style"
 									) {
@@ -45,18 +46,20 @@ export function InitializeNextJsInChatGpt({ baseUrl }: { baseUrl: string }) {
 							attributeOldValue: true,
 						});
 
-						const originalReplaceState = history.replaceState;
-						history.replaceState = (_s, unused, url) => {
-							const u = new URL(url ?? "", window.location.href);
-							const href = u.pathname + u.search + u.hash;
-							originalReplaceState.call(history, unused, href);
+						const originalReplaceState = history.replaceState.bind(history);
+						history.replaceState = (_s: unknown, unused: string, url?: string | URL | null) => {
+							try {
+								const u = new URL(String(url ?? ""), window.location.href);
+								originalReplaceState(null, unused, u.pathname + u.search + u.hash);
+							} catch { /* SecurityError in sandboxed iframe */ }
 						};
 
-						const originalPushState = history.pushState;
-						history.pushState = (_s, unused, url) => {
-							const u = new URL(url ?? "", window.location.href);
-							const href = u.pathname + u.search + u.hash;
-							originalPushState.call(history, unused, href);
+						const originalPushState = history.pushState.bind(history);
+						history.pushState = (_s: unknown, unused: string, url?: string | URL | null) => {
+							try {
+								const u = new URL(String(url ?? ""), window.location.href);
+								originalPushState(null, unused, u.pathname + u.search + u.hash);
+							} catch { /* SecurityError in sandboxed iframe */ }
 						};
 
 						const appOrigin = new URL(baseUrl).origin;

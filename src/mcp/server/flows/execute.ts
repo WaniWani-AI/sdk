@@ -6,6 +6,7 @@ import type {
 	NodeHandler,
 } from "./@types";
 import { END, interrupt, isInterrupt, isWidget, showWidget } from "./@types";
+import type { ScopedWaniWaniClient } from "../scoped-client";
 
 // ============================================================================
 // Helpers
@@ -101,6 +102,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 	edges: Map<string, Edge<TState>>,
 	validators: Map<string, ValidateFn>,
 	meta?: Record<string, unknown>,
+	waniwani?: ScopedWaniWaniClient,
 ): Promise<ExecutionResult> {
 	let currentNode = startNodeName;
 	let state = { ...startState };
@@ -139,6 +141,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				showWidget: showWidget as NodeHandler<TState> extends never
 					? never
 					: typeof showWidget,
+				waniwani,
 			};
 			const result = await handler(ctx as Parameters<typeof handler>[0]);
 
@@ -238,7 +241,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 						tool: result.tool.id,
 						data: result.data,
 						description: result.description,
-						...(result.interactive === false ? { interactive: false } : {}),
+						interactive: result.interactive !== false,
 					},
 					flowTokenContent: {
 						step: currentNode,
