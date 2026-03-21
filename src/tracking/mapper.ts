@@ -146,8 +146,7 @@ function resolveCorrelationIds(
 	const sessionId =
 		takeNonEmptyString(input.sessionId) ?? extractSessionId(meta);
 
-	const traceId =
-		takeNonEmptyString(input.traceId) ?? extractTraceId(meta);
+	const traceId = takeNonEmptyString(input.traceId) ?? extractTraceId(meta);
 
 	const externalUserId =
 		takeNonEmptyString(input.externalUserId) ?? extractExternalUserId(meta);
@@ -191,7 +190,6 @@ function normalizeTimestamp(
 	}
 	return now().toISOString();
 }
-
 
 function toRecord(value: unknown): Record<string, unknown> {
 	if (!value || typeof value !== "object" || Array.isArray(value)) {
