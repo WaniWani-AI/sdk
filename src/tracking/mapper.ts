@@ -1,3 +1,10 @@
+import {
+	extractCorrelationId,
+	extractExternalUserId,
+	extractRequestId,
+	extractSessionId,
+	extractTraceId,
+} from "../mcp/server/utils.js";
 import type { EventType, LegacyTrackEvent, TrackInput } from "./@types.js";
 import type { V2CorrelationIds, V2EventEnvelope } from "./v2-types.js";
 
@@ -134,40 +141,20 @@ function resolveCorrelationIds(
 	meta: Record<string, unknown>,
 ): V2CorrelationIds {
 	const requestId =
-		takeNonEmptyString(input.requestId) ??
-		pickFirstString(meta, ["openai/requestId", "requestId", "mcp/requestId"]);
+		takeNonEmptyString(input.requestId) ?? extractRequestId(meta);
 
 	const sessionId =
-		takeNonEmptyString(input.sessionId) ??
-		pickFirstString(meta, [
-			"openai/sessionId",
-			"sessionId",
-			"conversationId",
-			"anthropic/sessionId",
-		]);
+		takeNonEmptyString(input.sessionId) ?? extractSessionId(meta);
 
 	const traceId =
-		takeNonEmptyString(input.traceId) ??
-		pickFirstString(meta, [
-			"openai/traceId",
-			"traceId",
-			"mcp/traceId",
-			"openai/requestId",
-			"requestId",
-		]);
+		takeNonEmptyString(input.traceId) ?? extractTraceId(meta);
 
 	const externalUserId =
-		takeNonEmptyString(input.externalUserId) ??
-		pickFirstString(meta, [
-			"openai/userId",
-			"externalUserId",
-			"userId",
-			"actorId",
-		]);
+		takeNonEmptyString(input.externalUserId) ?? extractExternalUserId(meta);
 
 	const correlationId =
 		takeNonEmptyString(input.correlationId) ??
-		pickFirstString(meta, ["correlationId", "openai/requestId"]) ??
+		extractCorrelationId(meta) ??
 		requestId;
 
 	const correlation: V2CorrelationIds = {};
@@ -205,18 +192,6 @@ function normalizeTimestamp(
 	return now().toISOString();
 }
 
-function pickFirstString(
-	record: Record<string, unknown>,
-	keys: readonly string[],
-): string | undefined {
-	for (const key of keys) {
-		const value = record[key];
-		if (typeof value === "string" && value.trim().length > 0) {
-			return value;
-		}
-	}
-	return undefined;
-}
 
 function toRecord(value: unknown): Record<string, unknown> {
 	if (!value || typeof value !== "object" || Array.isArray(value)) {

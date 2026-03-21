@@ -1,3 +1,23 @@
+// ============================================================================
+// Meta key extraction helpers
+// ============================================================================
+
+/** Pick the first non-empty string value from `meta` matching the given keys. */
+function pickFirst(
+	meta: Record<string, unknown>,
+	keys: readonly string[],
+): string | undefined {
+	for (const key of keys) {
+		const value = meta[key];
+		if (typeof value === "string" && value.length > 0) {
+			return value;
+		}
+	}
+	return undefined;
+}
+
+// --- Key lists (ordered by priority) ---
+
 const SESSION_ID_KEYS = [
 	"waniwani/sessionId",
 	"openai/sessionId",
@@ -6,23 +26,60 @@ const SESSION_ID_KEYS = [
 	"anthropic/sessionId",
 ] as const;
 
-/**
- * Extracts the session ID from the _meta field of the MCP request.
- *
- * @param meta - The _meta field of the MCP request.
- * @returns The session ID, or undefined if not found.
- */
+const REQUEST_ID_KEYS = [
+	"waniwani/requestId",
+	"openai/requestId",
+	"requestId",
+	"mcp/requestId",
+] as const;
+
+const TRACE_ID_KEYS = [
+	"waniwani/traceId",
+	"openai/traceId",
+	"traceId",
+	"mcp/traceId",
+	"openai/requestId",
+	"requestId",
+] as const;
+
+const EXTERNAL_USER_ID_KEYS = [
+	"waniwani/userId",
+	"openai/userId",
+	"externalUserId",
+	"userId",
+	"actorId",
+] as const;
+
+const CORRELATION_ID_KEYS = ["correlationId", "openai/requestId"] as const;
+
+// --- Extractors ---
+
 export function extractSessionId(
 	meta: Record<string, unknown> | undefined,
 ): string | undefined {
-	if (!meta) {
-		return undefined;
-	}
-	for (const key of SESSION_ID_KEYS) {
-		const value = meta[key];
-		if (typeof value === "string" && value.length > 0) {
-			return value;
-		}
-	}
-	return undefined;
+	return meta ? pickFirst(meta, SESSION_ID_KEYS) : undefined;
+}
+
+export function extractRequestId(
+	meta: Record<string, unknown> | undefined,
+): string | undefined {
+	return meta ? pickFirst(meta, REQUEST_ID_KEYS) : undefined;
+}
+
+export function extractTraceId(
+	meta: Record<string, unknown> | undefined,
+): string | undefined {
+	return meta ? pickFirst(meta, TRACE_ID_KEYS) : undefined;
+}
+
+export function extractExternalUserId(
+	meta: Record<string, unknown> | undefined,
+): string | undefined {
+	return meta ? pickFirst(meta, EXTERNAL_USER_ID_KEYS) : undefined;
+}
+
+export function extractCorrelationId(
+	meta: Record<string, unknown> | undefined,
+): string | undefined {
+	return meta ? pickFirst(meta, CORRELATION_ID_KEYS) : undefined;
 }

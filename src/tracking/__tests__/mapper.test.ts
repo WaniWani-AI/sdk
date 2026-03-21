@@ -46,6 +46,31 @@ describe("mapTrackEventToV2", () => {
 		});
 	});
 
+	test("extracts sessionId from waniwani/sessionId in meta", () => {
+		const mapped = mapTrackEventToV2({
+			event: "user.identified",
+			meta: {
+				"waniwani/sessionId": "c9c1540c-6eee-4303-9f64-b184b592fd1b",
+			},
+		});
+
+		expect(mapped.correlation.sessionId).toBe(
+			"c9c1540c-6eee-4303-9f64-b184b592fd1b",
+		);
+	});
+
+	test("waniwani/sessionId takes precedence over openai/sessionId", () => {
+		const mapped = mapTrackEventToV2({
+			event: "tool.called",
+			meta: {
+				"waniwani/sessionId": "waniwani-session",
+				"openai/sessionId": "openai-session",
+			},
+		});
+
+		expect(mapped.correlation.sessionId).toBe("waniwani-session");
+	});
+
 	test("uses metadata fallback precedence for session and trace ids", () => {
 		const mapped = mapTrackEventToV2({
 			event: "quote.requested",
