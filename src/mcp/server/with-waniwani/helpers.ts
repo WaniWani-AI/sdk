@@ -3,7 +3,7 @@ import type {
 	TrackInput,
 } from "../../../tracking/index.js";
 import type { WaniWaniClient } from "../../../types.js";
-import { extractSessionId } from "../utils.js";
+import { extractSessionId, extractSource } from "../utils.js";
 import type { WidgetTokenCache } from "../widget-token.js";
 
 type UnknownRecord = Record<string, unknown>;
@@ -83,8 +83,8 @@ export function buildTrackInput(
 			...(io?.output !== undefined && { output: io.output }),
 		},
 		meta,
+		source: extractSource(meta),
 		metadata: {
-			source: "withWaniwani",
 			...(options.metadata ?? {}),
 			...(clientInfo && { clientInfo }),
 		},

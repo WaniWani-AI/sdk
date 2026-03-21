@@ -83,3 +83,24 @@ export function extractCorrelationId(
 ): string | undefined {
 	return meta ? pickFirst(meta, CORRELATION_ID_KEYS) : undefined;
 }
+
+const SOURCE_SESSION_KEYS = [
+	{ key: "waniwani/sessionId", source: "chatbar" },
+	{ key: "openai/sessionId", source: "chatgpt" },
+	{ key: "anthropic/sessionId", source: "claude" },
+] as const;
+
+export function extractSource(
+	meta: Record<string, unknown> | undefined,
+): string {
+	if (!meta) {
+		return "@waniwani/sdk";
+	}
+	for (const { key, source } of SOURCE_SESSION_KEYS) {
+		const value = meta[key];
+		if (typeof value === "string" && value.length > 0) {
+			return source;
+		}
+	}
+	return "@waniwani/sdk";
+}
