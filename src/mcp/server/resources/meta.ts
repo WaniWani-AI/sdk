@@ -103,12 +103,16 @@ export function buildToolMeta(config: {
 		"openai/toolInvocation/invoked": config.invoked,
 		"openai/widgetAccessible": true,
 		"openai/resultCanProduceWidget": true,
-		// MCP Apps metadata
+		// MCP Apps metadata (nested)
 		...(config.mcpTemplateUri && {
 			ui: {
 				resourceUri: config.mcpTemplateUri,
 				...(config.autoHeight && { autoHeight: true }),
 			},
+		}),
+		// MCP Apps backward-compat flat key (for older hosts)
+		...(config.mcpTemplateUri && {
+			"ui/resourceUri": config.mcpTemplateUri,
 		}),
 	};
 }
