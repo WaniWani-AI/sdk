@@ -72,6 +72,7 @@ export function buildTrackInput(
 ): TrackInput {
 	const toolType = resolveToolType(toolName, options.toolType);
 	const meta = extractMeta(extra);
+	console.log("[waniwani:debug] buildTrackInput meta:", JSON.stringify(meta), "-> source:", extractSource(meta));
 
 	return {
 		event: "tool.called",
