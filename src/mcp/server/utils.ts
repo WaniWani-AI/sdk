@@ -92,9 +92,9 @@ const SOURCE_SESSION_KEYS = [
 
 export function extractSource(
 	meta: Record<string, unknown> | undefined,
-): string {
+): string | undefined {
 	if (!meta) {
-		return "@waniwani/sdk";
+		return undefined;
 	}
 	for (const { key, source } of SOURCE_SESSION_KEYS) {
 		const value = meta[key];
@@ -102,5 +102,5 @@ export function extractSource(
 			return source;
 		}
 	}
-	return "@waniwani/sdk";
+	return undefined;
 }
