@@ -14,6 +14,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 	const {
 		apiKey,
 		baseUrl,
+		source,
 		systemPrompt,
 		maxSteps,
 		beforeRequest,
@@ -119,6 +120,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 					messages,
 					mcpServerUrl,
 					sessionId,
+					source,
 					systemPrompt: effectiveSystemPrompt,
 					maxSteps,
 					visitor,

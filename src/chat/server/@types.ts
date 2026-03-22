@@ -58,6 +58,12 @@ export type BeforeRequestResult = {
 
 export interface ApiHandlerOptions {
 	/**
+	 * Identifies this chatbar instance in analytics.
+	 * Forwarded as `waniwani/source` in MCP request metadata.
+	 */
+	source?: string;
+
+	/**
 	 * Your WaniWani API key.
 	 * Defaults to process.env.WANIWANI_API_KEY.
 	 */
@@ -136,6 +142,7 @@ type ConfigResolver = () => Promise<McpEnvironmentConfig>;
 export interface ApiHandlerDeps {
 	apiKey: string | undefined;
 	baseUrl: string;
+	source: string | undefined;
 	systemPrompt: string | undefined;
 	maxSteps: number;
 	beforeRequest: ApiHandlerOptions["beforeRequest"];

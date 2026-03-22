@@ -43,6 +43,7 @@ const sessionId = await client.getOrCreateSession(meta);
 Build: `bun run build`
 Dev: `bun run dev`
 Lint: `bun run lint`
+Pre-commit: Always run `bun biome check . --fix` before committing
 
 ## Skills
 

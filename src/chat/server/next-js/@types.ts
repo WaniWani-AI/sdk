@@ -47,6 +47,13 @@ export interface NextJsHandlerOptions {
 	chat?: ChatOptions;
 
 	/**
+	 * Identifies this chatbar instance in analytics.
+	 * Use a descriptive name like "hamilton-support" or "pricing-page".
+	 * Shows up as `source` on tracked events.
+	 */
+	source: string;
+
+	/**
 	 * Enable verbose debug logging for all handler steps.
 	 * Logs request details, response codes, resolved URLs, and caught errors.
 	 */

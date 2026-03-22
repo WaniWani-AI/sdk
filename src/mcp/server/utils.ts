@@ -96,6 +96,12 @@ export function extractSource(
 	if (!meta) {
 		return undefined;
 	}
+	// Explicit source set by the caller (e.g. chatbar name)
+	const explicit = meta["waniwani/source"];
+	if (typeof explicit === "string" && explicit.length > 0) {
+		return explicit;
+	}
+	// Derive from session ID key
 	for (const { key, source } of SOURCE_SESSION_KEYS) {
 		const value = meta[key];
 		if (typeof value === "string" && value.length > 0) {

@@ -46,6 +46,7 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 	const {
 		apiKey = process.env.WANIWANI_API_KEY,
 		baseUrl = "https://app.waniwani.ai",
+		source,
 		systemPrompt,
 		maxSteps = 5,
 		beforeRequest,
@@ -60,6 +61,7 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 	const handleChat = createChatRequestHandler({
 		apiKey,
 		baseUrl,
+		source,
 		systemPrompt,
 		maxSteps,
 		beforeRequest,

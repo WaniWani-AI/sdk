@@ -33,7 +33,7 @@ export type { NextJsHandlerOptions, NextJsHandlerResult } from "./@types.js";
  */
 export function toNextJsHandler(
 	client: WaniWaniClient,
-	options?: NextJsHandlerOptions,
+	options: NextJsHandlerOptions,
 ): NextJsHandlerResult {
 	const { apiKey, baseUrl } = client._config;
 
@@ -43,6 +43,7 @@ export function toNextJsHandler(
 		...options?.chat,
 		apiKey,
 		baseUrl,
+		source: options?.source,
 		debug: debugEnabled,
 	});
 
