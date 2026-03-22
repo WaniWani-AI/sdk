@@ -30,7 +30,10 @@ export function mapTrackEventToV2(
 	const eventId = takeNonEmptyString(input.eventId) ?? generateId();
 	const timestamp = normalizeTimestamp(input.timestamp, now);
 	const source =
-		takeNonEmptyString(input.source) ?? extractSource(meta) ?? options.source ?? DEFAULT_SOURCE;
+		takeNonEmptyString(input.source) ??
+		extractSource(meta) ??
+		options.source ??
+		DEFAULT_SOURCE;
 	const rawLegacy = isLegacyTrackEvent(input) ? { ...input } : undefined;
 
 	const mappedMetadata: Record<string, unknown> = {
