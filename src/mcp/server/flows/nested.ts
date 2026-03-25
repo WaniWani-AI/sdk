@@ -53,9 +53,12 @@ export function setNestedValue(
 	value: unknown,
 ): void {
 	const parts = path.split(".");
+	const lastKey = parts.pop();
+	if (!lastKey) {
+		return;
+	}
 	let current = obj;
-	for (let i = 0; i < parts.length - 1; i++) {
-		const part = parts[i]!;
+	for (const part of parts) {
 		if (
 			current[part] == null ||
 			typeof current[part] !== "object" ||
@@ -65,7 +68,7 @@ export function setNestedValue(
 		}
 		current = current[part] as Record<string, unknown>;
 	}
-	current[parts[parts.length - 1]!] = value;
+	current[lastKey] = value;
 }
 
 /** Delete a value at a dot-path. Only removes the leaf key. */
@@ -74,15 +77,19 @@ export function deleteNestedValue(
 	path: string,
 ): void {
 	const parts = path.split(".");
+	const lastKey = parts.pop();
+	if (!lastKey) {
+		return;
+	}
 	let current: unknown = obj;
-	for (let i = 0; i < parts.length - 1; i++) {
+	for (const part of parts) {
 		if (current == null || typeof current !== "object") {
 			return;
 		}
-		current = (current as Record<string, unknown>)[parts[i]!];
+		current = (current as Record<string, unknown>)[part];
 	}
 	if (current != null && typeof current === "object") {
-		delete (current as Record<string, unknown>)[parts[parts.length - 1]!];
+		delete (current as Record<string, unknown>)[lastKey];
 	}
 }
 
