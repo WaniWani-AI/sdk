@@ -628,8 +628,9 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 |--------|-------------|
 | `.addNode(name, handler)` | Add a node. Handler receives `{ state, meta, interrupt, showWidget }` context. Return `interrupt(...)`, `showWidget(...)`, or a plain object. |
 | `.addEdge(from, to)` | Static edge (`START` and `END` are valid) |
-| `.addConditionalEdge(from, condition)` | Dynamic routing — `condition(state)` returns the next node name |
+| `.addConditionalEdge(from, condition)` | Dynamic routing — `condition(state)` returns the next node name. TypeScript enforces the return type matches registered node names. |
 | `.compile(options?)` | Validate graph and return a `RegisteredFlow`. Options: `{ store?: FlowStore }` |
+| `.graph()` | Returns a Mermaid `flowchart TD` string. Available on both the builder and the compiled `RegisteredFlow`. Conditional edges show as dashed arrows (targets are runtime-determined). |
 
 ### `interrupt(fields, config?)` (from handler context)
 

@@ -377,6 +377,8 @@ export type RegisteredFlow = {
 	title: string;
 	description: string;
 	register: (server: McpServer) => Promise<void>;
+	/** Returns a Mermaid `flowchart TD` diagram of the flow graph. */
+	graph: () => string;
 };
 
 export interface CompileInput<TState extends Record<string, unknown>> {
@@ -384,6 +386,7 @@ export interface CompileInput<TState extends Record<string, unknown>> {
 	nodes: Map<string, NodeHandler<TState>>;
 	edges: Map<string, Edge<TState>>;
 	store?: FlowStore;
+	graph: () => string;
 }
 
 export type FlowToolInput = {

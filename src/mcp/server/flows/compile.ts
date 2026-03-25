@@ -170,6 +170,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		id: config.id,
 		title: config.title,
 		description: fullDescription,
+		graph: input.graph,
 
 		async register(server: McpServer): Promise<void> {
 			server.registerTool(

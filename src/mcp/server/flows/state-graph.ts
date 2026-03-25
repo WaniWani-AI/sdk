@@ -1,13 +1,27 @@
-import type {
-	ConditionFn,
-	Edge,
-	FlowConfig,
-	NodeHandler,
-	RegisteredFlow,
-} from "./@types";
+import type { Edge, FlowConfig, NodeHandler, RegisteredFlow } from "./@types";
 import { END, START } from "./@types";
 import { compileFlow } from "./compile";
 import type { FlowStore } from "./flow-store";
+
+function buildMermaidGraph(
+	nodes: Map<string, unknown>,
+	edges: Map<string, Edge<unknown>>,
+): string {
+	const lines: string[] = ["flowchart TD"];
+	lines.push(`  ${START}((Start))`);
+	for (const [name] of nodes) {
+		lines.push(`  ${name}[${name}]`);
+	}
+	lines.push(`  ${END}((End))`);
+	for (const [from, edge] of edges) {
+		if (edge.type === "direct") {
+			lines.push(`  ${from} --> ${edge.to}`);
+		} else {
+			lines.push(`  ${from} -.-> ${from}_branch([?])`);
+		}
+	}
+	return lines.join("\n");
+}
 
 /**
  * A LangGraph-inspired state graph builder for MCP tools.
@@ -27,7 +41,10 @@ import type { FlowStore } from "./flow-store";
  *   .compile();
  * ```
  */
-export class StateGraph<TState extends Record<string, unknown>> {
+export class StateGraph<
+	TState extends Record<string, unknown>,
+	TNodes extends string = never,
+> {
 	private nodes = new Map<string, NodeHandler<TState>>();
 	private edges = new Map<string, Edge<TState>>();
 	private config: FlowConfig;
@@ -41,7 +58,10 @@ export class StateGraph<TState extends Record<string, unknown>> {
 	 *
 	 * The handler receives a context object with `state`, `meta`, `interrupt`, and `showWidget`.
 	 */
-	addNode(name: string, handler: NodeHandler<TState>): this {
+	addNode<TName extends string>(
+		name: TName,
+		handler: NodeHandler<TState>,
+	): StateGraph<TState, TNodes | TName> {
 		if (name === START || name === END) {
 			throw new Error(
 				`"${name}" is a reserved name and cannot be used as a node name`,
@@ -52,7 +72,7 @@ export class StateGraph<TState extends Record<string, unknown>> {
 		}
 
 		this.nodes.set(name, handler);
-		return this;
+		return this as unknown as StateGraph<TState, TNodes | TName>;
 	}
 
 	/**
@@ -61,7 +81,7 @@ export class StateGraph<TState extends Record<string, unknown>> {
 	 * Use `START` as `from` to set the entry point.
 	 * Use `END` as `to` to mark a terminal node.
 	 */
-	addEdge(from: string, to: string): this {
+	addEdge(from: typeof START | TNodes, to: TNodes | typeof END): this {
 		if (this.edges.has(from)) {
 			throw new Error(
 				`Node "${from}" already has an outgoing edge. Use addConditionalEdge for branching.`,
@@ -76,12 +96,40 @@ export class StateGraph<TState extends Record<string, unknown>> {
 	 *
 	 * The condition function receives current state and returns the name of the next node.
 	 */
-	addConditionalEdge(from: string, condition: ConditionFn<TState>): this {
+	addConditionalEdge(
+		from: TNodes,
+		condition: (
+			state: Partial<TState>,
+		) => TNodes | typeof END | Promise<TNodes | typeof END>,
+	): this {
 		if (this.edges.has(from)) {
 			throw new Error(`Node "${from}" already has an outgoing edge.`);
 		}
 		this.edges.set(from, { type: "conditional", condition });
 		return this;
+	}
+
+	/**
+	 * Generate a Mermaid `flowchart TD` diagram of the graph.
+	 *
+	 * Direct edges use solid arrows. Conditional edges use a dashed arrow
+	 * to a placeholder since branch targets are determined at runtime.
+	 *
+	 * @example
+	 * ```ts
+	 * console.log(graph.graph());
+	 * // flowchart TD
+	 * //   __start__((Start))
+	 * //   ask_name[ask_name]
+	 * //   greet[greet]
+	 * //   __end__((End))
+	 * //   __start__ --> ask_name
+	 * //   ask_name --> greet
+	 * //   greet --> __end__
+	 * ```
+	 */
+	graph(): string {
+		return buildMermaidGraph(this.nodes, this.edges);
 	}
 
 	/**
@@ -92,11 +140,15 @@ export class StateGraph<TState extends Record<string, unknown>> {
 	compile(options?: { store?: FlowStore }): RegisteredFlow {
 		this.validate();
 
+		const nodesCopy = new Map(this.nodes);
+		const edgesCopy = new Map(this.edges);
+
 		return compileFlow<TState>({
 			config: this.config,
-			nodes: new Map(this.nodes),
-			edges: new Map(this.edges),
+			nodes: nodesCopy,
+			edges: edgesCopy,
 			store: options?.store,
+			graph: () => buildMermaidGraph(nodesCopy, edgesCopy),
 		});
 	}
 

@@ -30,7 +30,10 @@ describe("getObjectShape", () => {
 			name: z.string().describe("Name"),
 			age: z.number().describe("Age"),
 		});
-		const shape = getObjectShape(schema)!;
+		const shape = getObjectShape(schema);
+		if (!shape) {
+			throw new Error("Expected shape to be non-null");
+		}
 		expect(Object.keys(shape)).toEqual(["name", "age"]);
 	});
 
