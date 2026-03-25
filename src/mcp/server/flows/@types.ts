@@ -150,32 +150,74 @@ export function isWidget(value: unknown): value is WidgetSignal {
 
 export type MaybePromise<T> = T | Promise<T>;
 
+// ============================================================================
+// Nested state utility types
+// ============================================================================
+
+/** Deep partial — allows partial updates at any nesting level (for z.object state fields). */
+export type DeepPartial<T> = {
+	[K in keyof T]?: T[K] extends Record<string, unknown>
+		? DeepPartial<T[K]>
+		: T[K];
+};
+
+/**
+ * Union of all valid field paths for a state type.
+ * - Flat fields produce their key: `"email"`
+ * - `z.object()` fields produce dot-paths to sub-fields: `"driver.name"`, `"driver.license"`
+ * - Arrays and general records (`z.record()`) are treated as flat fields.
+ * - Only 1 level of nesting is supported.
+ */
+export type FieldPaths<TState> = {
+	[K in Extract<keyof TState, string>]: TState[K] extends unknown[]
+		? K
+		: TState[K] extends Record<string, unknown>
+			? string extends Extract<keyof TState[K], string>
+				? K
+				: `${K}.${Extract<keyof TState[K], string>}`
+			: K;
+}[Extract<keyof TState, string>];
+
+/** Resolve a dot-path to the value type at that path in TState. */
+export type ResolveFieldType<
+	TState,
+	P extends string,
+> = P extends `${infer Parent}.${infer Child}`
+	? Parent extends keyof TState
+		? Child extends keyof TState[Parent]
+			? TState[Parent][Child]
+			: never
+		: never
+	: P extends keyof TState
+		? TState[P]
+		: never;
+
+// ============================================================================
+// Typed interrupt & showWidget
+// ============================================================================
+
 /**
  * Typed interrupt function — available on the node context.
  *
- * First argument: an object where each key is a state field name and each value
- * describes the question for that field. `validate` receives the field's value
- * typed from the Zod schema.
+ * First argument: an object where each key is a field path and each value
+ * describes the question for that field. Use dot-paths for nested state fields.
+ * `validate` receives the field's value typed from the Zod schema.
  *
  * Second argument (optional): config with overall hidden AI instructions.
  *
  * @example
  * ```ts
- * // Single question
+ * // Flat field
  * interrupt({ breed: { question: "What breed is your pet?" } })
+ *
+ * // Nested field (z.object in state)
+ * interrupt({ "driver.name": { question: "Driver's name?" } })
  *
  * // Multiple questions with context
  * interrupt(
  *   {
- *     breed: {
- *       question: "What breed?",
- *       validate: async (breed) => {
- *         const result = await lookupBreed(breed);
- *         if (!result) throw new Error("Unknown breed");
- *         return { breedId: result.id };
- *       },
- *     },
- *     age: { question: "How old is your pet?" },
+ *     "driver.name": { question: "Name?" },
+ *     "driver.license": { question: "License?" },
  *   },
  *   { context: "Ask both questions naturally." },
  * )
@@ -183,10 +225,12 @@ export type MaybePromise<T> = T | Promise<T>;
  */
 export type TypedInterrupt<TState> = (
 	fields: {
-		[F in Extract<keyof TState, string>]?: {
+		[P in FieldPaths<TState>]?: {
 			question: string;
-			// biome-ignore lint/suspicious/noConfusingVoidType: void is needed so `async () => {}` compiles
-			validate?: (value: TState[F]) => MaybePromise<Partial<TState> | void>;
+			validate?: (
+				value: ResolveFieldType<TState, P>,
+				// biome-ignore lint/suspicious/noConfusingVoidType: void is needed so `async () => {}` compiles
+			) => MaybePromise<DeepPartial<TState> | void>;
 			suggestions?: string[];
 			context?: string;
 		};
@@ -199,7 +243,7 @@ export type TypedInterrupt<TState> = (
 
 /**
  * Typed showWidget function — available on the node context.
- * The `field` parameter is typed as `keyof TState`.
+ * The `field` parameter accepts field paths (flat or dot-path for nested state).
  */
 export type TypedShowWidget<TState> = (
 	tool: RegisteredTool,
@@ -207,7 +251,7 @@ export type TypedShowWidget<TState> = (
 		data: Record<string, unknown>;
 		description?: string;
 		interactive?: boolean;
-		field?: Extract<keyof TState, string>;
+		field?: FieldPaths<TState>;
 	},
 ) => WidgetSignal;
 
@@ -237,7 +281,7 @@ export type NodeContext<TState> = {
  */
 export type NodeHandler<TState> = (
 	ctx: NodeContext<TState>,
-) => MaybePromise<Partial<TState> | InterruptSignal | WidgetSignal>;
+) => MaybePromise<DeepPartial<TState> | InterruptSignal | WidgetSignal>;
 
 /**
  * Condition function for conditional edges.

@@ -754,3 +754,440 @@ describe("isError on error responses", () => {
 		expect(result.isError).toBe(undefined);
 	});
 });
+
+// ============================================================================
+// Nested object state (z.object)
+// ============================================================================
+
+describe("nested object state", () => {
+	test("dot-path interrupt produces correct field names", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nested_interrupt",
+			title: "Nested Interrupt",
+			description: "Test nested interrupt fields.",
+			state: {
+				driver: z
+					.object({
+						name: z.string().describe("Full name"),
+						license: z.string().describe("License number"),
+					})
+					.describe("Driver details"),
+			},
+		})
+			.addNode("ask_driver", ({ interrupt }) =>
+				interrupt({
+					"driver.name": { question: "Driver's name?" },
+					"driver.license": { question: "License number?" },
+				}),
+			)
+			.addEdge(START, "ask_driver")
+			.addEdge("ask_driver", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.({ action: "start" }, TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("interrupt");
+		expect(parsed.questions).toHaveLength(2);
+		const fields = (parsed.questions as Array<{ field: string }>).map(
+			(q) => q.field,
+		);
+		expect(fields).toContain("driver.name");
+		expect(fields).toContain("driver.license");
+	});
+
+	test("dot-path stateUpdates fill nested state correctly", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nested_fill",
+			title: "Nested Fill",
+			description: "Test nested state filling.",
+			state: {
+				driver: z
+					.object({
+						name: z.string().describe("Full name"),
+						license: z.string().describe("License number"),
+					})
+					.describe("Driver details"),
+			},
+		})
+			.addNode("ask_driver", ({ interrupt }) =>
+				interrupt({
+					"driver.name": { question: "Name?" },
+					"driver.license": { question: "License?" },
+				}),
+			)
+			.addEdge(START, "ask_driver")
+			.addEdge("ask_driver", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		await handler?.({ action: "start" }, TEST_EXTRA);
+
+		const result = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: {
+					"driver.name": "John",
+					"driver.license": "ABC123",
+				},
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("complete");
+		const tokenData = await store.get(TEST_SESSION_ID);
+		expect(tokenData?.state).toMatchObject({
+			driver: { name: "John", license: "ABC123" },
+		});
+	});
+
+	test("partial nested answers re-ask remaining sub-fields", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nested_partial",
+			title: "Nested Partial",
+			description: "Test partial nested answers.",
+			state: {
+				driver: z
+					.object({
+						name: z.string().describe("Full name"),
+						license: z.string().describe("License number"),
+					})
+					.describe("Driver details"),
+			},
+		})
+			.addNode("ask_driver", ({ interrupt }) =>
+				interrupt({
+					"driver.name": { question: "Name?" },
+					"driver.license": { question: "License?" },
+				}),
+			)
+			.addEdge(START, "ask_driver")
+			.addEdge("ask_driver", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		await handler?.({ action: "start" }, TEST_EXTRA);
+
+		// Partial — only name
+		const r2 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { "driver.name": "Alice" },
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const p2 = parsePayload(r2);
+
+		expect(p2.status).toBe("interrupt");
+		// Single remaining question — should use shorthand
+		expect(p2.question).toBe("License?");
+		expect(p2.field).toBe("driver.license");
+
+		// Complete
+		const r3 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { "driver.license": "XYZ" },
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const p3 = parsePayload(r3);
+
+		expect(p3.status).toBe("complete");
+	});
+
+	test("mixed flat and nested fields work together", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nested_mixed",
+			title: "Nested Mixed",
+			description: "Test mixed flat and nested.",
+			state: {
+				driver: z
+					.object({
+						name: z.string().describe("Full name"),
+					})
+					.describe("Driver details"),
+				email: z.string().describe("Contact email"),
+			},
+		})
+			.addNode("ask_driver", ({ interrupt }) =>
+				interrupt({
+					"driver.name": { question: "Driver's name?" },
+				}),
+			)
+			.addNode("ask_email", ({ interrupt }) =>
+				interrupt({
+					email: { question: "Email?" },
+				}),
+			)
+			.addEdge(START, "ask_driver")
+			.addEdge("ask_driver", "ask_email")
+			.addEdge("ask_email", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		await handler?.({ action: "start" }, TEST_EXTRA);
+
+		const r2 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { "driver.name": "Bob" },
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const p2 = parsePayload(r2);
+
+		expect(p2.status).toBe("interrupt");
+		expect(p2.field).toBe("email");
+
+		const r3 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { email: "bob@test.com" },
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const p3 = parsePayload(r3);
+
+		expect(p3.status).toBe("complete");
+		const tokenData = await store.get(TEST_SESSION_ID);
+		expect(tokenData?.state).toMatchObject({
+			driver: { name: "Bob" },
+			email: "bob@test.com",
+		});
+	});
+
+	test("nested field validation runs and enriches state", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nested_validate",
+			title: "Nested Validate",
+			description: "Test nested validation.",
+			state: {
+				driver: z
+					.object({
+						name: z.string().describe("Full name"),
+						nameUpper: z.string().describe("Uppercased name"),
+					})
+					.describe("Driver details"),
+			},
+		})
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({
+					"driver.name": {
+						question: "Name?",
+						validate: async (name) => {
+							return { driver: { nameUpper: name.toUpperCase() } };
+						},
+					},
+				}),
+			)
+			.addEdge(START, "ask_name")
+			.addEdge("ask_name", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		await handler?.({ action: "start" }, TEST_EXTRA);
+
+		const r2 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { "driver.name": "alice" },
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const p2 = parsePayload(r2);
+
+		expect(p2.status).toBe("complete");
+		const tokenData = await store.get(TEST_SESSION_ID);
+		expect(tokenData?.state).toMatchObject({
+			driver: { name: "alice", nameUpper: "ALICE" },
+		});
+	});
+
+	test("nested validation error clears only the sub-field", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nested_validate_error",
+			title: "Nested Validate Error",
+			description: "Test nested validation error.",
+			state: {
+				driver: z
+					.object({
+						name: z.string().describe("Full name"),
+						license: z.string().describe("License number"),
+					})
+					.describe("Driver details"),
+			},
+		})
+			.addNode("ask_driver", ({ interrupt }) =>
+				interrupt({
+					"driver.name": {
+						question: "Name?",
+						validate: async (name) => {
+							if (name === "bad") {
+								throw new Error("Invalid name");
+							}
+						},
+					},
+					"driver.license": { question: "License?" },
+				}),
+			)
+			.addEdge(START, "ask_driver")
+			.addEdge("ask_driver", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		await handler?.({ action: "start" }, TEST_EXTRA);
+
+		// Answer both, but name is invalid
+		const r2 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: {
+					"driver.name": "bad",
+					"driver.license": "ABC",
+				},
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const p2 = parsePayload(r2);
+
+		expect(p2.status).toBe("interrupt");
+		expect(p2.field).toBe("driver.name");
+		expect(p2.context).toContain("Invalid name");
+
+		// License should still be in state
+		const tokenData = await store.get(TEST_SESSION_ID);
+		expect((tokenData?.state as Record<string, unknown>)?.driver).toMatchObject(
+			{ license: "ABC" },
+		);
+	});
+
+	test("pre-fill nested fields on start with auto-skip", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nested_prefill",
+			title: "Nested Prefill",
+			description: "Test nested pre-fill.",
+			state: {
+				driver: z
+					.object({
+						name: z.string().describe("Full name"),
+						license: z.string().describe("License number"),
+					})
+					.describe("Driver details"),
+			},
+		})
+			.addNode("ask_driver", ({ interrupt }) =>
+				interrupt({
+					"driver.name": { question: "Name?" },
+					"driver.license": { question: "License?" },
+				}),
+			)
+			.addEdge(START, "ask_driver")
+			.addEdge("ask_driver", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Pre-fill name on start
+		const r1 = (await handler?.(
+			{
+				action: "start",
+				stateUpdates: { "driver.name": "Pre-filled" },
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const p1 = parsePayload(r1);
+
+		// Should only ask for license
+		expect(p1.status).toBe("interrupt");
+		expect(p1.question).toBe("License?");
+		expect(p1.field).toBe("driver.license");
+	});
+
+	test("deep merge preserves sibling nested fields on continue", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nested_deep_merge",
+			title: "Nested Deep Merge",
+			description: "Test deep merge preserves siblings.",
+			state: {
+				driver: z
+					.object({
+						name: z.string().describe("Full name"),
+						license: z.string().describe("License number"),
+					})
+					.describe("Driver details"),
+			},
+		})
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ "driver.name": { question: "Name?" } }),
+			)
+			.addNode("ask_license", ({ interrupt }) =>
+				interrupt({ "driver.license": { question: "License?" } }),
+			)
+			.addEdge(START, "ask_name")
+			.addEdge("ask_name", "ask_license")
+			.addEdge("ask_license", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Start → ask name
+		await handler?.({ action: "start" }, TEST_EXTRA);
+		// Answer name → ask license
+		await handler?.(
+			{ action: "continue", stateUpdates: { "driver.name": "Alice" } },
+			TEST_EXTRA,
+		);
+		// Answer license → complete
+		const r3 = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { "driver.license": "XYZ" },
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const p3 = parsePayload(r3);
+
+		expect(p3.status).toBe("complete");
+		const tokenData = await store.get(TEST_SESSION_ID);
+		// Both fields must be present — deep merge didn't wipe name
+		expect(tokenData?.state).toMatchObject({
+			driver: { name: "Alice", license: "XYZ" },
+		});
+	});
+});

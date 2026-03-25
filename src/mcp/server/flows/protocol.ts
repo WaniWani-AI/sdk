@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { FlowConfig } from "./@types";
+import { getObjectShape } from "./nested";
 
 /** Extract a human-readable label from a Zod schema for the AI protocol */
 function describeZodField(schema: z.ZodType): string {
@@ -35,16 +36,35 @@ export function buildFlowProtocol(config: FlowConfig): string {
 	];
 
 	if (config.state) {
-		const fieldList = Object.entries(config.state)
-			.map(([key, schema]) => {
+		const parts: string[] = [];
+		for (const [key, schema] of Object.entries(config.state)) {
+			const shape = getObjectShape(schema);
+			if (shape) {
+				const groupDesc = schema.description ?? "";
+				const subFields = Object.entries(shape)
+					.map(([subKey, subSchema]) => {
+						const info = describeZodField(subSchema);
+						return info
+							? `\`${key}.${subKey}\` (${info})`
+							: `\`${key}.${subKey}\``;
+					})
+					.join(", ");
+				parts.push(
+					groupDesc
+						? `\`${key}\` (${groupDesc}): ${subFields}`
+						: `\`${key}\`: ${subFields}`,
+				);
+			} else {
 				const info = describeZodField(schema);
-				return info ? `\`${key}\` (${info})` : `\`${key}\``;
-			})
-			.join(", ");
-		lines.push(`   Known fields: ${fieldList}.`);
+				parts.push(info ? `\`${key}\` (${info})` : `\`${key}\``);
+			}
+		}
+		lines.push(`   Known fields: ${parts.join(", ")}.`);
 	}
 
 	lines.push(
+		"   For grouped fields (shown as `group.subfield`), use dot-notation keys in `stateUpdates`:",
+		'   e.g. `{ "driver.name": "John", "driver.license": "ABC123" }`.',
 		"2. The response JSON `status` field tells you what to do next:",
 		'   - `"interrupt"`: Pause and ask the user. Two forms:',
 		"     a. Single question: `{ question, field, context? }` — ask `question`, store answer in `field`.",

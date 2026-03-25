@@ -90,6 +90,55 @@ const flow = createFlow({
 })
 ```
 
+### Nested state fields (`z.object`)
+
+Use `z.object()` to group related fields. The `.describe()` on the parent object provides AI context for when to collect the group. Only 1 level of nesting is supported.
+
+```ts
+const flow = createFlow({
+  id: "insurance_quote",
+  title: "Insurance Quote",
+  description: "Get a car insurance quote.",
+  state: {
+    driver: z.object({
+      name: z.string().describe("Driver's full name"),
+      license: z.string().describe("License number"),
+    }).describe("Driver details — collect when user wants car insurance"),
+    vehicle: z.object({
+      make: z.string().describe("Car manufacturer"),
+      model: z.string().describe("Car model"),
+    }).describe("Vehicle info"),
+    email: z.string().describe("Contact email"),
+  },
+})
+```
+
+Nested fields use **dot-path notation** everywhere — interrupts, `stateUpdates`, and `showWidget` field:
+
+```ts
+// Interrupt with dot-path keys
+.addNode("ask_driver", ({ interrupt }) =>
+  interrupt({
+    "driver.name": { question: "What's the driver's name?" },
+    "driver.license": { question: "License number?" },
+  })
+)
+
+// State access uses native nested objects
+.addNode("summarize", ({ state }) => ({
+  summary: `${state.driver?.name} — ${state.email}`,
+}))
+```
+
+The AI sends dot-path keys in `stateUpdates`: `{ "driver.name": "John", "driver.license": "ABC" }`. The engine expands them into nested objects and deep-merges to preserve sibling fields.
+
+**Rules:**
+- Flat fields (`email`) and dot-path fields (`driver.name`) work the same way in interrupts
+- `isFilled` checks resolve dot-paths: auto-skip works per sub-field
+- Validation `validate` on a nested field receives the leaf value (e.g., `string` for `driver.name`)
+- Validation errors clear only the specific sub-field, not the entire parent object
+- Action nodes returning nested objects are deep-merged (returning `{ driver: { name: "John" } }` won't wipe `driver.license`)
+
 At every step, the engine stores the current flow state (step, field, state values) server-side, keyed by session ID. The AI simply calls `action: "continue"` — no token round-tripping needed.
 
 By default, a `WaniwaniFlowStore` is used — it stores flow state via the WaniWani API using your `WANIWANI_API_KEY` and `WANIWANI_BASE_URL` env vars. This works seamlessly in serverless environments (Vercel) with no extra infrastructure. Tenant isolation is handled by the API key.
@@ -571,7 +620,7 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 | `id` | `string` | yes | MCP tool name |
 | `title` | `string` | yes | Display title |
 | `description` | `string` | yes | Tells the AI when to use this flow |
-| `state` | `Record<string, z.ZodType>` | yes | State schema — defines all fields the flow collects. Keys match interrupt field names, values are Zod schemas with `.describe()` |
+| `state` | `Record<string, z.ZodType>` | yes | State schema — defines all fields the flow collects. Values are Zod schemas with `.describe()`. Use `z.object()` for grouped nested fields (1 level). |
 
 ### `StateGraph` methods
 
@@ -584,7 +633,7 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 
 ### `interrupt(fields, config?)` (from handler context)
 
-**`fields`** — each key is a state field name, each value is a question config:
+**`fields`** — each key is a field path (flat like `"email"` or dot-path like `"driver.name"`), each value is a question config:
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
@@ -605,7 +654,7 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 |----------|------|----------|-------------|
 | `tool` | `RegisteredTool` | yes | The display tool (from `createTool()`) |
 | `data` | `Record<string, unknown>` | yes | Data to pass to the display tool |
-| `field` | `keyof TState` | no | State field this widget fills — enables auto-skip |
+| `field` | `FieldPaths<TState>` | no | State field path this widget fills — enables auto-skip. Supports dot-paths for nested state. |
 | `description` | `string` | no | Description for the AI |
 | `interactive` | `boolean` | no | Set to `false` for display-only widgets that auto-advance |
 

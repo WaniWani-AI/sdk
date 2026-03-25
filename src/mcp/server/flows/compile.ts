@@ -17,6 +17,7 @@ import type {
 import { START } from "./@types";
 import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
 import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
+import { deepMerge, expandDotPaths } from "./nested";
 import { buildFlowProtocol } from "./protocol";
 
 // ============================================================================
@@ -69,7 +70,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
-			const startState = { ...(args.stateUpdates ?? {}) } as TState;
+			const startState = expandDotPaths(args.stateUpdates ?? {}) as TState;
 			const firstNode = await resolveNextNode(startEdge, startState);
 			return executeFrom(
 				firstNode,
@@ -115,10 +116,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
-			const updatedState = {
-				...state,
-				...(args.stateUpdates ?? {}),
-			} as TState;
+			const updatedState = deepMerge(
+				state as Record<string, unknown>,
+				expandDotPaths(args.stateUpdates ?? {}),
+			) as TState;
 
 			// Widget continue: advance past the widget step (don't re-show it)
 			if (flowState.widgetId) {

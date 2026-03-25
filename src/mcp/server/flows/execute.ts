@@ -7,6 +7,7 @@ import type {
 	NodeHandler,
 } from "./@types";
 import { END, interrupt, isInterrupt, isWidget, showWidget } from "./@types";
+import { deepMerge, deleteNestedValue, getNestedValue } from "./nested";
 
 // ============================================================================
 // Helpers
@@ -54,13 +55,17 @@ export function buildInterruptResult<TState extends Record<string, unknown>>(
 	state: TState,
 ): ExecutionResult | null {
 	// All filled — caller should advance to the next node
-	if (questions.every((q) => isFilled(state[q.field as keyof TState]))) {
+	if (
+		questions.every((q) =>
+			isFilled(getNestedValue(state as Record<string, unknown>, q.field)),
+		)
+	) {
 		return null;
 	}
 
 	// Filter out questions whose fields are already answered
 	const unanswered = questions.filter(
-		(q) => !isFilled(state[q.field as keyof TState]),
+		(q) => !isFilled(getNestedValue(state as Record<string, unknown>, q.field)),
 	);
 
 	// Single-question shorthand: unwrap for cleaner AI payload
@@ -170,14 +175,20 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 					const fn = validators.get(`${currentNode}:${q.field}`);
 					if (fn) {
 						try {
-							const value = state[q.field as keyof TState];
+							const value = getNestedValue(
+								state as Record<string, unknown>,
+								q.field,
+							);
 							const vResult = await fn(value);
 							if (vResult && typeof vResult === "object") {
-								state = { ...state, ...vResult } as TState;
+								state = deepMerge(
+									state as Record<string, unknown>,
+									vResult as Record<string, unknown>,
+								) as TState;
 							}
 						} catch (err) {
 							const msg = err instanceof Error ? err.message : String(err);
-							delete (state as Record<string, unknown>)[q.field];
+							deleteNestedValue(state as Record<string, unknown>, q.field);
 							const questionsWithError = result.questions.map((qq) =>
 								qq.field === q.field
 									? {
@@ -220,7 +231,11 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 			if (isWidget(result)) {
 				const widgetField = result.field;
 				if (widgetField) {
-					if (isFilled(state[widgetField as keyof TState])) {
+					if (
+						isFilled(
+							getNestedValue(state as Record<string, unknown>, widgetField),
+						)
+					) {
 						const edge = edges.get(currentNode);
 						if (!edge) {
 							return {
@@ -252,8 +267,11 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				};
 			}
 
-			// Action node — merge state and auto-advance
-			state = { ...state, ...result } as TState;
+			// Action node — deep-merge state (preserves nested object siblings)
+			state = deepMerge(
+				state as Record<string, unknown>,
+				result as Record<string, unknown>,
+			) as TState;
 
 			const edge = edges.get(currentNode);
 			if (!edge) {
