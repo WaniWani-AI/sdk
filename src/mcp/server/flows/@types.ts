@@ -162,6 +162,22 @@ export type DeepPartial<T> = {
 };
 
 /**
+ * Extract known (non-index-signature) string keys from a type.
+ * Zod v4's z.object() adds `[key: string]: unknown` to inferred types,
+ * so we filter those out to get only the declared field names.
+ */
+type KnownStringKeys<T> = Extract<
+	keyof {
+		[K in keyof T as string extends K
+			? never
+			: number extends K
+				? never
+				: K]: T[K];
+	},
+	string
+>;
+
+/**
  * Union of all valid field paths for a state type.
  * - Flat fields produce their key: `"email"`
  * - `z.object()` fields produce dot-paths to sub-fields: `"driver.name"`, `"driver.license"`
@@ -172,9 +188,9 @@ export type FieldPaths<TState> = {
 	[K in Extract<keyof TState, string>]: TState[K] extends unknown[]
 		? K
 		: TState[K] extends Record<string, unknown>
-			? string extends Extract<keyof TState[K], string>
+			? KnownStringKeys<TState[K]> extends never
 				? K
-				: `${K}.${Extract<keyof TState[K], string>}`
+				: `${K}.${KnownStringKeys<TState[K]>}`
 			: K;
 }[Extract<keyof TState, string>];
 
