@@ -185,12 +185,12 @@ type KnownStringKeys<T> = Extract<
  * - Only 1 level of nesting is supported.
  */
 export type FieldPaths<TState> = {
-	[K in Extract<keyof TState, string>]: TState[K] extends unknown[]
+	[K in Extract<keyof TState, string>]: NonNullable<TState[K]> extends unknown[]
 		? K
-		: TState[K] extends Record<string, unknown>
-			? KnownStringKeys<TState[K]> extends never
+		: NonNullable<TState[K]> extends Record<string, unknown>
+			? KnownStringKeys<NonNullable<TState[K]>> extends never
 				? K
-				: `${K}.${KnownStringKeys<TState[K]>}`
+				: K | `${K}.${KnownStringKeys<NonNullable<TState[K]>>}`
 			: K;
 }[Extract<keyof TState, string>];
 
@@ -200,8 +200,8 @@ export type ResolveFieldType<
 	P extends string,
 > = P extends `${infer Parent}.${infer Child}`
 	? Parent extends keyof TState
-		? Child extends keyof TState[Parent]
-			? TState[Parent][Child]
+		? Child extends keyof NonNullable<TState[Parent]>
+			? NonNullable<TState[Parent]>[Child]
 			: never
 		: never
 	: P extends keyof TState
