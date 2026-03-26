@@ -39,6 +39,11 @@
       "types": "./dist/kb/index.d.ts",
       "import": "./dist/kb/index.js",
       "default": "./dist/kb/index.js"
+    },
+    "./evals": {
+      "types": "./dist/evals/index.d.ts",
+      "import": "./dist/evals/index.js",
+      "default": "./dist/evals/index.js"
     }
   },
   "files": [
@@ -65,7 +70,9 @@
     "zod": ">=4.0.0",
     "@ai-sdk/react": ">=1.0.0",
     "ai": ">=4.0.0",
-    "@ai-sdk/mcp": ">=1.0.0"
+    "@ai-sdk/mcp": ">=1.0.0",
+    "braintrust": ">=3.0.0",
+    "autoevals": ">=0.0.100"
   },
   "peerDependenciesMeta": {
     "@modelcontextprotocol/sdk": {
@@ -88,6 +95,12 @@
     },
     "@ai-sdk/mcp": {
       "optional": true
+    },
+    "braintrust": {
+      "optional": true
+    },
+    "autoevals": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -104,6 +117,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.2.3",
     "ai": "^6.0.71",
+    "autoevals": "^0.0.132",
     "clsx": "^2.1.1",
     "happy-dom": "^20.7.0",
     "lucide-react": "^0.563.0",
