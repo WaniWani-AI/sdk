@@ -8,6 +8,7 @@ interface AutoCaptureConfig {
 	sessionId?: string;
 	traceId?: string;
 	metadata?: Record<string, unknown>;
+	source?: string;
 }
 
 function eventId(): string {
@@ -23,7 +24,7 @@ function baseFields(
 		event_id: eventId(),
 		event_type: eventType,
 		timestamp: new Date().toISOString(),
-		source: "widget",
+		source: config.source ?? "widget",
 		session_id: config.sessionId,
 		trace_id: config.traceId,
 		...extra,

@@ -184,6 +184,7 @@ export function withWaniwani(
 						result,
 						getTokenCache(),
 						tracker._config.baseUrl ?? DEFAULT_BASE_URL,
+						extra,
 						options.onError,
 					);
 				}

@@ -14,12 +14,14 @@ interface WaniwaniMeta {
 	token?: string;
 	endpoint?: string;
 	sessionId?: string;
+	source?: string;
 }
 
 interface WaniwaniConfig {
 	token?: string;
 	endpoint: string;
 	sessionId?: string;
+	source?: string;
 }
 
 /**
@@ -126,6 +128,7 @@ function resolveConfigFromContext(
 		endpoint,
 		token: normalizeString(waniwani?.token),
 		sessionId: normalizeString(waniwani?.sessionId),
+		source: normalizeString(waniwani?.source),
 	};
 }
 
@@ -136,7 +139,8 @@ function isSameConfig(
 	return (
 		a?.endpoint === b?.endpoint &&
 		a?.token === b?.token &&
-		a?.sessionId === b?.sessionId
+		a?.sessionId === b?.sessionId &&
+		a?.source === b?.source
 	);
 }
 
@@ -191,8 +195,10 @@ function createState(
 		transport.send(events);
 	};
 
+	const source = config.source ?? "widget";
+
 	const cleanupCapture = initAutoCapture(
-		{ sessionId, traceId, metadata },
+		{ sessionId, traceId, metadata, source },
 		enqueue,
 	);
 
@@ -204,7 +210,7 @@ function createState(
 			event_id: eventId(),
 			event_type: eventType,
 			timestamp: new Date().toISOString(),
-			source: "widget",
+			source,
 			session_id: sessionId,
 			trace_id: traceId,
 			user_id: userId,
@@ -291,13 +297,14 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 	const explicitToken = normalizeString(options.token);
 	const explicitSessionId = normalizeString(options.sessionId);
 
-	// Stabilize config identity — only changes when the three primitives change
+	// Stabilize config identity — only changes when the primitives change
 	const config = useMemo<WaniwaniConfig | null>(() => {
 		if (explicitEndpoint) {
 			return {
 				endpoint: explicitEndpoint,
 				token: explicitToken ?? contextConfig?.token,
 				sessionId: explicitSessionId ?? contextConfig?.sessionId,
+				source: contextConfig?.source,
 			};
 		}
 		return contextConfig;

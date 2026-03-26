@@ -124,6 +124,7 @@ export async function injectWidgetConfig(
 	result: unknown,
 	cache: WidgetTokenCache | null,
 	baseUrl: string,
+	extra?: unknown,
 	onError?: (error: Error) => void,
 ): Promise<void> {
 	if (!isRecord(result)) {
@@ -168,6 +169,11 @@ export async function injectWidgetConfig(
 		if (!waniwaniConfig.geoLocation) {
 			waniwaniConfig.geoLocation = geoLocation;
 		}
+	}
+
+	const source = extractSource(extractMeta(extra));
+	if (source && !waniwaniConfig.source) {
+		waniwaniConfig.source = source;
 	}
 
 	meta.waniwani = waniwaniConfig;
