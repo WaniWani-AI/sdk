@@ -1,9 +1,12 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
 	parseJsonEventStream,
 	readUIMessageStream,
 	type UIMessage,
 	uiMessageChunkSchema,
 } from "ai";
+import { z } from "zod";
 import type {
 	ChatResult,
 	ConversationResult,
@@ -13,6 +16,20 @@ import type {
 	ToolCallTrace,
 	TurnAssertion,
 } from "./types";
+
+// UIMessage parts are heterogeneous — validate the fields we need, pass extras through
+const sessionReplaySchema = z.object({
+	name: z.string(),
+	mode: z.enum(["regenerate", "inject"]).optional(),
+	outcome: z.object({ toolsCalled: z.array(z.string()) }).optional(),
+	messages: z.array(
+		z.looseObject({
+			id: z.string(),
+			role: z.enum(["user", "assistant", "system", "data"]),
+			parts: z.array(z.record(z.string(), z.unknown())),
+		}),
+	),
+});
 
 // --- Internal helpers ---
 
@@ -104,6 +121,23 @@ async function sendMessages(
 }
 
 // --- Public API ---
+
+/**
+ * Load all session replay JSON files from a directory.
+ * Drop any exported session JSON there — it just works.
+ *
+ * @param dir - Path to the sessions directory. Defaults to `evals/sessions`.
+ */
+export function loadSessions(dir = "evals/sessions"): SessionReplay[] {
+	const root = join(process.cwd(), dir);
+	return readdirSync(root)
+		.filter((f) => f.endsWith(".json"))
+		.sort()
+		.map((f) => {
+			const raw = JSON.parse(readFileSync(join(root, f), "utf8"));
+			return sessionReplaySchema.parse(raw) as unknown as SessionReplay;
+		});
+}
 
 /**
  * Send a single user message to a WaniWani MCP chat endpoint.

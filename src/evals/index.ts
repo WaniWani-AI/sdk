@@ -1,4 +1,4 @@
-export { chat, conversation, replaySession } from "./chat";
+export { chat, conversation, loadSessions, replaySession } from "./chat";
 export { createLocalReporter } from "./reporter";
 
 export {

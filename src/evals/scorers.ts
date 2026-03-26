@@ -154,18 +154,18 @@ export const FaqAccuracy = async (args: {
 	input: unknown;
 	output: unknown;
 	expected?: unknown;
-}) => wrapAutoeval(await getAutoeval("ClosedQA"))(args);
+}): Promise<unknown> => wrapAutoeval(await getAutoeval("ClosedQA"))(args);
 
 /** Factuality — checks if the output is factually consistent with the expected output. */
 export const OutputFactuality = async (args: {
 	input: unknown;
 	output: unknown;
 	expected?: unknown;
-}) => wrapAutoeval(await getAutoeval("Factuality"))(args);
+}): Promise<unknown> => wrapAutoeval(await getAutoeval("Factuality"))(args);
 
 /** Moderation — flags unsafe or inappropriate content. */
 export const SafetyCheck = async (args: {
 	input: unknown;
 	output: unknown;
 	expected?: unknown;
-}) => wrapAutoeval(await getAutoeval("Moderation"))(args);
+}): Promise<unknown> => wrapAutoeval(await getAutoeval("Moderation"))(args);

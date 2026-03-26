@@ -140,6 +140,6 @@ export default defineConfig([
 		sourcemap: true,
 		minify: true,
 		outDir: "dist",
-		external: ["ai", "braintrust", "autoevals"],
+		external: ["ai", "braintrust", "autoevals", "zod"],
 	},
 ]);
