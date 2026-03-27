@@ -153,7 +153,7 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	const { messages, sendMessage, status } = useChat({
 		transport: transportRef.current,
-		onFinish(message) {
+		onFinish({ message }) {
 			onResponseReceived?.();
 			if (pendingWaitRef.current) {
 				pendingWaitRef.current.resolve(message);

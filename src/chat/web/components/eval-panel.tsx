@@ -3,7 +3,6 @@
 import { type RefObject, useEffect, useRef, useState } from "react";
 import type { ChatHandle } from "../@types";
 import { cn } from "../lib/utils";
-import { Button } from "../ui/button";
 
 // ---- Types ----
 
@@ -75,7 +74,7 @@ function StatusLabel({ pass }: { pass: boolean | null }) {
 			className={cn(
 				"ww:font-mono ww:text-[10px] ww:font-semibold ww:uppercase ww:tracking-wider ww:shrink-0",
 				pass === null && "ww:text-muted-foreground",
-				pass === true && "ww:text-green-500",
+				pass === true && "ww:text-[#03d916]",
 				pass === false && "ww:text-red-500",
 			)}
 		>
@@ -101,7 +100,7 @@ function ScoreBar({ score }: { score: number }) {
 					className={cn(
 						"ww:h-full ww:rounded-full ww:transition-all ww:duration-500 ww:ease-out",
 						score === 1
-							? "ww:bg-green-500"
+							? "ww:bg-[#03d916]"
 							: score >= 0.5
 								? "ww:bg-yellow-500"
 								: "ww:bg-red-500",
@@ -125,7 +124,7 @@ function TurnRow({ turn, index }: { turn: TurnResult; index: number }) {
 			className={cn(
 				"ww:border-l-2 ww:pl-3",
 				status === null && "ww:border-muted-foreground/30",
-				status === true && "ww:border-green-500",
+				status === true && "ww:border-[#03d916]",
 				status === false && "ww:border-red-500",
 				"ww:animate-[ww-fade-in_0.15s_ease-out_both]",
 			)}
@@ -199,9 +198,13 @@ function TurnRow({ turn, index }: { turn: TurnResult; index: number }) {
 // ---- Main component ----
 
 type EvalPanelProps = {
+	/** API endpoint to fetch sessions from
+	 *
+	 * @default "/api/waniwani"
+	 */
 	api?: string;
 	/** Ref to the ChatCard or ChatBar so eval turns flow through the chat UI */
-	chatRef?: RefObject<ChatHandle | null>;
+	chatRef: RefObject<ChatHandle | null>;
 };
 
 /**
@@ -323,7 +326,7 @@ function EvalPanelInner({ api, chatRef }: EvalPanelProps) {
 	}
 
 	return (
-		<div className="ww:flex ww:flex-col ww:h-full ww:overflow-hidden ww:text-foreground">
+		<div className="ww:flex ww:flex-col ww:h-full ww:overflow-hidden ww:text-foreground ww:border-l ww:border-border ww:pl-1">
 			{/* Header */}
 			<div className="ww:px-3 ww:py-2 ww:border-b ww:border-border/50">
 				<span className="ww:text-[10px] ww:font-mono ww:uppercase ww:tracking-widest ww:text-muted-foreground">
@@ -350,16 +353,11 @@ function EvalPanelInner({ api, chatRef }: EvalPanelProps) {
 							className={cn(
 								"ww:w-full ww:text-left ww:px-3 ww:py-2 ww:text-xs ww:font-mono ww:transition-colors ww:border-l-2",
 								selected?.name === s.name
-									? "ww:border-primary ww:bg-primary/5 ww:text-foreground"
+									? "ww:border-[#03d916] ww:bg-[#03d916]/5 ww:text-foreground"
 									: "ww:border-transparent ww:text-foreground/70 ww:hover:text-foreground ww:hover:bg-muted/30",
 							)}
 						>
 							<span className="ww:block ww:truncate">{s.name}</span>
-							{s.mode && (
-								<span className="ww:text-[10px] ww:text-muted-foreground ww:uppercase ww:tracking-wider">
-									{s.mode}
-								</span>
-							)}
 						</button>
 					))
 				)}
@@ -368,14 +366,14 @@ function EvalPanelInner({ api, chatRef }: EvalPanelProps) {
 			{/* Run + results */}
 			{selected && (
 				<div className="ww:border-t ww:border-border/50 ww:p-3 ww:space-y-3 ww:overflow-y-auto ww:max-h-[60%]">
-					<Button
+					<button
+						type="button"
 						onClick={() => runSession(selected)}
 						disabled={running}
-						size="sm"
-						className="ww:w-full ww:font-mono ww:text-xs"
+						className="ww:w-full ww:py-2 ww:rounded-md ww:text-xs ww:font-mono ww:font-medium ww:bg-foreground ww:text-background ww:hover:opacity-90 ww:disabled:opacity-50 ww:transition-opacity ww:cursor-pointer"
 					>
 						{running ? "Running..." : "Run session"}
-					</Button>
+					</button>
 
 					{error && (
 						<div className="ww:border-l-2 ww:border-red-500 ww:pl-3 ww:py-1">
