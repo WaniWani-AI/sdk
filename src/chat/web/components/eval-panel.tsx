@@ -175,7 +175,28 @@ function TurnRow({ turn }: { turn: TurnResult }) {
 
 // ---- Main component ----
 
-export function EvalPanel({ api, hidden }: { api: string; hidden?: boolean }) {
+type EvalPanelProps = { api?: string };
+
+/**
+ * Dev-only evaluation panel for replaying recorded sessions and asserting tool usage.
+ *
+ * This component is automatically tree-shaken from production builds —
+ * it returns `null` when `process.env.NODE_ENV === "production"`.
+ *
+ * To populate sessions, set `WANIWANI_EVAL=1` in your `.env` and add
+ * session files to `evals/sessions/`.
+ */
+export function EvalPanel(props: EvalPanelProps) {
+	if (process.env.NODE_ENV === "production") {
+		return null;
+	}
+
+	return <EvalPanelInner {...props} />;
+}
+
+function EvalPanelInner({ api }: EvalPanelProps) {
+	const effectiveApi = api ?? "/api/waniwani";
+	const [enabled, setEnabled] = useState<boolean | null>(null);
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [selected, setSelected] = useState<Session | null>(null);
 	const [running, setRunning] = useState(false);
@@ -184,13 +205,25 @@ export function EvalPanel({ api, hidden }: { api: string; hidden?: boolean }) {
 	const abortRef = useRef<AbortController | null>(null);
 
 	useEffect(() => {
-		fetch(`${api}/sessions`)
+		fetch(`${effectiveApi}/config`)
+			.then((r) => r.json())
+			.then((data: { eval?: boolean }) => {
+				setEnabled(data.eval === true);
+			})
+			.catch(() => setEnabled(false));
+	}, [effectiveApi]);
+
+	useEffect(() => {
+		if (!enabled) {
+			return;
+		}
+		fetch(`${effectiveApi}/sessions`)
 			.then((r) => r.json())
 			.then((data: Session[]) => {
 				setSessions(data);
 			})
 			.catch(() => {});
-	}, [api]);
+	}, [effectiveApi, enabled]);
 
 	async function runSession(session: Session) {
 		abortRef.current?.abort();
@@ -223,7 +256,10 @@ export function EvalPanel({ api, hidden }: { api: string; hidden?: boolean }) {
 				history.push(userMsg);
 
 				const expectedTools = assistant ? getRecordedTools(assistant) : [];
-				const { toolsCalled, output, message } = await sendTurn(history, api);
+				const { toolsCalled, output, message } = await sendTurn(
+					history,
+					effectiveApi,
+				);
 				history.push(message);
 
 				turns.push({
@@ -252,11 +288,12 @@ export function EvalPanel({ api, hidden }: { api: string; hidden?: boolean }) {
 		}
 	}
 
+	if (!enabled) {
+		return null;
+	}
+
 	return (
-		<div
-			className="ww:flex ww:flex-col ww:h-full ww:overflow-hidden"
-			style={hidden ? { display: "none" } : undefined}
-		>
+		<div className="ww:flex ww:flex-col ww:h-full ww:overflow-hidden">
 			{/* Session list */}
 			<div className="ww:flex-1 ww:overflow-y-auto ww:min-h-0">
 				{sessions.length === 0 ? (
