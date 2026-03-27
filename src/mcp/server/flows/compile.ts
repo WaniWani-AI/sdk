@@ -111,7 +111,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					content: {
 						status: "error" as const,
 						error:
-							"Flow state is missing the current step. The flow may have expired.",
+							'This flow has already completed. Use action "start" to begin a new flow.',
 					},
 				};
 			}
@@ -193,8 +193,17 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					const result = await handleToolCall(args, sessionId, _meta, waniwani);
 
 					// Persist flow state under session ID
-					if (result.flowTokenContent && sessionId) {
-						await store.set(sessionId, result.flowTokenContent);
+					if (sessionId) {
+						if (
+							result.flowTokenContent &&
+							result.content.status !== "complete"
+						) {
+							await store.set(sessionId, result.flowTokenContent);
+						} else if (result.content.status === "complete") {
+							// Clean up — flow is done, remove stale state so a subsequent
+							// "continue" returns "not found" instead of a confusing step error.
+							await store.delete(sessionId);
+						}
 					}
 
 					const content = [
