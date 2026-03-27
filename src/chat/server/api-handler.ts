@@ -1,5 +1,6 @@
 // API Handler - Composes chat and resource handlers into a unified API handler
 
+import { loadSessions } from "../../evals/chat.js";
 import { createLogger } from "../../utils/logger.js";
 import type { ApiHandler, ApiHandlerOptions } from "./@types";
 import { createChatRequestHandler } from "./handle-chat";
@@ -82,8 +83,10 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		debug,
 	});
 
+	const evalEnabled = process.env.WANIWANI_EVAL === "1";
+
 	async function handleConfig(): Promise<Response> {
-		return jsonResponse({ debug }, 200);
+		return jsonResponse({ debug, eval: evalEnabled }, 200);
 	}
 
 	async function routeGet(request: Request): Promise<Response> {
@@ -96,6 +99,16 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 				.filter(Boolean);
 			const subRoute = segments.at(-1);
 			log("pathname:", url.pathname, "subRoute:", subRoute);
+
+			// This is used for evaluation purposes.
+			if (evalEnabled && subRoute === "sessions") {
+				log("dispatching to sessions handler");
+				try {
+					return jsonResponse(loadSessions(), 200);
+				} catch {
+					return jsonResponse([], 200);
+				}
+			}
 
 			if (subRoute === "resource") {
 				log("dispatching to resource handler");
