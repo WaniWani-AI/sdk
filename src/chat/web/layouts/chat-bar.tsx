@@ -27,6 +27,7 @@ import { MessageList } from "../components/message-list";
 import { Suggestions } from "../components/suggestions";
 import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
+import { useConfig } from "../hooks/use-config";
 import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { cn } from "../lib/utils";
@@ -46,7 +47,6 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			triggerEvent = "triggerDemoRequest",
 			resourceEndpoint,
 			api,
-			debug,
 		} = props;
 
 		const expandedWidth =
@@ -60,6 +60,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 		const cssVars = themeToCSSProperties(resolvedTheme);
 		const isDark = isDarkTheme(resolvedTheme);
 
+		const config = useConfig(api);
 		const engine = useChatEngine(props);
 		const handleCallTool = useCallTool({
 			...props,
@@ -223,7 +224,11 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 						<div className="ww:text-sm ww:font-semibold ww:truncate">
 							{title}
 						</div>
-						{debug && <ExportSessionButton messages={engine.messages} />}
+						<ExportSessionButton
+							messages={engine.messages}
+							evalEnabled={config.eval}
+							api={api}
+						/>
 					</div>
 
 					{/* Messages */}

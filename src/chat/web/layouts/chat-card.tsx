@@ -27,6 +27,7 @@ import { MessageList } from "../components/message-list";
 import { Suggestions } from "../components/suggestions";
 import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
+import { useConfig } from "../hooks/use-config";
 import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { cn } from "../lib/utils";
@@ -58,20 +59,8 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 		const cssVars = themeToCSSProperties(resolvedTheme);
 		const isDark = isDarkTheme(resolvedTheme);
 
-		const [serverDebug, setServerDebug] = useState(false);
-		const effectiveDebug = debug ?? serverDebug;
-
-		useEffect(() => {
-			(async () => {
-				try {
-					const r = await fetch(`${effectiveApi}/config`);
-					const data = await r.json();
-					if (data.debug === true) {
-						setServerDebug(true);
-					}
-				} catch {}
-			})();
-		}, [effectiveApi]);
+		const config = useConfig(effectiveApi);
+		const effectiveDebug = debug ?? config.debug;
 
 		const engine = useChatEngine({ ...props, api: effectiveApi });
 		const handleCallTool = useCallTool({
@@ -196,7 +185,11 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 					}}
 				>
 					<div className="ww:text-sm ww:font-semibold ww:truncate">{title}</div>
-					{effectiveDebug && <ExportSessionButton messages={engine.messages} />}
+					<ExportSessionButton
+						messages={engine.messages}
+						evalEnabled={config.eval}
+						api={effectiveApi}
+					/>
 				</div>
 
 				{/* Messages */}

@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
 	parseJsonEventStream,
@@ -128,6 +128,24 @@ async function sendMessages(
  *
  * @param dir - Path to the sessions directory. Defaults to `evals/sessions`.
  */
+/**
+ * Save a session replay JSON file to the sessions directory.
+ *
+ * @param session - The session to save.
+ * @param dir - Path to the sessions directory. Defaults to `evals/sessions`.
+ * @returns The filename that was written.
+ */
+export function saveSession(
+	session: SessionReplay,
+	dir = "evals/sessions",
+): string {
+	const root = join(process.cwd(), dir);
+	mkdirSync(root, { recursive: true });
+	const filename = `${session.name}.json`;
+	writeFileSync(join(root, filename), JSON.stringify(session, null, 2));
+	return filename;
+}
+
 export function loadSessions(dir = "evals/sessions"): SessionReplay[] {
 	const root = join(process.cwd(), dir);
 	return readdirSync(root)
