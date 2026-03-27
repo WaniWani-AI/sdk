@@ -1,12 +1,9 @@
 "use client";
 
-import {
-	parseJsonEventStream,
-	readUIMessageStream,
-	type UIMessage,
-	uiMessageChunkSchema,
-} from "ai";
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
+import type { ChatHandle } from "../@types";
+import { cn } from "../lib/utils";
+import { Button } from "../ui/button";
 
 // ---- Types ----
 
@@ -52,130 +49,160 @@ function getUserText(msg: SessionMessage): string {
 		.join("");
 }
 
-async function sendTurn(
-	messages: UIMessage[],
-	apiUrl: string,
-): Promise<{ toolsCalled: string[]; output: string; message: UIMessage }> {
-	const response = await fetch(apiUrl, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		signal: AbortSignal.timeout(60_000),
-		body: JSON.stringify({ messages }),
-	});
+type MessageLike = {
+	parts: Array<{ type: string; toolName?: string; text?: string }>;
+};
 
-	if (!response.ok || !response.body) {
-		throw new Error(`Chat returned ${response.status}`);
-	}
-
-	const chunkStream = parseJsonEventStream({
-		stream: response.body,
-		schema: uiMessageChunkSchema,
-	}).pipeThrough(
-		new TransformStream({
-			transform(chunk, controller) {
-				if (chunk.success) {
-					controller.enqueue(chunk.value);
-				}
-			},
-		}),
-	);
-
-	let finalMessage: UIMessage | undefined;
-	for await (const msg of readUIMessageStream({ stream: chunkStream })) {
-		finalMessage = msg;
-	}
-	if (!finalMessage) {
-		throw new Error("No message received");
-	}
-
-	const toolsCalled = finalMessage.parts
+function extractToolsCalled(message: MessageLike): string[] {
+	return message.parts
 		.filter((p) => p.type === "dynamic-tool" || p.type.startsWith("tool-"))
-		.map((p) => (p as unknown as { toolName: string }).toolName)
+		.map((p) => p.toolName as string)
 		.filter(Boolean);
+}
 
-	const output = finalMessage.parts
+function extractOutput(message: MessageLike): string {
+	return message.parts
 		.filter((p): p is { type: "text"; text: string } => p.type === "text")
 		.map((p) => p.text)
 		.join("");
-
-	return { toolsCalled, output, message: finalMessage };
 }
 
 // ---- Sub-components ----
 
-function Dot({ pass }: { pass: boolean | null }) {
-	const color =
-		pass === null
-			? "ww:bg-gray-300 dark:ww:bg-gray-600"
-			: pass
-				? "ww:bg-green-500"
-				: "ww:bg-red-500";
+function StatusLabel({ pass }: { pass: boolean | null }) {
 	return (
 		<span
-			className={`ww:inline-block ww:w-2 ww:h-2 ww:rounded-full ww:shrink-0 ${color}`}
-		/>
+			className={cn(
+				"ww:font-mono ww:text-[10px] ww:font-semibold ww:uppercase ww:tracking-wider ww:shrink-0",
+				pass === null && "ww:text-muted-foreground",
+				pass === true && "ww:text-green-500",
+				pass === false && "ww:text-red-500",
+			)}
+		>
+			{pass === null ? "SKIP" : pass ? "PASS" : "FAIL"}
+		</span>
 	);
 }
 
-function TurnRow({ turn }: { turn: TurnResult }) {
+function ScoreBar({ score }: { score: number }) {
+	const pct = Math.round(score * 100);
+	return (
+		<div className="ww:space-y-1.5">
+			<div className="ww:flex ww:items-baseline ww:justify-between">
+				<span className="ww:text-xs ww:font-mono ww:font-semibold ww:text-foreground">
+					{pct}%
+				</span>
+				<span className="ww:text-[10px] ww:text-muted-foreground ww:uppercase ww:tracking-wider ww:font-mono">
+					{score === 1 ? "ALL PASS" : "ASSERTIONS"}
+				</span>
+			</div>
+			<div className="ww:h-1 ww:w-full ww:rounded-full ww:bg-border">
+				<div
+					className={cn(
+						"ww:h-full ww:rounded-full ww:transition-all ww:duration-500 ww:ease-out",
+						score === 1
+							? "ww:bg-green-500"
+							: score >= 0.5
+								? "ww:bg-yellow-500"
+								: "ww:bg-red-500",
+					)}
+					style={{ width: `${pct}%` }}
+				/>
+			</div>
+		</div>
+	);
+}
+
+function TurnRow({ turn, index }: { turn: TurnResult; index: number }) {
 	const [open, setOpen] = useState(false);
 	const allPass =
 		turn.expectedTools.length === 0 ||
 		turn.expectedTools.every((t) => turn.toolsCalled.includes(t));
+	const status = turn.expectedTools.length > 0 ? allPass : null;
 
 	return (
-		<div className="ww:border ww:border-border ww:rounded-lg ww:overflow-hidden">
+		<div
+			className={cn(
+				"ww:border-l-2 ww:pl-3",
+				status === null && "ww:border-muted-foreground/30",
+				status === true && "ww:border-green-500",
+				status === false && "ww:border-red-500",
+				"ww:animate-[ww-fade-in_0.15s_ease-out_both]",
+			)}
+			style={{ animationDelay: `${index * 60}ms` }}
+		>
 			<button
 				type="button"
 				onClick={() => setOpen((v) => !v)}
-				className="ww:w-full ww:flex ww:items-center ww:gap-2 ww:px-3 ww:py-2 ww:text-left ww:hover:bg-muted/50 ww:transition-colors"
+				className="ww:w-full ww:flex ww:items-center ww:gap-2 ww:py-1.5 ww:text-left"
 			>
-				<Dot pass={turn.expectedTools.length > 0 ? allPass : null} />
-				<span className="ww:text-xs ww:text-foreground ww:truncate ww:flex-1">
+				<span
+					className={cn(
+						"ww:text-muted-foreground ww:text-[10px] ww:transition-transform ww:duration-150 ww:inline-block",
+						open && "ww:rotate-90",
+					)}
+				>
+					&#9654;
+				</span>
+				<span className="ww:text-xs ww:font-mono ww:text-foreground ww:truncate ww:flex-1">
 					{turn.input}
 				</span>
-				{turn.toolsCalled.length > 0 && (
-					<span className="ww:text-xs ww:text-muted-foreground ww:shrink-0">
-						{turn.toolsCalled.join(", ")}
-					</span>
-				)}
-				<span className="ww:text-xs ww:text-muted-foreground">
-					{open ? "▲" : "▼"}
-				</span>
+				<StatusLabel pass={status} />
 			</button>
-			{open && (
-				<div className="ww:px-3 ww:pb-3 ww:pt-2 ww:border-t ww:border-border ww:space-y-1.5">
-					{turn.expectedTools.map((tool) => {
-						const hit = turn.toolsCalled.includes(tool);
-						return (
-							<div
-								key={tool}
-								className="ww:flex ww:items-center ww:gap-2 ww:text-xs"
-							>
-								<Dot pass={hit} />
-								<span className="ww:font-mono ww:text-foreground">{tool}</span>
-								{!hit && turn.toolsCalled.length > 0 && (
-									<span className="ww:text-muted-foreground">
-										got [{turn.toolsCalled.join(", ")}]
+
+			<div
+				className={cn(
+					"ww:grid ww:transition-[grid-template-rows,opacity] ww:duration-200 ww:ease-out",
+					open
+						? "ww:grid-rows-[1fr] ww:opacity-100"
+						: "ww:grid-rows-[0fr] ww:opacity-0",
+				)}
+			>
+				<div className="ww:min-h-0 ww:overflow-hidden">
+					<div className="ww:pb-2 ww:pt-1 ww:space-y-1 ww:ml-4">
+						{turn.expectedTools.map((tool) => {
+							const hit = turn.toolsCalled.includes(tool);
+							return (
+								<div
+									key={tool}
+									className="ww:flex ww:items-center ww:gap-2 ww:text-xs"
+								>
+									<StatusLabel pass={hit} />
+									<span className="ww:font-mono ww:text-foreground/80">
+										{tool}
 									</span>
-								)}
+									{!hit && turn.toolsCalled.length > 0 && (
+										<span className="ww:text-muted-foreground ww:font-mono">
+											got [{turn.toolsCalled.join(", ")}]
+										</span>
+									)}
+								</div>
+							);
+						})}
+						{turn.expectedTools.length === 0 && turn.toolsCalled.length > 0 && (
+							<div className="ww:text-xs ww:text-muted-foreground ww:font-mono">
+								called: {turn.toolsCalled.join(", ")}
 							</div>
-						);
-					})}
-					{turn.output && (
-						<p className="ww:text-xs ww:text-muted-foreground ww:italic ww:border-t ww:border-border ww:pt-2 ww:line-clamp-2">
-							{turn.output}
-						</p>
-					)}
+						)}
+						{turn.output && (
+							<p className="ww:text-xs ww:text-muted-foreground ww:font-mono ww:line-clamp-2 ww:pt-1 ww:border-t ww:border-border/50">
+								{turn.output}
+							</p>
+						)}
+					</div>
 				</div>
-			)}
+			</div>
 		</div>
 	);
 }
 
 // ---- Main component ----
 
-type EvalPanelProps = { api?: string };
+type EvalPanelProps = {
+	api?: string;
+	/** Ref to the ChatCard or ChatBar so eval turns flow through the chat UI */
+	chatRef?: RefObject<ChatHandle | null>;
+};
 
 /**
  * Dev-only evaluation panel for replaying recorded sessions and asserting tool usage.
@@ -194,7 +221,7 @@ export function EvalPanel(props: EvalPanelProps) {
 	return <EvalPanelInner {...props} />;
 }
 
-function EvalPanelInner({ api }: EvalPanelProps) {
+function EvalPanelInner({ api, chatRef }: EvalPanelProps) {
 	const effectiveApi = api ?? "/api/waniwani";
 	const [enabled, setEnabled] = useState<boolean | null>(null);
 	const [sessions, setSessions] = useState<Session[]>([]);
@@ -233,7 +260,6 @@ function EvalPanelInner({ api }: EvalPanelProps) {
 		setError(null);
 
 		try {
-			const history: UIMessage[] = [];
 			const turns: TurnResult[] = [];
 
 			const userTurns: { user: SessionMessage; assistant?: SessionMessage }[] =
@@ -249,21 +275,25 @@ function EvalPanelInner({ api }: EvalPanelProps) {
 				}
 			}
 
-			for (const { user, assistant } of userTurns) {
-				const userMsg: UIMessage = {
-					...(user as unknown as UIMessage),
-				};
-				history.push(userMsg);
-
-				const expectedTools = assistant ? getRecordedTools(assistant) : [];
-				const { toolsCalled, output, message } = await sendTurn(
-					history,
-					effectiveApi,
+			if (!chatRef?.current) {
+				throw new Error(
+					"EvalPanel requires a chatRef prop pointing to the ChatCard/ChatBar",
 				);
-				history.push(message);
+			}
+
+			for (const { user, assistant } of userTurns) {
+				const userText = getUserText(user);
+				const expectedTools = assistant ? getRecordedTools(assistant) : [];
+
+				const responseMessage = (await chatRef.current.sendMessageAndWait(
+					userText,
+				)) as MessageLike;
+
+				const toolsCalled = extractToolsCalled(responseMessage);
+				const output = extractOutput(responseMessage);
 
 				turns.push({
-					input: getUserText(user),
+					input: userText,
 					toolsCalled,
 					expectedTools,
 					output,
@@ -293,12 +323,19 @@ function EvalPanelInner({ api }: EvalPanelProps) {
 	}
 
 	return (
-		<div className="ww:flex ww:flex-col ww:h-full ww:overflow-hidden">
+		<div className="ww:flex ww:flex-col ww:h-full ww:overflow-hidden ww:text-foreground">
+			{/* Header */}
+			<div className="ww:px-3 ww:py-2 ww:border-b ww:border-border/50">
+				<span className="ww:text-[10px] ww:font-mono ww:uppercase ww:tracking-widest ww:text-muted-foreground">
+					Eval
+				</span>
+			</div>
+
 			{/* Session list */}
 			<div className="ww:flex-1 ww:overflow-y-auto ww:min-h-0">
 				{sessions.length === 0 ? (
-					<p className="ww:text-xs ww:text-muted-foreground ww:text-center ww:py-8 ww:px-4">
-						No sessions found in evals/sessions/
+					<p className="ww:text-xs ww:font-mono ww:text-muted-foreground ww:text-center ww:py-8 ww:px-4">
+						No sessions found
 					</p>
 				) : (
 					sessions.map((s) => (
@@ -310,15 +347,18 @@ function EvalPanelInner({ api }: EvalPanelProps) {
 								setResult(null);
 								setError(null);
 							}}
-							className={`ww:w-full ww:text-left ww:px-4 ww:py-2.5 ww:text-xs ww:border-b ww:border-border ww:hover:bg-muted/50 ww:transition-colors ${
-								selected?.name === s.name ? "ww:bg-primary/10" : ""
-							}`}
+							className={cn(
+								"ww:w-full ww:text-left ww:px-3 ww:py-2 ww:text-xs ww:font-mono ww:transition-colors ww:border-l-2",
+								selected?.name === s.name
+									? "ww:border-primary ww:bg-primary/5 ww:text-foreground"
+									: "ww:border-transparent ww:text-foreground/70 ww:hover:text-foreground ww:hover:bg-muted/30",
+							)}
 						>
-							<span className="ww:block ww:font-medium ww:text-foreground ww:truncate">
-								{s.name}
-							</span>
+							<span className="ww:block ww:truncate">{s.name}</span>
 							{s.mode && (
-								<span className="ww:text-muted-foreground">{s.mode}</span>
+								<span className="ww:text-[10px] ww:text-muted-foreground ww:uppercase ww:tracking-wider">
+									{s.mode}
+								</span>
 							)}
 						</button>
 					))
@@ -327,29 +367,28 @@ function EvalPanelInner({ api }: EvalPanelProps) {
 
 			{/* Run + results */}
 			{selected && (
-				<div className="ww:border-t ww:border-border ww:p-3 ww:space-y-3 ww:overflow-y-auto ww:max-h-[60%]">
-					<button
-						type="button"
+				<div className="ww:border-t ww:border-border/50 ww:p-3 ww:space-y-3 ww:overflow-y-auto ww:max-h-[60%]">
+					<Button
 						onClick={() => runSession(selected)}
 						disabled={running}
-						className="ww:w-full ww:py-1.5 ww:rounded-lg ww:text-xs ww:font-medium ww:bg-primary ww:text-primary-foreground ww:hover:opacity-90 ww:disabled:opacity-50 ww:transition-opacity"
+						size="sm"
+						className="ww:w-full ww:font-mono ww:text-xs"
 					>
-						{running ? "Running…" : "Run"}
-					</button>
+						{running ? "Running..." : "Run session"}
+					</Button>
 
-					{error && <p className="ww:text-xs ww:text-destructive">{error}</p>}
+					{error && (
+						<div className="ww:border-l-2 ww:border-red-500 ww:pl-3 ww:py-1">
+							<p className="ww:text-xs ww:font-mono ww:text-red-500">{error}</p>
+						</div>
+					)}
 
 					{result && (
-						<div className="ww:space-y-2">
-							<div className="ww:flex ww:items-center ww:gap-2 ww:text-xs">
-								<Dot pass={result.score === 1} />
-								<span className="ww:text-muted-foreground">
-									{Math.round(result.score * 100)}% assertions passed
-								</span>
-							</div>
+						<div className="ww:space-y-3 ww:animate-[ww-fade-in_0.2s_ease-out_both]">
+							<ScoreBar score={result.score} />
 							<div className="ww:space-y-1">
 								{result.turns.map((turn, i) => (
-									<TurnRow key={i} turn={turn} />
+									<TurnRow key={i} turn={turn} index={i} />
 								))}
 							</div>
 						</div>

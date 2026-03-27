@@ -137,9 +137,10 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 					engine.handleSubmit({ text, files: [] });
 					focusInput();
 				},
+				sendMessageAndWait: (text: string) => engine.sendMessageAndWait(text),
 				focus: focusInput,
 			}),
-			[engine.handleSubmit, focusInput],
+			[engine.handleSubmit, engine.sendMessageAndWait, focusInput],
 		);
 
 		// Listen for custom trigger event (e.g. "triggerDemoRequest")

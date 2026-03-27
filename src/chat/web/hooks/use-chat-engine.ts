@@ -146,13 +146,26 @@ export function useChatEngine(props: ChatBaseProps) {
 		}),
 	);
 
+	const pendingWaitRef = useRef<{
+		resolve: (msg: unknown) => void;
+		reject: (err: Error) => void;
+	} | null>(null);
+
 	const { messages, sendMessage, status } = useChat({
 		transport: transportRef.current,
-		onFinish() {
+		onFinish(message) {
 			onResponseReceived?.();
+			if (pendingWaitRef.current) {
+				pendingWaitRef.current.resolve(message);
+				pendingWaitRef.current = null;
+			}
 		},
 		onError(error) {
 			console.warn("[WaniWani] Chat error:", error.message);
+			if (pendingWaitRef.current) {
+				pendingWaitRef.current.reject(error);
+				pendingWaitRef.current = null;
+			}
 		},
 	});
 
@@ -206,6 +219,17 @@ export function useChatEngine(props: ChatBaseProps) {
 		[sendMessage, onMessageSent, isLoading, queuedMessages.length],
 	);
 
+	const sendMessageAndWait = useCallback(
+		(text: string): Promise<unknown> => {
+			return new Promise((resolve, reject) => {
+				pendingWaitRef.current = { resolve, reject };
+				sendMessage({ text });
+				onMessageSent?.(text);
+			});
+		},
+		[sendMessage, onMessageSent],
+	);
+
 	// Flush first queued message once the current response finishes
 	useEffect(() => {
 		if (status !== "ready") {
@@ -250,6 +274,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		lastMessage,
 		hasMessages,
 		sendMessage,
+		sendMessageAndWait,
 		queuedMessages,
 		queueFull,
 		removeQueuedMessage,

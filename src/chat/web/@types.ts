@@ -159,6 +159,11 @@ export interface ChatCardProps extends ChatBaseProps {
 export interface ChatHandle {
 	/** Programmatically send a user message into the chat */
 	sendMessage: (text: string) => void;
+	/**
+	 * Send a user message and wait for the assistant response to complete.
+	 * Returns the final assistant message. Useful for eval/testing flows.
+	 */
+	sendMessageAndWait: (text: string) => Promise<unknown>;
 	/** Scroll to the chat input, focus it, and show a highlight glow */
 	focus: () => void;
 }
