@@ -325,13 +325,45 @@ function EvalPanelInner({ api, chatRef }: EvalPanelProps) {
 		return null;
 	}
 
+	function reloadSessions() {
+		fetch(`${effectiveApi}/sessions`)
+			.then((r) => r.json())
+			.then((data: Session[]) => {
+				setSessions(data);
+			})
+			.catch(() => {});
+	}
+
 	return (
-		<div className="ww:flex ww:flex-col ww:h-full ww:overflow-hidden ww:text-foreground ww:border-l ww:border-border ww:pl-1">
+		<div className="ww:flex ww:flex-col ww:h-full ww:overflow-hidden ww:text-foreground ww:border-l ww:border-border ww:pl-1 ww:min-w-[220px]">
 			{/* Header */}
-			<div className="ww:px-3 ww:py-2 ww:border-b ww:border-border/50">
+			<div className="ww:px-3 ww:py-2 ww:border-b ww:border-border/50 ww:flex ww:items-center ww:justify-between">
 				<span className="ww:text-[10px] ww:font-mono ww:uppercase ww:tracking-widest ww:text-muted-foreground">
 					Eval
 				</span>
+				<button
+					type="button"
+					onClick={reloadSessions}
+					className="ww:text-muted-foreground ww:hover:text-foreground ww:transition-colors ww:cursor-pointer"
+					title="Reload sessions"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="12"
+						height="12"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+						role="img"
+					>
+						<title>Reload sessions</title>
+						<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+						<path d="M21 3v5h-5" />
+					</svg>
+				</button>
 			</div>
 
 			{/* Session list */}
