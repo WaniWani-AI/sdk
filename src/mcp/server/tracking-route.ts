@@ -11,7 +11,7 @@
  *
  * const handler = createTrackingRoute({
  *   apiKey: process.env.WANIWANI_API_KEY,
- *   apiUrl: process.env.WANIWANI_BASE_URL,
+ *   apiUrl: process.env.WANIWANI_API_URL,
  * });
  *
  * export { handler as POST };

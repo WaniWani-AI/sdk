@@ -7,18 +7,18 @@
  * Usage:
  *   WANIWANI_API_KEY=your-key bun run playground/e2e-tracking.ts
  *
- * Expects backend on http://localhost:3000 (or set WANIWANI_BASE_URL).
+ * Expects backend on http://localhost:3000 (or set WANIWANI_API_URL).
  */
 
 import { waniwani } from "../src/waniwani.js";
 import { withWaniwani } from "../src/mcp/server/with-waniwani/index.js";
 
-const baseUrl = process.env.WANIWANI_BASE_URL ?? "http://localhost:3000";
+const apiUrl = process.env.WANIWANI_API_URL ?? "http://localhost:3000";
 const apiKey = process.env.WANIWANI_API_KEY ?? "playground-dev-key";
 
-const client = waniwani({ apiKey, baseUrl });
+const client = waniwani({ apiKey, apiUrl });
 
-console.log(`\n[e2e-tracking] Backend: ${baseUrl}`);
+console.log(`\n[e2e-tracking] Backend: ${apiUrl}`);
 console.log("[e2e-tracking] API Key: %s\n", apiKey.slice(0, 8) + "...");
 
 // ─── Test 1: Direct client.track() ──────────────────────────────────────────

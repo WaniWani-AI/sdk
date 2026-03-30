@@ -39,7 +39,7 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 	constructor(options?: KvStoreOptions) {
 		this.baseUrl = (
 			options?.baseUrl ??
-			process.env.WANIWANI_BASE_URL ??
+			process.env.WANIWANI_API_URL ??
 			DEFAULT_BASE_URL
 		).replace(/\/$/, "");
 		this.apiKey = options?.apiKey ?? process.env.WANIWANI_API_KEY;

@@ -2,7 +2,7 @@ import { waniwani } from "@waniwani/sdk";
 
 const client = waniwani({
 	apiKey: process.env.WANIWANI_API_KEY ?? "playground-dev-key",
-	baseUrl: process.env.WANIWANI_BASE_URL ?? "http://localhost:3000",
+	apiUrl: process.env.WANIWANI_API_URL ?? "http://localhost:3000",
 });
 
 export async function POST(request: Request) {
