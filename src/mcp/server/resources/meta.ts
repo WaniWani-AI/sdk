@@ -11,10 +11,10 @@ export const MIME_TYPE_MCP = "text/html;profile=mcp-app";
 // ---- HTML fetching ----
 
 export const fetchHtml = async (
-	apiUrl: string,
+	baseUrl: string,
 	path: string,
 ): Promise<string> => {
-	const normalizedBase = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
+	const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
 	const result = await fetch(`${normalizedBase}${path}`);
 	return await result.text();
 };

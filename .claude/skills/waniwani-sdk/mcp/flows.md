@@ -421,7 +421,7 @@ const pricingUI = createResource({
   id: "pricing_table",
   title: "Pricing Table",
   description: "Interactive pricing comparison",
-  apiUrl: "https://my-app.com",
+  baseUrl: "https://my-app.com",
   htmlPath: "/widgets/pricing",
   widgetDomain: "my-app.com",
 });

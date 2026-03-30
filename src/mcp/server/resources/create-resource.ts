@@ -16,7 +16,7 @@ import type { McpServer, RegisteredResource, ResourceConfig } from "./types";
  * const pricingUI = createResource({
  *   id: "pricing_table",
  *   title: "Pricing Table",
- *   apiUrl: "https://my-app.com",
+ *   baseUrl: "https://my-app.com",
  *   htmlPath: "/widgets/pricing",
  *   widgetDomain: "my-app.com",
  * });
@@ -29,24 +29,24 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 		id,
 		title,
 		description,
-		apiUrl,
+		baseUrl,
 		htmlPath,
 		widgetDomain,
 		prefersBorder = true,
 		autoHeight = true,
 	} = config;
 
-	// Auto-generate CSP from apiUrl if not explicitly provided
+	// Auto-generate CSP from baseUrl if not explicitly provided
 	let widgetCSP = config.widgetCSP ?? {
-		connect_domains: [apiUrl],
-		resource_domains: [apiUrl],
+		connect_domains: [baseUrl],
+		resource_domains: [baseUrl],
 	};
 
 	// In development with localhost, add extra CSP domains for
 	// Next.js dev features (WebSocket HMR, Turbopack font serving)
 	if (process.env.NODE_ENV === "development") {
 		try {
-			const { hostname } = new URL(apiUrl);
+			const { hostname } = new URL(baseUrl);
 			if (hostname === "localhost" || hostname === "127.0.0.1") {
 				widgetCSP = {
 					...widgetCSP,
@@ -62,7 +62,7 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 				};
 			}
 		} catch {
-			// Invalid apiUrl — skip dev CSP additions
+			// Invalid baseUrl — skip dev CSP additions
 		}
 	}
 
@@ -73,7 +73,7 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 	let htmlPromise: Promise<string> | null = null;
 	const getHtml = () => {
 		if (!htmlPromise) {
-			htmlPromise = fetchHtml(apiUrl, htmlPath);
+			htmlPromise = fetchHtml(baseUrl, htmlPath);
 		}
 		return htmlPromise;
 	};

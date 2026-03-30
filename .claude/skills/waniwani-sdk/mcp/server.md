@@ -22,8 +22,8 @@ Creates a reusable UI resource (HTML template). Register it on the server, then 
 | `id` | `string` | Yes | Unique resource identifier |
 | `title` | `string` | Yes | Display title |
 | `description` | `string` | No | UI description (WHAT it displays) |
-| `apiUrl` | `string` | Yes | Where to fetch widget HTML |
-| `htmlPath` | `string` | Yes | Path relative to apiUrl |
+| `baseUrl` | `string` | Yes | Where to fetch widget HTML |
+| `htmlPath` | `string` | Yes | Path relative to baseUrl |
 | `widgetDomain` | `string` | Yes | Domain for OpenAI security context |
 | `prefersBorder` | `boolean` | No | Widget border (default: `true`) |
 | `autoHeight` | `boolean` | No | Auto-adapt iframe height to content |
@@ -91,7 +91,7 @@ const pricingUI = createResource({
   id: "show_pricing",
   title: "Show Pricing",
   description: "Displays pricing plans",
-  apiUrl: "https://my-app.com",
+  baseUrl: "https://my-app.com",
   htmlPath: "/widgets/pricing",
   widgetDomain: "my-app.com",
 });
