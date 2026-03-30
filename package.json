@@ -105,7 +105,7 @@
   },
   "devDependencies": {
     "@ai-sdk/mcp": "^1.0.0",
-    "@ai-sdk/react": "^3.0.73",
+    "@ai-sdk/react": "^3.0.134",
     "@biomejs/biome": "^2.3.13",
     "@modelcontextprotocol/ext-apps": "1.0.1",
     "@modelcontextprotocol/sdk": "1.25.2",
@@ -116,7 +116,7 @@
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.2.3",
-    "ai": "^6.0.71",
+    "ai": "^6.0.134",
     "autoevals": "^0.0.132",
     "clsx": "^2.1.1",
     "happy-dom": "^20.7.0",
