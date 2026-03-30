@@ -73,7 +73,7 @@ export interface ApiHandlerOptions {
 	 * The base URL of the WaniWani API.
 	 * Defaults to https://app.waniwani.ai.
 	 */
-	baseUrl?: string;
+	apiUrl?: string;
 
 	/**
 	 * System prompt for the assistant.
@@ -141,7 +141,7 @@ type ConfigResolver = () => Promise<McpEnvironmentConfig>;
 
 export interface ApiHandlerDeps {
 	apiKey: string | undefined;
-	baseUrl: string;
+	apiUrl: string;
 	source: string | undefined;
 	systemPrompt: string | undefined;
 	maxSteps: number;

@@ -11,7 +11,9 @@ export type {
 	KbSearchOptions,
 	KbSource,
 } from "./kb/types.js";
-
+export type { WaniWaniProjectConfig } from "./project-config.js";
+// Project Config
+export { defineConfig } from "./project-config.js";
 // Types - Tracking
 export type {
 	EventType,
@@ -32,7 +34,6 @@ export type {
 	V2EnvelopeType,
 	V2EventEnvelope,
 } from "./tracking/index.js";
-
 // Types - Client
 export type { WaniWaniClient, WaniWaniConfig } from "./types.js";
 

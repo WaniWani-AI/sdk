@@ -35,14 +35,14 @@ export function toNextJsHandler(
 	client: WaniWaniClient,
 	options: NextJsHandlerOptions,
 ): NextJsHandlerResult {
-	const { apiKey, baseUrl } = client._config;
+	const { apiKey, apiUrl } = client._config;
 
 	const debugEnabled = options?.debug ?? process.env.WANIWANI_DEBUG === "1";
 
 	const handler = createApiHandler({
 		...options?.chat,
 		apiKey,
-		baseUrl,
+		apiUrl,
 		source: options?.source,
 		debug: debugEnabled,
 	});

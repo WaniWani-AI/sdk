@@ -4,7 +4,7 @@
  */
 
 interface WidgetTokenConfig {
-	baseUrl: string;
+	apiUrl: string;
 	apiKey: string;
 }
 
@@ -56,7 +56,7 @@ export class WidgetTokenCache {
 		sessionId?: string,
 		traceId?: string,
 	): Promise<string | null> {
-		const url = joinUrl(this.config.baseUrl, "/api/mcp/widget-tokens");
+		const url = joinUrl(this.config.apiUrl, "/api/mcp/widget-tokens");
 
 		const body: Record<string, string> = {};
 		if (sessionId) {
@@ -104,7 +104,7 @@ export class WidgetTokenCache {
 	}
 }
 
-function joinUrl(baseUrl: string, path: string): string {
-	const base = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+function joinUrl(apiUrl: string, path: string): string {
+	const base = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
 	return `${base}${path}`;
 }

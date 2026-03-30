@@ -22,7 +22,7 @@ export interface WaniWaniConfig {
 	 *
 	 * Defaults to https://app.waniwani.ai
 	 */
-	baseUrl?: string;
+	apiUrl?: string;
 	/**
 	 * Tracking transport behavior.
 	 */
@@ -54,7 +54,7 @@ export interface WaniWaniClient extends TrackingClient {
 // ============================================================================
 
 export interface InternalConfig {
-	baseUrl: string;
+	apiUrl: string;
 	apiKey: string | undefined;
 	tracking: Required<TrackingConfig>;
 }

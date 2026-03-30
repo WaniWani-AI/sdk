@@ -32,7 +32,7 @@ function mockClient() {
 				sources: async () => [],
 			},
 			_config: {
-				baseUrl: "https://test.waniwani.ai",
+				apiUrl: "https://test.waniwani.ai",
 				apiKey: undefined,
 				tracking: {
 					endpointPath: "/api/mcp/events/v2/batch",

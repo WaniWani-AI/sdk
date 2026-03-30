@@ -30,12 +30,12 @@ const SDK_NAME = "@waniwani/sdk";
 const DEFAULT_BASE_URL = "https://app.waniwani.ai";
 
 export class WaniwaniFlowStore implements FlowStore {
-	private readonly baseUrl: string;
+	private readonly apiUrl: string;
 	private readonly apiKey: string | undefined;
 
-	constructor(options?: { baseUrl?: string; apiKey?: string }) {
-		this.baseUrl = (
-			options?.baseUrl ??
+	constructor(options?: { apiUrl?: string; apiKey?: string }) {
+		this.apiUrl = (
+			options?.apiUrl ??
 			process.env.WANIWANI_BASE_URL ??
 			DEFAULT_BASE_URL
 		).replace(/\/$/, "");
@@ -80,7 +80,7 @@ export class WaniwaniFlowStore implements FlowStore {
 	}
 
 	private async request<T>(path: string, body: unknown): Promise<T> {
-		const url = `${this.baseUrl}${path}`;
+		const url = `${this.apiUrl}${path}`;
 		const response = await fetch(url, {
 			method: "POST",
 			headers: {

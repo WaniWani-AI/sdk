@@ -35,7 +35,7 @@ export type {
 } from "./v2-types.js";
 
 export function createTrackingClient(config: InternalConfig): TrackingClient {
-	const { baseUrl, apiKey, tracking } = config;
+	const { apiUrl, apiKey, tracking } = config;
 
 	function requireApiKey(): string {
 		if (!apiKey) {
@@ -46,7 +46,7 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 
 	const transport = apiKey
 		? createV2BatchTransport({
-				baseUrl,
+				apiUrl,
 				apiKey,
 				endpointPath: tracking.endpointPath,
 				flushIntervalMs: tracking.flushIntervalMs,

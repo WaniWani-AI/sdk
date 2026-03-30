@@ -9,7 +9,7 @@ interface McpEnvironmentConfig {
 const TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export function createMcpConfigResolver(
-	baseUrl: string,
+	apiUrl: string,
 	apiKey: string | undefined,
 ) {
 	let cached: { config: McpEnvironmentConfig; expiresAt: number } | null = null;
@@ -33,7 +33,7 @@ export function createMcpConfigResolver(
 				);
 			}
 
-			const response = await fetch(`${baseUrl}/api/mcp/environments/config`, {
+			const response = await fetch(`${apiUrl}/api/mcp/environments/config`, {
 				method: "GET",
 				headers: {
 					Authorization: `Bearer ${apiKey}`,

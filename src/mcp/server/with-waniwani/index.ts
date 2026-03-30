@@ -1,4 +1,5 @@
 import type { ToolCalledProperties } from "../../../tracking/index.js";
+import { waniwani } from "../../../waniwani.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../tools/types";
 import { WidgetTokenCache } from "../widget-token.js";
@@ -25,10 +26,11 @@ type WrappedServer = McpServer & {
  */
 export type WithWaniwaniOptions = {
 	/**
-	 * The WaniWani client instance. All tracking calls made through this client
-	 * during tool execution will automatically include session metadata.
+	 * The WaniWani client instance. When omitted, a client is created
+	 * automatically using the global config registered by `defineConfig()`,
+	 * falling back to env vars.
 	 */
-	client: WaniwaniTracker;
+	client?: WaniwaniTracker;
 	/**
 	 * Optional explicit tool type. Defaults to `"other"`.
 	 */
@@ -73,7 +75,7 @@ const DEFAULT_BASE_URL = "https://app.waniwani.ai";
  */
 export function withWaniwani(
 	server: McpServer,
-	options: WithWaniwaniOptions,
+	options?: WithWaniwaniOptions,
 ): McpServer {
 	const wrappedServer = server as WrappedServer;
 	if (wrappedServer.__waniwaniWrapped) {
@@ -82,8 +84,9 @@ export function withWaniwani(
 
 	wrappedServer.__waniwaniWrapped = true;
 
-	const tracker = options.client;
-	const injectToken = options.injectWidgetToken !== false;
+	const opts = options ?? {};
+	const tracker = opts.client ?? waniwani();
+	const injectToken = opts.injectWidgetToken !== false;
 
 	let tokenCache: WidgetTokenCache | null = null;
 
@@ -96,7 +99,7 @@ export function withWaniwani(
 			return null;
 		}
 		tokenCache = new WidgetTokenCache({
-			baseUrl: tracker._config.baseUrl ?? DEFAULT_BASE_URL,
+			apiUrl: tracker._config.apiUrl ?? DEFAULT_BASE_URL,
 			apiKey,
 		});
 		return tokenCache;
@@ -159,7 +162,7 @@ export function withWaniwani(
 					buildTrackInput(
 						toolName,
 						extra,
-						options,
+						opts,
 						{
 							durationMs,
 							status: isErrorResult ? "error" : "ok",
@@ -170,11 +173,11 @@ export function withWaniwani(
 						clientInfo,
 						{ input, output: result },
 					),
-					options.onError,
+					opts.onError,
 				);
 
-				if (options.flushAfterToolCall) {
-					await safeFlush(tracker, options.onError);
+				if (opts.flushAfterToolCall) {
+					await safeFlush(tracker, opts.onError);
 				}
 
 				injectRequestMetadata(result, extra);
@@ -183,9 +186,9 @@ export function withWaniwani(
 					await injectWidgetConfig(
 						result,
 						getTokenCache(),
-						tracker._config.baseUrl ?? DEFAULT_BASE_URL,
+						tracker._config.apiUrl ?? DEFAULT_BASE_URL,
 						extra,
-						options.onError,
+						opts.onError,
 					);
 				}
 
@@ -198,7 +201,7 @@ export function withWaniwani(
 					buildTrackInput(
 						toolName,
 						extra,
-						options,
+						opts,
 						{
 							durationMs,
 							status: "error",
@@ -208,11 +211,11 @@ export function withWaniwani(
 						clientInfo,
 						{ input },
 					),
-					options.onError,
+					opts.onError,
 				);
 
-				if (options.flushAfterToolCall) {
-					await safeFlush(tracker, options.onError);
+				if (opts.flushAfterToolCall) {
+					await safeFlush(tracker, opts.onError);
 				}
 
 				throw error;

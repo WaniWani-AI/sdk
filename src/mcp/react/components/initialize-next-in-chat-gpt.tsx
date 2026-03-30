@@ -10,16 +10,16 @@
  *
  * https://vercel.com/blog/running-next-js-inside-chatgpt-a-deep-dive-into-native-app-integration
  */
-export function InitializeNextJsInChatGpt({ baseUrl }: { baseUrl: string }) {
+export function InitializeNextJsInChatGpt({ apiUrl }: { apiUrl: string }) {
 	return (
 		<>
-			<base href={baseUrl}></base>
-			<script>{`window.innerBaseUrl = ${JSON.stringify(baseUrl)}`}</script>
+			<base href={apiUrl}></base>
+			<script>{`window.innerBaseUrl = ${JSON.stringify(apiUrl)}`}</script>
 			<script>{`window.__isChatGptApp = typeof window.openai !== "undefined";`}</script>
 			<script>
 				{"(" +
 					(() => {
-						const baseUrl = window.innerBaseUrl;
+						const apiUrl = window.innerBaseUrl;
 						const htmlElement = document.documentElement;
 						const observer = new MutationObserver((mutations) => {
 							mutations.forEach((mutation) => {
@@ -78,7 +78,7 @@ export function InitializeNextJsInChatGpt({ baseUrl }: { baseUrl: string }) {
 							}
 						};
 
-						const appOrigin = new URL(baseUrl).origin;
+						const appOrigin = new URL(apiUrl).origin;
 						const isInIframe = window.self !== window.top;
 
 						window.addEventListener(
@@ -136,7 +136,7 @@ export function InitializeNextJsInChatGpt({ baseUrl }: { baseUrl: string }) {
 								}
 
 								if (url.origin === window.location.origin) {
-									const newUrl = new URL(baseUrl);
+									const newUrl = new URL(apiUrl);
 									newUrl.pathname = url.pathname;
 									newUrl.search = url.search;
 									newUrl.hash = url.hash;

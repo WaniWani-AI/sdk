@@ -14,7 +14,7 @@ import type {
 const SDK_NAME = "@waniwani/sdk";
 
 export function createKbClient(config: InternalConfig): KbClient {
-	const { baseUrl, apiKey } = config;
+	const { apiUrl, apiKey } = config;
 
 	function requireApiKey(): string {
 		if (!apiKey) {
@@ -29,7 +29,7 @@ export function createKbClient(config: InternalConfig): KbClient {
 		body?: unknown,
 	): Promise<T> {
 		const key = requireApiKey();
-		const url = `${baseUrl.replace(/\/$/, "")}${path}`;
+		const url = `${apiUrl.replace(/\/$/, "")}${path}`;
 
 		const headers: Record<string, string> = {
 			Authorization: `Bearer ${key}`,

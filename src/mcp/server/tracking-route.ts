@@ -11,7 +11,7 @@
  *
  * const handler = createTrackingRoute({
  *   apiKey: process.env.WANIWANI_API_KEY,
- *   baseUrl: process.env.WANIWANI_BASE_URL,
+ *   apiUrl: process.env.WANIWANI_BASE_URL,
  * });
  *
  * export { handler as POST };
@@ -26,7 +26,7 @@ export interface TrackingRouteOptions {
 	/** API key for the WaniWani backend. Defaults to WANIWANI_API_KEY env var. */
 	apiKey?: string;
 	/** Base URL for the WaniWani backend. Defaults to https://app.waniwani.ai. */
-	baseUrl?: string;
+	apiUrl?: string;
 }
 
 /** Shape of a single event from the WidgetTransport client. */
@@ -90,7 +90,7 @@ function mapWidgetEvent(ev: WidgetEventPayload): TrackInput {
 export function createTrackingRoute(options?: TrackingRouteOptions) {
 	const config: WaniWaniConfig = {
 		apiKey: options?.apiKey,
-		baseUrl: options?.baseUrl,
+		apiUrl: options?.apiUrl,
 	};
 
 	// Lazy singleton — created on first request

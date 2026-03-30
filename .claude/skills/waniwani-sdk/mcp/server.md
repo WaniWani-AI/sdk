@@ -22,8 +22,8 @@ Creates a reusable UI resource (HTML template). Register it on the server, then 
 | `id` | `string` | Yes | Unique resource identifier |
 | `title` | `string` | Yes | Display title |
 | `description` | `string` | No | UI description (WHAT it displays) |
-| `baseUrl` | `string` | Yes | Where to fetch widget HTML |
-| `htmlPath` | `string` | Yes | Path relative to baseUrl |
+| `apiUrl` | `string` | Yes | Where to fetch widget HTML |
+| `htmlPath` | `string` | Yes | Path relative to apiUrl |
 | `widgetDomain` | `string` | Yes | Domain for OpenAI security context |
 | `prefersBorder` | `boolean` | No | Widget border (default: `true`) |
 | `autoHeight` | `boolean` | No | Auto-adapt iframe height to content |
@@ -91,7 +91,7 @@ const pricingUI = createResource({
   id: "show_pricing",
   title: "Show Pricing",
   description: "Displays pricing plans",
-  baseUrl: "https://my-app.com",
+  apiUrl: "https://my-app.com",
   htmlPath: "/widgets/pricing",
   widgetDomain: "my-app.com",
 });
@@ -152,13 +152,13 @@ Wraps an MCP server so all tool handlers automatically emit `tool.called` events
 **after** execution with timing and status:
 
 ```typescript
+import "../../waniwani.config";
 import { withWaniwani } from "@waniwani/sdk/mcp";
 
 const server = new McpServer({ name: "my-server", version: "1.0.0" });
-withWaniwani(server, {
-  config: { apiKey: "..." },
-  flushAfterToolCall: true,
-});
+
+// No args needed — reads from defineConfig
+withWaniwani(server);
 ```
 
 Each `tool.called` event includes `durationMs` (execution time), `status` (`"ok"` or `"error"`),
@@ -167,7 +167,7 @@ and `errorMessage` (on failure). Errors are re-thrown after tracking.
 **Widget tracking config injection (default: enabled):** When `injectWidgetToken` is `true`
 (default), `withWaniwani` injects `_meta.waniwani` into tool responses.
 
-- Always injects `endpoint` (derived from `baseUrl`).
+- Always injects `endpoint` (derived from `apiUrl`).
 - Injects `token` when JWT minting via `POST /api/mcp/widget-tokens` succeeds.
 
 This allows browser widgets using `useWaniwani()` to send events directly to the WaniWani
@@ -187,7 +187,7 @@ import { createTrackingRoute } from "@waniwani/sdk/mcp";
 // app/api/waniwani/track/route.ts
 const handler = createTrackingRoute({
   apiKey: process.env.WANIWANI_API_KEY,
-  baseUrl: process.env.WANIWANI_BASE_URL,
+  apiUrl: process.env.WANIWANI_API_URL,
 });
 
 export { handler as POST };
@@ -198,7 +198,7 @@ export { handler as POST };
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `apiKey` | `string` | No | API key for the WaniWani backend. Defaults to `WANIWANI_API_KEY` env var. |
-| `baseUrl` | `string` | No | Base URL for the WaniWani backend. Defaults to `https://app.waniwani.ai`. |
+| `apiUrl` | `string` | No | Base URL for the WaniWani backend. Defaults to `https://app.waniwani.ai`. |
 
 This is an alternative to direct browser-to-backend posting via JWT tokens. Use it when
 you prefer routing widget events through your own server rather than having widgets POST

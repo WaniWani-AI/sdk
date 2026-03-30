@@ -28,7 +28,7 @@ describe("V2 transport", () => {
 		const requests: V2BatchRequest[] = [];
 
 		const transport = createV2BatchTransport({
-			baseUrl: "https://example.com",
+			apiUrl: "https://example.com",
 			apiKey: "test-key",
 			flushIntervalMs: 20,
 			maxBatchSize: 50,
@@ -49,7 +49,7 @@ describe("V2 transport", () => {
 		const requests: V2BatchRequest[] = [];
 
 		const transport = createV2BatchTransport({
-			baseUrl: "https://example.com",
+			apiUrl: "https://example.com",
 			apiKey: "test-key",
 			flushIntervalMs: 10_000,
 			maxBatchSize: 2,
@@ -73,7 +73,7 @@ describe("V2 transport", () => {
 		const backoffs: number[] = [];
 
 		const transport = createV2BatchTransport({
-			baseUrl: "https://example.com",
+			apiUrl: "https://example.com",
 			apiKey: "test-key",
 			flushIntervalMs: 10_000,
 			maxRetries: 2,
@@ -104,7 +104,7 @@ describe("V2 transport", () => {
 		let attempts = 0;
 
 		const transport = createV2BatchTransport({
-			baseUrl: "https://example.com",
+			apiUrl: "https://example.com",
 			apiKey: "test-key",
 			flushIntervalMs: 10_000,
 			fetchFn: async () => {
@@ -128,7 +128,7 @@ describe("V2 transport", () => {
 
 	test("drains on shutdown and reports timeout state", async () => {
 		const fastTransport = createV2BatchTransport({
-			baseUrl: "https://example.com",
+			apiUrl: "https://example.com",
 			apiKey: "test-key",
 			flushIntervalMs: 10_000,
 			fetchFn: async () => {
@@ -143,7 +143,7 @@ describe("V2 transport", () => {
 		expect(drained.pendingEvents).toBe(0);
 
 		const slowTransport = createV2BatchTransport({
-			baseUrl: "https://example.com",
+			apiUrl: "https://example.com",
 			apiKey: "test-key",
 			flushIntervalMs: 10_000,
 			fetchFn: async () => {

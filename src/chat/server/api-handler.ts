@@ -46,7 +46,7 @@ function jsonResponse(data: object, status: number): Response {
 export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 	const {
 		apiKey = process.env.WANIWANI_API_KEY,
-		baseUrl = "https://app.waniwani.ai",
+		apiUrl = "https://app.waniwani.ai",
 		source,
 		systemPrompt,
 		maxSteps = 5,
@@ -57,11 +57,11 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 
 	const log = createLogger("router", debug);
 
-	const resolveConfig = createMcpConfigResolver(baseUrl, apiKey);
+	const resolveConfig = createMcpConfigResolver(apiUrl, apiKey);
 
 	const handleChat = createChatRequestHandler({
 		apiKey,
-		baseUrl,
+		apiUrl,
 		source,
 		systemPrompt,
 		maxSteps,

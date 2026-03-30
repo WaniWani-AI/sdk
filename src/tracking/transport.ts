@@ -28,7 +28,7 @@ interface Logger {
 }
 
 export interface V2TransportOptions {
-	baseUrl: string;
+	apiUrl: string;
 	apiKey: string;
 	endpointPath?: string;
 	flushIntervalMs?: number;
@@ -98,7 +98,7 @@ class BatchingV2Transport implements V2BatchTransport {
 
 	constructor(options: V2TransportOptions) {
 		this.endpointUrl = joinUrl(
-			options.baseUrl,
+			options.apiUrl,
 			options.endpointPath ?? DEFAULT_ENDPOINT_PATH,
 		);
 		this.flushIntervalMs = options.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS;
@@ -430,8 +430,8 @@ async function parseJsonResponse<T>(
 	}
 }
 
-function joinUrl(baseUrl: string, endpointPath: string): string {
-	const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+function joinUrl(apiUrl: string, endpointPath: string): string {
+	const normalizedBase = apiUrl.endsWith("/") ? apiUrl : `${apiUrl}/`;
 	const normalizedPath = endpointPath.startsWith("/")
 		? endpointPath.slice(1)
 		: endpointPath;

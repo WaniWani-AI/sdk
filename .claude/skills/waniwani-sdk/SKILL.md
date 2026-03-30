@@ -18,6 +18,7 @@ bun add @waniwani/sdk
 
 | Export | Purpose | Docs | Peer Dependencies |
 |--------|---------|------|-------------------|
+| — | Project setup & config | [setup.md](setup.md) | — |
 | `@waniwani/sdk` | Event tracking | (below) | None |
 | `@waniwani/sdk/mcp` | Widget creation (server-side) | [mcp/server.md](mcp/server.md) | `@modelcontextprotocol/sdk`, `zod` |
 | `@waniwani/sdk/mcp` | Multi-step flows | [mcp/flows.md](mcp/flows.md) | `@modelcontextprotocol/sdk`, `zod` |
@@ -32,12 +33,16 @@ bun add @waniwani/sdk
 
 ### Setup
 
+See the [setup skill](../setup/SKILL.md) for full project setup with `defineConfig`.
+
+Quick standalone usage:
+
 ```typescript
 import { waniwani } from "@waniwani/sdk";
 
 const client = waniwani({
   apiKey: "...",    // or set WANIWANI_API_KEY env var
-  baseUrl: "...",   // defaults to https://app.waniwani.ai
+  apiUrl: "...",    // defaults to https://app.waniwani.ai
 });
 ```
 
@@ -136,15 +141,14 @@ Wraps an MCP server so all tool handlers automatically emit `tool.called` events
 **after** execution with `durationMs`, `status` (`"ok"` or `"error"`), and `errorMessage` (on failure).
 
 ```typescript
+import "../../waniwani.config";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { withWaniwani } from "@waniwani/sdk/mcp";
 
 const server = new McpServer({ name: "my-server", version: "1.0.0" });
-withWaniwani(server, {
-  config: { apiKey: "..." },          // or uses WANIWANI_API_KEY env var
-  toolType: "pricing",                 // default type for all tools
-  flushAfterToolCall: true,            // flush after each tool invocation
-});
+
+// No args needed — reads from defineConfig
+withWaniwani(server);
 
 // All tools registered after wrapping are auto-tracked
 server.registerTool("get_pricing", config, async (input, extra) => {
@@ -154,17 +158,16 @@ server.registerTool("get_pricing", config, async (input, extra) => {
 });
 ```
 
-Options:
+Options (all optional):
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `client` | `WaniWaniClient` | Pre-built client (skips internal creation) |
-| `config` | `WaniWaniConfig` | Config for internal client creation |
-| `toolType` | `string \| (name) => string` | Default tool type for tracked events |
-| `metadata` | `Record<string, unknown>` | Extra metadata merged into every event |
-| `flushAfterToolCall` | `boolean` | Flush transport after each tool call |
-| `onError` | `(error) => void` | Non-fatal tracking error callback |
-| `injectWidgetToken` | `boolean` (default: `true`) | Mint JWT and inject into `_meta.waniwani` for direct browser-to-backend tracking |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `client` | `WaniWaniClient` | auto-created from global config | Pre-built client |
+| `toolType` | `string \| (name) => string` | `"other"` | Default tool type for tracked events |
+| `metadata` | `Record<string, unknown>` | — | Extra metadata merged into every event |
+| `flushAfterToolCall` | `boolean` | `false` | Flush transport after each tool call |
+| `onError` | `(error) => void` | — | Non-fatal tracking error callback |
+| `injectWidgetToken` | `boolean` | `true` | Mint JWT and inject into `_meta.waniwani` for direct browser-to-backend tracking |
 
 ---
 

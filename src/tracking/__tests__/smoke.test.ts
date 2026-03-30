@@ -5,7 +5,7 @@ describe("tracking smoke", () => {
 	test("creates a client with tracking lifecycle methods", () => {
 		const client = waniwani({
 			apiKey: "test-key",
-			baseUrl: "https://example.com",
+			apiUrl: "https://example.com",
 		});
 		expect(typeof client.track).toBe("function");
 		expect(typeof client.flush).toBe("function");

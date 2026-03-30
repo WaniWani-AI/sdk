@@ -2,6 +2,7 @@
 
 import { type RefObject, useEffect, useRef, useState } from "react";
 import type { ChatHandle } from "../@types";
+import { useConfig } from "../hooks/use-config";
 import { cn } from "../lib/utils";
 
 // ---- Types ----
@@ -216,44 +217,28 @@ type EvalPanelProps = {
  * To populate sessions, set `WANIWANI_EVAL=1` in your `.env` and add
  * session files to `evals/sessions/`.
  */
-export function EvalPanel(props: EvalPanelProps) {
-	if (process.env.NODE_ENV === "production") {
-		return null;
-	}
-
-	return <EvalPanelInner {...props} />;
-}
-
-function EvalPanelInner({ api, chatRef }: EvalPanelProps) {
+export function EvalPanel({ api, chatRef }: EvalPanelProps) {
 	const effectiveApi = api ?? "/api/waniwani";
-	const [enabled, setEnabled] = useState<boolean | null>(null);
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [selected, setSelected] = useState<Session | null>(null);
 	const [running, setRunning] = useState(false);
 	const [result, setResult] = useState<RunResult | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const abortRef = useRef<AbortController | null>(null);
+	const config = useConfig(effectiveApi);
 
 	useEffect(() => {
-		fetch(`${effectiveApi}/config`)
-			.then((r) => r.json())
-			.then((data: { eval?: boolean }) => {
-				setEnabled(data.eval === true);
-			})
-			.catch(() => setEnabled(false));
-	}, [effectiveApi]);
-
-	useEffect(() => {
-		if (!enabled) {
+		if (!config.eval) {
 			return;
 		}
+
 		fetch(`${effectiveApi}/sessions`)
 			.then((r) => r.json())
 			.then((data: Session[]) => {
 				setSessions(data);
 			})
 			.catch(() => {});
-	}, [effectiveApi, enabled]);
+	}, [effectiveApi, config.eval]);
 
 	async function runSession(session: Session) {
 		abortRef.current?.abort();
@@ -321,7 +306,7 @@ function EvalPanelInner({ api, chatRef }: EvalPanelProps) {
 		}
 	}
 
-	if (!enabled) {
+	if (!config.eval) {
 		return null;
 	}
 

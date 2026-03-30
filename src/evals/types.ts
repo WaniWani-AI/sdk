@@ -65,3 +65,55 @@ export interface SessionReplay {
 		toolsCalled: string[];
 	};
 }
+
+// ── Dynamic Scenario Simulation ──────────────────────────────────
+
+/**
+ * A scenario definition for dynamic multi-turn simulation.
+ * An LLM user simulator plays the persona while the agent
+ * tries to complete the flow through conversation.
+ */
+export interface Scenario {
+	/** Human-readable name for this scenario. */
+	name: string;
+	/** Natural-language persona description fed to the user simulator LLM. */
+	persona: string;
+	/** The first user message that kicks off the conversation. */
+	openingMessage: string;
+	/** Language the simulated user speaks. */
+	language: "en" | "sv" | "fr" | "de";
+	/** Expected fields in the accumulated state at conversation end (for future evaluation). */
+	expectedState: Record<string, unknown>;
+	/** Tools that should be called at some point during the conversation (for future evaluation). */
+	expectedToolsCalled?: string[];
+	/** Maximum turns before considering the conversation stuck. Defaults to 15. */
+	maxTurns?: number;
+}
+
+/** A single turn in a simulated conversation. */
+export interface SimulationTurn {
+	userMessage: string;
+	assistantText: string;
+	toolsCalled: string[];
+	toolCallTraces: ToolCallTrace[];
+}
+
+/** Result of a dynamic scenario simulation run. */
+export interface SimulationResult {
+	/** Unique identifier for this simulation run. */
+	id: string;
+	/** Name of the scenario that was simulated. */
+	scenarioName: string;
+	/** Current status of the simulation. */
+	status: "pending" | "running" | "completed" | "failed";
+	/** All conversation turns. */
+	turns: SimulationTurn[];
+	/** Accumulated stateUpdates from all tool calls, deep-merged. */
+	accumulatedState: Record<string, unknown>;
+	/** Whether the flow reached completion. */
+	completed: boolean;
+	/** Total number of turns in the conversation. */
+	totalTurns: number;
+	/** Error message if status is "failed". */
+	error?: string;
+}

@@ -15,7 +15,10 @@ export type {
 	ConversationResult,
 	ConversationTurn,
 	ConversationTurnResult,
+	Scenario,
 	SessionReplay,
+	SimulationResult,
+	SimulationTurn,
 	ToolCallTrace,
 	TurnAssertion,
 } from "./types";

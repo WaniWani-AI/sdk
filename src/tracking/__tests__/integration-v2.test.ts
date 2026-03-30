@@ -28,11 +28,11 @@ describe("integration: SDK to V2 ingest", () => {
 		server.listen(0, "127.0.0.1");
 		await once(server, "listening");
 		const address = server.address() as AddressInfo;
-		const baseUrl = `http://127.0.0.1:${address.port}`;
+		const apiUrl = `http://127.0.0.1:${address.port}`;
 
 		const client = waniwani({
 			apiKey: "test-key",
-			baseUrl,
+			apiUrl,
 			tracking: {
 				flushIntervalMs: 10_000,
 				maxBatchSize: 10,
@@ -110,11 +110,11 @@ describe("integration: SDK to V2 ingest", () => {
 		server.listen(0, "127.0.0.1");
 		await once(server, "listening");
 		const address = server.address() as AddressInfo;
-		const baseUrl = `http://127.0.0.1:${address.port}`;
+		const apiUrl = `http://127.0.0.1:${address.port}`;
 
 		const client = waniwani({
 			apiKey: "test-key",
-			baseUrl,
+			apiUrl,
 			tracking: {
 				flushIntervalMs: 10_000,
 				maxRetries: 3,

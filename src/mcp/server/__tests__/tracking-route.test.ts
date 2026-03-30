@@ -63,7 +63,7 @@ describe("createTrackingRoute", () => {
 	it("returns 200 with accepted count for valid batch", async () => {
 		const handler = createTrackingRoute({
 			apiKey: "test-key",
-			baseUrl: "http://localhost:3000",
+			apiUrl: "http://localhost:3000",
 		});
 		const response = await handler(
 			makeBatchRequest([
@@ -86,7 +86,7 @@ describe("createTrackingRoute", () => {
 	it("forwards events to the WaniWani backend", async () => {
 		const handler = createTrackingRoute({
 			apiKey: "test-key",
-			baseUrl: "http://localhost:3000",
+			apiUrl: "http://localhost:3000",
 		});
 		await handler(
 			makeBatchRequest([

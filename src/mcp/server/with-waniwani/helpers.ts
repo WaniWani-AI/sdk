@@ -123,7 +123,7 @@ export async function safeFlush(
 export async function injectWidgetConfig(
 	result: unknown,
 	cache: WidgetTokenCache | null,
-	baseUrl: string,
+	apiUrl: string,
 	extra?: unknown,
 	onError?: (error: Error) => void,
 ): Promise<void> {
@@ -143,7 +143,7 @@ export async function injectWidgetConfig(
 		...(existingWaniwaniConfig ?? {}),
 		endpoint:
 			existingWaniwaniConfig?.endpoint ??
-			`${baseUrl.replace(/\/$/, "")}/api/mcp/events/v2/batch`,
+			`${apiUrl.replace(/\/$/, "")}/api/mcp/events/v2/batch`,
 	};
 
 	if (cache) {

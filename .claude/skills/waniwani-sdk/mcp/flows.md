@@ -141,7 +141,7 @@ The AI sends dot-path keys in `stateUpdates`: `{ "driver.name": "John", "driver.
 
 At every step, the engine stores the current flow state (step, field, state values) server-side, keyed by session ID. The AI simply calls `action: "continue"` — no token round-tripping needed.
 
-By default, a `WaniwaniFlowStore` is used — it stores flow state via the WaniWani API using your `WANIWANI_API_KEY` and `WANIWANI_BASE_URL` env vars. This works seamlessly in serverless environments (Vercel) with no extra infrastructure. Tenant isolation is handled by the API key.
+By default, a `WaniwaniFlowStore` is used — it stores flow state via the WaniWani API using your `WANIWANI_API_KEY` and `WANIWANI_API_URL` env vars. This works seamlessly in serverless environments (Vercel) with no extra infrastructure. Tenant isolation is handled by the API key.
 
 ```ts
 // Default — zero config, uses WANIWANI_API_KEY env var
@@ -149,7 +149,7 @@ const flow = createFlow({ ... }).compile();
 
 // Explicit store (rare — only if you need custom options)
 import { WaniwaniFlowStore } from "@waniwani/sdk/mcp";
-const store = new WaniwaniFlowStore({ apiKey: "...", baseUrl: "..." });
+const store = new WaniwaniFlowStore({ apiKey: "...", apiUrl: "..." });
 const flow = createFlow({ ... }).compile({ store });
 ```
 
@@ -421,7 +421,7 @@ const pricingUI = createResource({
   id: "pricing_table",
   title: "Pricing Table",
   description: "Interactive pricing comparison",
-  baseUrl: "https://my-app.com",
+  apiUrl: "https://my-app.com",
   htmlPath: "/widgets/pricing",
   widgetDomain: "my-app.com",
 });
@@ -663,7 +663,7 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 
 | Export | Description |
 |--------|-------------|
-| `WaniwaniFlowStore` | Default API-backed state store. Stores flow state via the WaniWani API. Options: `{ apiKey?: string, baseUrl?: string }`. Falls back to `WANIWANI_API_KEY` / `WANIWANI_BASE_URL` env vars. |
+| `WaniwaniFlowStore` | Default API-backed state store. Stores flow state via the WaniWani API. Options: `{ apiKey?: string, apiUrl?: string }`. Falls back to `WANIWANI_API_KEY` / `WANIWANI_API_URL` env vars. |
 | `FlowStore` | Interface for custom store implementations. |
 
 ## Common Mistakes

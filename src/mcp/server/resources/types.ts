@@ -21,8 +21,8 @@ export type ResourceConfig = {
 	/** UI description (describes WHAT the resource displays) */
 	description?: string;
 	/** Base URL for fetching the HTML */
-	baseUrl: string;
-	/** Path to the HTML file (relative to baseUrl) */
+	apiUrl: string;
+	/** Path to the HTML file (relative to apiUrl) */
 	htmlPath: string;
 	/** Domain for OpenAI security context */
 	widgetDomain: string;

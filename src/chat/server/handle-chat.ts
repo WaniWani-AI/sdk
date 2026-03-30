@@ -13,7 +13,7 @@ import { applyModelContextToSystemPrompt } from "./model-context";
 export function createChatRequestHandler(deps: ApiHandlerDeps) {
 	const {
 		apiKey,
-		baseUrl,
+		apiUrl,
 		source,
 		systemPrompt,
 		maxSteps,
@@ -103,7 +103,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 			);
 
 			// 4. Forward to WaniWani API
-			const upstreamUrl = `${baseUrl}/api/mcp/chat`;
+			const upstreamUrl = `${apiUrl}/api/mcp/chat`;
 			log("forwarding to", upstreamUrl);
 			const clientUserAgent = request.headers.get("user-agent");
 
