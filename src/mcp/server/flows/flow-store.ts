@@ -10,6 +10,7 @@
  * The `FlowStore` interface is exported for custom implementations.
  */
 
+import { type KvStoreOptions, WaniwaniKvStore } from "../kv";
 import type { FlowTokenContent } from "./@types";
 
 // ============================================================================
@@ -26,77 +27,22 @@ export interface FlowStore {
 // WaniWani API implementation
 // ============================================================================
 
-const SDK_NAME = "@waniwani/sdk";
-const DEFAULT_BASE_URL = "https://app.waniwani.ai";
-
 export class WaniwaniFlowStore implements FlowStore {
-	private readonly apiUrl: string;
-	private readonly apiKey: string | undefined;
+	private readonly store: WaniwaniKvStore<FlowTokenContent>;
 
-	constructor(options?: { apiUrl?: string; apiKey?: string }) {
-		this.apiUrl = (
-			options?.apiUrl ??
-			process.env.WANIWANI_BASE_URL ??
-			DEFAULT_BASE_URL
-		).replace(/\/$/, "");
-		this.apiKey = options?.apiKey ?? process.env.WANIWANI_API_KEY;
+	constructor(options?: KvStoreOptions) {
+		this.store = new WaniwaniKvStore<FlowTokenContent>(options);
 	}
 
-	async get(key: string): Promise<FlowTokenContent | null> {
-		if (!this.apiKey) {
-			return null;
-		}
-		try {
-			const data = await this.request<FlowTokenContent | null>(
-				"/api/mcp/redis/get",
-				{ key },
-			);
-			return data ?? null;
-		} catch {
-			return null;
-		}
+	get(key: string): Promise<FlowTokenContent | null> {
+		return this.store.get(key);
 	}
 
-	async set(key: string, value: FlowTokenContent): Promise<void> {
-		if (!this.apiKey) {
-			return;
-		}
-		try {
-			await this.request("/api/mcp/redis/set", { key, value });
-		} catch {
-			// Non-fatal
-		}
+	set(key: string, value: FlowTokenContent): Promise<void> {
+		return this.store.set(key, value);
 	}
 
-	async delete(key: string): Promise<void> {
-		if (!this.apiKey) {
-			return;
-		}
-		try {
-			await this.request("/api/mcp/redis/delete", { key });
-		} catch {
-			// Non-fatal
-		}
-	}
-
-	private async request<T>(path: string, body: unknown): Promise<T> {
-		const url = `${this.apiUrl}${path}`;
-		const response = await fetch(url, {
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${this.apiKey}`,
-				"Content-Type": "application/json",
-				"X-WaniWani-SDK": SDK_NAME,
-			},
-			body: JSON.stringify(body),
-		});
-
-		if (!response.ok) {
-			const text = await response.text().catch(() => "");
-			throw new Error(text || `Flow state API error: HTTP ${response.status}`);
-		}
-
-		const json = (await response.json()) as { data: T };
-		return json.data;
+	delete(key: string): Promise<void> {
+		return this.store.delete(key);
 	}
 }

@@ -21,6 +21,7 @@ function pickFirst(
 const SESSION_ID_KEYS = [
 	"waniwani/sessionId",
 	"openai/sessionId",
+	"openai/session",
 	"sessionId",
 	"conversationId",
 	"anthropic/sessionId",
@@ -87,6 +88,7 @@ export function extractCorrelationId(
 const SOURCE_SESSION_KEYS = [
 	{ key: "waniwani/sessionId", source: "chatbar" },
 	{ key: "openai/sessionId", source: "chatgpt" },
+	{ key: "openai/session", source: "chatgpt" },
 	{ key: "anthropic/sessionId", source: "claude" },
 ] as const;
 
