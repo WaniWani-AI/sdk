@@ -26,10 +26,10 @@ import { WidgetErrorBoundary } from "./widget-error-boundary";
 
 /** Converts `get_price_estimate` or `compare-prices` → `Get price estimate` / `Compare prices` */
 function formatToolName(name: string | undefined): string {
-	if (!name) { 
-		return "Tool"; 
+	if (!name) {
+		return "Tool";
 	}
-	
+
 	return name.replace(/[-_]/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
