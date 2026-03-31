@@ -57,6 +57,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			className,
 			allowAttachments = false,
 			welcomeMessage,
+			welcome,
 			placeholder = "Ask me anything...",
 			triggerEvent = "triggerDemoRequest",
 			api,
@@ -184,6 +185,8 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 							messages={engine.messages}
 							status={engine.status}
 							welcomeMessage={welcomeMessage}
+							welcome={welcome}
+							onSuggestionSelect={handleSuggestionSelect}
 							resourceEndpoint={mcp?.resourceEndpoint}
 							chatSessionId={engine.sessionId}
 							isDark={isDark}

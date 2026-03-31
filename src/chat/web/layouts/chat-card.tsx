@@ -44,6 +44,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			className,
 			allowAttachments = false,
 			welcomeMessage,
+			welcome,
 			placeholder = "Ask me anything...",
 			triggerEvent = "triggerDemoRequest",
 			api,
@@ -202,6 +203,8 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 							messages={engine.messages}
 							status={engine.status}
 							welcomeMessage={welcomeMessage}
+							welcome={welcome}
+							onSuggestionSelect={handleSuggestionSelect}
 							resourceEndpoint={effectiveResourceEndpoint}
 							chatSessionId={engine.sessionId}
 							isDark={isDark}

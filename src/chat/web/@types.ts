@@ -38,6 +38,21 @@ export interface ChatTheme {
 }
 
 // ============================================================================
+// Welcome Screen
+// ============================================================================
+
+export interface WelcomeConfig {
+	/** Icon displayed above the title. Accepts any React node (e.g. an SVG or img). */
+	icon?: React.ReactNode;
+	/** Title text shown prominently in the welcome screen. */
+	title: string;
+	/** Description text shown below the title. */
+	description?: string;
+	/** Suggestion cards shown in the welcome screen. Disappear after the first message. */
+	suggestions?: string[];
+}
+
+// ============================================================================
 // Suggestions
 // ============================================================================
 
@@ -65,6 +80,13 @@ export interface ChatBaseProps {
 	api?: string;
 	/** Initial greeting shown before user types */
 	welcomeMessage?: string;
+	/**
+	 * Rich welcome screen shown when the conversation is empty.
+	 * Replaces `welcomeMessage` with a centered layout featuring an icon, title,
+	 * description, and card-style suggestion prompts.
+	 * Takes precedence over `welcomeMessage` when provided.
+	 */
+	welcome?: WelcomeConfig;
 	/** Theme overrides */
 	theme?: ChatTheme;
 	/** Additional headers to send with chat API requests */

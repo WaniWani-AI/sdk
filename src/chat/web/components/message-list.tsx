@@ -3,6 +3,7 @@
 import type { ChatStatus, ReasoningUIPart, ToolUIPart, UIMessage } from "ai";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 
+import type { WelcomeConfig } from "../@types";
 import { Attachments } from "../ai-elements/attachments";
 import { Loader } from "../ai-elements/loader";
 import {
@@ -22,6 +23,7 @@ import {
 } from "../ai-elements/tool";
 import type { McpAppDisplayMode } from "./mcp-app-frame";
 import { McpAppFrame } from "./mcp-app-frame";
+import { WelcomeScreen } from "./welcome-screen";
 import { WidgetErrorBoundary } from "./widget-error-boundary";
 
 /** Converts `get_price_estimate` or `compare-prices` → `Get price estimate` / `Compare prices` */
@@ -49,6 +51,10 @@ interface MessageListProps {
 	messages: UIMessage[];
 	status: ChatStatus;
 	welcomeMessage?: string;
+	/** Rich welcome screen config. Takes precedence over `welcomeMessage`. */
+	welcome?: WelcomeConfig;
+	/** Called when a welcome screen suggestion card is clicked. */
+	onSuggestionSelect?: (suggestion: string) => void;
 	resourceEndpoint?: string;
 	chatSessionId?: string;
 	isDark?: boolean;
@@ -79,6 +85,8 @@ export function MessageList({
 	messages,
 	status,
 	welcomeMessage,
+	welcome,
+	onSuggestionSelect,
 	resourceEndpoint,
 	chatSessionId,
 	isDark,
@@ -96,12 +104,16 @@ export function MessageList({
 
 	return (
 		<>
-			{welcomeMessage && (
-				<Message from="assistant">
-					<MessageContent>
-						<MessageResponse>{welcomeMessage}</MessageResponse>
-					</MessageContent>
-				</Message>
+			{!hasMessages && welcome ? (
+				<WelcomeScreen {...welcome} onSuggestionSelect={onSuggestionSelect} />
+			) : (
+				welcomeMessage && (
+					<Message from="assistant">
+						<MessageContent>
+							<MessageResponse>{welcomeMessage}</MessageResponse>
+						</MessageContent>
+					</Message>
+				)
 			)}
 			{messages.map((message) => {
 				const textParts = message.parts.filter((p) => p.type === "text");

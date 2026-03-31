@@ -43,6 +43,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			expandedHeight = 400,
 			allowAttachments = false,
 			welcomeMessage,
+			welcome,
 			placeholder = "Ask me anything...",
 			triggerEvent = "triggerDemoRequest",
 			api,
@@ -243,6 +244,8 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 								messages={engine.messages}
 								status={engine.status}
 								welcomeMessage={welcomeMessage}
+								welcome={welcome}
+								onSuggestionSelect={handleSuggestionSelect}
 								resourceEndpoint={effectiveResourceEndpoint}
 								chatSessionId={engine.sessionId}
 								isDark={isDark}
