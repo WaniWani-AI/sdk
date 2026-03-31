@@ -16,7 +16,11 @@ export function WelcomeScreen({
 }: WelcomeScreenProps) {
 	return (
 		<div className="ww:flex ww:flex-col ww:items-center ww:justify-center ww:py-12 ww:px-6 ww:text-center ww:min-h-full">
-			{icon && <div className="ww:mb-4 ww:text-foreground">{icon}</div>}
+			{icon && (
+				<div className="ww:mb-4 ww:flex ww:items-center ww:justify-center ww:size-12 ww:rounded-xl ww:bg-foreground ww:text-background">
+					{icon}
+				</div>
+			)}
 			<h2 className="ww:text-lg ww:font-semibold ww:text-foreground">
 				{title}
 			</h2>
