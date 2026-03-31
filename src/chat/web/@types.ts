@@ -85,8 +85,6 @@ export interface ChatBaseProps {
 	onMessageSent?: (message: string) => void;
 	/** Callback fired when a response is received */
 	onResponseReceived?: () => void;
-	/** Endpoint URL for fetching MCP app resources (HTML widgets). Defaults to "/api/mcp/resource" */
-	resourceEndpoint?: string;
 	/**
 	 * Enable AI-generated suggestions after each response.
 	 * `true` enables with defaults (3 suggestions), object allows config, `false`/undefined disables.
@@ -97,14 +95,7 @@ export interface ChatBaseProps {
 	 * Called when a widget uses `callServerTool` (MCP Apps standard).
 	 * If not provided, defaults to POSTing to `${api}/tool`.
 	 */
-	onCallTool?: (params: {
-		name: string;
-		arguments: Record<string, unknown>;
-	}) => Promise<{
-		content?: Array<{ type: string; text?: string }>;
-		structuredContent?: Record<string, unknown>;
-		_meta?: Record<string, unknown>;
-	}>;
+	onCallTool?: CallToolHandler;
 	/**
 	 * Enable debug mode. When true, the `_meta` field is shown in tool call
 	 * inputs and outputs instead of being filtered out.
@@ -127,6 +118,76 @@ export interface ChatBarProps extends ChatBaseProps {
 	expandedHeight?: number;
 	/** Title shown in the header when expanded. Defaults to "Assistant". */
 	title?: string;
+}
+
+// ============================================================================
+// ChatEmbed Props (standalone, bring-your-own-backend chat)
+// ============================================================================
+
+/**
+ * MCP Apps configuration for {@link ChatEmbedProps}.
+ *
+ * Only needed when your backend proxies an MCP server whose tools return
+ * widget metadata (`_meta.ui.resourceUri`). Without this, tool calls still
+ * render with collapsible input/output — just no iframe widgets.
+ */
+export interface ChatEmbedMcpConfig {
+	/** Endpoint that serves MCP app resources (HTML widgets). Called as `GET ${resourceEndpoint}?uri=...`. */
+	resourceEndpoint: string;
+	/**
+	 * Handler for MCP tool calls triggered by widgets via `callServerTool`.
+	 * If not provided, widget-initiated tool calls will be ignored.
+	 */
+	onCallTool?: CallToolHandler;
+}
+
+/** Handler signature for MCP tool calls from widgets. */
+export type CallToolHandler = (params: {
+	name: string;
+	arguments: Record<string, unknown>;
+}) => Promise<{
+	content?: Array<{ type: string; text?: string }>;
+	structuredContent?: Record<string, unknown>;
+	_meta?: Record<string, unknown>;
+}>;
+
+/**
+ * Standalone, borderless chat component designed for embedding into existing pages.
+ *
+ * Unlike {@link ChatCardProps} and {@link ChatBarProps}, ChatEmbed does **not** rely on
+ * the WaniWani hosted backend. It does not fetch `/config` or call `/tool` — you bring
+ * your own `api` endpoint.
+ *
+ * The component fills its parent container (`width: 100%; height: 100%`) with no
+ * header, border, or shadow — making it ideal for integrating into an existing layout
+ * that already provides its own chrome.
+ *
+ * To enable MCP App widgets (iframes), pass the optional `mcp` config.
+ *
+ * @example
+ * ```tsx
+ * // Basic — no MCP Apps
+ * <ChatEmbed
+ *   api="/api/my-chat-endpoint"
+ *   body={{ environmentId, sessionId }}
+ *   theme={{ backgroundColor: "#fff" }}
+ * />
+ *
+ * // With MCP Apps support
+ * <ChatEmbed
+ *   api="/api/my-chat-endpoint"
+ *   mcp={{ resourceEndpoint: "/api/mcp/resource" }}
+ * />
+ * ```
+ */
+export interface ChatEmbedProps
+	extends Omit<ChatBaseProps, "api" | "onCallTool"> {
+	/** The chat API endpoint URL. Required — there is no default. */
+	api: string;
+	/** Additional class names applied to the root element (e.g. Tailwind classes). */
+	className?: string;
+	/** MCP Apps configuration. Only needed if your backend serves widget resources. */
+	mcp?: ChatEmbedMcpConfig;
 }
 
 // ============================================================================

@@ -57,24 +57,27 @@ export interface WaniWaniProjectConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Global singleton
+// Global singleton — uses globalThis so the config is shared across all
+// SDK entry points (e.g. @waniwani/sdk and @waniwani/sdk/mcp) even when
+// they are bundled as separate chunks with their own module scopes.
 // ---------------------------------------------------------------------------
 
-let _globalConfig: WaniWaniProjectConfig | undefined;
+const GLOBAL_KEY = "__waniwani_config__" as const;
 
 /**
  * Define and register a WaniWani project configuration.
  *
- * Calling this stores the config in a module-level variable so that
+ * Calling this stores the config on `globalThis` so that
  * `waniwani()` and `withWaniwani()` can read from it automatically
- * when no explicit config is passed.
+ * when no explicit config is passed — even across different SDK
+ * entry points (`@waniwani/sdk`, `@waniwani/sdk/mcp`, etc.).
  *
  * The config is also returned for direct use.
  */
 export function defineConfig(
 	config: WaniWaniProjectConfig,
 ): WaniWaniProjectConfig {
-	_globalConfig = config;
+	(globalThis as Record<string, unknown>)[GLOBAL_KEY] = config;
 	return config;
 }
 
@@ -84,5 +87,7 @@ export function defineConfig(
  * @internal
  */
 export function getGlobalConfig(): WaniWaniProjectConfig | undefined {
-	return _globalConfig;
+	return (globalThis as Record<string, unknown>)[GLOBAL_KEY] as
+		| WaniWaniProjectConfig
+		| undefined;
 }

@@ -4,6 +4,8 @@ export type {
 	ChatBarProps,
 	ChatBaseProps,
 	ChatCardProps,
+	ChatEmbedMcpConfig,
+	ChatEmbedProps,
 	ChatHandle,
 	ChatTheme,
 	ChatWidgetProps,
@@ -18,6 +20,7 @@ export type {
 export { McpAppFrame } from "./components/mcp-app-frame";
 export { ChatBar } from "./layouts/chat-bar";
 export { ChatCard } from "./layouts/chat-card";
+export { ChatEmbed } from "./layouts/chat-embed";
 export {
 	DARK_THEME,
 	DEFAULT_THEME,

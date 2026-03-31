@@ -45,7 +45,6 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			welcomeMessage,
 			placeholder = "Ask me anything...",
 			triggerEvent = "triggerDemoRequest",
-			resourceEndpoint,
 			api,
 		} = props;
 
@@ -53,8 +52,8 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			userExpandedWidth ??
 			Math.round((typeof width === "number" ? width : 600) * 1.2);
 
-		const effectiveResourceEndpoint =
-			resourceEndpoint ?? (api ? `${api}/resource` : undefined);
+		const effectiveApi = api ?? "/api/waniwani";
+		const effectiveResourceEndpoint = `${effectiveApi}/resource`;
 
 		const resolvedTheme = mergeTheme(userTheme);
 		const cssVars = themeToCSSProperties(resolvedTheme);
@@ -227,7 +226,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 						<ExportSessionButton
 							messages={engine.messages}
 							evalEnabled={config.eval}
-							api={api}
+							api={effectiveApi}
 						/>
 					</div>
 

@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import type { ChatBaseProps } from "../@types";
+import type { CallToolHandler } from "../@types";
 
-type CallToolFn = NonNullable<ChatBaseProps["onCallTool"]>;
-type CallToolParams = Parameters<CallToolFn>[0];
-type CallToolResult = Awaited<ReturnType<CallToolFn>>;
+type CallToolParams = Parameters<CallToolHandler>[0];
+type CallToolResult = Awaited<ReturnType<CallToolHandler>>;
 
 /**
  * Returns a stable `onCallTool` callback.
@@ -14,9 +13,9 @@ type CallToolResult = Awaited<ReturnType<CallToolFn>>;
 export function useCallTool(props: {
 	api?: string;
 	headers?: Record<string, string>;
-	onCallTool?: CallToolFn;
+	onCallTool?: CallToolHandler;
 	sessionId?: string;
-}): CallToolFn {
+}): CallToolHandler {
 	const propsRef = useRef(props);
 	propsRef.current = props;
 

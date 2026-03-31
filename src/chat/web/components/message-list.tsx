@@ -169,7 +169,7 @@ export function MessageList({
 											</ToolContent>
 										</Tool>
 									</div>
-									{resourceUri && output !== undefined && (
+									{resourceUri && resourceEndpoint && output !== undefined && (
 										<WidgetErrorBoundary>
 											<McpAppFrame
 												isFullscreen={isFullscreen}

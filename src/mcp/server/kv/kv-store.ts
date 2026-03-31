@@ -8,6 +8,8 @@
  * with `FlowTokenContent` as the value type.
  */
 
+import { getGlobalConfig } from "../../../project-config.js";
+
 // ============================================================================
 // Interface
 // ============================================================================
@@ -37,12 +39,19 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 	private readonly apiKey: string | undefined;
 
 	constructor(options?: KvStoreOptions) {
+		const globalConfig = getGlobalConfig();
+
+		// order: options.baseUrl, process.env.WANIWANI_API_URL, globalConfig?.apiUrl, DEFAULT_BASE_URL
 		this.baseUrl = (
 			options?.baseUrl ??
 			process.env.WANIWANI_API_URL ??
+			globalConfig?.apiUrl ??
 			DEFAULT_BASE_URL
 		).replace(/\/$/, "");
-		this.apiKey = options?.apiKey ?? process.env.WANIWANI_API_KEY;
+
+		// order: options.apiKey, process.env.WANIWANI_API_KEY, globalConfig?.apiKey
+		this.apiKey =
+			options?.apiKey ?? process.env.WANIWANI_API_KEY ?? globalConfig?.apiKey;
 	}
 
 	async get(key: string): Promise<T | null> {

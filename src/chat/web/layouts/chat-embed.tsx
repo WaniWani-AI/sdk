@@ -9,7 +9,7 @@ import {
 	useState,
 } from "react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
-import type { ChatCardProps, ChatHandle } from "../@types";
+import type { ChatEmbedProps, ChatHandle } from "../@types";
 import {
 	Conversation,
 	ConversationContent,
@@ -22,76 +22,76 @@ import {
 	PromptInputTextarea,
 } from "../ai-elements/prompt-input";
 import { ChatQueue } from "../components/chat-queue";
-import { ExportSessionButton } from "../components/export-session";
 import { MessageList } from "../components/message-list";
 import { Suggestions } from "../components/suggestions";
 import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
-import { useConfig } from "../hooks/use-config";
 import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { cn } from "../lib/utils";
 import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
 
-export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
-	function ChatCard(props, ref) {
+/**
+ * Standalone, borderless chat component — bring your own backend.
+ *
+ * Fills its parent container with no header, border, or shadow.
+ * Does **not** call any WaniWani-specific endpoints (`/config`, `/tool`, `/sessions`).
+ * Point `api` at your own AI-SDK-compatible streaming endpoint and pass extra
+ * request fields via `body`.
+ *
+ * Supports the same ref API as ChatCard (`sendMessage`, `sendMessageAndWait`, `focus`).
+ *
+ * @example
+ * ```tsx
+ * <ChatEmbed
+ *   api={`/api/mcp/projects/${projectId}/chat`}
+ *   body={{ environmentId, chatSessionId }}
+ *   suggestions={{ initial: ["What can you do?"] }}
+ * />
+ * ```
+ */
+export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
+	function ChatEmbed(props, ref) {
 		const {
 			theme: userTheme,
-			title = "Assistant",
-
-			width,
-			height,
 			className,
 			allowAttachments = false,
 			welcomeMessage,
 			placeholder = "Ask me anything...",
 			triggerEvent = "triggerDemoRequest",
 			api,
-			debug,
+			mcp,
+			debug = false,
 		} = props;
-
-		const effectiveApi = api ?? "/api/waniwani";
-		const effectiveResourceEndpoint = `${effectiveApi}/resource`;
 
 		const resolvedTheme = mergeTheme(userTheme);
 		const cssVars = themeToCSSProperties(resolvedTheme);
 		const isDark = isDarkTheme(resolvedTheme);
 
-		const config = useConfig(effectiveApi);
-		const effectiveDebug = debug ?? config.debug;
-
-		const engine = useChatEngine({ ...props, api: effectiveApi });
+		const engine = useChatEngine({ ...props, api });
 		const handleCallTool = useCallTool({
 			...props,
-			api: effectiveApi,
+			api,
 			sessionId: engine.sessionId,
+			onCallTool: mcp?.onCallTool,
 		});
 
 		const animatedPlaceholder = useTypingPlaceholder(placeholder, !engine.text);
 
-		const [isHighlighted, setIsHighlighted] = useState(false);
 		const [fullscreenToolCallId, setFullscreenToolCallId] = useState<
 			string | null
 		>(null);
-		const cardRef = useRef<HTMLDivElement>(null);
-		const highlightTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+		const panelRef = useRef<HTMLDivElement>(null);
 
 		const focusInput = useCallback(() => {
-			const container = cardRef.current;
+			const container = panelRef.current;
 			if (!container) {
 				return;
 			}
-			container.scrollIntoView({ behavior: "smooth", block: "center" });
 			const textarea = container.querySelector("textarea");
 			if (textarea) {
-				setTimeout(() => textarea.focus(), 300);
+				textarea.focus();
 			}
-			setIsHighlighted(true);
-			clearTimeout(highlightTimerRef.current);
-			highlightTimerRef.current = setTimeout(
-				() => setIsHighlighted(false),
-				2000,
-			);
 		}, []);
 
 		const suggestionsState = useSuggestions({
@@ -142,7 +142,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			[engine.handleSubmit, engine.sendMessageAndWait, focusInput],
 		);
 
-		// Listen for custom trigger event (e.g. "triggerDemoRequest")
+		// Listen for custom trigger event
 		useEffect(() => {
 			if (!triggerEvent) {
 				return;
@@ -162,34 +162,16 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 
 		return (
 			<div
-				ref={cardRef}
-				style={{ ...cssVars, width, height }}
+				ref={panelRef}
+				style={cssVars}
 				data-waniwani-chat=""
-				data-waniwani-layout="card"
+				data-waniwani-layout="embed"
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className={cn(
-					"ww:flex ww:flex-col ww:font-[family-name:var(--ww-font)] ww:text-foreground ww:bg-background ww:rounded-[var(--ww-radius)] ww:overflow-hidden",
-					isHighlighted &&
-						"ww:ring-2 ww:ring-blue-400/70 ww:ring-offset-2 ww:ring-offset-background",
+					"ww:flex ww:flex-col ww:w-full ww:h-full ww:font-[family-name:var(--ww-font)] ww:text-foreground ww:bg-background ww:overflow-hidden",
 					className,
 				)}
 			>
-				{/* Header */}
-				<div
-					className="ww:shrink-0 ww:flex ww:items-center ww:px-6 ww:py-3"
-					style={{
-						backgroundColor: resolvedTheme.headerBackgroundColor,
-						color: resolvedTheme.headerTextColor,
-					}}
-				>
-					<div className="ww:text-sm ww:font-semibold ww:truncate">{title}</div>
-					<ExportSessionButton
-						messages={engine.messages}
-						evalEnabled={config.eval}
-						api={effectiveApi}
-					/>
-				</div>
-
 				{/* Messages */}
 				<Conversation
 					className={cn(
@@ -202,13 +184,13 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 							messages={engine.messages}
 							status={engine.status}
 							welcomeMessage={welcomeMessage}
-							resourceEndpoint={effectiveResourceEndpoint}
+							resourceEndpoint={mcp?.resourceEndpoint}
 							chatSessionId={engine.sessionId}
 							isDark={isDark}
 							onFollowUp={handleWidgetMessage}
 							onCallTool={handleCallTool}
 							fullscreenToolCallId={fullscreenToolCallId}
-							debug={effectiveDebug}
+							debug={debug}
 							onWidgetDisplayModeChange={(mode, widget) => {
 								setFullscreenToolCallId(
 									mode === "fullscreen" ? widget.toolCallId : null,
