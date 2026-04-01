@@ -129,7 +129,7 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 				const bodyStyle = getComputedStyle(document.body);
 				const bodyMargins =
 					parseFloat(bodyStyle.marginTop) + parseFloat(bodyStyle.marginBottom);
-				const height = document.body.scrollHeight + bodyMargins;
+				const height = Math.ceil(document.body.scrollHeight + bodyMargins);
 
 				if (width !== lastWidth || height !== lastHeight) {
 					lastWidth = width;
