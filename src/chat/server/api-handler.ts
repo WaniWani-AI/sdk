@@ -1,6 +1,5 @@
 // API Handler - Composes chat and resource handlers into a unified API handler
 
-import { loadScenarios, saveScenario } from "../../evals/chat.js";
 import { createLogger } from "../../utils/logger.js";
 import type { ApiHandler, ApiHandlerOptions } from "./@types";
 import { createChatRequestHandler } from "./handle-chat";
@@ -100,11 +99,19 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 			const subRoute = segments.at(-1);
 			log("pathname:", url.pathname, "subRoute:", subRoute);
 
-			// This is used for evaluation purposes.
+			// Proxy scenarios list to the WaniWani app API
 			if (evalEnabled && subRoute === "scenarios") {
-				log("dispatching to scenarios handler");
+				log("dispatching to scenarios handler (proxy to app API)");
 				try {
-					return jsonResponse(loadScenarios(), 200);
+					const res = await fetch(`${apiUrl}/api/mcp/scenarios`, {
+						headers: {
+							...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+						},
+					});
+					const json = await res.json();
+					// The app API wraps responses in { success, data } — unwrap for the SDK
+					const scenarios = json.data ?? json;
+					return jsonResponse(scenarios, 200);
 				} catch {
 					return jsonResponse([], 200);
 				}
@@ -146,12 +153,24 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 			const subRoute = segments.at(-1);
 			log("pathname:", url.pathname, "subRoute:", subRoute);
 
+			// Proxy scenario creation to the WaniWani app API
 			if (evalEnabled && subRoute === "scenarios") {
-				log("dispatching to save-scenario handler");
+				log("dispatching to save-scenario handler (proxy to app API)");
 				try {
 					const body = await request.json();
-					const filename = saveScenario(body);
-					return jsonResponse({ ok: true, filename }, 200);
+					const res = await fetch(`${apiUrl}/api/mcp/scenarios`, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+						},
+						body: JSON.stringify(body),
+					});
+					const json = await res.json();
+					if (!res.ok) {
+						return jsonResponse({ error: json.message ?? "Failed to save scenario" }, res.status);
+					}
+					return jsonResponse({ ok: true, scenario: json.data }, 200);
 				} catch (e) {
 					const msg =
 						e instanceof Error ? e.message : "Failed to save scenario";

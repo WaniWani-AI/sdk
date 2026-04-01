@@ -20,8 +20,9 @@ export function ExportSessionButton({
 	const handleExport = async () => {
 		const session = {
 			name: `session-${new Date().toISOString().slice(0, 19)}`,
+			type: "functional" as const,
 			messages,
-			mode: "regenerate" as const,
+			mode: "manual" as const,
 		};
 
 		setSaving(true);
@@ -62,7 +63,7 @@ export function ExportSessionButton({
 			type="button"
 			onClick={handleExport}
 			disabled={saving}
-			title="Save scenario to evals/scenarios/"
+			title="Save scenario to WaniWani"
 			className="ww:ml-auto ww:text-[10px] ww:font-mono ww:uppercase ww:tracking-wider ww:text-muted-foreground hover:ww:text-foreground ww:cursor-pointer ww:transition-colors ww:disabled:opacity-40"
 		>
 			{label}
