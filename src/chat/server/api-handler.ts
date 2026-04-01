@@ -168,7 +168,10 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 					});
 					const json = await res.json();
 					if (!res.ok) {
-						return jsonResponse({ error: json.message ?? "Failed to save scenario" }, res.status);
+						return jsonResponse(
+							{ error: json.message ?? "Failed to save scenario" },
+							res.status,
+						);
 					}
 					return jsonResponse({ ok: true, scenario: json.data }, 200);
 				} catch (e) {
