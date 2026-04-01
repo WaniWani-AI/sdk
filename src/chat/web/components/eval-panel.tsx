@@ -251,8 +251,10 @@ export function EvalPanel({ api, chatRef }: EvalPanelProps) {
 		try {
 			const turns: TurnResult[] = [];
 
-			const userTurns: { user: ScenarioMessage; assistant?: ScenarioMessage }[] =
-				[];
+			const userTurns: {
+				user: ScenarioMessage;
+				assistant?: ScenarioMessage;
+			}[] = [];
 			for (let i = 0; i < scenario.messages.length; i++) {
 				const msg = scenario.messages[i];
 				if (msg.role === "user") {

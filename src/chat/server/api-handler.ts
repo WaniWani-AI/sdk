@@ -153,7 +153,8 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 					const filename = saveScenario(body);
 					return jsonResponse({ ok: true, filename }, 200);
 				} catch (e) {
-					const msg = e instanceof Error ? e.message : "Failed to save scenario";
+					const msg =
+						e instanceof Error ? e.message : "Failed to save scenario";
 					return jsonResponse({ error: msg }, 400);
 				}
 			}
