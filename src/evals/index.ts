@@ -1,4 +1,4 @@
-export { chat, conversation, loadSessions, replaySession } from "./chat";
+export { chat, conversation, loadScenarios, replayScenario, saveScenario } from "./chat";
 export { createLocalReporter } from "./reporter";
 
 export {
@@ -15,8 +15,9 @@ export type {
 	ConversationResult,
 	ConversationTurn,
 	ConversationTurnResult,
+	EvalScenario,
+	EvalScenarioType,
 	Scenario,
-	SessionReplay,
 	SimulationResult,
 	SimulationTurn,
 	ToolCallTrace,

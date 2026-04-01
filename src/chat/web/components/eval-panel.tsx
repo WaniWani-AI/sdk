@@ -7,17 +7,18 @@ import { cn } from "../lib/utils";
 
 // ---- Types ----
 
-type SessionPart = { type: string; [key: string]: unknown };
-type SessionMessage = {
+type ScenarioPart = { type: string; [key: string]: unknown };
+type ScenarioMessage = {
 	id: string;
 	role: "user" | "assistant" | "system" | "data";
-	parts: SessionPart[];
+	parts: ScenarioPart[];
 };
-type Session = {
+type EvalScenario = {
 	name: string;
+	type?: "regulatory" | "functional" | "adversarial";
 	mode?: "regenerate" | "inject";
 	outcome?: { toolsCalled: string[] };
-	messages: SessionMessage[];
+	messages: ScenarioMessage[];
 };
 type TurnResult = {
 	input: string;
@@ -32,14 +33,14 @@ type RunResult = {
 
 // ---- Replay helpers ----
 
-function getRecordedTools(msg: SessionMessage): string[] {
+function getRecordedTools(msg: ScenarioMessage): string[] {
 	return msg.parts
 		.filter((p) => p.type === "dynamic-tool" || p.type.startsWith("tool-"))
 		.map((p) => p.toolName as string)
 		.filter(Boolean);
 }
 
-function getUserText(msg: SessionMessage): string {
+function getUserText(msg: ScenarioMessage): string {
 	return msg.parts
 		.filter(
 			(p): p is { type: "text"; text: string } =>
@@ -199,7 +200,7 @@ function TurnRow({ turn, index }: { turn: TurnResult; index: number }) {
 // ---- Main component ----
 
 type EvalPanelProps = {
-	/** API endpoint to fetch sessions from
+	/** API endpoint to fetch scenarios from
 	 *
 	 * @default "/api/waniwani"
 	 */
@@ -209,18 +210,18 @@ type EvalPanelProps = {
 };
 
 /**
- * Dev-only evaluation panel for replaying recorded sessions and asserting tool usage.
+ * Dev-only evaluation panel for replaying recorded eval scenarios and asserting tool usage.
  *
  * This component is automatically tree-shaken from production builds —
  * it returns `null` when `process.env.NODE_ENV === "production"`.
  *
- * To populate sessions, set `WANIWANI_EVAL=1` in your `.env` and add
- * session files to `evals/sessions/`.
+ * To populate scenarios, set `WANIWANI_EVAL=1` in your `.env` and add
+ * scenario files to `evals/scenarios/`.
  */
 export function EvalPanel({ api, chatRef }: EvalPanelProps) {
 	const effectiveApi = api ?? "/api/waniwani";
-	const [sessions, setSessions] = useState<Session[]>([]);
-	const [selected, setSelected] = useState<Session | null>(null);
+	const [scenarios, setScenarios] = useState<EvalScenario[]>([]);
+	const [selected, setSelected] = useState<EvalScenario | null>(null);
 	const [running, setRunning] = useState(false);
 	const [result, setResult] = useState<RunResult | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -232,15 +233,15 @@ export function EvalPanel({ api, chatRef }: EvalPanelProps) {
 			return;
 		}
 
-		fetch(`${effectiveApi}/sessions`)
+		fetch(`${effectiveApi}/scenarios`)
 			.then((r) => r.json())
-			.then((data: Session[]) => {
-				setSessions(data);
+			.then((data: EvalScenario[]) => {
+				setScenarios(data);
 			})
 			.catch(() => {});
 	}, [effectiveApi, config.eval]);
 
-	async function runSession(session: Session) {
+	async function runScenario(scenario: EvalScenario) {
 		abortRef.current?.abort();
 		abortRef.current = new AbortController();
 		setRunning(true);
@@ -250,12 +251,12 @@ export function EvalPanel({ api, chatRef }: EvalPanelProps) {
 		try {
 			const turns: TurnResult[] = [];
 
-			const userTurns: { user: SessionMessage; assistant?: SessionMessage }[] =
+			const userTurns: { user: ScenarioMessage; assistant?: ScenarioMessage }[] =
 				[];
-			for (let i = 0; i < session.messages.length; i++) {
-				const msg = session.messages[i];
+			for (let i = 0; i < scenario.messages.length; i++) {
+				const msg = scenario.messages[i];
 				if (msg.role === "user") {
-					const next = session.messages[i + 1];
+					const next = scenario.messages[i + 1];
 					userTurns.push({
 						user: msg,
 						assistant: next?.role === "assistant" ? next : undefined,
@@ -310,11 +311,11 @@ export function EvalPanel({ api, chatRef }: EvalPanelProps) {
 		return null;
 	}
 
-	function reloadSessions() {
-		fetch(`${effectiveApi}/sessions`)
+	function reloadScenarios() {
+		fetch(`${effectiveApi}/scenarios`)
 			.then((r) => r.json())
-			.then((data: Session[]) => {
-				setSessions(data);
+			.then((data: EvalScenario[]) => {
+				setScenarios(data);
 			})
 			.catch(() => {});
 	}
@@ -328,9 +329,9 @@ export function EvalPanel({ api, chatRef }: EvalPanelProps) {
 				</span>
 				<button
 					type="button"
-					onClick={reloadSessions}
+					onClick={reloadScenarios}
 					className="ww:text-muted-foreground ww:hover:text-foreground ww:transition-colors ww:cursor-pointer"
-					title="Reload sessions"
+					title="Reload scenarios"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -344,21 +345,21 @@ export function EvalPanel({ api, chatRef }: EvalPanelProps) {
 						strokeLinejoin="round"
 						role="img"
 					>
-						<title>Reload sessions</title>
+						<title>Reload scenarios</title>
 						<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
 						<path d="M21 3v5h-5" />
 					</svg>
 				</button>
 			</div>
 
-			{/* Session list */}
+			{/* Scenario list */}
 			<div className="ww:flex-1 ww:overflow-y-auto ww:min-h-0">
-				{sessions.length === 0 ? (
+				{scenarios.length === 0 ? (
 					<p className="ww:text-xs ww:font-mono ww:text-muted-foreground ww:text-center ww:py-8 ww:px-4">
-						No sessions found
+						No scenarios found
 					</p>
 				) : (
-					sessions.map((s) => (
+					scenarios.map((s) => (
 						<button
 							key={s.name}
 							type="button"
@@ -385,11 +386,11 @@ export function EvalPanel({ api, chatRef }: EvalPanelProps) {
 				<div className="ww:border-t ww:border-border/50 ww:p-3 ww:space-y-3 ww:overflow-y-auto ww:max-h-[60%]">
 					<button
 						type="button"
-						onClick={() => runSession(selected)}
+						onClick={() => runScenario(selected)}
 						disabled={running}
 						className="ww:w-full ww:py-2 ww:rounded-md ww:text-xs ww:font-mono ww:font-medium ww:bg-foreground ww:text-background ww:hover:opacity-90 ww:disabled:opacity-50 ww:transition-opacity ww:cursor-pointer"
 					>
-						{running ? "Running..." : "Run session"}
+						{running ? "Running..." : "Run scenario"}
 					</button>
 
 					{error && (

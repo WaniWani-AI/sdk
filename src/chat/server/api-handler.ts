@@ -1,6 +1,6 @@
 // API Handler - Composes chat and resource handlers into a unified API handler
 
-import { loadSessions, saveSession } from "../../evals/chat.js";
+import { loadScenarios, saveScenario } from "../../evals/chat.js";
 import { createLogger } from "../../utils/logger.js";
 import type { ApiHandler, ApiHandlerOptions } from "./@types";
 import { createChatRequestHandler } from "./handle-chat";
@@ -101,10 +101,10 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 			log("pathname:", url.pathname, "subRoute:", subRoute);
 
 			// This is used for evaluation purposes.
-			if (evalEnabled && subRoute === "sessions") {
-				log("dispatching to sessions handler");
+			if (evalEnabled && subRoute === "scenarios") {
+				log("dispatching to scenarios handler");
 				try {
-					return jsonResponse(loadSessions(), 200);
+					return jsonResponse(loadScenarios(), 200);
 				} catch {
 					return jsonResponse([], 200);
 				}
@@ -146,14 +146,14 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 			const subRoute = segments.at(-1);
 			log("pathname:", url.pathname, "subRoute:", subRoute);
 
-			if (evalEnabled && subRoute === "sessions") {
-				log("dispatching to save-session handler");
+			if (evalEnabled && subRoute === "scenarios") {
+				log("dispatching to save-scenario handler");
 				try {
 					const body = await request.json();
-					const filename = saveSession(body);
+					const filename = saveScenario(body);
 					return jsonResponse({ ok: true, filename }, 200);
 				} catch (e) {
-					const msg = e instanceof Error ? e.message : "Failed to save session";
+					const msg = e instanceof Error ? e.message : "Failed to save scenario";
 					return jsonResponse({ error: msg }, 400);
 				}
 			}

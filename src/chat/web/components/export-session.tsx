@@ -28,7 +28,7 @@ export function ExportSessionButton({
 		setFeedback(null);
 
 		try {
-			const res = await fetch(`${api}/sessions`, {
+			const res = await fetch(`${api}/scenarios`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(session),
@@ -62,7 +62,7 @@ export function ExportSessionButton({
 			type="button"
 			onClick={handleExport}
 			disabled={saving}
-			title="Save session to evals/sessions/"
+			title="Save scenario to evals/scenarios/"
 			className="ww:ml-auto ww:text-[10px] ww:font-mono ww:uppercase ww:tracking-wider ww:text-muted-foreground hover:ww:text-foreground ww:cursor-pointer ww:transition-colors ww:disabled:opacity-40"
 		>
 			{label}

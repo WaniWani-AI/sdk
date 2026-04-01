@@ -41,7 +41,15 @@ export interface ConversationResult {
 }
 
 /**
- * A recorded conversation session that can be replayed as a test.
+ * Scenario category for grouping and filtering eval scenarios.
+ * - **"regulatory"**: Checks against legal/regulatory requirements (e.g. did the agent push a sale?).
+ * - **"functional"**: Checks product behavior and correctness (e.g. did the flow return the right data?).
+ * - **"adversarial"**: Edge cases and robustness (e.g. weird inputs, missing data, contradictory requests).
+ */
+export type EvalScenarioType = "regulatory" | "functional" | "adversarial";
+
+/**
+ * A recorded conversation that can be replayed as an automated eval test.
  * Messages use the AI SDK's UIMessage format — same as what the
  * Export button in the chatbar produces.
  *
@@ -53,13 +61,14 @@ export interface ConversationResult {
  * - **"inject"**: Prior turns are injected as-is, only the
  *   final user message gets a fresh LLM response.
  */
-export interface SessionReplay {
+export interface EvalScenario {
 	name: string;
+	type?: EvalScenarioType;
 	messages: UIMessage[];
 	mode?: "regenerate" | "inject";
 	/**
 	 * Optional session-level outcome assertion.
-	 * Checks that all listed tools were called at least once across the session.
+	 * Checks that all listed tools were called at least once across the scenario.
 	 */
 	outcome?: {
 		toolsCalled: string[];

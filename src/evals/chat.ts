@@ -12,15 +12,16 @@ import type {
 	ConversationResult,
 	ConversationTurn,
 	ConversationTurnResult,
-	SessionReplay,
+	EvalScenario,
 	ToolCallTrace,
 	TurnAssertion,
 } from "./types";
 
 // UIMessage parts are heterogeneous — validate the fields we need, pass extras through
-const sessionReplaySchema = z.object({
+const evalScenarioSchema = z.object({
 	name: z.string(),
-	mode: z.enum(["regenerate", "inject"]).optional(),
+	type: z.enum(["regulatory", "functional", "tone"]).optional(),
+	mode: z.enum(["synthetic", "manual"]).optional(),
 	outcome: z.object({ toolsCalled: z.array(z.string()) }).optional(),
 	messages: z.array(
 		z.looseObject({
@@ -129,31 +130,31 @@ async function sendMessages(
  * @param dir - Path to the sessions directory. Defaults to `evals/sessions`.
  */
 /**
- * Save a session replay JSON file to the sessions directory.
+ * Save an eval scenario JSON file to the scenarios directory.
  *
- * @param session - The session to save.
- * @param dir - Path to the sessions directory. Defaults to `evals/sessions`.
+ * @param scenario - The scenario to save.
+ * @param dir - Path to the scenarios directory. Defaults to `evals/scenarios`.
  * @returns The filename that was written.
  */
-export function saveSession(
-	session: SessionReplay,
-	dir = "evals/sessions",
+export function saveScenario(
+	scenario: EvalScenario,
+	dir = "evals/scenarios",
 ): string {
 	const root = join(process.cwd(), dir);
 	mkdirSync(root, { recursive: true });
-	const filename = `${session.name}.json`;
-	writeFileSync(join(root, filename), JSON.stringify(session, null, 2));
+	const filename = `${scenario.name}.json`;
+	writeFileSync(join(root, filename), JSON.stringify(scenario, null, 2));
 	return filename;
 }
 
-export function loadSessions(dir = "evals/sessions"): SessionReplay[] {
+export function loadScenarios(dir = "evals/scenarios"): EvalScenario[] {
 	const root = join(process.cwd(), dir);
 	return readdirSync(root)
 		.filter((f) => f.endsWith(".json"))
 		.sort()
 		.map((f) => {
 			const raw = JSON.parse(readFileSync(join(root, f), "utf8"));
-			return sessionReplaySchema.parse(raw) as unknown as SessionReplay;
+			return evalScenarioSchema.parse(raw) as unknown as EvalScenario;
 		});
 }
 
@@ -197,32 +198,32 @@ export async function conversation(
 }
 
 /**
- * Replay a recorded conversation session (exported from the chatbar debug button).
+ * Replay a recorded eval scenario (exported from the chatbar debug button).
  * Uses UIMessage[] directly — same format as useChat's messages array.
  *
  * **"regenerate" mode** (default):
  *   Sends only user messages. The LLM generates fresh responses.
  *   Per-turn assertions are auto-derived by comparing actual tool calls
- *   to the tool calls recorded in the session.
+ *   to the tool calls recorded in the scenario.
  *
  * **"inject" mode**:
  *   Injects the recorded conversation as-is, only generates a fresh
  *   response for the final user message.
  */
-export async function replaySession(
+export async function replayScenario(
 	url: string,
-	session: SessionReplay,
+	scenario: EvalScenario,
 ): Promise<ConversationResult> {
-	const mode = session.mode ?? "regenerate";
+	const mode = scenario.mode ?? "regenerate";
 	const history: UIMessage[] = [];
 	const turnResults: ConversationTurnResult[] = [];
 
 	// Pair user messages with their assistant responses
 	const userTurns: { userMsg: UIMessage; assistantMsg?: UIMessage }[] = [];
-	for (let i = 0; i < session.messages.length; i++) {
-		const msg = session.messages[i];
+	for (let i = 0; i < scenario.messages.length; i++) {
+		const msg = scenario.messages[i];
 		if (msg.role === "user") {
-			const next = session.messages[i + 1];
+			const next = scenario.messages[i + 1];
 			userTurns.push({
 				userMsg: msg,
 				assistantMsg: next?.role === "assistant" ? next : undefined,
