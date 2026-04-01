@@ -118,13 +118,18 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 				const scrollbarGap = window.innerWidth - el.clientWidth;
 				const width = Math.ceil(fitRect.width + scrollbarGap);
 
-				// --- Height: read body.scrollHeight ---
+				// --- Height: read body.scrollHeight + body margins ---
 				// We use document.body.scrollHeight rather than collapsing
 				// <html> and reading its scrollHeight, because in an iframe
 				// document.documentElement.scrollHeight never drops below
 				// the viewport height (set by the parent iframe element),
 				// causing a ratchet effect where the iframe only ever grows.
-				const height = document.body.scrollHeight;
+				// scrollHeight excludes the body's own margins, so we add
+				// them back to avoid clipping.
+				const bodyStyle = getComputedStyle(document.body);
+				const bodyMargins =
+					parseFloat(bodyStyle.marginTop) + parseFloat(bodyStyle.marginBottom);
+				const height = document.body.scrollHeight + bodyMargins;
 
 				if (width !== lastWidth || height !== lastHeight) {
 					lastWidth = width;
