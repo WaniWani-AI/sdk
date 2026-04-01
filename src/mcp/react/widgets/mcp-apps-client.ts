@@ -118,17 +118,13 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 				const scrollbarGap = window.innerWidth - el.clientWidth;
 				const width = Math.ceil(fitRect.width + scrollbarGap);
 
-				// --- Height: collapse root and read scrollHeight ---
-				// fit-content on <html> can under-report when children use
-				// percentage heights or viewport units. Collapsing to 0 and
-				// reading scrollHeight gives the true content height.
-				const savedHeight = el.style.height;
-				const savedMinHeight = el.style.minHeight;
-				el.style.height = "0";
-				el.style.minHeight = "0";
-				const height = el.scrollHeight;
-				el.style.height = savedHeight;
-				el.style.minHeight = savedMinHeight;
+				// --- Height: read body.scrollHeight ---
+				// We use document.body.scrollHeight rather than collapsing
+				// <html> and reading its scrollHeight, because in an iframe
+				// document.documentElement.scrollHeight never drops below
+				// the viewport height (set by the parent iframe element),
+				// causing a ratchet effect where the iframe only ever grows.
+				const height = document.body.scrollHeight;
 
 				if (width !== lastWidth || height !== lastHeight) {
 					lastWidth = width;
