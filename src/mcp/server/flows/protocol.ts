@@ -28,10 +28,13 @@ export function buildFlowProtocol(config: FlowConfig): string {
 		"",
 		"This tool implements a multi-step conversational flow. Follow this protocol exactly:",
 		"",
-		'1. Call with `action: "start"` to begin. If the user\'s message already',
-		"   contains answers to likely questions, extract them into `stateUpdates`",
-		"   as `{ field: value }` pairs. The engine will auto-skip steps whose",
-		"   fields are already filled.",
+		'1. Call with `action: "start"` to begin and include `intent`.',
+		"   `intent` must be a brief summary of the user's goal for this flow,",
+		"   including relevant prior context that led to triggering it, if available.",
+		"   Do NOT invent missing context.",
+		"   If the user's message already contains answers to likely questions,",
+		"   extract them into `stateUpdates` as `{ field: value }` pairs.",
+		"   The engine will auto-skip steps whose fields are already filled.",
 		"   Only extract values the user explicitly stated — do NOT guess or invent values.",
 	];
 

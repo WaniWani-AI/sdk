@@ -37,6 +37,16 @@ type RegisterToolArgs = [string, Record<string, unknown>, Handler];
 
 const TEST_SESSION_ID = "test-session-1";
 const TEST_EXTRA = { _meta: { sessionId: TEST_SESSION_ID } };
+const TEST_INTENT =
+	"Qualify the user for this flow based on what they asked for earlier in the conversation.";
+
+function startInput(stateUpdates?: Record<string, unknown>) {
+	return {
+		action: "start" as const,
+		intent: TEST_INTENT,
+		...(stateUpdates ? { stateUpdates } : {}),
+	};
+}
 
 function mockServer() {
 	const registered: RegisterToolArgs[] = [];
@@ -55,6 +65,41 @@ function parsePayload(result: Record<string, unknown>) {
 }
 
 describe("compileFlow response contract", () => {
+	test("returns an error when start is missing intent", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "missing_intent_flow",
+			title: "Missing Intent Flow",
+			description: "Collect lead details.",
+			state: {
+				useCase: z.string().describe("Primary use case"),
+			},
+		})
+			.addNode("ask_use_case", ({ interrupt }) =>
+				interrupt({
+					useCase: { question: "What's your primary use case?" },
+				}),
+			)
+			.addEdge(START, "ask_use_case")
+			.addEdge("ask_use_case", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.({ action: "start" }, TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("error");
+		expect(parsed.error).toContain('Missing required "intent"');
+		expect(result.isError).toBe(true);
+		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
+	});
+
 	test("returns interrupt JSON content", async () => {
 		const store = new TestFlowStateStore();
 		const flow = createFlow({
@@ -78,10 +123,9 @@ describe("compileFlow response contract", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		const result = (await handler?.(
-			{ action: "start" },
-			{ _meta: { requestId: "req-1", sessionId: TEST_SESSION_ID } },
-		)) as Record<string, unknown>;
+		const result = (await handler?.(startInput(), {
+			_meta: { requestId: "req-1", sessionId: TEST_SESSION_ID },
+		})) as Record<string, unknown>;
 		const parsed = parsePayload(result);
 
 		expect(parsed).toMatchObject({
@@ -126,7 +170,7 @@ describe("compileFlow response contract", () => {
 		const handler = registered[0]?.[2];
 
 		// Start to populate the store
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 
 		// Continue using session ID
 		const result = (await handler?.(
@@ -139,11 +183,7 @@ describe("compileFlow response contract", () => {
 		const parsed = parsePayload(result);
 
 		expect(parsed).toMatchObject({ status: "complete" });
-		// Verify final state is in the store
-		const tokenData = await store.get(TEST_SESSION_ID);
-		expect(tokenData?.state).toMatchObject({
-			useCase: "Lead qualification",
-		});
+		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
 	});
 
 	test("multi-question interrupt loops with unanswered questions when user answers partially", async () => {
@@ -177,7 +217,7 @@ describe("compileFlow response contract", () => {
 		const handler = registered[0]?.[2];
 
 		// Step 1: Start — should get all 3 questions
-		const r1 = (await handler?.({ action: "start" }, TEST_EXTRA)) as Record<
+		const r1 = (await handler?.(startInput(), TEST_EXTRA)) as Record<
 			string,
 			unknown
 		>;
@@ -232,13 +272,7 @@ describe("compileFlow response contract", () => {
 		const p4 = parsePayload(r4);
 
 		expect(p4.status).toBe("complete");
-		// Verify final state is in the store
-		const tokenData = await store.get(TEST_SESSION_ID);
-		expect(tokenData?.state).toMatchObject({
-			name: "Alice",
-			email: "alice@example.com",
-			company: "Acme Inc",
-		});
+		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
 	});
 
 	test("multi-question interrupt completes when all questions answered at once", async () => {
@@ -267,7 +301,7 @@ describe("compileFlow response contract", () => {
 		const handler = registered[0]?.[2];
 
 		// Start
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 
 		// Answer both at once — should complete
 		const r2 = (await handler?.(
@@ -311,7 +345,7 @@ describe("compileFlow response contract", () => {
 		const handler = registered[0]?.[2];
 
 		// Start — handler called once
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 		expect(handlerCallCount).toBe(1);
 
 		// Partial answer — handler re-executes to filter answered questions
@@ -369,7 +403,7 @@ describe("compileFlow response contract", () => {
 		const handler = registered[0]?.[2];
 
 		// Start — should show widget
-		const r1 = (await handler?.({ action: "start" }, TEST_EXTRA)) as Record<
+		const r1 = (await handler?.(startInput(), TEST_EXTRA)) as Record<
 			string,
 			unknown
 		>;
@@ -414,7 +448,7 @@ describe("compileFlow response contract", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		const result = (await handler?.({ action: "start" }, TEST_EXTRA)) as Record<
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
 			string,
 			unknown
 		>;
@@ -463,7 +497,7 @@ describe("compileFlow response contract", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		const result = (await handler?.({ action: "start" }, TEST_EXTRA)) as Record<
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
 			string,
 			unknown
 		>;
@@ -507,7 +541,7 @@ describe("validate on interrupt", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 
 		const r2 = (await handler?.(
 			{
@@ -519,11 +553,7 @@ describe("validate on interrupt", () => {
 		const p2 = parsePayload(r2);
 
 		expect(p2.status).toBe("complete");
-		const tokenData = await store.get(TEST_SESSION_ID);
-		expect(tokenData?.state).toMatchObject({
-			breed: "labrador",
-			breedId: "id-labrador",
-		});
+		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
 	});
 
 	test("validate returning void advances without enrichment", async () => {
@@ -554,7 +584,7 @@ describe("validate on interrupt", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 
 		const r2 = (await handler?.(
 			{
@@ -566,8 +596,7 @@ describe("validate on interrupt", () => {
 		const p2 = parsePayload(r2);
 
 		expect(p2.status).toBe("complete");
-		const tokenData = await store.get(TEST_SESSION_ID);
-		expect(tokenData?.state).toMatchObject({ email: "test@test.com" });
+		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
 	});
 
 	test("validate throwing re-asks with error message and clears field", async () => {
@@ -605,7 +634,7 @@ describe("validate on interrupt", () => {
 		const handler = registered[0]?.[2];
 
 		// Start
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 
 		// Submit invalid code — should re-ask
 		const r2 = (await handler?.(
@@ -665,7 +694,7 @@ describe("validate on interrupt", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 
 		// Partial answer — should NOT trigger validate
 		const r2 = (await handler?.(
@@ -715,7 +744,7 @@ describe("isError on error responses", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		const result = (await handler?.({ action: "start" }, TEST_EXTRA)) as Record<
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
 			string,
 			unknown
 		>;
@@ -746,7 +775,7 @@ describe("isError on error responses", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		const result = (await handler?.({ action: "start" }, TEST_EXTRA)) as Record<
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
 			string,
 			unknown
 		>;
@@ -789,7 +818,7 @@ describe("nested object state", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		const result = (await handler?.({ action: "start" }, TEST_EXTRA)) as Record<
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
 			string,
 			unknown
 		>;
@@ -833,7 +862,7 @@ describe("nested object state", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 
 		const result = (await handler?.(
 			{
@@ -848,10 +877,7 @@ describe("nested object state", () => {
 		const parsed = parsePayload(result);
 
 		expect(parsed.status).toBe("complete");
-		const tokenData = await store.get(TEST_SESSION_ID);
-		expect(tokenData?.state).toMatchObject({
-			driver: { name: "John", license: "ABC123" },
-		});
+		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
 	});
 
 	test("partial nested answers re-ask remaining sub-fields", async () => {
@@ -883,7 +909,7 @@ describe("nested object state", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 
 		// Partial — only name
 		const r2 = (await handler?.(
@@ -947,7 +973,7 @@ describe("nested object state", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 
 		const r2 = (await handler?.(
 			{
@@ -971,11 +997,7 @@ describe("nested object state", () => {
 		const p3 = parsePayload(r3);
 
 		expect(p3.status).toBe("complete");
-		const tokenData = await store.get(TEST_SESSION_ID);
-		expect(tokenData?.state).toMatchObject({
-			driver: { name: "Bob" },
-			email: "bob@test.com",
-		});
+		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
 	});
 
 	test("nested field validation runs and enriches state", async () => {
@@ -1011,7 +1033,7 @@ describe("nested object state", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 
 		const r2 = (await handler?.(
 			{
@@ -1023,10 +1045,7 @@ describe("nested object state", () => {
 		const p2 = parsePayload(r2);
 
 		expect(p2.status).toBe("complete");
-		const tokenData = await store.get(TEST_SESSION_ID);
-		expect(tokenData?.state).toMatchObject({
-			driver: { name: "alice", nameUpper: "ALICE" },
-		});
+		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
 	});
 
 	test("nested validation error clears only the sub-field", async () => {
@@ -1065,7 +1084,7 @@ describe("nested object state", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 
 		// Answer both, but name is invalid
 		const r2 = (await handler?.(
@@ -1122,10 +1141,7 @@ describe("nested object state", () => {
 
 		// Pre-fill name on start
 		const r1 = (await handler?.(
-			{
-				action: "start",
-				stateUpdates: { "driver.name": "Pre-filled" },
-			},
+			startInput({ "driver.name": "Pre-filled" }),
 			TEST_EXTRA,
 		)) as Record<string, unknown>;
 		const p1 = parsePayload(r1);
@@ -1167,7 +1183,7 @@ describe("nested object state", () => {
 		const handler = registered[0]?.[2];
 
 		// Start → ask name
-		await handler?.({ action: "start" }, TEST_EXTRA);
+		await handler?.(startInput(), TEST_EXTRA);
 		// Answer name → ask license
 		await handler?.(
 			{ action: "continue", stateUpdates: { "driver.name": "Alice" } },
@@ -1184,10 +1200,6 @@ describe("nested object state", () => {
 		const p3 = parsePayload(r3);
 
 		expect(p3.status).toBe("complete");
-		const tokenData = await store.get(TEST_SESSION_ID);
-		// Both fields must be present — deep merge didn't wipe name
-		expect(tokenData?.state).toMatchObject({
-			driver: { name: "Alice", license: "XYZ" },
-		});
+		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
 	});
 });
