@@ -391,6 +391,8 @@ export interface CompileInput<TState extends Record<string, unknown>> {
 
 export type FlowToolInput = {
 	action: "start" | "continue";
+	/** Required when `action` is `"start"`. */
+	intent?: string;
 	stateUpdates?: Record<string, unknown>;
 };
 

@@ -21,11 +21,19 @@ State is stored server-side via the WaniWani API, keyed by the session ID from `
 Flow tools accept:
 
 ```ts
-{
-  action: "start" | "continue";
-  stateUpdates?: Record<string, unknown>;
-}
+type FlowToolInput =
+  | {
+      action: "start";
+      intent: string;
+      stateUpdates?: Record<string, unknown>;
+    }
+  | {
+      action: "continue";
+      stateUpdates?: Record<string, unknown>;
+    };
 ```
+
+`intent` is required on `start` and should summarize the user's goal for the flow, including relevant prior context that led to triggering it, if available.
 
 ### Tool output
 

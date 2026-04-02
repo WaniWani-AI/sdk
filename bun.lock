@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "@waniwani/cli",
@@ -41,7 +42,7 @@
         "@ai-sdk/react": ">=1.0.0",
         "@modelcontextprotocol/ext-apps": "1.0.1",
         "@modelcontextprotocol/sdk": "1.25.2",
-        "ai": "^6.0.141",
+        "ai": ">=4.0.0",
         "autoevals": ">=0.0.100",
         "braintrust": ">=3.0.0",
         "react": ">=18.0.0",

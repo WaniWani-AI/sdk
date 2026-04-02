@@ -30,6 +30,12 @@ const inputSchema = {
 		.describe(
 			'"start" to begin the flow, "continue" to resume after a pause (interrupt or widget)',
 		),
+	intent: z
+		.string()
+		.optional()
+		.describe(
+			'Required when action is "start". Provide a brief summary of the user\'s goal for this flow, including relevant prior context that led to triggering it, if available. Do not invent missing context.',
+		),
 	stateUpdates: z
 		.record(z.string(), z.unknown())
 		.optional()
@@ -63,6 +69,19 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		waniwani?: ScopedWaniWaniClient,
 	) {
 		if (args.action === "start") {
+			const intent =
+				typeof args.intent === "string" ? args.intent.trim() : undefined;
+			if (!intent) {
+				return {
+					content: {
+						status: "error" as const,
+						error:
+							'Missing required "intent" for action "start". Include a brief summary of the user\'s goal for this flow and any relevant prior context that led to triggering it, if available.',
+					},
+				};
+			}
+			args.intent = intent;
+
 			const startEdge = edges.get(START);
 			if (!startEdge) {
 				return {
