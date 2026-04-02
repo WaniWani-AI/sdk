@@ -56,6 +56,7 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 
 	async get(key: string): Promise<T | null> {
 		if (!this.apiKey) {
+			console.warn("[WaniWani KV] get: no API key configured — returning null");
 			return null;
 		}
 		try {
@@ -63,19 +64,21 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 				key,
 			});
 			return data ?? null;
-		} catch {
+		} catch (error) {
+			console.error("[WaniWani KV] get failed for key:", key, error);
 			return null;
 		}
 	}
 
 	async set(key: string, value: T): Promise<void> {
 		if (!this.apiKey) {
+			console.warn("[WaniWani KV] set: no API key configured — skipping");
 			return;
 		}
 		try {
 			await this.request("/api/mcp/redis/set", { key, value });
-		} catch {
-			// Non-fatal
+		} catch (error) {
+			console.error("[WaniWani KV] set failed for key:", key, error);
 		}
 	}
 
@@ -85,8 +88,8 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 		}
 		try {
 			await this.request("/api/mcp/redis/delete", { key });
-		} catch {
-			// Non-fatal
+		} catch (error) {
+			console.error("[WaniWani KV] delete failed for key:", key, error);
 		}
 	}
 

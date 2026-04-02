@@ -155,4 +155,5 @@ export interface ResourceHandlerDeps {
 	mcpServerUrl: string | undefined;
 	resolveConfig: ConfigResolver;
 	debug: boolean;
+	source?: string;
 }

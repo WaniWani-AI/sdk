@@ -80,6 +80,7 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		mcpServerUrl,
 		resolveConfig,
 		debug,
+		source,
 	});
 
 	const evalEnabled = process.env.WANIWANI_EVAL === "1";

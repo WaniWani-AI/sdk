@@ -5,7 +5,12 @@ import { createLogger } from "../../utils/logger.js";
 import type { ResourceHandlerDeps } from "./@types";
 
 export function createToolHandler(deps: ResourceHandlerDeps) {
-	const { mcpServerUrl: mcpServerUrlOverride, resolveConfig, debug } = deps;
+	const {
+		mcpServerUrl: mcpServerUrlOverride,
+		resolveConfig,
+		debug,
+		source,
+	} = deps;
 
 	const log = createLogger("tool", debug);
 
@@ -70,16 +75,17 @@ export function createToolHandler(deps: ResourceHandlerDeps) {
 
 			try {
 				log("calling tool:", name);
+				const _meta: Record<string, unknown> = {};
+				if (requestSessionId) {
+					_meta["waniwani/sessionId"] = requestSessionId;
+				}
+				if (source) {
+					_meta["waniwani/source"] = source;
+				}
 				const result = await client.callTool({
 					name,
 					arguments: args ?? {},
-					...(requestSessionId
-						? {
-								_meta: {
-									"waniwani/sessionId": requestSessionId,
-								},
-							}
-						: {}),
+					...(Object.keys(_meta).length > 0 ? { _meta } : {}),
 				} as {
 					name: string;
 					arguments: Record<string, unknown>;
