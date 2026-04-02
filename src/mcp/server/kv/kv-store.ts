@@ -52,6 +52,17 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 		// order: options.apiKey, process.env.WANIWANI_API_KEY, globalConfig?.apiKey
 		this.apiKey =
 			options?.apiKey ?? process.env.WANIWANI_API_KEY ?? globalConfig?.apiKey;
+
+		const keySource = options?.apiKey
+			? "options"
+			: process.env.WANIWANI_API_KEY
+				? "env:WANIWANI_API_KEY"
+				: globalConfig?.apiKey
+					? "globalConfig"
+					: "none";
+		console.debug(
+			`[WaniWani KV] init: baseUrl=${this.baseUrl}, keySource=${keySource}, keyPrefix=${this.apiKey?.slice(0, 8) ?? "n/a"}`,
+		);
 	}
 
 	async get(key: string): Promise<T | null> {
