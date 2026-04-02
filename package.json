@@ -44,6 +44,11 @@
       "types": "./dist/evals/index.d.ts",
       "import": "./dist/evals/index.js",
       "default": "./dist/evals/index.js"
+    },
+    "./evals/scorers": {
+      "types": "./dist/evals/scorers.d.ts",
+      "import": "./dist/evals/scorers.js",
+      "default": "./dist/evals/scorers.js"
     }
   },
   "files": [

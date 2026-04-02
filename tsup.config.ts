@@ -128,9 +128,23 @@ export default defineConfig([
 		outDir: "dist",
 		external: ["ai"],
 	},
-	// Evals (Node.js, server-side — braintrust + autoevals are optional peer deps)
+	// Evals (Node.js — replay, scenarios, chat — no optional deps)
 	{
 		entry: { "evals/index": "src/evals/index.ts" },
+		format: ["esm"],
+		target: "node20",
+		dts: true,
+		clean: false,
+		shims: true,
+		splitting: true,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		external: ["ai", "zod"],
+	},
+	// Evals scorers (Node.js — braintrust + autoevals required)
+	{
+		entry: { "evals/scorers": "src/evals/scorers-entry.ts" },
 		format: ["esm"],
 		target: "node20",
 		dts: true,
