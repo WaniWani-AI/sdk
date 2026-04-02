@@ -161,11 +161,14 @@ export function MessageList({
 													position: "absolute" as const,
 													inset: 0,
 													zIndex: 10,
+													display: "flex",
+													flexDirection: "column" as const,
+													overflow: "hidden",
 												}
 											: undefined
 									}
 								>
-									<div>
+									<div style={isFullscreen ? { display: "none" } : undefined}>
 										<Tool defaultOpen={part.state === "output-available"}>
 											<ToolHeader
 												title={part.title ?? formatToolName(part.toolName)}
