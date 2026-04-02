@@ -151,7 +151,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		reject: (err: Error) => void;
 	} | null>(null);
 
-	const { messages, sendMessage, status } = useChat({
+	const { messages, sendMessage, setMessages, status } = useChat({
 		transport: transportRef.current,
 		onFinish({ message }) {
 			onResponseReceived?.();
@@ -250,6 +250,13 @@ export function useChatEngine(props: ChatBaseProps) {
 		onMessageSent?.(first.text);
 	}, [status, sendMessage, onMessageSent, queuedMessages]);
 
+	const reset = useCallback(() => {
+		setMessages([]);
+		setQueuedMessages([]);
+		clearSessionId();
+		setText("");
+	}, [setMessages, clearSessionId]);
+
 	const handleTextChange = useCallback(
 		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
 			setText(e.target.value);
@@ -275,6 +282,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		hasMessages,
 		sendMessage,
 		sendMessageAndWait,
+		reset,
 		queuedMessages,
 		queueFull,
 		removeQueuedMessage,

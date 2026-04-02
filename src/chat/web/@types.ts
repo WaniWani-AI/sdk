@@ -247,6 +247,8 @@ export interface ChatHandle {
 	 * Returns the final assistant message. Useful for eval/testing flows.
 	 */
 	sendMessageAndWait: (text: string) => Promise<unknown>;
+	/** Clear all messages and start a fresh conversation */
+	reset: () => void;
 	/** Scroll to the chat input, focus it, and show a highlight glow */
 	focus: () => void;
 }

@@ -138,9 +138,15 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 					focusInput();
 				},
 				sendMessageAndWait: (text: string) => engine.sendMessageAndWait(text),
+				reset: engine.reset,
 				focus: focusInput,
 			}),
-			[engine.handleSubmit, engine.sendMessageAndWait, focusInput],
+			[
+				engine.handleSubmit,
+				engine.sendMessageAndWait,
+				engine.reset,
+				focusInput,
+			],
 		);
 
 		// Listen for custom trigger event (e.g. "triggerDemoRequest")

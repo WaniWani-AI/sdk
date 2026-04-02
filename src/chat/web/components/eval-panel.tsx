@@ -49,18 +49,18 @@ function ScenarioSkeleton() {
 
 const PANEL_WIDTH = 320;
 
-type EvalPanelProps = {
+type ScenarioPanelProps = {
 	/** API endpoint to fetch scenarios from
 	 *
 	 * @default "/api/waniwani"
 	 */
 	api?: string;
-	/** Ref to the ChatCard or ChatBar so eval turns flow through the chat UI */
+	/** Ref to the ChatCard or ChatBar so scenario turns flow through the chat UI */
 	chatRef: RefObject<ChatHandle | null>;
 };
 
 /**
- * Dev-only evaluation panel for replaying recorded eval scenarios.
+ * Dev-only scenario panel for replaying recorded scenarios through the chat.
  *
  * This component is automatically tree-shaken from production builds —
  * it returns `null` when `process.env.NODE_ENV === "production"`.
@@ -68,7 +68,7 @@ type EvalPanelProps = {
  * To populate scenarios, set `WANIWANI_EVAL=1` in your `.env` and add
  * scenario files to `evals/scenarios/`.
  */
-export function EvalPanel({ api, chatRef }: EvalPanelProps) {
+export function ScenarioPanel({ api, chatRef }: ScenarioPanelProps) {
 	const effectiveApi = api ?? "/api/waniwani";
 	const [selected, setSelected] = useState<EvalScenario | null>(null);
 	const [running, setRunning] = useState(false);
@@ -87,9 +87,11 @@ export function EvalPanel({ api, chatRef }: EvalPanelProps) {
 		try {
 			if (!chatRef?.current) {
 				throw new Error(
-					"EvalPanel requires a chatRef prop pointing to the ChatCard/ChatBar",
+					"ScenarioPanel requires a chatRef prop pointing to the ChatCard/ChatBar",
 				);
 			}
+
+			chatRef.current.reset();
 
 			const userMessages = scenario.messages.filter(
 				(msg) => msg.role === "user",
@@ -103,7 +105,7 @@ export function EvalPanel({ api, chatRef }: EvalPanelProps) {
 			}
 		} catch (e) {
 			if ((e as Error).name !== "AbortError") {
-				console.error("[EvalPanel] run failed:", e);
+				console.error("[ScenarioPanel] run failed:", e);
 			}
 		} finally {
 			setRunning(false);
@@ -122,7 +124,7 @@ export function EvalPanel({ api, chatRef }: EvalPanelProps) {
 			{/* Header */}
 			<div className="ww:px-3 ww:py-2 ww:border-b ww:border-border/50 ww:flex ww:items-center ww:justify-between">
 				<span className="ww:text-[10px] ww:font-mono ww:uppercase ww:tracking-widest ww:text-muted-foreground">
-					Eval
+					Scenarios
 				</span>
 				<button
 					type="button"

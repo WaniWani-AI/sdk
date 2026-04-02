@@ -13,7 +13,7 @@ export type {
 	WelcomeConfig,
 } from "./@types";
 export { ChatWidget } from "./components/chat-widget";
-export { EvalPanel } from "./components/eval-panel";
+export { ScenarioPanel } from "./components/eval-panel";
 export type {
 	McpAppDisplayMode,
 	McpAppFrameProps,
