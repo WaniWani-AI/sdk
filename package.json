@@ -157,6 +157,6 @@
   "author": "WaniWani",
   "license": "MIT",
   "dependencies": {
-    "@waniwani/sdk": "^0.2.2-beta.0"
+    "@waniwani/sdk": "^0.6.1-beta.8"
   }
 }
