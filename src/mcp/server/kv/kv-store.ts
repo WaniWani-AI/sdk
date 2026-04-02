@@ -60,7 +60,7 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 				: globalConfig?.apiKey
 					? "globalConfig"
 					: "none";
-		console.debug(
+		console.log(
 			`[WaniWani KV] init: baseUrl=${this.baseUrl}, keySource=${keySource}, keyPrefix=${this.apiKey?.slice(0, 8) ?? "n/a"}`,
 		);
 	}
