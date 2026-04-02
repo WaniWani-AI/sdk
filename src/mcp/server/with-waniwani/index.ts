@@ -128,7 +128,10 @@ export function withWaniwani(
 		const wrappedHandler = async (input: unknown, extra: unknown) => {
 			// Inject scoped client into extra so createTool/flows can surface it
 			const meta = extractMeta(extra) ?? {};
-			const scopedClient = createScopedClient(tracker, meta);
+			const scopedClient = createScopedClient(tracker, meta, {
+				apiUrl: tracker._config.apiUrl,
+				apiKey: tracker._config.apiKey,
+			});
 			if (isRecord(extra)) {
 				(extra as UnknownRecord)[SCOPED_CLIENT_KEY] = scopedClient;
 			}

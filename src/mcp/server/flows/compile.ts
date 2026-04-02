@@ -56,7 +56,21 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	const fullDescription = `${config.description}\n${protocol}`;
 
 	// Server-side state store — keyed by sessionId, backed by WaniWani API.
-	const store: FlowStore = input.store ?? new WaniwaniFlowStore();
+	// Lazy-initialized on first request so it can pick up KV config injected
+	// by withWaniwani() (correct apiUrl/apiKey), instead of resolving at compile time.
+	const explicitStore = input.store;
+	let lazyStore: FlowStore | undefined;
+
+	function getStore(waniwani?: ScopedWaniWaniClient): FlowStore {
+		if (explicitStore) {
+			return explicitStore;
+		}
+		if (lazyStore) {
+			return lazyStore;
+		}
+		lazyStore = new WaniwaniFlowStore(waniwani?._config);
+		return lazyStore;
+	}
 
 	// Validator storage — populated when handlers return interrupts with validate functions.
 	// Keyed by "nodeName:fieldName", persists across tool calls within the same server.
@@ -65,6 +79,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	async function handleToolCall(
 		args: FlowToolInput,
 		sessionId: string | undefined,
+		store: FlowStore,
 		meta?: Record<string, unknown>,
 		waniwani?: ScopedWaniWaniClient,
 	) {
@@ -208,8 +223,15 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					const _meta: Record<string, unknown> = requestExtra._meta ?? {};
 					const sessionId = extractSessionId(_meta);
 					const waniwani = extractScopedClient(requestExtra);
+					const store = getStore(waniwani);
 
-					const result = await handleToolCall(args, sessionId, _meta, waniwani);
+					const result = await handleToolCall(
+						args,
+						sessionId,
+						store,
+						_meta,
+						waniwani,
+					);
 
 					// Persist flow state under session ID
 					if (sessionId) {

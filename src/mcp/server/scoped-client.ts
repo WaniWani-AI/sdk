@@ -23,12 +23,10 @@ export interface ScopedWaniWaniClient {
 	): Promise<{ eventId: string }>;
 	/** Knowledge base client (no meta needed). */
 	readonly kb: KbClient;
+	/** @internal Resolved API config from withWaniwani(). */
+	readonly _config?: { apiUrl?: string; apiKey?: string };
 }
 
-/**
- * Creates a request-scoped client that delegates to the base client
- * with request meta pre-attached to every tracking call.
- */
 /**
  * Extract the scoped client from the MCP `extra` object.
  * Returns undefined if `withWaniwani()` is not wrapping the server.
@@ -47,6 +45,7 @@ export function extractScopedClient(
 export function createScopedClient(
 	base: Pick<TrackingClient, "track" | "identify"> & { readonly kb: KbClient },
 	meta: Record<string, unknown>,
+	config?: { apiUrl?: string; apiKey?: string },
 ): ScopedWaniWaniClient {
 	return {
 		track(event) {
@@ -59,5 +58,6 @@ export function createScopedClient(
 			return base.identify(userId, properties, meta);
 		},
 		kb: base.kb,
+		_config: config,
 	};
 }

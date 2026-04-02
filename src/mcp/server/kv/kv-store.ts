@@ -28,7 +28,7 @@ const SDK_NAME = "@waniwani/sdk";
 const DEFAULT_BASE_URL = "https://app.waniwani.ai";
 
 export interface KvStoreOptions {
-	baseUrl?: string;
+	apiUrl?: string;
 	apiKey?: string;
 }
 
@@ -41,9 +41,9 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 	constructor(options?: KvStoreOptions) {
 		const globalConfig = getGlobalConfig();
 
-		// order: options.baseUrl, process.env.WANIWANI_API_URL, globalConfig?.apiUrl, DEFAULT_BASE_URL
+		// order: options.apiUrl, process.env.WANIWANI_API_URL, globalConfig?.apiUrl, DEFAULT_BASE_URL
 		this.baseUrl = (
-			options?.baseUrl ??
+			options?.apiUrl ??
 			process.env.WANIWANI_API_URL ??
 			globalConfig?.apiUrl ??
 			DEFAULT_BASE_URL
