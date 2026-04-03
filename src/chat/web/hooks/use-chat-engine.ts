@@ -152,6 +152,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	} | null>(null);
 
 	const { messages, sendMessage, setMessages, status } = useChat({
+		messages: props.initialMessages,
 		transport: transportRef.current,
 		onFinish({ message }) {
 			onResponseReceived?.();

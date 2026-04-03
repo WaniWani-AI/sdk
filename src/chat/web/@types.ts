@@ -78,6 +78,9 @@ export interface ChatBaseProps {
 	apiKey?: string;
 	/** Chat API endpoint URL. Defaults to WaniWani hosted endpoint */
 	api?: string;
+	/** Pre-loaded messages to display when the chat mounts. */
+	initialMessages?: import("ai").UIMessage[];
+
 	/** Initial greeting shown before user types */
 	welcomeMessage?: string;
 	/**
