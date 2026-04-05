@@ -140,11 +140,15 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 				sendMessageAndWait: (text: string) => engine.sendMessageAndWait(text),
 				reset: engine.reset,
 				focus: focusInput,
+				get messages() {
+					return engine.messages;
+				},
 			}),
 			[
 				engine.handleSubmit,
 				engine.sendMessageAndWait,
 				engine.reset,
+				engine.messages,
 				focusInput,
 			],
 		);
@@ -198,13 +202,14 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 				</div>
 
 				{/* Messages */}
-				<Conversation
-					className={cn(
-						"ww:flex-1 ww:min-h-0 ww:bg-background",
-						fullscreenToolCallId && "[&>div]:ww:!overflow-hidden",
-					)}
-				>
-					<ConversationContent>
+				<Conversation className="ww:flex-1 ww:min-h-0 ww:bg-background">
+					<ConversationContent
+						scrollClassName={
+							fullscreenToolCallId
+								? "ww:!relative ww:!overflow-hidden"
+								: undefined
+						}
+					>
 						<MessageList
 							messages={engine.messages}
 							status={engine.status}

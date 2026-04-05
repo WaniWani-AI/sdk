@@ -102,19 +102,22 @@ export function MessageList({
 	const showLoaderBubble =
 		isLoading && (!hasMessages || lastMessage.role === "user");
 
+	const isFullscreenActive = fullscreenToolCallId != null;
+
 	return (
 		<>
-			{!hasMessages && welcome ? (
-				<WelcomeScreen {...welcome} onSuggestionSelect={onSuggestionSelect} />
-			) : (
-				welcomeMessage && (
-					<Message from="assistant">
-						<MessageContent>
-							<MessageResponse>{welcomeMessage}</MessageResponse>
-						</MessageContent>
-					</Message>
-				)
-			)}
+			{!isFullscreenActive &&
+				(!hasMessages && welcome ? (
+					<WelcomeScreen {...welcome} onSuggestionSelect={onSuggestionSelect} />
+				) : (
+					welcomeMessage && (
+						<Message from="assistant">
+							<MessageContent>
+								<MessageResponse>{welcomeMessage}</MessageResponse>
+							</MessageContent>
+						</Message>
+					)
+				))}
 			{messages.map((message) => {
 				const textParts = message.parts.filter((p) => p.type === "text");
 				const reasoningParts = message.parts.filter(
@@ -135,15 +138,24 @@ export function MessageList({
 				const isLastAssistant =
 					message === lastMessage && message.role === "assistant";
 				const hasTextContent = textParts.length > 0;
+				const containsFullscreenTool = isFullscreenActive
+					? toolParts.some((p) => p.toolCallId === fullscreenToolCallId)
+					: false;
+
+				// Hide messages that don't contain the fullscreen widget
+				if (isFullscreenActive && !containsFullscreenTool) {
+					return <div key={message.id} style={{ display: "none" }} />;
+				}
 
 				return (
 					<Message from={message.role} key={message.id}>
-						{reasoningParts.map((part, i) => (
-							<Reasoning
-								key={`reasoning-${message.id}-${i}`}
-								text={part.text}
-							/>
-						))}
+						{!containsFullscreenTool &&
+							reasoningParts.map((part, i) => (
+								<Reasoning
+									key={`reasoning-${message.id}-${i}`}
+									text={part.text}
+								/>
+							))}
 						{toolParts.map((part) => {
 							const output = "output" in part ? part.output : undefined;
 							const resourceUri =
@@ -164,6 +176,7 @@ export function MessageList({
 													display: "flex",
 													flexDirection: "column" as const,
 													overflow: "hidden",
+													background: "var(--ww-color-background)",
 												}
 											: undefined
 									}
@@ -255,22 +268,24 @@ export function MessageList({
 								</div>
 							);
 						})}
-						<div>
-							<MessageContent>
-								{fileParts.length > 0 && <Attachments files={fileParts} />}
-								{hasTextContent
-									? textParts.map((part, i) => (
-											<MessageResponse key={`${message.id}-${i}`}>
-												{part.type === "text" ? part.text : ""}
-											</MessageResponse>
-										))
-									: isLastAssistant && isLoading && <Loader />}
-							</MessageContent>
-						</div>
+						{!containsFullscreenTool && (
+							<div>
+								<MessageContent>
+									{fileParts.length > 0 && <Attachments files={fileParts} />}
+									{hasTextContent
+										? textParts.map((part, i) => (
+												<MessageResponse key={`${message.id}-${i}`}>
+													{part.type === "text" ? part.text : ""}
+												</MessageResponse>
+											))
+										: isLastAssistant && isLoading && <Loader />}
+								</MessageContent>
+							</div>
+						)}
 					</Message>
 				);
 			})}
-			{showLoaderBubble && (
+			{!isFullscreenActive && showLoaderBubble && (
 				<Message from="assistant">
 					<MessageContent>
 						<Loader />

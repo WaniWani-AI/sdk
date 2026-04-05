@@ -141,11 +141,15 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 				sendMessageAndWait: (text: string) => engine.sendMessageAndWait(text),
 				reset: engine.reset,
 				focus: focusInput,
+				get messages() {
+					return engine.messages;
+				},
 			}),
 			[
 				engine.handleSubmit,
 				engine.sendMessageAndWait,
 				engine.reset,
+				engine.messages,
 				focusInput,
 			],
 		);
@@ -239,13 +243,16 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 
 					{/* Messages */}
 					<Conversation
-						className={cn(
-							"ww:flex-1",
-							fullscreenToolCallId && "[&>div]:ww:!overflow-hidden",
-						)}
+						className="ww:flex-1"
 						style={{ height: expandedHeight }}
 					>
-						<ConversationContent>
+						<ConversationContent
+							scrollClassName={
+								fullscreenToolCallId
+									? "ww:!relative ww:!overflow-hidden"
+									: undefined
+							}
+						>
 							<MessageList
 								messages={engine.messages}
 								status={engine.status}

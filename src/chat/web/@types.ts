@@ -254,6 +254,8 @@ export interface ChatHandle {
 	reset: () => void;
 	/** Scroll to the chat input, focus it, and show a highlight glow */
 	focus: () => void;
+	/** Current chat messages */
+	messages: import("ai").UIMessage[];
 }
 
 // ============================================================================
