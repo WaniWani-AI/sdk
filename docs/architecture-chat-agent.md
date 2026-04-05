@@ -1,105 +1,239 @@
 # Chat Agent Architecture
 
-> How the WaniWani SDK connects end-user chat widgets to customer agents via the WaniWani API.
+> How MCP servers, the WaniWani SDK, and the WaniWani platform fit together.
 
-## Overview
+## The Big Picture
 
-The SDK provides an embeddable chat widget + a server-side proxy (`toNextJsHandler`) that customers mount on their backend. The WaniWani platform reuses the same API to showcase agents directly.
+There are three layers to understand:
 
-## Request Flow
+1. **The MCP Server** — the product. Standalone, works with any MCP client (ChatGPT, Claude Desktop, etc.)
+2. **The Chat Agent** — optional WaniWani-powered layer that adds a conversational interface on top of the MCP
+3. **The WaniWani Platform** — showcases and manages agents, reuses the same infrastructure
+
+The MCP is the interface. WaniWani offers the package to build it once, distribute it everywhere.
+
+## Architecture Overview
 
 ```
-                        CUSTOMER INFRA                           WANIWANI CLOUD
-                    ┌─────────────────────┐               ┌──────────────────────┐
-                    │                     │               │                      │
- ┌──────────┐      │  ┌───────────────┐  │   Bearer key  │  ┌──────────────┐   │
- │  Chat     │ POST │  │toNextJsHandler│  │ ────────────> │  │ WaniWani API │   │
- │  Widget   │ ───> │  │/api/waniwani/*│  │               │  │ /api/mcp/chat│   │
- │ (browser) │ <─── │  │               │  │ <──────────── │  │              │   │
- │           │  SSE │  │ beforeRequest │  │   SSE stream  │  └──────┬───────┘   │
- └──────────┘      │  │    hook       │  │               │         │           │
-                    │  └───────────────┘  │               │         │tools/call │
-                    │                     │               │         ▼           │
-                    └─────────────────────┘               │  ┌──────────────┐   │
-                                                          │  │  MCP Server  │   │
- ┌───────────────┐                                        │  │(customer's   │   │
- │ WaniWani      │  direct call (same API, no proxy)      │  │ tools)       │   │
- │ Platform      │ ─────────────────────────────────────> │  └──────────────┘   │
- │ (app.ww.ai)   │                                        │                      │
- └───────────────┘                                        └──────────────────────┘
+                        MCP REPO (e.g. lassie, waniwani-website)
+                   ┌──────────────────────────────────────────────┐
+                   │                                              │
+                   │   /mcp                 ← MCP Server          │
+                   │   /api/waniwani/*      ← toNextJsHandler     │
+                   │   /pricing, /book-call ← Widget pages        │
+                   │   /playground          ← Dev chat UI         │
+                   │                                              │
+                   │   lib/                                       │
+                   │   ├── tools/           ← Domain logic        │
+                   │   ├── flows/           ← Multi-step flows    │
+                   │   └── widgets/         ← Interactive UIs     │
+                   │                                              │
+                   └───────────────┬──────────────────────────────┘
+                                   │
+                          deployed (e.g. Vercel)
+                                   │
+                  ┌────────────────┼────────────────┐
+                  │                │                 │
+                  ▼                ▼                 ▼
+          CUSTOMER WEBSITE    WANIWANI           AI CLIENTS
+          (e.g. waniwani.ai)  PLATFORM          (ChatGPT, Claude)
+                              (app.ww.ai)
 ```
 
-## Components
+### The three consumers of an MCP server:
 
-### Client-side: Chat Widget (`src/chat/web/`)
+| Consumer | Calls | Via |
+|----------|-------|-----|
+| **AI Clients** (ChatGPT, Claude Desktop) | `/mcp` directly | MCP protocol |
+| **Customer's website** | `/mcp` indirectly (via WaniWani API) | `toNextJsHandler` on the website |
+| **WaniWani platform** | `/mcp` indirectly (via WaniWani API) | WaniWani API directly |
 
-- React component (`<ChatBar>`, `<ChatEmbed>`) embedded on the customer's website
-- Collects visitor context: UA, device, screen, timezone, language, referrer
-- Generates a stable `visitorId` (SHA256 hash stored in localStorage)
-- Sends messages via POST to the customer's API endpoint
-- Receives SSE stream back and renders the conversation
+## Detailed Request Flows
 
-### Server-side: `toNextJsHandler` (`src/chat/server/`)
+### Path A: AI Clients (ChatGPT, Claude Desktop)
 
-A thin API gateway mounted on the customer's backend (e.g. `app/api/waniwani/[[...path]]/route.ts`).
+Direct MCP protocol. No WaniWani involvement.
 
-**Routes exposed:**
+```
+ ChatGPT / Claude Desktop
+         │
+         │  MCP protocol (tools/call, resources/read)
+         ▼
+    POST /mcp  (MCP Server)
+         │
+         ▼
+    Tool executes → returns result
+```
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/api/waniwani` | Chat — proxies messages to WaniWani API |
-| POST | `/api/waniwani/tool` | Tool call — direct MCP tool execution |
-| GET | `/api/waniwani/resource?uri=...` | Widget HTML — serves MCP resource content |
-| GET | `/api/waniwani/config` | Debug info (debug/eval flags) |
-| GET/POST | `/api/waniwani/scenarios` | Eval mode only (requires `WANIWANI_EVAL=1`) |
+### Path B: Customer's Website (chat widget)
 
-**What it does on each chat request:**
+The customer's website (e.g. waniwani.ai) has its OWN `toNextJsHandler` that points to the deployed MCP.
 
-1. Parses the request body (messages, sessionId, modelContext)
-2. Extracts geo from platform headers (Vercel `x-vercel-ip-*`, Cloudflare `cf-*`)
-3. Runs the `beforeRequest` hook (customer's custom auth/logic)
-4. Resolves the MCP server URL via WaniWani config API (cached 5min)
-5. Proxies to `POST /api/mcp/chat` with `Authorization: Bearer <apiKey>`
-6. Streams the SSE response back to the client
+```
+ End User
+    │
+    ▼
+ Chat Widget (on website)
+    │
+    │  POST /api/waniwani
+    ▼
+ Website's toNextJsHandler ─────── source: "website"
+    │                               mcpServerUrl: "https://mcp.example.com/mcp"
+    │  Bearer API key
+    ▼
+ WaniWani API (/api/mcp/chat)
+    │
+    │  MCP protocol
+    ▼
+ MCP Server (/mcp on deployed MCP repo)
+    │
+    ▼
+ Tool executes → streams back through the whole chain
+```
 
-### WaniWani API (`/api/mcp/chat`)
+### Path C: WaniWani Platform (showcasing agents)
 
-- Validates the API key
-- Orchestrates the LLM conversation with the customer's MCP server
-- Calls tools on the MCP server as needed
-- Streams responses back
+The platform calls the WaniWani API directly — no customer backend involved.
 
-### MCP Server (customer-owned)
+```
+ WaniWani Platform (app.waniwani.ai)
+    │
+    │  Direct API call
+    ▼
+ WaniWani API (/api/mcp/chat)
+    │
+    │  MCP protocol
+    ▼
+ MCP Server (/mcp on deployed MCP repo)
+```
 
-- The actual agent logic and tools
-- Hosted wherever the customer wants (same repo, separate service, etc.)
-- Called by the WaniWani API via MCP protocol (`tools/call`)
+### Path D: MCP Repo's Own Playground (development)
+
+The MCP repo itself has a `toNextJsHandler` at `/api/waniwani` for local development/testing.
+
+```
+ Developer
+    │
+    ▼
+ /playground page (in MCP repo)
+    │
+    │  POST /api/waniwani
+    ▼
+ MCP Repo's toNextJsHandler ─────── source: "playground"
+    │                                 mcpServerUrl: "${baseURL}/mcp" (localhost/tunnel)
+    │  Bearer API key
+    ▼
+ WaniWani API
+    │
+    ▼
+ /mcp (same repo, loopback)
+```
+
+## The Two toNextJsHandler Instances
+
+This is the key thing to understand. There are TWO `toNextJsHandler` mounts for any given agent:
+
+### 1. Inside the MCP repo (development/playground)
+
+```typescript
+// MCP repo: app/api/waniwani/[[...path]]/route.ts
+export const { GET, POST } = toNextJsHandler(wani, {
+  source: "playground",
+  chat: {
+    mcpServerUrl: `${baseURL}/mcp`,  // points to itself
+  },
+});
+```
+
+- Used for development via `/playground`
+- Points to its own `/mcp` endpoint (loopback)
+- Source: `"playground"`
+- **NOT used in production by the customer's website**
+
+### 2. Inside the customer's website (production)
+
+```typescript
+// Website repo: app/api/waniwani/[[...path]]/route.ts
+export const { GET, POST } = toNextJsHandler(client, {
+  source: "website",
+  chat: {
+    mcpServerUrl: "https://mcp.example.com/mcp",  // points to deployed MCP
+  },
+});
+```
+
+- Used in production by end users
+- Points to the deployed MCP server URL (external)
+- Source: `"website"`
+- This is where `beforeRequest` auth should go
+
+### Why two?
+
+The MCP repo needs a chat interface for development. The customer's website needs one for production. They're separate deployments pointing to the same MCP server, but with different configs and security contexts.
+
+## Real-World Example: WaniWani Website
+
+```
+ managed/waniwani-website/          ← MCP REPO
+ ├── /mcp                           ← MCP Server (tools, flows, widgets)
+ ├── /api/waniwani                  ← Playground handler (source: "playground")
+ └── deployed at wani-website-mcp.waniwani.run
+
+ website/                           ← CUSTOMER WEBSITE (waniwani.ai)
+ ├── /api/waniwani                  ← Production handler (source: "website")
+ │   └── mcpServerUrl: "https://wani-website-mcp.waniwani.run/mcp"
+ └── ChatCard in hero section
+```
+
+The website repo does NOT have an MCP server. It only has the chat handler pointing to the external MCP.
+
+## Real-World Example: Lassie
+
+```
+ managed/lassie/                    ← MCP REPO
+ ├── /mcp                           ← MCP Server (quote flow, FAQ, pricing)
+ ├── /api/waniwani                  ← Playground handler (source: "playground")
+ └── deployed at [lassie-mcp-url]
+
+ [Lassie's website]                 ← CUSTOMER WEBSITE
+ ├── /api/waniwani                  ← Production handler (source: "lassie-website")
+ │   └── mcpServerUrl: "[lassie-mcp-url]/mcp"
+ └── ChatCard / ChatEmbed
+```
+
+## The MCP Is the Product
+
+The MCP server is standalone and contains all the domain logic:
+- **Tools**: individual capabilities (FAQ search, show pricing, etc.)
+- **Flows**: multi-step stateful conversations (quote flow, demo qualification)
+- **Widgets**: interactive UIs rendered in iframes (booking calendar, pricing cards)
+- **Knowledge base**: embedded docs for FAQ search
+
+The `toNextJsHandler` is just a thin proxy that connects a chat UI to the MCP via the WaniWani API. The MCP doesn't know or care who's calling it — ChatGPT, Claude, the customer's website, or the WaniWani platform all look the same.
 
 ## Security Model
 
 ```
- Browser ──────> Customer Backend ──────> WaniWani API ──────> MCP Server
-   │                    │                       │                    │
-   │  NO auth by       │  beforeRequest hook   │  API key          │  MCP protocol
-   │  default           │  (customer's auth)    │  (validated)      │  (trusted)
-   │                    │                       │                    │
-   ▼                    ▼                       ▼                    ▼
- OPEN               CUSTOMER'S              WANIWANI'S           INTERNAL
-                    RESPONSIBILITY          RESPONSIBILITY
+                    WHO               BOUNDARY              RESPONSIBILITY
+                    ─────             ────────              ──────────────
+
+ AI Clients ──────► /mcp              MCP protocol          MCP server itself
+                                      (no auth by default)
+
+ End Users ───────► /api/waniwani     beforeRequest hook     Customer
+                    (website)
+
+ WaniWani ────────► WaniWani API      API key                WaniWani
+ Platform           directly
 ```
 
-### What's protected today
+### The open endpoint problem
 
-- **API key**: stays on the server, never sent to the browser. Used as `Bearer` token on all upstream requests.
-- **Session management**: `x-session-id` header round-trip. WaniWani API creates/validates sessions.
-- **Source tracking**: `source` option identifies which chat instance sent the request (for analytics separation).
-- **Auth failure handling**: 401/403 from WaniWani API immediately stops the transport and drops all buffered events.
+The customer's `/api/waniwani` is open by default. Without protection, anyone can POST and start chatting.
 
-### What customers MUST do
+**Customer's responsibility:**
 
-The `/api/waniwani` endpoint is open by default. Without additional protection, anyone can POST to it and start chatting. Customers should:
-
-1. **Use `beforeRequest` hook** — check session cookies, JWTs, or any auth token. Throw to reject.
+1. **`beforeRequest` hook** — check session cookies, JWTs, or any auth token. Throw to reject.
 
 ```typescript
 toNextJsHandler(client, {
@@ -110,42 +244,29 @@ toNextJsHandler(client, {
 });
 ```
 
-2. **Add rate limiting** — at the infra level (Vercel/Cloudflare rate limiting on `/api/waniwani/*`)
-3. **Configure CORS** — only allow their own domain(s)
+2. **Rate limiting** — at the infra level (Vercel/Cloudflare rate limiting)
+3. **CORS** — only allow their own domain(s)
 
-### What WaniWani should consider adding
+**WaniWani should consider adding:**
+- Built-in rate limiter option in `toNextJsHandler`
+- Default CORS helper
+- Server-side abuse detection (flag abnormal session volumes)
 
-- **Built-in rate limiter option** in `toNextJsHandler` (e.g. `rateLimit: { windowMs: 60000, max: 20 }`)
-- **Default CORS helper** in the handler options
-- **Server-side abuse detection** — flag sessions with abnormal message volumes at the API level
-- **Documentation** making it explicit that `beforeRequest` is the auth boundary
+## Current Quirk: Platform Showcase
 
-## Platform Reuse (WaniWani App showcasing agents)
+The WaniWani platform wants to showcase agents using real conversations. Today it calls the WaniWani API directly (Path C). This works, but there's a subtlety:
 
-The WaniWani platform (app.waniwani.ai) reuses the same architecture to showcase customer agents:
+- The MCP repo's `/api/waniwani` (playground) is a development tool, not meant for production showcase
+- The customer's `/api/waniwani` (website) is for end users, not for the platform
+- The platform bypasses both and calls the API directly
 
-```
- Path A (end user):    Chat Widget → Customer's /api/waniwani → WaniWani API → MCP Server
- Path B (platform):    WaniWani App → WaniWani API directly   →                MCP Server
-```
+This is actually the cleanest approach — the platform doesn't need a proxy, it owns the API. Just ensure `source` tracking distinguishes platform sessions from real user sessions.
 
-- Path B skips the customer's backend entirely — WaniWani owns the API
-- The MCP server doesn't know or care which path called it
-- Conversations are real (not simulated), using the actual agent
-- Sessions from Path B should use a distinct `source` value (e.g. `"waniwani-platform"`) to keep analytics clean
-
-### Why this is sound
-
-- One agent (MCP server), two clients (customer widget, WaniWani platform), one shared API layer
-- Standard BFF (Backend-for-Frontend) proxy pattern — same as Stripe, Intercom, etc.
-- The customer embeds a client-side widget, it talks to their backend, which proxies to the vendor API with a secret key
-- No duplication of agent logic, no "demo mode" vs "real mode" divergence
-
-## Key Files
+## Key SDK Files
 
 | File | Purpose |
 |------|---------|
-| `src/chat/server/next-js/index.ts` | `toNextJsHandler` — entry point |
+| `src/chat/server/next-js/index.ts` | `toNextJsHandler` entry point |
 | `src/chat/server/api-handler.ts` | Core router (routeGet, routePost) |
 | `src/chat/server/handle-chat.ts` | Chat proxy to WaniWani API |
 | `src/chat/server/handle-tool.ts` | Direct MCP tool execution |
