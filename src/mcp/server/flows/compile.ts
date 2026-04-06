@@ -64,7 +64,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	async function handleToolCall(
 		args: FlowToolInput,
 		sessionId: string | undefined,
-		store: FlowStore,
 		meta?: Record<string, unknown>,
 		waniwani?: ScopedWaniWaniClient,
 	) {
@@ -220,13 +219,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					const sessionId = extractSessionId(_meta);
 					const waniwani = extractScopedClient(requestExtra);
 
-					const result = await handleToolCall(
-						args,
-						sessionId,
-						store,
-						_meta,
-						waniwani,
-					);
+					const result = await handleToolCall(args, sessionId, _meta, waniwani);
 
 					// Persist flow state under session ID
 					if (sessionId) {

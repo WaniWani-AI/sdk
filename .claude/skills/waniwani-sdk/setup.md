@@ -2,11 +2,10 @@
 
 ## Overview
 
-Every WaniWani MCP project needs three things:
+Every WaniWani MCP project needs two things:
 
-1. **`waniwani.config.ts`** — single source of truth for all config
-2. **`lib/waniwani.ts`** — SDK client instance (reads from the config)
-3. **MCP server + API route** — wired up with `withWaniwani` and `toNextJsHandler`
+1. **Environment variables** — `WANIWANI_API_KEY` (required), `WANIWANI_API_URL` (optional)
+2. **`lib/waniwani.ts`** — SDK client instance
 
 ## Step 1: Install
 
@@ -14,84 +13,60 @@ Every WaniWani MCP project needs three things:
 bun add @waniwani/sdk
 ```
 
-## Step 2: `waniwani.config.ts` (project root)
+## Step 2: Environment Variables
 
-This is the **single source of truth**. `defineConfig()` registers the config globally so that `waniwani()` and `withWaniwani()` pick it up automatically.
+Set these in your `.env` (or Vercel/deployment config):
 
-```typescript
-import { defineConfig } from "@waniwani/sdk";
+```env
+WANIWANI_API_KEY=your_api_key_here
 
-export default defineConfig({
-  // Required — your MCP environment API key
-  apiKey: process.env.WANIWANI_API_KEY,
-
-  // Optional — defaults to https://app.waniwani.ai
-  apiUrl: process.env.WANIWANI_API_URL,
-
-  // Optional — only needed if using evals
-  evals: {
-    mcpServerUrl: "http://localhost:3001",
-    dir: "./evals", // default
-  },
-
-  // Optional — only needed if using knowledge base
-  knowledgeBase: {
-    dir: "./knowledge-base",
-  },
-});
+# Optional — defaults to https://app.waniwani.ai
+WANIWANI_API_URL=https://app.waniwani.ai
 ```
 
-### How it works
-
-Calling `defineConfig()` does two things:
-1. **Stores** the config in a module-level singleton inside the SDK
-2. **Returns** the config object (so you can also pass it explicitly)
-
-Any subsequent call to `waniwani()` or `withWaniwani()` with no arguments will read from this stored config.
+All SDK components (tracking, flow state, KV store) read directly from these env vars. No config file needed.
 
 ## Step 3: `lib/waniwani.ts`
 
-Import the config file (side-effect import registers the global config), then create the client.
+Create a single SDK client instance:
 
 ```typescript
-import "../waniwani.config";
 import { waniwani } from "@waniwani/sdk";
 
 export const wani = waniwani();
-// No args needed — picks up apiKey/apiUrl from defineConfig
+// Reads WANIWANI_API_KEY from env
 ```
 
-Alternative — pass the config explicitly (also works):
+Or pass config explicitly:
 
 ```typescript
-import config from "../waniwani.config";
 import { waniwani } from "@waniwani/sdk";
 
-export const wani = waniwani(config);
+export const wani = waniwani({
+  apiKey: process.env.WANIWANI_API_KEY,
+  apiUrl: process.env.WANIWANI_API_URL,
+});
 ```
 
 ## Step 4: MCP Server Route (`app/mcp/route.ts`)
 
-Wrap your MCP server with `withWaniwani` for automatic tool tracking.
+Wrap your MCP server with `withWaniwani` for automatic tool tracking:
 
 ```typescript
-import "../../waniwani.config";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { withWaniwani } from "@waniwani/sdk/mcp";
+import { wani } from "../../lib/waniwani";
 
 const server = new McpServer({ name: "my-server", version: "1.0.0" });
 
-// Auto-tracks all tool calls — no client arg needed
-withWaniwani(server);
+withWaniwani(server, { client: wani });
 ```
 
 If you need custom options (tool types, metadata, flush behavior):
 
 ```typescript
-import { wani } from "../../lib/waniwani";
-
 withWaniwani(server, {
-  client: wani,                    // optional — explicit client
+  client: wani,                    // explicit client
   toolType: "pricing",             // default type for all tools
   flushAfterToolCall: true,        // flush after each tool call
   metadata: { source: "my-mcp" }, // extra metadata on every event
@@ -100,7 +75,7 @@ withWaniwani(server, {
 
 ## Step 5: Chat API Route (`app/api/waniwani/[[...path]]/route.ts`)
 
-Wire the client to the Next.js handler for the chat UI.
+Wire the client to the Next.js handler for the chat UI:
 
 ```typescript
 import { wani } from "../../../../lib/waniwani";
@@ -117,46 +92,32 @@ export const { GET, POST } = toNextJsHandler(wani, {
 ## How They Work Together
 
 ```
-waniwani.config.ts          (defineConfig — stores global config)
+.env                          (WANIWANI_API_KEY, WANIWANI_API_URL)
        |
        v
-lib/waniwani.ts             (waniwani() — creates client from global config)
+lib/waniwani.ts             (waniwani() — creates client from env vars)
        |
        +---> app/mcp/route.ts               (withWaniwani — auto-tracks tools)
        |
        +---> app/api/waniwani/.../route.ts   (toNextJsHandler — chat API)
 ```
 
-- `defineConfig()` is the **source of truth** for apiKey, apiUrl, and all project settings
-- `waniwani()` reads from the global config when called with no arguments
-- `withWaniwani(server)` creates its own client internally (also reads from global config)
-- `toNextJsHandler(wani, ...)` uses the client's resolved config
+- `WANIWANI_API_KEY` env var is the **source of truth** for authentication
+- `waniwani()` reads from env vars when called with no config
+- Flow state (KV store) reads `WANIWANI_API_KEY` and `WANIWANI_API_URL` directly from env — no config threading needed
 
 ## `WithWaniwaniOptions` Reference
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `client` | `WaniWaniClient` | auto-created | Pre-built client (if omitted, creates one from global config) |
+| `client` | `WaniWaniClient` | auto-created | Pre-built client (if omitted, creates one from env vars) |
 | `toolType` | `string \| (name) => string` | `"other"` | Default tool type for tracked events |
 | `metadata` | `Record<string, unknown>` | — | Extra metadata merged into every event |
 | `flushAfterToolCall` | `boolean` | `false` | Flush transport after each tool call |
 | `onError` | `(error) => void` | — | Non-fatal tracking error callback |
 | `injectWidgetToken` | `boolean` | `true` | Inject JWT into `_meta.waniwani` for browser widgets |
 
-## `WaniWaniProjectConfig` Reference
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `apiKey` | `string` | No | API key. Defaults to `WANIWANI_API_KEY` env var |
-| `apiUrl` | `string` | No | API URL. Defaults to `https://app.waniwani.ai` |
-| `tracking` | `TrackingConfig` | No | Transport options (flush interval, batch size, retries) |
-| `evals.mcpServerUrl` | `string` | Yes (when evals used) | MCP server URL for eval simulations |
-| `evals.dir` | `string` | No | Evals directory. Defaults to `./evals` |
-| `knowledgeBase.dir` | `string` | No | Knowledge base directory |
-
 ## Common Mistakes
 
-- **Forgetting the config import** — `import "../waniwani.config"` must run before `waniwani()` is called, otherwise the global config is empty
-- **Passing config to both `defineConfig` and `waniwani()`** — Pick one. If you use `defineConfig`, call `waniwani()` with no args
-- **Creating multiple clients** — Create one client in `lib/waniwani.ts` and import it everywhere. Don't call `waniwani()` in multiple files
-- **Passing `client` to `withWaniwani` when not needed** — If you've already called `defineConfig`, just use `withWaniwani(server)` with no options
+- **Missing `WANIWANI_API_KEY` env var** — Flow state will throw an error. Make sure the env var is set in all environments (dev, staging, prod).
+- **Creating multiple clients** — Create one client in `lib/waniwani.ts` and import it everywhere. Don't call `waniwani()` in multiple files.

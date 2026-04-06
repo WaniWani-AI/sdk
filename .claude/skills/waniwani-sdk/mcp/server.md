@@ -152,13 +152,12 @@ Wraps an MCP server so all tool handlers automatically emit `tool.called` events
 **after** execution with timing and status:
 
 ```typescript
-import "../../waniwani.config";
 import { withWaniwani } from "@waniwani/sdk/mcp";
+import { wani } from "../../lib/waniwani";
 
 const server = new McpServer({ name: "my-server", version: "1.0.0" });
 
-// No args needed — reads from defineConfig
-withWaniwani(server);
+withWaniwani(server, { client: wani });
 ```
 
 Each `tool.called` event includes `durationMs` (execution time), `status` (`"ok"` or `"error"`),

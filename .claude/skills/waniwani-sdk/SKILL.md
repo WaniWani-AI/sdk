@@ -33,17 +33,13 @@ bun add @waniwani/sdk
 
 ### Setup
 
-See the [setup skill](../setup/SKILL.md) for full project setup with `defineConfig`.
-
-Quick standalone usage:
+See [setup.md](setup.md) for full project setup.
 
 ```typescript
 import { waniwani } from "@waniwani/sdk";
 
-const client = waniwani({
-  apiKey: "...",    // or set WANIWANI_API_KEY env var
-  apiUrl: "...",    // defaults to https://app.waniwani.ai
-});
+// Reads WANIWANI_API_KEY and WANIWANI_API_URL from env vars
+const client = waniwani();
 ```
 
 ### `client.identify(userId, properties?)`
@@ -141,14 +137,13 @@ Wraps an MCP server so all tool handlers automatically emit `tool.called` events
 **after** execution with `durationMs`, `status` (`"ok"` or `"error"`), and `errorMessage` (on failure).
 
 ```typescript
-import "../../waniwani.config";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { withWaniwani } from "@waniwani/sdk/mcp";
+import { wani } from "../../lib/waniwani";
 
 const server = new McpServer({ name: "my-server", version: "1.0.0" });
 
-// No args needed — reads from defineConfig
-withWaniwani(server);
+withWaniwani(server, { client: wani });
 
 // All tools registered after wrapping are auto-tracked
 server.registerTool("get_pricing", config, async (input, extra) => {
