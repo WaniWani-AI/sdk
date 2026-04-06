@@ -2,15 +2,10 @@
  * Server-side flow state store.
  *
  * Flow state is stored via the WaniWani API, keyed by session ID.
- * The session ID comes from _meta (provided by the MCP client on every call),
- * so the LLM doesn't need to round-trip anything.
- *
- * Tenant isolation is handled by the API key — no manual key prefixing needed.
- *
- * The `FlowStore` interface is exported for custom implementations.
+ * Config comes from env vars (WANIWANI_API_KEY, WANIWANI_API_URL).
  */
 
-import { type KvStoreOptions, WaniwaniKvStore } from "../kv";
+import { WaniwaniKvStore } from "../kv";
 import type { FlowTokenContent } from "./@types";
 
 // ============================================================================
@@ -28,11 +23,7 @@ export interface FlowStore {
 // ============================================================================
 
 export class WaniwaniFlowStore implements FlowStore {
-	private readonly store: WaniwaniKvStore<FlowTokenContent>;
-
-	constructor(options?: KvStoreOptions) {
-		this.store = new WaniwaniKvStore<FlowTokenContent>(options);
-	}
+	private readonly store = new WaniwaniKvStore<FlowTokenContent>();
 
 	get(key: string): Promise<FlowTokenContent | null> {
 		return this.store.get(key);

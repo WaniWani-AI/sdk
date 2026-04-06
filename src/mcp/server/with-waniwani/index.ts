@@ -1,6 +1,5 @@
 import type { ToolCalledProperties } from "../../../tracking/index.js";
 import { waniwani } from "../../../waniwani.js";
-import { WaniwaniFlowStore } from "../flows/flow-store.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../tools/types";
 import { WidgetTokenCache } from "../widget-token.js";
@@ -17,8 +16,6 @@ import {
 } from "./helpers.js";
 
 type UnknownRecord = Record<string, unknown>;
-
-export const FLOW_STORE_KEY = "waniwani/flowStore";
 
 type WrappedServer = McpServer & {
 	__waniwaniWrapped?: true;
@@ -98,11 +95,6 @@ export function withWaniwani(
 			})
 		: null;
 
-	const flowStore = new WaniwaniFlowStore({
-		apiUrl: tracker._config.apiUrl,
-		apiKey: tracker._config.apiKey,
-	});
-
 	const originalRegisterTool = server.registerTool.bind(server) as (
 		...args: unknown[]
 	) => unknown;
@@ -132,7 +124,6 @@ export function withWaniwani(
 			});
 			if (isRecord(extra)) {
 				extra[SCOPED_CLIENT_KEY] = scopedClient;
-				extra[FLOW_STORE_KEY] = flowStore;
 			}
 
 			const startTime = performance.now();

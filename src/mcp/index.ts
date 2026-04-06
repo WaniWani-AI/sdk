@@ -32,7 +32,7 @@ export {
 	StateGraph,
 } from "./server/flows";
 // Generic key-value store
-export type { KvStore, KvStoreOptions } from "./server/kv";
+export type { KvStore } from "./server/kv";
 export { WaniwaniKvStore } from "./server/kv";
 export type {
 	RegisteredResource,

@@ -8,7 +8,6 @@ import { z } from "zod";
 import type { ScopedWaniWaniClient } from "../scoped-client";
 import { extractScopedClient } from "../scoped-client";
 import { extractSessionId } from "../utils";
-import { FLOW_STORE_KEY } from "../with-waniwani/index";
 import type {
 	CompileInput,
 	FlowToolInput,
@@ -17,7 +16,7 @@ import type {
 } from "./@types";
 import { START } from "./@types";
 import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
-import type { FlowStore } from "./flow-store";
+import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
 import { deepMerge, expandDotPaths } from "./nested";
 import { buildFlowProtocol } from "./protocol";
 
@@ -55,6 +54,8 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	const { config, nodes, edges } = input;
 	const protocol = buildFlowProtocol(config);
 	const fullDescription = `${config.description}\n${protocol}`;
+
+	const store: FlowStore = input.store ?? new WaniwaniFlowStore();
 
 	// Validator storage — populated when handlers return interrupts with validate functions.
 	// Keyed by "nodeName:fieldName", persists across tool calls within the same server.
@@ -214,32 +215,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					const requestExtra = extra as RequestHandlerExtra<
 						ServerRequest,
 						ServerNotification
-					> & {
-						[FLOW_STORE_KEY]?: FlowStore;
-					};
-
+					>;
 					const _meta: Record<string, unknown> = requestExtra._meta ?? {};
 					const sessionId = extractSessionId(_meta);
 					const waniwani = extractScopedClient(requestExtra);
-					const store = input.store ?? requestExtra[FLOW_STORE_KEY];
-
-					if (!store) {
-						const errorContent = [
-							{
-								type: "text" as const,
-								text: JSON.stringify(
-									{
-										status: "error",
-										error:
-											"No flow store available. Wrap your MCP server with withWaniwani() or pass a store to .compile().",
-									},
-									null,
-									2,
-								),
-							},
-						];
-						return { content: errorContent, _meta, isError: true };
-					}
 
 					const result = await handleToolCall(
 						args,

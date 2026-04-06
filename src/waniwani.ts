@@ -2,7 +2,6 @@
 
 import { createKbClient } from "./kb/client.js";
 import type { WaniWaniProjectConfig } from "./project-config.js";
-import { getGlobalConfig } from "./project-config.js";
 import { createTrackingClient } from "./tracking/index.js";
 import type { WaniWaniClient, WaniWaniConfig } from "./types.js";
 
@@ -29,7 +28,7 @@ import type { WaniWaniClient, WaniWaniConfig } from "./types.js";
 export function waniwani(
 	config?: WaniWaniConfig | WaniWaniProjectConfig,
 ): WaniWaniClient {
-	const effective = config ?? getGlobalConfig();
+	const effective = config;
 
 	const apiUrl = effective?.apiUrl ?? "https://app.waniwani.ai";
 	const apiKey = effective?.apiKey ?? process.env.WANIWANI_API_KEY;

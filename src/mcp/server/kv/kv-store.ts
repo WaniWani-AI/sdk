@@ -4,11 +4,10 @@
  * Values are stored as JSON objects (`Record<string, unknown>`) in the
  * `/api/mcp/redis/*` endpoints. Tenant isolation is handled by the API key.
  *
- * This is the generic version — `WaniwaniFlowStore` uses this under the hood
- * with `FlowTokenContent` as the value type.
+ * Config is read from env vars:
+ * - `WANIWANI_API_KEY` (required)
+ * - `WANIWANI_API_URL` (optional, defaults to https://app.waniwani.ai)
  */
-
-import { getGlobalConfig } from "../../../project-config.js";
 
 // ============================================================================
 // Interface
@@ -27,37 +26,24 @@ export interface KvStore<T = Record<string, unknown>> {
 const SDK_NAME = "@waniwani/sdk";
 const DEFAULT_BASE_URL = "https://app.waniwani.ai";
 
-export interface KvStoreOptions {
-	apiUrl?: string;
-	apiKey?: string;
-}
-
 export class WaniwaniKvStore<T = Record<string, unknown>>
 	implements KvStore<T>
 {
-	private readonly baseUrl: string;
-	private readonly apiKey: string | undefined;
+	private get baseUrl(): string {
+		return (process.env.WANIWANI_API_URL ?? DEFAULT_BASE_URL).replace(
+			/\/$/,
+			"",
+		);
+	}
 
-	constructor(options?: KvStoreOptions) {
-		const globalConfig = getGlobalConfig();
-
-		// order: options.apiUrl, process.env.WANIWANI_API_URL, globalConfig?.apiUrl, DEFAULT_BASE_URL
-		this.baseUrl = (
-			options?.apiUrl ??
-			process.env.WANIWANI_API_URL ??
-			globalConfig?.apiUrl ??
-			DEFAULT_BASE_URL
-		).replace(/\/$/, "");
-
-		// order: options.apiKey, process.env.WANIWANI_API_KEY, globalConfig?.apiKey
-		this.apiKey =
-			options?.apiKey ?? process.env.WANIWANI_API_KEY ?? globalConfig?.apiKey;
+	private get apiKey(): string | undefined {
+		return process.env.WANIWANI_API_KEY;
 	}
 
 	async get(key: string): Promise<T | null> {
 		if (!this.apiKey) {
 			throw new Error(
-				"[WaniWani KV] No API key configured. Set WANIWANI_API_KEY or pass apiKey in options.",
+				"[WaniWani KV] No API key configured. Set WANIWANI_API_KEY env var.",
 			);
 		}
 		const data = await this.request<T | null>("/api/mcp/redis/get", { key });
@@ -67,7 +53,7 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 	async set(key: string, value: T): Promise<void> {
 		if (!this.apiKey) {
 			throw new Error(
-				"[WaniWani KV] No API key configured. Set WANIWANI_API_KEY or pass apiKey in options.",
+				"[WaniWani KV] No API key configured. Set WANIWANI_API_KEY env var.",
 			);
 		}
 		await this.request("/api/mcp/redis/set", { key, value });
