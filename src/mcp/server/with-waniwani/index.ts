@@ -1,5 +1,6 @@
 import type { ToolCalledProperties } from "../../../tracking/index.js";
 import { waniwani } from "../../../waniwani.js";
+import { WaniwaniFlowStore } from "../flows/flow-store.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../tools/types";
 import { WidgetTokenCache } from "../widget-token.js";
@@ -16,6 +17,8 @@ import {
 } from "./helpers.js";
 
 type UnknownRecord = Record<string, unknown>;
+
+export const FLOW_STORE_KEY = "waniwani/flowStore";
 
 type WrappedServer = McpServer & {
 	__waniwaniWrapped?: true;
@@ -88,22 +91,17 @@ export function withWaniwani(
 	const tracker = opts.client ?? waniwani();
 	const injectToken = opts.injectWidgetToken !== false;
 
-	let tokenCache: WidgetTokenCache | null = null;
+	const tokenCache: WidgetTokenCache | null = tracker._config.apiKey
+		? new WidgetTokenCache({
+				apiUrl: tracker._config.apiUrl ?? DEFAULT_BASE_URL,
+				apiKey: tracker._config.apiKey,
+			})
+		: null;
 
-	function getTokenCache(): WidgetTokenCache | null {
-		if (tokenCache) {
-			return tokenCache;
-		}
-		const apiKey = tracker._config.apiKey;
-		if (!apiKey) {
-			return null;
-		}
-		tokenCache = new WidgetTokenCache({
-			apiUrl: tracker._config.apiUrl ?? DEFAULT_BASE_URL,
-			apiKey,
-		});
-		return tokenCache;
-	}
+	const flowStore = new WaniwaniFlowStore({
+		apiUrl: tracker._config.apiUrl,
+		apiKey: tracker._config.apiKey,
+	});
 
 	const originalRegisterTool = server.registerTool.bind(server) as (
 		...args: unknown[]
@@ -133,7 +131,8 @@ export function withWaniwani(
 				apiKey: tracker._config.apiKey,
 			});
 			if (isRecord(extra)) {
-				(extra as UnknownRecord)[SCOPED_CLIENT_KEY] = scopedClient;
+				extra[SCOPED_CLIENT_KEY] = scopedClient;
+				extra[FLOW_STORE_KEY] = flowStore;
 			}
 
 			const startTime = performance.now();
@@ -188,7 +187,7 @@ export function withWaniwani(
 				if (injectToken) {
 					await injectWidgetConfig(
 						result,
-						getTokenCache(),
+						tokenCache,
 						tracker._config.apiUrl ?? DEFAULT_BASE_URL,
 						extra,
 						opts.onError,

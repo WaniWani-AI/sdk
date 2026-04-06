@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { ScopedWaniWaniClient } from "../scoped-client";
 import { extractScopedClient } from "../scoped-client";
 import { extractSessionId } from "../utils";
+import { FLOW_STORE_KEY } from "../with-waniwani/index";
 import type {
 	CompileInput,
 	FlowToolInput,
@@ -16,7 +17,7 @@ import type {
 } from "./@types";
 import { START } from "./@types";
 import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
-import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
+import type { FlowStore } from "./flow-store";
 import { deepMerge, expandDotPaths } from "./nested";
 import { buildFlowProtocol } from "./protocol";
 
@@ -54,23 +55,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	const { config, nodes, edges } = input;
 	const protocol = buildFlowProtocol(config);
 	const fullDescription = `${config.description}\n${protocol}`;
-
-	// Server-side state store — keyed by sessionId, backed by WaniWani API.
-	// Lazy-initialized on first request so it can pick up KV config injected
-	// by withWaniwani() (correct apiUrl/apiKey), instead of resolving at compile time.
-	const explicitStore = input.store;
-	let lazyStore: FlowStore | undefined;
-
-	function getStore(waniwani?: ScopedWaniWaniClient): FlowStore {
-		if (explicitStore) {
-			return explicitStore;
-		}
-		if (lazyStore) {
-			return lazyStore;
-		}
-		lazyStore = new WaniwaniFlowStore(waniwani?._config);
-		return lazyStore;
-	}
 
 	// Validator storage — populated when handlers return interrupts with validate functions.
 	// Keyed by "nodeName:fieldName", persists across tool calls within the same server.
@@ -127,13 +111,24 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
-			const flowState = await store.get(sessionId);
+			let flowState: Awaited<ReturnType<typeof store.get>>;
+			try {
+				flowState = await store.get(sessionId);
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				return {
+					content: {
+						status: "error" as const,
+						error: `Failed to load flow state (session "${sessionId}"): ${msg}`,
+					},
+				};
+			}
 
 			if (!flowState) {
 				return {
 					content: {
 						status: "error" as const,
-						error: "Flow state not found. The flow may have expired.",
+						error: `Flow state not found for session "${sessionId}". The flow may have expired.`,
 					},
 				};
 			}
@@ -219,11 +214,32 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					const requestExtra = extra as RequestHandlerExtra<
 						ServerRequest,
 						ServerNotification
-					>;
+					> & {
+						[FLOW_STORE_KEY]?: FlowStore;
+					};
+
 					const _meta: Record<string, unknown> = requestExtra._meta ?? {};
 					const sessionId = extractSessionId(_meta);
 					const waniwani = extractScopedClient(requestExtra);
-					const store = getStore(waniwani);
+					const store = input.store ?? requestExtra[FLOW_STORE_KEY];
+
+					if (!store) {
+						const errorContent = [
+							{
+								type: "text" as const,
+								text: JSON.stringify(
+									{
+										status: "error",
+										error:
+											"No flow store available. Wrap your MCP server with withWaniwani() or pass a store to .compile().",
+									},
+									null,
+									2,
+								),
+							},
+						];
+						return { content: errorContent, _meta, isError: true };
+					}
 
 					const result = await handleToolCall(
 						args,
@@ -239,7 +255,29 @@ export function compileFlow<TState extends Record<string, unknown>>(
 							result.flowTokenContent &&
 							result.content.status !== "complete"
 						) {
-							await store.set(sessionId, result.flowTokenContent);
+							try {
+								await store.set(sessionId, result.flowTokenContent);
+							} catch (err) {
+								const msg = err instanceof Error ? err.message : String(err);
+								const errorContent = [
+									{
+										type: "text" as const,
+										text: JSON.stringify(
+											{
+												status: "error",
+												error: `Flow state failed to persist (session "${sessionId}"): ${msg}`,
+											},
+											null,
+											2,
+										),
+									},
+								];
+								return {
+									content: errorContent,
+									_meta,
+									isError: true,
+								};
+							}
 						} else if (result.content.status === "complete") {
 							// Clean up — flow is done, remove stale state so a subsequent
 							// "continue" returns "not found" instead of a confusing step error.

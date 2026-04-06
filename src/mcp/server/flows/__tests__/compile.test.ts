@@ -724,6 +724,8 @@ describe("validate on interrupt", () => {
 });
 
 describe("isError on error responses", () => {
+	const store = new TestFlowStateStore();
+
 	test("error responses have isError: true", async () => {
 		const flow = createFlow({
 			id: "error_flow",
@@ -738,7 +740,7 @@ describe("isError on error responses", () => {
 			})
 			.addEdge(START, "will_fail")
 			.addEdge("will_fail", END)
-			.compile();
+			.compile({ store });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);
@@ -769,7 +771,7 @@ describe("isError on error responses", () => {
 			)
 			.addEdge(START, "ask")
 			.addEdge("ask", END)
-			.compile();
+			.compile({ store });
 
 		const { server, registered } = mockServer();
 		await flow.register(server);

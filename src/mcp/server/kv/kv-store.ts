@@ -52,45 +52,25 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 		// order: options.apiKey, process.env.WANIWANI_API_KEY, globalConfig?.apiKey
 		this.apiKey =
 			options?.apiKey ?? process.env.WANIWANI_API_KEY ?? globalConfig?.apiKey;
-
-		const keySource = options?.apiKey
-			? "options"
-			: process.env.WANIWANI_API_KEY
-				? "env:WANIWANI_API_KEY"
-				: globalConfig?.apiKey
-					? "globalConfig"
-					: "none";
-		console.log(
-			`[WaniWani KV] init: baseUrl=${this.baseUrl}, keySource=${keySource}, keyPrefix=${this.apiKey?.slice(0, 8) ?? "n/a"}`,
-		);
 	}
 
 	async get(key: string): Promise<T | null> {
 		if (!this.apiKey) {
-			console.warn("[WaniWani KV] get: no API key configured — returning null");
-			return null;
+			throw new Error(
+				"[WaniWani KV] No API key configured. Set WANIWANI_API_KEY or pass apiKey in options.",
+			);
 		}
-		try {
-			const data = await this.request<T | null>("/api/mcp/redis/get", {
-				key,
-			});
-			return data ?? null;
-		} catch (error) {
-			console.error("[WaniWani KV] get failed for key:", key, error);
-			return null;
-		}
+		const data = await this.request<T | null>("/api/mcp/redis/get", { key });
+		return data ?? null;
 	}
 
 	async set(key: string, value: T): Promise<void> {
 		if (!this.apiKey) {
-			console.warn("[WaniWani KV] set: no API key configured — skipping");
-			return;
+			throw new Error(
+				"[WaniWani KV] No API key configured. Set WANIWANI_API_KEY or pass apiKey in options.",
+			);
 		}
-		try {
-			await this.request("/api/mcp/redis/set", { key, value });
-		} catch (error) {
-			console.error("[WaniWani KV] set failed for key:", key, error);
-		}
+		await this.request("/api/mcp/redis/set", { key, value });
 	}
 
 	async delete(key: string): Promise<void> {
