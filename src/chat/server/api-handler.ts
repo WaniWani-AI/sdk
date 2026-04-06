@@ -2,59 +2,30 @@
 
 import { createLogger } from "../../utils/logger.js";
 import type { ApiHandler, ApiHandlerOptions } from "./@types";
+import { createCors, createJsonResponse } from "./@utils";
 import { createChatRequestHandler } from "./handle-chat";
 import { createResourceHandler } from "./handle-resource";
 import { createToolHandler } from "./handle-tool";
 import { createMcpConfigResolver } from "./mcp-config-resolver";
 
-/**
- * Create a JSON response with the given data and status code.
- * @param data - The data to be serialized to JSON.
- * @param status - The HTTP status code to be returned.
- * @returns A Response object with the JSON data and the given status code.
- */
-function jsonResponse(data: object, status: number): Response {
-	return new Response(JSON.stringify(data), {
-		headers: { "Content-Type": "application/json" },
-		status,
-	});
-}
+const DEFAULT_API_URL = "https://app.waniwani.ai";
 
-/**
- * Create a framework-agnostic API handler for chat and MCP resources.
- *
- * Returns an object with handler methods that can be wired into
- * any framework (Next.js, Hono, Express, etc.):
- *
- * - `handleChat(request)` → proxies chat messages to WaniWani API
- * - `handleResource(url)` → serves MCP resource content (HTML widgets)
- * - `routeGet(request)` → routes GET sub-paths (e.g. /resource)
- *
- * @example
- * ```typescript
- * import { waniwani } from "@waniwani/sdk";
- * import { toNextJsHandler } from "@waniwani/sdk/next-js";
- *
- * const wani = waniwani();
- *
- * export const { GET, POST, dynamic } = toNextJsHandler(wani, {
- *   chat: { systemPrompt: "You are a helpful assistant." },
- * });
- * ```
- */
 export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 	const {
 		apiKey = process.env.WANIWANI_API_KEY,
-		apiUrl = "https://app.waniwani.ai",
+		apiUrl = DEFAULT_API_URL,
 		source,
 		systemPrompt,
 		maxSteps = 5,
 		beforeRequest,
 		mcpServerUrl,
+		allowedOrigins: extraOrigins,
 		debug = false,
 	} = options;
 
 	const log = createLogger("router", debug);
+	const cors = createCors([apiUrl, ...(extraOrigins ?? [])]);
+	const json = createJsonResponse(cors);
 
 	const resolveConfig = createMcpConfigResolver(apiUrl, apiKey);
 
@@ -85,10 +56,6 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 
 	const evalEnabled = process.env.WANIWANI_EVAL === "1";
 
-	async function handleConfig(): Promise<Response> {
-		return jsonResponse({ debug, eval: evalEnabled }, 200);
-	}
-
 	async function routeGet(request: Request): Promise<Response> {
 		log("→ GET", request.url);
 		try {
@@ -100,7 +67,6 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 			const subRoute = segments.at(-1);
 			log("pathname:", url.pathname, "subRoute:", subRoute);
 
-			// Proxy scenarios list to the WaniWani app API
 			if (evalEnabled && subRoute === "scenarios") {
 				log("dispatching to scenarios handler (proxy to app API)");
 				try {
@@ -109,12 +75,10 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 							...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
 						},
 					});
-					const json = await res.json();
-					// The app API wraps responses in { success, data } — unwrap for the SDK
-					const scenarios = json.data ?? json;
-					return jsonResponse(scenarios, 200);
+					const data = await res.json();
+					return json(data.data ?? data, 200, request);
 				} catch {
-					return jsonResponse([], 200);
+					return json([], 200, request);
 				}
 			}
 
@@ -122,24 +86,22 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 				log("dispatching to resource handler");
 				const response = await handleResource(url);
 				log("← resource handler returned", response.status);
-				return response;
+				return cors(response, request);
 			}
 
 			if (subRoute === "config") {
 				log("dispatching to config handler");
-				const response = await handleConfig();
-				log("← config handler returned", response.status);
-				return response;
+				return json({ debug, eval: evalEnabled }, 200, request);
 			}
 
 			log("← 404 no matching sub-route for", subRoute);
-			return jsonResponse({ error: "Not found" }, 404);
+			return json({ error: "Not found" }, 404, request);
 		} catch (error) {
 			console.error("[waniwani:router] GET handler error:", error);
 			const message =
 				error instanceof Error ? error.message : "Unknown error occurred";
 			log("← 500 from caught error");
-			return jsonResponse({ error: message }, 500);
+			return json({ error: message }, 500, request);
 		}
 	}
 
@@ -154,7 +116,6 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 			const subRoute = segments.at(-1);
 			log("pathname:", url.pathname, "subRoute:", subRoute);
 
-			// Proxy scenario creation to the WaniWani app API
 			if (evalEnabled && subRoute === "scenarios") {
 				log("dispatching to save-scenario handler (proxy to app API)");
 				try {
@@ -167,18 +128,19 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 						},
 						body: JSON.stringify(body),
 					});
-					const json = await res.json();
+					const data = await res.json();
 					if (!res.ok) {
-						return jsonResponse(
-							{ error: json.message ?? "Failed to save scenario" },
+						return json(
+							{ error: data.message ?? "Failed to save scenario" },
 							res.status,
+							request,
 						);
 					}
-					return jsonResponse({ ok: true, scenario: json.data }, 200);
+					return json({ ok: true, scenario: data.data }, 200, request);
 				} catch (e) {
 					const msg =
 						e instanceof Error ? e.message : "Failed to save scenario";
-					return jsonResponse({ error: msg }, 400);
+					return json({ error: msg }, 400, request);
 				}
 			}
 
@@ -186,20 +148,32 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 				log("dispatching to tool handler");
 				const response = await handleTool(request);
 				log("← tool handler returned", response.status);
-				return response;
+				return cors(response, request);
 			}
 
 			// Default: treat as chat request
 			log("dispatching to chat handler");
-			return handleChat(request);
+			const chatResponse = await handleChat(request);
+			return cors(chatResponse, request);
 		} catch (error) {
 			console.error("[waniwani:router] POST handler error:", error);
 			const message =
 				error instanceof Error ? error.message : "Unknown error occurred";
 			log("← 500 from caught error");
-			return jsonResponse({ error: message }, 500);
+			return json({ error: message }, 500, request);
 		}
 	}
 
-	return { handleChat, handleResource, handleTool, routeGet, routePost };
+	function handleOptions(request?: Request): Response {
+		return cors(new Response(null, { status: 204 }), request);
+	}
+
+	return {
+		handleChat,
+		handleResource,
+		handleTool,
+		routeGet,
+		routePost,
+		handleOptions,
+	};
 }

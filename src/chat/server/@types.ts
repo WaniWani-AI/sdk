@@ -110,6 +110,12 @@ export interface ApiHandlerOptions {
 	 * Logs request details, response codes, resolved URLs, and caught errors.
 	 */
 	debug?: boolean;
+
+	/**
+	 * Additional origins allowed for cross-origin requests.
+	 * The WaniWani platform URL (apiUrl) is always included.
+	 */
+	allowedOrigins?: string[];
 }
 
 // ============================================================================
@@ -127,6 +133,8 @@ export interface ApiHandler {
 	routeGet: (request: Request) => Promise<Response>;
 	/** Routes POST sub-paths (e.g. /tool), defaults to chat */
 	routePost: (request: Request) => Promise<Response>;
+	/** Handles CORS preflight requests */
+	handleOptions: (request?: Request) => Response;
 }
 
 // ============================================================================
