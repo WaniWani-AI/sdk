@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback } from "react";
 import {
 	hasModelContext,
 	type ModelContextUpdate,
@@ -22,29 +22,15 @@ export function useSendFollowUp(): (
 	options?: SendFollowUpOptions,
 ) => void {
 	const client = useWidgetClient();
-	const cancelRef = useRef<(() => void) | null>(null);
-
-	// Cancel any active retry loop on unmount
-	useEffect(() => {
-		return () => cancelRef.current?.();
-	}, []);
-
 	return useCallback(
 		(prompt: string, options?: SendFollowUpOptions) => {
-			// Cancel any previous retry loop
-			cancelRef.current?.();
-			cancelRef.current = null;
-
 			void (async () => {
 				if (hasModelContext(options?.modelContext)) {
 					await Promise.resolve(
 						client.updateModelContext(options.modelContext),
 					);
 				}
-				const result = client.sendFollowUp(prompt);
-				if (typeof result === "function") {
-					cancelRef.current = result;
-				}
+				await Promise.resolve(client.sendFollowUp(prompt));
 			})().catch((error) => {
 				console.error("Failed to send follow-up message:", error);
 			});

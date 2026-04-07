@@ -96,39 +96,15 @@ export class OpenAIWidgetClient implements UnifiedWidgetClient {
 		}
 	}
 
-	sendFollowUp(prompt: string): () => void {
-		const hiddenContext = formatModelContextForPrompt(this.pendingModelContext);
-		this.pendingModelContext = null;
-		const message = hiddenContext ? `${prompt}\n\n${hiddenContext}` : prompt;
-
-		// Send immediately, then retry every 2s for up to 30s.
-		// ChatGPT silently drops messages when the agent is busy generating,
-		// so we retry until the message is (presumably) picked up.
-		let cancelled = false;
-		let attempts = 0;
-		const MAX_ATTEMPTS = 15;
-
-		const send = () => {
-			if (cancelled || typeof window === "undefined") {
-				return;
-			}
-			attempts++;
-			window.openai?.sendFollowUpMessage?.({ prompt: message });
-		};
-
-		send();
-		const timer = setInterval(() => {
-			if (cancelled || attempts >= MAX_ATTEMPTS) {
-				clearInterval(timer);
-				return;
-			}
-			send();
-		}, 2_000);
-
-		return () => {
-			cancelled = true;
-			clearInterval(timer);
-		};
+	sendFollowUp(prompt: string): void {
+		if (typeof window !== "undefined" && window.openai?.sendFollowUpMessage) {
+			const hiddenContext = formatModelContextForPrompt(
+				this.pendingModelContext,
+			);
+			this.pendingModelContext = null;
+			const message = hiddenContext ? `${prompt}\n\n${hiddenContext}` : prompt;
+			window.openai.sendFollowUpMessage({ prompt: message });
+		}
 	}
 
 	updateModelContext(context: ModelContextUpdate): void {
