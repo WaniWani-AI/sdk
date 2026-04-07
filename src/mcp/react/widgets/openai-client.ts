@@ -118,8 +118,14 @@ export class OpenAIWidgetClient implements UnifiedWidgetClient {
 				role: "user",
 				content: [{ type: "text", text: message }],
 			})
+			.then((result) => {
+				console.log("[sendFollowUp] ui/message result:", result);
+				if (result.isError) {
+					console.warn("[sendFollowUp] host rejected message:", result);
+				}
+			})
 			.catch((err: unknown) => {
-				console.error("Failed to send follow-up message:", err);
+				console.error("[sendFollowUp] ui/message error:", err);
 			});
 	}
 
