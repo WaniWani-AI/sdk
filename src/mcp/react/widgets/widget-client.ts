@@ -94,7 +94,7 @@ export interface UnifiedWidgetClient {
 	 * On OpenAI: openai.sendFollowUpMessage({ prompt })
 	 * On MCP Apps: app.sendMessages([{ role: 'user', content: { type: 'text', text: prompt } }])
 	 */
-	sendFollowUp(prompt: string): void | Promise<void>;
+	sendFollowUp(prompt: string): void | (() => void) | Promise<void>;
 
 	/**
 	 * Update hidden model context for the next assistant turn.
