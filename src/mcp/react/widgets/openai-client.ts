@@ -1,3 +1,4 @@
+import { App, PostMessageTransport } from "@modelcontextprotocol/ext-apps";
 import {
 	formatModelContextForPrompt,
 	type ModelContextUpdate,
@@ -24,6 +25,7 @@ type GlobalsKey = keyof SetGlobalsEvent["detail"]["globals"];
  */
 export class OpenAIWidgetClient implements UnifiedWidgetClient {
 	private pendingModelContext: ModelContextUpdate | null = null;
+	private app: App;
 
 	private getGlobal<T>(
 		key: keyof NonNullable<typeof window.openai>,
@@ -58,14 +60,25 @@ export class OpenAIWidgetClient implements UnifiedWidgetClient {
 		return () => window.removeEventListener(SET_GLOBALS_EVENT_TYPE, handler);
 	}
 
+	constructor() {
+		this.app = new App(
+			{ name: "WaniWani Widget", version: "1.0.0" },
+			{},
+			{ autoResize: false },
+		);
+	}
+
 	async connect(): Promise<void> {
 		if (typeof window === "undefined" || !("openai" in window)) {
 			throw new Error("OpenAI global not found. Are you running in ChatGPT?");
 		}
+		await this.app.connect(
+			new PostMessageTransport(window.parent, window.parent),
+		);
 	}
 
 	async close(): Promise<void> {
-		// No-op for OpenAI - connection is managed by the host
+		await this.app.close();
 	}
 
 	getToolOutput<T = Record<string, unknown>>(): T | null {
@@ -97,14 +110,17 @@ export class OpenAIWidgetClient implements UnifiedWidgetClient {
 	}
 
 	sendFollowUp(prompt: string): void {
-		if (typeof window !== "undefined" && window.openai?.sendFollowUpMessage) {
-			const hiddenContext = formatModelContextForPrompt(
-				this.pendingModelContext,
-			);
-			this.pendingModelContext = null;
-			const message = hiddenContext ? `${prompt}\n\n${hiddenContext}` : prompt;
-			window.openai.sendFollowUpMessage({ prompt: message });
-		}
+		const hiddenContext = formatModelContextForPrompt(this.pendingModelContext);
+		this.pendingModelContext = null;
+		const message = hiddenContext ? `${prompt}\n\n${hiddenContext}` : prompt;
+		this.app
+			.sendMessage({
+				role: "user",
+				content: [{ type: "text", text: message }],
+			})
+			.catch((err: unknown) => {
+				console.error("Failed to send follow-up message:", err);
+			});
 	}
 
 	updateModelContext(context: ModelContextUpdate): void {
