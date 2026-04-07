@@ -10,9 +10,19 @@ export function createCors(allowedOrigins: string[]): CorsFunction {
 	return function applyCors(response: Response, request?: Request): Response {
 		const requestOrigin = request?.headers.get("origin");
 		const origin = requestOrigin?.toLowerCase();
-		const allowed =
-			origin && originSet.has(origin) ? (requestOrigin ?? "") : "";
-		response.headers.set("Access-Control-Allow-Origin", allowed);
+		// Auto-allow all *.mcp.waniwani.run subdomains (deployed chat widgets)
+		const isAllowed =
+			origin != null &&
+			(originSet.has(origin) || origin.endsWith(".mcp.waniwani.run"));
+
+		if (!isAllowed) {
+			return response;
+		}
+
+		response.headers.set(
+			"Access-Control-Allow-Origin",
+			requestOrigin as string,
+		);
 		response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 		response.headers.set(
 			"Access-Control-Allow-Headers",
