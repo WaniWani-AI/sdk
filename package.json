@@ -69,8 +69,8 @@
     "release:beta": "npm whoami && bun run build && npm version prerelease --preid beta && npm publish --access public --tag beta"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/sdk": "1.25.2",
-    "@modelcontextprotocol/ext-apps": "1.0.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/ext-apps": "^1.5.0",
     "react": ">=18.0.0",
     "zod": ">=4.0.0",
     "@ai-sdk/react": ">=1.0.0",
@@ -112,8 +112,8 @@
     "@ai-sdk/mcp": "^1.0.0",
     "@ai-sdk/react": "^3.0.134",
     "@biomejs/biome": "^2.3.13",
-    "@modelcontextprotocol/ext-apps": "1.0.1",
-    "@modelcontextprotocol/sdk": "1.25.2",
+    "@modelcontextprotocol/ext-apps": "^1.5.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@streamdown/cjk": "^1.0.1",
     "@streamdown/code": "^1.0.1",
     "@tailwindcss/cli": "^4.1.18",
