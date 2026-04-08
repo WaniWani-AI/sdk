@@ -98,10 +98,23 @@ jobs:
         env:
           TAG: ${{ steps.tag.outputs.value }}
 
+      - name: Check if already published
+        id: check
+        run: |
+          VERSION=$(jq -r .version package.json)
+          if npm view "@waniwani/sdk@$VERSION" version 2>/dev/null; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::v$VERSION is already published to npm, skipping"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to npm
+        if: steps.check.outputs.published == 'false'
         run: npm publish --access public --tag ${{ steps.channel.outputs.npm_tag }} --provenance --ignore-scripts
 
       - name: Create GitHub Release
+        if: steps.check.outputs.published == 'false'
         run: |
           if [[ "$PRERELEASE" == "true" ]]; then
             gh release create "$TAG" --generate-notes --prerelease
