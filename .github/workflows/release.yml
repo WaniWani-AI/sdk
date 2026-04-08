@@ -1,0 +1,50 @@
+name: Release to npm
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run build
+
+      - name: Determine release channel
+        id: channel
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [[ "$TAG" == *"alpha"* ]]; then
+            echo "npm_tag=alpha" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$TAG" == *"beta"* ]]; then
+            echo "npm_tag=beta" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        run: npm publish --access public --tag ${{ steps.channel.outputs.npm_tag }} --provenance
+
+      - name: Create GitHub Release
+        run: |
+          if [[ "${{ steps.channel.outputs.prerelease }}" == "true" ]]; then
+            gh release create "${{ github.ref_name }}" --generate-notes --prerelease
+          else
+            gh release create "${{ github.ref_name }}" --generate-notes
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
