@@ -18,6 +18,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
+          registry-url: "https://registry.npmjs.org"
 
       - uses: oven-sh/setup-bun@v2
 
@@ -42,7 +43,7 @@ jobs:
           TAG: ${{ github.ref_name }}
 
       - name: Publish to npm
-        run: npm publish --access public --tag ${{ steps.channel.outputs.npm_tag }} --provenance
+        run: npm publish --access public --tag ${{ steps.channel.outputs.npm_tag }} --provenance --ignore-scripts
 
       - name: Create GitHub Release
         run: |
