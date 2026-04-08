@@ -37,6 +37,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/checkout@v6
+        with:
+          token: ${{ github.event_name == 'workflow_dispatch' && secrets.RELEASE_TOKEN || github.token }}
 
       - uses: actions/setup-node@v5
         with:
