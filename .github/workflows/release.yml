@@ -15,6 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
       - uses: oven-sh/setup-bun@v2
 
       - run: bun install --frozen-lockfile
@@ -24,7 +29,6 @@ jobs:
       - name: Determine release channel
         id: channel
         run: |
-          TAG="${{ github.ref_name }}"
           if [[ "$TAG" == *"alpha"* ]]; then
             echo "npm_tag=alpha" >> "$GITHUB_OUTPUT"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
@@ -35,16 +39,20 @@ jobs:
             echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
+        env:
+          TAG: ${{ github.ref_name }}
 
       - name: Publish to npm
         run: npm publish --access public --tag ${{ steps.channel.outputs.npm_tag }} --provenance
 
       - name: Create GitHub Release
         run: |
-          if [[ "${{ steps.channel.outputs.prerelease }}" == "true" ]]; then
-            gh release create "${{ github.ref_name }}" --generate-notes --prerelease
+          if [[ "$PRERELEASE" == "true" ]]; then
+            gh release create "$TAG" --generate-notes --prerelease
           else
-            gh release create "${{ github.ref_name }}" --generate-notes
+            gh release create "$TAG" --generate-notes
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ steps.channel.outputs.prerelease }}
