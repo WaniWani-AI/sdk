@@ -1,0 +1,107 @@
+name: Release to npm
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - beta
+          - alpha
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Check admin access
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          PERMISSION=$(gh api repos/${{ github.repository }}/collaborators/${{ github.actor }}/permission --jq '.permission')
+          if [[ "$PERMISSION" != "admin" ]]; then
+            echo "::error::Only admins can trigger manual releases"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - name: Bump version and create tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BUMP="${{ inputs.bump }}"
+          if [[ "$BUMP" == "beta" ]]; then
+            npm version prerelease --preid beta
+          elif [[ "$BUMP" == "alpha" ]]; then
+            npm version prerelease --preid alpha
+          else
+            npm version "$BUMP"
+          fi
+          git push --follow-tags
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "value=v$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=$TAG" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          TAG: ${{ github.ref_name }}
+
+      - run: bun run build
+
+      - name: Determine release channel
+        id: channel
+        run: |
+          if [[ "$TAG" == *"alpha"* ]]; then
+            echo "npm_tag=alpha" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$TAG" == *"beta"* ]]; then
+            echo "npm_tag=beta" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          TAG: ${{ steps.tag.outputs.value }}
+
+      - name: Publish to npm
+        run: npm publish --access public --tag ${{ steps.channel.outputs.npm_tag }} --provenance --ignore-scripts
+
+      - name: Create GitHub Release
+        run: |
+          if [[ "$PRERELEASE" == "true" ]]; then
+            gh release create "$TAG" --generate-notes --prerelease
+          else
+            gh release create "$TAG" --generate-notes
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.value }}
+          PRERELEASE: ${{ steps.channel.outputs.prerelease }}
