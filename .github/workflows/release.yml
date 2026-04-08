@@ -25,9 +25,13 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - name: Check admin access
+      - name: Check manual release requirements
         if: github.event_name == 'workflow_dispatch'
         run: |
+          if [[ -z "$RELEASE_TOKEN" ]]; then
+            echo "::error::RELEASE_TOKEN secret is not set. Add an admin fine-grained PAT as a repo secret."
+            exit 1
+          fi
           PERMISSION=$(gh api repos/${{ github.repository }}/collaborators/${{ github.actor }}/permission --jq '.permission')
           if [[ "$PERMISSION" != "admin" ]]; then
             echo "::error::Only admins can trigger manual releases"
@@ -35,6 +39,7 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
       - uses: actions/checkout@v6
         with:
