@@ -73,7 +73,7 @@ jobs:
         id: tag
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "value=v$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+            echo "value=v$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
           else
             echo "value=$TAG" >> "$GITHUB_OUTPUT"
           fi
@@ -109,6 +109,6 @@ jobs:
             gh release create "$TAG" --generate-notes
           fi
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.event_name == 'workflow_dispatch' && secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.tag.outputs.value }}
           PRERELEASE: ${{ steps.channel.outputs.prerelease }}
