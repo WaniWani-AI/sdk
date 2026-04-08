@@ -4,6 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - beta
+          - alpha
 
 jobs:
   release:
@@ -13,6 +25,17 @@ jobs:
       contents: write
       id-token: write
     steps:
+      - name: Check admin access
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          PERMISSION=$(gh api repos/${{ github.repository }}/collaborators/${{ github.actor }}/permission --jq '.permission')
+          if [[ "$PERMISSION" != "admin" ]]; then
+            echo "::error::Only admins can trigger manual releases"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v5
@@ -23,6 +46,32 @@ jobs:
       - uses: oven-sh/setup-bun@v2
 
       - run: bun install --frozen-lockfile
+
+      - name: Bump version and create tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BUMP="${{ inputs.bump }}"
+          if [[ "$BUMP" == "beta" ]]; then
+            npm version prerelease --preid beta
+          elif [[ "$BUMP" == "alpha" ]]; then
+            npm version prerelease --preid alpha
+          else
+            npm version "$BUMP"
+          fi
+          git push --follow-tags
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "value=v$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=$TAG" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          TAG: ${{ github.ref_name }}
 
       - run: bun run build
 
@@ -40,7 +89,7 @@ jobs:
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.tag.outputs.value }}
 
       - name: Publish to npm
         run: npm publish --access public --tag ${{ steps.channel.outputs.npm_tag }} --provenance --ignore-scripts
@@ -54,5 +103,5 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.tag.outputs.value }}
           PRERELEASE: ${{ steps.channel.outputs.prerelease }}
