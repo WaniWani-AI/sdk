@@ -2,6 +2,13 @@ import type { z } from "zod";
 import type { McpServer } from "../resources/types";
 import type { ScopedWaniWaniClient } from "../scoped-client";
 import type { RegisteredTool } from "../tools/types";
+
+/** Minimum descriptor needed by showWidget — accepts RegisteredTool or any plain object with these fields. */
+export type WidgetToolRef = Pick<
+	RegisteredTool,
+	"id" | "title" | "description"
+>;
+
 import type { FlowStore } from "./flow-store";
 
 export type { McpServer };
@@ -115,7 +122,7 @@ export function interrupt(
  * Used internally by the engine. Flow authors use the typed `showWidget` from the node context.
  */
 export function showWidget(
-	tool: RegisteredTool,
+	tool: WidgetToolRef,
 	config: {
 		data: Record<string, unknown>;
 		description?: string;

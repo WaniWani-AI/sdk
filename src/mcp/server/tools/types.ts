@@ -70,6 +70,6 @@ export type RegisteredTool = {
 	id: string;
 	title: string;
 	description: string;
-	/** Register the tool on the server */
-	register: (server: McpServer) => Promise<void>;
+	/** Register the tool on the server. Optional when used as a reference-only shim (e.g. in showWidget). */
+	register?: (server: McpServer) => Promise<void>;
 };

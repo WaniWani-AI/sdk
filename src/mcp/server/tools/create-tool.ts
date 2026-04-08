@@ -146,5 +146,5 @@ export async function registerTools(
 	server: McpServer,
 	tools: RegisteredTool[],
 ): Promise<void> {
-	await Promise.all(tools.map((t) => t.register(server)));
+	await Promise.all(tools.map((t) => t.register?.(server)));
 }
