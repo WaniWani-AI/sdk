@@ -195,82 +195,80 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		};
 	}
 
-	return {
-		id: config.id,
+	const toolConfig = {
 		title: config.title,
 		description: fullDescription,
-		graph: input.graph,
+		inputSchema,
+		annotations: config.annotations,
+	};
 
-		async register(server: McpServer): Promise<void> {
-			server.registerTool(
-				config.id,
-				{
-					title: config.title,
-					description: fullDescription,
-					inputSchema,
-					annotations: config.annotations,
-				},
-				(async (args: FlowToolInput, extra: unknown) => {
-					const requestExtra = extra as RequestHandlerExtra<
-						ServerRequest,
-						ServerNotification
-					>;
-					const _meta: Record<string, unknown> = requestExtra._meta ?? {};
-					const sessionId = extractSessionId(_meta);
-					const waniwani = extractScopedClient(requestExtra);
+	const toolHandler = (async (args: FlowToolInput, extra: unknown) => {
+		const requestExtra = extra as RequestHandlerExtra<
+			ServerRequest,
+			ServerNotification
+		>;
+		const _meta: Record<string, unknown> = requestExtra._meta ?? {};
+		const sessionId = extractSessionId(_meta);
+		const waniwani = extractScopedClient(requestExtra);
 
-					const result = await handleToolCall(args, sessionId, _meta, waniwani);
+		const result = await handleToolCall(args, sessionId, _meta, waniwani);
 
-					// Persist flow state under session ID
-					if (sessionId) {
-						if (
-							result.flowTokenContent &&
-							result.content.status !== "complete"
-						) {
-							try {
-								await store.set(sessionId, result.flowTokenContent);
-							} catch (err) {
-								const msg = err instanceof Error ? err.message : String(err);
-								const errorContent = [
-									{
-										type: "text" as const,
-										text: JSON.stringify(
-											{
-												status: "error",
-												error: `Flow state failed to persist (session "${sessionId}"): ${msg}`,
-											},
-											null,
-											2,
-										),
-									},
-								];
-								return {
-									content: errorContent,
-									_meta,
-									isError: true,
-								};
-							}
-						} else if (result.content.status === "complete") {
-							// Clean up — flow is done, remove stale state so a subsequent
-							// "continue" returns "not found" instead of a confusing step error.
-							await store.delete(sessionId);
-						}
-					}
-
-					const content = [
+		// Persist flow state under session ID
+		if (sessionId) {
+			if (result.flowTokenContent && result.content.status !== "complete") {
+				try {
+					await store.set(sessionId, result.flowTokenContent);
+				} catch (err) {
+					const msg = err instanceof Error ? err.message : String(err);
+					const errorContent = [
 						{
 							type: "text" as const,
-							text: JSON.stringify(result.content, null, 2),
+							text: JSON.stringify(
+								{
+									status: "error",
+									error: `Flow state failed to persist (session "${sessionId}"): ${msg}`,
+								},
+								null,
+								2,
+							),
 						},
 					];
-
 					return {
-						content,
+						content: errorContent,
 						_meta,
-						...(result.content.status === "error" ? { isError: true } : {}),
+						isError: true,
 					};
-				}) satisfies ToolCallback<typeof inputSchema>,
-			);
+				}
+			} else if (result.content.status === "complete") {
+				// Clean up — flow is done, remove stale state so a subsequent
+				// "continue" returns "not found" instead of a confusing step error.
+				await store.delete(sessionId);
+			}
+		}
+
+		const content = [
+			{
+				type: "text" as const,
+				text: JSON.stringify(result.content, null, 2),
+			},
+		];
+
+		return {
+			content,
+			_meta,
+			...(result.content.status === "error" ? { isError: true } : {}),
+		};
+	}) satisfies ToolCallback<typeof inputSchema>;
+
+	return {
+		// MCP-compatible — server.registerTool(flow.name, flow.config, flow.handler)
+		name: config.id,
+		config: toolConfig,
+		handler: toolHandler as unknown as ToolCallback,
+
+		async register(server: McpServer): Promise<void> {
+			server.registerTool(config.id, toolConfig, toolHandler);
 		},
+		graph: input.graph,
 	};
 }

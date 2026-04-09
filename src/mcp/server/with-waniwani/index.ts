@@ -63,17 +63,6 @@ export type WithWaniwaniOptions = {
 
 const DEFAULT_BASE_URL = "https://app.waniwani.ai";
 
-type Registerable = { register: (server: McpServer) => void };
-
-function isRegisterable(value: unknown): value is Registerable {
-	return (
-		typeof value === "object" &&
-		value !== null &&
-		"register" in value &&
-		typeof value.register === "function"
-	);
-}
-
 /**
  * Wrap an MCP server so tool handlers automatically emit `tool.called` events.
  *
@@ -116,14 +105,6 @@ export function withWaniwani(
 			typeof toolNameRaw === "string" && toolNameRaw.trim().length > 0
 				? toolNameRaw
 				: "unknown";
-
-		// server.registerTool("my-tool", myFlow) — RegisteredFlow / RegisteredTool
-		// passed in config position. Delegate to its .register() which calls back
-		// into registerTool(name, config, handler) with the real args.
-		if (isRegisterable(config)) {
-			config.register(wrappedServer);
-			return wrappedServer;
-		}
 
 		if (typeof handlerRaw !== "function") {
 			return originalRegisterTool(...args);

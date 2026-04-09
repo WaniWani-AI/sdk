@@ -1,3 +1,4 @@
+import type { ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { z } from "zod";
 import type { McpServer } from "../resources/types";
 import type { ScopedWaniWaniClient } from "../scoped-client";
@@ -378,11 +379,28 @@ export type InferFlowState<T extends Record<string, z.ZodType>> = {
 
 /**
  * A compiled flow — can be registered on an McpServer.
+ *
+ * Exposes MCP-compatible `name`, `config`, and `handler` so it can be
+ * registered directly: `server.registerTool(flow.name, flow.config, flow.handler)`
  */
 export type RegisteredFlow = {
-	id: string;
-	title: string;
-	description: string;
+	/** Tool name — pass to `server.registerTool(flow.name, flow.config, flow.handler)`. */
+	name: string;
+	/** Tool config object — pass to `server.registerTool(flow.name, flow.config, flow.handler)`. */
+	config: {
+		title: string;
+		description: string;
+		inputSchema: Record<string, unknown>;
+		annotations?: {
+			readOnlyHint?: boolean;
+			idempotentHint?: boolean;
+			openWorldHint?: boolean;
+			destructiveHint?: boolean;
+		};
+	};
+	/** Tool callback — pass to `server.registerTool(flow.name, flow.config, flow.handler)`. */
+	handler: ToolCallback;
+	/** Register this flow on an MCP server. Shorthand for `server.registerTool(flow.name, flow.config, flow.handler)`. */
 	register: (server: McpServer) => Promise<void>;
 	/** Returns a Mermaid `flowchart TD` diagram of the flow graph. */
 	graph: () => string;
