@@ -182,7 +182,7 @@ export function MessageList({
 									}
 								>
 									<div style={isFullscreen ? { display: "none" } : undefined}>
-										<Tool defaultOpen={part.state === "output-available"}>
+										<Tool>
 											<ToolHeader
 												title={part.title ?? formatToolName(part.toolName)}
 												state={part.state}
