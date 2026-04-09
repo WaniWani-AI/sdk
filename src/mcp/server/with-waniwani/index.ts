@@ -1,4 +1,5 @@
 import type { ToolCalledProperties } from "../../../tracking/index.js";
+import { createLogger } from "../../../utils/logger.js";
 import { waniwani } from "../../../waniwani.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../tools/types";
@@ -60,6 +61,8 @@ export type WithWaniwaniOptions = {
 	 */
 	injectWidgetToken?: boolean;
 };
+
+const log = createLogger("mcp", !!process.env.WANIWANI_DEBUG);
 
 const DEFAULT_BASE_URL = "https://app.waniwani.ai";
 
@@ -140,6 +143,10 @@ export function withWaniwani(
 				const result = await handler(input, extra);
 				const durationMs = Math.round(performance.now() - startTime);
 
+				log(
+					`tool "${toolName}" handler returned in ${durationMs}ms, running post-processing...`,
+				);
+
 				const isErrorResult =
 					isRecord(result) && (result as UnknownRecord).isError === true;
 
@@ -169,6 +176,8 @@ export function withWaniwani(
 					opts.onError,
 				);
 
+				log(`tool "${toolName}" tracking done`);
+
 				if (opts.flushAfterToolCall) {
 					await safeFlush(tracker, opts.onError);
 				}
@@ -183,7 +192,10 @@ export function withWaniwani(
 						extra,
 						opts.onError,
 					);
+					log(`tool "${toolName}" widget config injected`);
 				}
+
+				log(`tool "${toolName}" post-processing complete, returning result`);
 
 				return result;
 			} catch (error) {
