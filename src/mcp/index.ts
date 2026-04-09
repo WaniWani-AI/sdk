@@ -31,9 +31,6 @@ export {
 	START,
 	StateGraph,
 } from "./server/flows";
-// Handler
-export type { CreateMcpHandlerOptions } from "./server/handler";
-export { createMcpHandler } from "./server/handler";
 // Generic key-value store
 export type { KvStore } from "./server/kv";
 export { WaniwaniKvStore } from "./server/kv";
