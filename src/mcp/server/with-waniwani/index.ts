@@ -8,6 +8,7 @@ import {
 	extractErrorText,
 	extractMeta,
 	injectRequestMetadata,
+	injectToolDefinitionMeta,
 	injectWidgetConfig,
 	isRecord,
 	safeFlush,
@@ -110,6 +111,13 @@ export function withWaniwani(
 			return originalRegisterTool(...args);
 		}
 
+		// Capture widget metadata from the tool definition (e.g. Skybridge's
+		// registerWidget sets _meta.ui.resourceUri and openai/outputTemplate here).
+		const configMeta =
+			isRecord(config) && isRecord(config._meta)
+				? (config._meta as UnknownRecord)
+				: undefined;
+
 		const handler = handlerRaw as (
 			input: unknown,
 			extra: unknown,
@@ -173,6 +181,7 @@ export function withWaniwani(
 					await safeFlush(tracker, opts.onError);
 				}
 
+				injectToolDefinitionMeta(result, configMeta);
 				injectRequestMetadata(result, extra);
 
 				if (injectToken) {

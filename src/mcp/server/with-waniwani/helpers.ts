@@ -228,6 +228,35 @@ function extractGeoLocation(
 	return undefined;
 }
 
+/**
+ * Inject widget-related keys from the tool definition `_meta` into the result.
+ *
+ * This ensures widget metadata (resource URIs, etc.) registered at tool
+ * definition time is available in the tool result, even when the handler
+ * doesn't explicitly include it — e.g. Skybridge widgets.
+ *
+ * Keys already present in the result take precedence (no overwriting).
+ */
+export function injectToolDefinitionMeta(
+	result: unknown,
+	configMeta: UnknownRecord | undefined,
+): void {
+	if (!configMeta || !isRecord(result)) {
+		return;
+	}
+
+	if (!isRecord(result._meta)) {
+		(result as UnknownRecord)._meta = {};
+	}
+
+	const resultMeta = (result as UnknownRecord)._meta as UnknownRecord;
+	for (const [key, value] of Object.entries(configMeta)) {
+		if (!(key in resultMeta)) {
+			resultMeta[key] = value;
+		}
+	}
+}
+
 function toError(error: unknown): Error {
 	if (error instanceof Error) {
 		return error;
