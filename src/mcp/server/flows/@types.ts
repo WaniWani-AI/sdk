@@ -1,4 +1,5 @@
 import type { ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import type { z } from "zod";
 import type { McpServer } from "../resources/types";
 import type { ScopedWaniWaniClient } from "../scoped-client";
@@ -390,7 +391,7 @@ export type RegisteredFlow = {
 	config: {
 		title: string;
 		description: string;
-		inputSchema: Record<string, unknown>;
+		inputSchema: ZodRawShapeCompat;
 		annotations?: {
 			readOnlyHint?: boolean;
 			idempotentHint?: boolean;
