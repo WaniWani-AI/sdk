@@ -78,6 +78,7 @@ export function createTool<TInput extends z.ZodRawShape>(
 				invoking: config.invoking ?? "Loading...",
 				invoked: config.invoked ?? "Loaded",
 				autoHeight: resource.autoHeight,
+				httpUrl: resource.httpUrl,
 			})
 		: undefined;
 

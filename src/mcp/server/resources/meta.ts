@@ -93,6 +93,7 @@ export function buildToolMeta(config: {
 	invoking: string;
 	invoked: string;
 	autoHeight?: boolean;
+	httpUrl?: string;
 }) {
 	return {
 		// OpenAI metadata
@@ -108,6 +109,7 @@ export function buildToolMeta(config: {
 			ui: {
 				resourceUri: config.mcpTemplateUri,
 				...(config.autoHeight && { autoHeight: true }),
+				...(config.httpUrl && { httpUrl: config.httpUrl }),
 			},
 		}),
 		// MCP Apps backward-compat flat key (for older hosts)

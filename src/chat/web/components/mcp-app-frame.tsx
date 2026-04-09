@@ -68,6 +68,8 @@ export interface McpAppFrameProps {
 		_meta?: Record<string, unknown>;
 	};
 	resourceEndpoint?: string;
+	/** Direct HTTP URL for the widget HTML. When provided, bypasses the resource proxy. */
+	httpUrl?: string;
 	chatSessionId?: string;
 	isDark?: boolean;
 	className?: string;
@@ -101,6 +103,7 @@ export function McpAppFrame({
 	toolInput,
 	toolResult,
 	resourceEndpoint = DEFAULT_RESOURCE_ENDPOINT,
+	httpUrl,
 	chatSessionId,
 	isDark = false,
 	className,
@@ -147,8 +150,9 @@ export function McpAppFrame({
 
 	// Build the iframe src URL directly — avoids null-origin issues with srcdoc
 	const iframeSrc = useMemo(
-		() => `${resourceEndpoint}?uri=${encodeURIComponent(resourceUri)}`,
-		[resourceEndpoint, resourceUri],
+		() =>
+			httpUrl ?? `${resourceEndpoint}?uri=${encodeURIComponent(resourceUri)}`,
+		[httpUrl, resourceEndpoint, resourceUri],
 	);
 
 	const isDarkRef = useRef(isDark);

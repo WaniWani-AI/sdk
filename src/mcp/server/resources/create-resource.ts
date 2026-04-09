@@ -68,6 +68,8 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 
 	const openaiUri = `ui://widgets/apps-sdk/${id}.html`;
 	const mcpUri = `ui://widgets/ext-apps/${id}.html`;
+	const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+	const httpUrl = `${normalizedBase}${htmlPath}`;
 
 	// Lazy HTML — fetched once, shared across all calls
 	let htmlPromise: Promise<string> | null = null;
@@ -153,6 +155,7 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 		openaiUri,
 		mcpUri,
 		autoHeight,
+		httpUrl,
 		register,
 	};
 }

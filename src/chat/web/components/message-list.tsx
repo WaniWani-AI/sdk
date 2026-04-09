@@ -14,6 +14,7 @@ import {
 import { Reasoning } from "../ai-elements/reasoning";
 import {
 	getAutoHeight,
+	getHttpUrl,
 	getResourceUri,
 	Tool,
 	ToolContent,
@@ -38,6 +39,7 @@ function formatToolName(name: string | undefined): string {
 export interface FullscreenWidget {
 	toolCallId: string;
 	resourceUri: string;
+	httpUrl?: string;
 	toolInput: Record<string, unknown>;
 	toolResult: {
 		content?: Array<{ type: string; text?: string }>;
@@ -160,6 +162,8 @@ export function MessageList({
 							const output = "output" in part ? part.output : undefined;
 							const resourceUri =
 								output !== undefined ? getResourceUri(output) : undefined;
+							const httpUrl =
+								output !== undefined ? getHttpUrl(output) : undefined;
 							const autoHeight =
 								output !== undefined ? getAutoHeight(output) : false;
 							const isFullscreen = part.toolCallId === fullscreenToolCallId;
@@ -201,70 +205,76 @@ export function MessageList({
 											</ToolContent>
 										</Tool>
 									</div>
-									{resourceUri && resourceEndpoint && output !== undefined && (
-										<WidgetErrorBoundary>
-											<McpAppFrame
-												isFullscreen={isFullscreen}
-												resourceUri={resourceUri}
-												toolInput={
-													(part.input as Record<string, unknown>) ?? {}
-												}
-												toolResult={{
-													content: (output as Record<string, unknown>)
-														.content as
-														| Array<{
-																type: string;
-																text?: string;
-														  }>
-														| undefined,
-													structuredContent: (output as Record<string, unknown>)
-														.structuredContent as
-														| Record<string, unknown>
-														| undefined,
-													_meta: (output as Record<string, unknown>)._meta as
-														| Record<string, unknown>
-														| undefined,
-												}}
-												resourceEndpoint={resourceEndpoint}
-												chatSessionId={chatSessionId}
-												isDark={isDark}
-												autoHeight={autoHeight}
-												onFollowUp={onFollowUp}
-												onCallTool={onCallTool}
-												onDisplayModeChange={
-													onWidgetDisplayModeChange
-														? (mode) =>
-																onWidgetDisplayModeChange(mode, {
-																	toolCallId: part.toolCallId,
-																	resourceUri,
-																	toolInput:
-																		(part.input as Record<string, unknown>) ??
-																		{},
-																	toolResult: {
-																		content: (output as Record<string, unknown>)
-																			.content as
-																			| Array<{
-																					type: string;
-																					text?: string;
-																			  }>
-																			| undefined,
-																		structuredContent: (
-																			output as Record<string, unknown>
-																		).structuredContent as
-																			| Record<string, unknown>
-																			| undefined,
-																		_meta: (output as Record<string, unknown>)
-																			._meta as
-																			| Record<string, unknown>
-																			| undefined,
-																	},
-																	autoHeight,
-																})
-														: undefined
-												}
-											/>
-										</WidgetErrorBoundary>
-									)}
+									{resourceUri &&
+										(resourceEndpoint || httpUrl) &&
+										output !== undefined && (
+											<WidgetErrorBoundary>
+												<McpAppFrame
+													isFullscreen={isFullscreen}
+													resourceUri={resourceUri}
+													httpUrl={httpUrl}
+													toolInput={
+														(part.input as Record<string, unknown>) ?? {}
+													}
+													toolResult={{
+														content: (output as Record<string, unknown>)
+															.content as
+															| Array<{
+																	type: string;
+																	text?: string;
+															  }>
+															| undefined,
+														structuredContent: (
+															output as Record<string, unknown>
+														).structuredContent as
+															| Record<string, unknown>
+															| undefined,
+														_meta: (output as Record<string, unknown>)._meta as
+															| Record<string, unknown>
+															| undefined,
+													}}
+													resourceEndpoint={resourceEndpoint}
+													chatSessionId={chatSessionId}
+													isDark={isDark}
+													autoHeight={autoHeight}
+													onFollowUp={onFollowUp}
+													onCallTool={onCallTool}
+													onDisplayModeChange={
+														onWidgetDisplayModeChange
+															? (mode) =>
+																	onWidgetDisplayModeChange(mode, {
+																		toolCallId: part.toolCallId,
+																		resourceUri,
+																		httpUrl,
+																		toolInput:
+																			(part.input as Record<string, unknown>) ??
+																			{},
+																		toolResult: {
+																			content: (
+																				output as Record<string, unknown>
+																			).content as
+																				| Array<{
+																						type: string;
+																						text?: string;
+																				  }>
+																				| undefined,
+																			structuredContent: (
+																				output as Record<string, unknown>
+																			).structuredContent as
+																				| Record<string, unknown>
+																				| undefined,
+																			_meta: (output as Record<string, unknown>)
+																				._meta as
+																				| Record<string, unknown>
+																				| undefined,
+																		},
+																		autoHeight,
+																	})
+															: undefined
+													}
+												/>
+											</WidgetErrorBoundary>
+										)}
 								</div>
 							);
 						})}

@@ -416,6 +416,12 @@ export function getResourceUri(output: unknown): string | undefined {
 	return typeof uri === "string" ? uri : undefined;
 }
 
+/** Extract the direct HTTP URL from `output._meta.ui.httpUrl`, if present. */
+export function getHttpUrl(output: unknown): string | undefined {
+	const url = getUiMeta(output)?.httpUrl;
+	return typeof url === "string" ? url : undefined;
+}
+
 /** Extract the auto-height flag from `output._meta.ui.autoHeight`, if present. */
 export function getAutoHeight(output: unknown): boolean {
 	return getUiMeta(output)?.autoHeight === true;

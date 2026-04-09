@@ -43,6 +43,8 @@ export type RegisteredResource = {
 	/** MCP URI: ui://widgets/ext-apps/{id}.html */
 	readonly mcpUri: string;
 	readonly autoHeight: boolean | undefined;
+	/** Direct HTTP URL to the widget HTML. Used by hosts to load the widget directly, bypassing the MCP resource proxy. */
+	readonly httpUrl: string;
 	/** Register this resource on an McpServer */
 	register: (server: McpServer) => Promise<void>;
 };
