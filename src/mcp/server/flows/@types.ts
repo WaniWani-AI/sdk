@@ -1,5 +1,10 @@
-import type { ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
+import type {
+	CallToolResult,
+	ServerNotification,
+	ServerRequest,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
 import type { McpServer } from "../resources/types";
 import type { ScopedWaniWaniClient } from "../scoped-client";
@@ -379,6 +384,15 @@ export type InferFlowState<T extends Record<string, z.ZodType>> = {
 };
 
 /**
+ * Flow tool handler — uses shared MCP types (`RequestHandlerExtra`, `CallToolResult`)
+ * so it's assignable to both MCP SDK's `ToolCallback` and Skybridge's `ToolHandler`.
+ */
+export type FlowToolHandler = (
+	args: Record<string, unknown>,
+	extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+) => CallToolResult | Promise<CallToolResult>;
+
+/**
  * A compiled flow — can be registered on an McpServer.
  *
  * Exposes MCP-compatible `name`, `config`, and `handler` so it can be
@@ -400,7 +414,7 @@ export type RegisteredFlow = {
 		};
 	};
 	/** Tool callback — pass to `server.registerTool(flow.name, flow.config, flow.handler)`. */
-	handler: ToolCallback;
+	handler: FlowToolHandler;
 	/** Register this flow on an MCP server. Shorthand for `server.registerTool(flow.name, flow.config, flow.handler)`. */
 	register: (server: McpServer) => Promise<void>;
 	/** Returns a Mermaid `flowchart TD` diagram of the flow graph. */
