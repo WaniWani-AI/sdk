@@ -1,6 +1,10 @@
 // WaniWani SDK - Next.js Adapter Types
 
-import type { BeforeRequestContext, BeforeRequestResult } from "../@types.js";
+import type {
+	BeforeRequestContext,
+	BeforeRequestResult,
+	WebSearchConfig,
+} from "../@types.js";
 
 // ============================================================================
 // Chat Options (namespaced under `chat`)
@@ -36,6 +40,12 @@ export interface ChatOptions {
 	 * Useful for development/testing when pointing to a local MCP server.
 	 */
 	mcpServerUrl?: string;
+
+	/**
+	 * Enable web search as an additional tool alongside MCP tools.
+	 * Pass `true` to enable with defaults, or a config object to restrict domains.
+	 */
+	webSearch?: boolean | WebSearchConfig;
 }
 
 // ============================================================================

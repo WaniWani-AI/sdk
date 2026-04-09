@@ -1,7 +1,11 @@
 // API Handler - Composes chat and resource handlers into a unified API handler
 
 import { createLogger } from "../../utils/logger.js";
-import type { ApiHandler, ApiHandlerOptions } from "./@types";
+import {
+	type ApiHandler,
+	type ApiHandlerOptions,
+	resolveWebSearchConfig,
+} from "./@types";
 import { createCors, createJsonResponse } from "./@utils";
 import { createChatRequestHandler } from "./handle-chat";
 import { createResourceHandler } from "./handle-resource";
@@ -21,6 +25,7 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		mcpServerUrl,
 		allowedOrigins: extraOrigins,
 		debug = false,
+		webSearch,
 	} = options;
 
 	const log = createLogger("router", debug);
@@ -39,6 +44,7 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		mcpServerUrl,
 		resolveConfig,
 		debug,
+		webSearch: resolveWebSearchConfig(webSearch),
 	});
 
 	const handleResource = createResourceHandler({

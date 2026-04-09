@@ -1,6 +1,6 @@
 {
   "name": "@waniwani/sdk",
-  "version": "0.8.2-alpha.10",
+  "version": "0.8.6",
   "description": "WaniWani SDK - MCP event tracking, widget framework, and tools",
   "type": "module",
   "exports": {
@@ -63,15 +63,15 @@
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "prepublishOnly": "bun run build",
-    "release": "npm whoami && bun run build && npm version patch && npm publish --access public",
-    "release:minor": "npm whoami && bun run build && npm version minor && npm publish --access public",
-    "release:major": "npm whoami && bun run build && npm version major && npm publish --access public",
-    "release:alpha": "npm whoami && bun run build && npm version prerelease --preid alpha && npm publish --access public --tag alpha",
-    "release:beta": "npm whoami && bun run build && npm version prerelease --preid beta && npm publish --access public --tag beta"
+    "release": "npm version patch && git push --follow-tags",
+    "release:minor": "npm version minor && git push --follow-tags",
+    "release:major": "npm version major && git push --follow-tags",
+    "release:beta": "npm version prerelease --preid beta && git push --follow-tags",
+    "release:alpha": "npm version prerelease --preid alpha && git push --follow-tags"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "@modelcontextprotocol/ext-apps": "^1.5.0",
+    "@modelcontextprotocol/sdk": "~1.29.0",
+    "@modelcontextprotocol/ext-apps": "~1.5.0",
     "react": ">=18.0.0",
     "zod": ">=4.0.0",
     "@ai-sdk/react": ">=1.0.0",
@@ -113,8 +113,8 @@
     "@ai-sdk/mcp": "^1.0.0",
     "@ai-sdk/react": "^3.0.134",
     "@biomejs/biome": "^2.3.13",
-    "@modelcontextprotocol/ext-apps": "^1.5.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/ext-apps": "~1.5.0",
+    "@modelcontextprotocol/sdk": "~1.29.0",
     "@streamdown/cjk": "^1.0.1",
     "@streamdown/code": "^1.0.1",
     "@tailwindcss/cli": "^4.1.18",

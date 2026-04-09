@@ -53,6 +53,17 @@ export type BeforeRequestResult = {
 };
 
 // ============================================================================
+// Web Search
+// ============================================================================
+
+export interface WebSearchConfig {
+	/** Restrict web search results to these domains */
+	includeDomains?: string[];
+	/** Exclude these domains from web search results */
+	excludeDomains?: string[];
+}
+
+// ============================================================================
 // API Handler Options
 // ============================================================================
 
@@ -116,6 +127,12 @@ export interface ApiHandlerOptions {
 	 * The WaniWani platform URL (apiUrl) is always included.
 	 */
 	allowedOrigins?: string[];
+
+	/**
+	 * Enable web search as an additional tool alongside MCP tools.
+	 * Pass `true` to enable with defaults, or a config object to restrict domains.
+	 */
+	webSearch?: boolean | WebSearchConfig;
 }
 
 // ============================================================================
@@ -157,6 +174,20 @@ export interface ApiHandlerDeps {
 	mcpServerUrl: string | undefined;
 	resolveConfig: ConfigResolver;
 	debug: boolean;
+	webSearch?: WebSearchConfig;
+}
+
+/** Normalize `true` to `{}` so the upstream API always receives an object or undefined */
+export function resolveWebSearchConfig(
+	value: boolean | WebSearchConfig | undefined,
+): WebSearchConfig | undefined {
+	if (value === true) {
+		return {};
+	}
+	if (value === false || value === undefined) {
+		return undefined;
+	}
+	return value;
 }
 
 export interface ResourceHandlerDeps {

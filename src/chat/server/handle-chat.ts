@@ -21,6 +21,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 		mcpServerUrl: mcpServerUrlOverride,
 		resolveConfig,
 		debug,
+		webSearch,
 	} = deps;
 
 	const log = createLogger("chat", debug);
@@ -124,6 +125,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 					systemPrompt: effectiveSystemPrompt,
 					maxSteps,
 					visitor,
+					webSearch,
 				}),
 				signal: request.signal,
 			});
