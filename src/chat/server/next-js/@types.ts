@@ -68,12 +68,6 @@ export interface NextJsHandlerOptions {
 	 * Logs request details, response codes, resolved URLs, and caught errors.
 	 */
 	debug?: boolean;
-
-	/**
-	 * Additional origins allowed for cross-origin requests.
-	 * The WaniWani platform URL is always included by default.
-	 */
-	allowedOrigins?: string[];
 }
 
 // ============================================================================

@@ -23,13 +23,12 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		maxSteps = 5,
 		beforeRequest,
 		mcpServerUrl,
-		allowedOrigins: extraOrigins,
 		debug = false,
 		webSearch,
 	} = options;
 
 	const log = createLogger("router", debug);
-	const cors = createCors([apiUrl, ...(extraOrigins ?? [])]);
+	const cors = createCors();
 	const json = createJsonResponse(cors);
 
 	const resolveConfig = createMcpConfigResolver(apiUrl, apiKey);

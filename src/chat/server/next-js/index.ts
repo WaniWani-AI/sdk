@@ -44,7 +44,6 @@ export function toNextJsHandler(
 		apiKey,
 		apiUrl,
 		source: options?.source,
-		allowedOrigins: options?.allowedOrigins,
 		debug: debugEnabled,
 	});
 
