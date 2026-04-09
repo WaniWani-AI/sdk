@@ -3,6 +3,10 @@
  * so browser widgets can POST events directly.
  */
 
+import { createLogger } from "../../utils/logger.js";
+
+const log = createLogger("widget-token", !!process.env.WANIWANI_DEBUG);
+
 interface WidgetTokenConfig {
 	apiUrl: string;
 	apiKey: string;
@@ -57,7 +61,7 @@ export class WidgetTokenCache {
 		traceId?: string,
 	): Promise<string | null> {
 		const url = joinUrl(this.config.apiUrl, "/api/mcp/widget-tokens");
-		console.log("[waniwani:widget-token] minting token from", url);
+		log("minting token from", url);
 
 		const body: Record<string, string> = {};
 		if (sessionId) {
@@ -77,7 +81,7 @@ export class WidgetTokenCache {
 				body: JSON.stringify(body),
 				signal: AbortSignal.timeout(5_000),
 			});
-			console.log("[waniwani:widget-token] mint response:", response.status);
+			log("mint response:", response.status);
 
 			if (!response.ok) {
 				return null;
@@ -102,7 +106,7 @@ export class WidgetTokenCache {
 
 			return result.token;
 		} catch (error) {
-			console.error("[waniwani:widget-token] mint failed:", error);
+			log("mint failed:", error);
 			return null;
 		}
 	}
