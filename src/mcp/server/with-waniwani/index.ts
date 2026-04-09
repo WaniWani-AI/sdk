@@ -140,6 +140,10 @@ export function withWaniwani(
 				const result = await handler(input, extra);
 				const durationMs = Math.round(performance.now() - startTime);
 
+				console.log(
+					`[waniwani] tool "${toolName}" handler returned in ${durationMs}ms, running post-processing...`,
+				);
+
 				const isErrorResult =
 					isRecord(result) && (result as UnknownRecord).isError === true;
 
@@ -169,6 +173,8 @@ export function withWaniwani(
 					opts.onError,
 				);
 
+				console.log(`[waniwani] tool "${toolName}" tracking done`);
+
 				if (opts.flushAfterToolCall) {
 					await safeFlush(tracker, opts.onError);
 				}
@@ -184,6 +190,10 @@ export function withWaniwani(
 						opts.onError,
 					);
 				}
+
+				console.log(
+					`[waniwani] tool "${toolName}" widget config injected, returning result`,
+				);
 
 				return result;
 			} catch (error) {
