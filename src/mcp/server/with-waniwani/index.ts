@@ -6,14 +6,18 @@ import type { McpServer } from "../tools/types";
 import { WidgetTokenCache } from "../widget-token.js";
 import {
 	buildTrackInput,
+	createWaniwaniResourceHandler,
 	extractErrorText,
 	extractMeta,
+	injectHttpUrl,
 	injectRequestMetadata,
 	injectToolDefinitionMeta,
 	injectWidgetConfig,
 	isRecord,
+	type ResourceCallbackMap,
 	safeFlush,
 	safeTrack,
+	WANIWANI_RESOURCE_PATH,
 	type WaniwaniTracker,
 } from "./helpers.js";
 
@@ -98,6 +102,47 @@ export function withWaniwani(
 				apiKey: tracker._config.apiKey,
 			})
 		: null;
+
+	// ── Intercept registerResource to capture read callbacks ──────────
+	const resourceCallbacks: ResourceCallbackMap = new Map();
+
+	const originalRegisterResource = server.registerResource.bind(server) as (
+		...args: unknown[]
+	) => unknown;
+
+	wrappedServer.registerResource = ((...args: unknown[]) => {
+		const [, uriOrTemplate, , readCallback] = args;
+
+		// Only capture static URI resources (not ResourceTemplates)
+		if (
+			typeof uriOrTemplate === "string" &&
+			typeof readCallback === "function"
+		) {
+			resourceCallbacks.set(
+				uriOrTemplate,
+				readCallback as Parameters<ResourceCallbackMap["set"]>[1],
+			);
+		}
+
+		return originalRegisterResource(...args);
+	}) as McpServer["registerResource"];
+
+	// ── Register HTTP GET endpoint for widget resources ────────────────
+	// When the server supports express-style .use() (e.g. Skybridge), add
+	// an endpoint that serves resource HTML directly. This lets iframe src
+	// point to the MCP server origin, avoiding CORS issues with the proxy.
+	let httpEndpointRegistered = false;
+	const serverWithUse = server as {
+		use?: (path: string, handler: unknown) => void;
+	};
+	if (typeof serverWithUse.use === "function") {
+		serverWithUse.use(
+			WANIWANI_RESOURCE_PATH,
+			createWaniwaniResourceHandler(resourceCallbacks),
+		);
+		httpEndpointRegistered = true;
+		log("registered HTTP resource endpoint at", WANIWANI_RESOURCE_PATH);
+	}
 
 	const originalRegisterTool = server.registerTool.bind(server) as (
 		...args: unknown[]
@@ -191,6 +236,9 @@ export function withWaniwani(
 				}
 
 				injectToolDefinitionMeta(result, configMeta);
+				if (httpEndpointRegistered) {
+					injectHttpUrl(result, extra, resourceCallbacks);
+				}
 				injectRequestMetadata(result, extra);
 
 				if (injectToken) {

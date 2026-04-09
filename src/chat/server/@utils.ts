@@ -2,6 +2,15 @@
 
 export type CorsFunction = (response: Response, request?: Request) => Response;
 
+function isLocalhostOrigin(origin: string): boolean {
+	try {
+		const url = new URL(origin);
+		return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+	} catch {
+		return false;
+	}
+}
+
 export function createCors(allowedOrigins: string[]): CorsFunction {
 	const originSet = new Set(
 		allowedOrigins.map((o) => o.replace(/\/$/, "").toLowerCase()),
@@ -10,10 +19,11 @@ export function createCors(allowedOrigins: string[]): CorsFunction {
 	return function applyCors(response: Response, request?: Request): Response {
 		const requestOrigin = request?.headers.get("origin");
 		const origin = requestOrigin?.toLowerCase();
-		// Auto-allow all *.mcp.waniwani.run subdomains (deployed chat widgets)
 		const isAllowed =
 			origin != null &&
-			(originSet.has(origin) || origin.endsWith(".mcp.waniwani.run"));
+			(originSet.has(origin) ||
+				origin.endsWith(".mcp.waniwani.run") ||
+				isLocalhostOrigin(origin));
 
 		if (!isAllowed) {
 			return response;
