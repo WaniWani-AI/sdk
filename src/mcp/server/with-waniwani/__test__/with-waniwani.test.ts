@@ -62,7 +62,6 @@ function mockServer() {
 		registerTool: (...args: unknown[]) => {
 			registered.push(args as RegisterToolArgs);
 		},
-		registerResource: (..._args: unknown[]) => {},
 	};
 	return {
 		server: server as unknown as Parameters<typeof withWaniwani>[0],
