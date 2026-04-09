@@ -8,6 +8,7 @@ export type {
 	BeforeRequestResult,
 	ClientVisitorContext,
 	VisitorMeta,
+	WebSearchConfig,
 } from "./@types";
 export type { GeoLocation } from "./geo";
 export { extractGeoFromHeaders } from "./geo";
