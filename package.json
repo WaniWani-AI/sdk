@@ -156,8 +156,5 @@
     "widgets"
   ],
   "author": "WaniWani",
-  "license": "MIT",
-  "dependencies": {
-    "@waniwani/sdk": "^0.6.1-beta.8"
-  }
+  "license": "MIT"
 }
