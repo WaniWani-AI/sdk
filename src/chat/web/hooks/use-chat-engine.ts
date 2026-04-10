@@ -2,13 +2,13 @@
 
 import { useChat } from "@ai-sdk/react";
 import type { FileUIPart } from "ai";
-import { DefaultChatTransport } from "ai";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import { hasModelContext } from "../../../shared/model-context";
 import type { ChatBaseProps } from "../@types";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
+import { LenientChatTransport } from "../lib/lenient-chat-transport";
 import type { VisitorContext } from "../lib/visitor-context";
 import { collectVisitorContext } from "../lib/visitor-context";
 
@@ -94,7 +94,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	}, []);
 
 	const transportRef = useRef(
-		new DefaultChatTransport({
+		new LenientChatTransport({
 			api,
 			headers: () => ({
 				...headersRef.current,
