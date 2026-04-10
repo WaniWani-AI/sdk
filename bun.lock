@@ -1,12 +1,8 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "@waniwani/cli",
-      "dependencies": {
-        "@waniwani/sdk": "^0.6.1-beta.8",
-      },
       "devDependencies": {
         "@ai-sdk/mcp": "^1.0.0",
         "@ai-sdk/react": "^3.0.134",
@@ -322,8 +318,6 @@
     "@ungap/structured-clone": ["@ungap/structured-clone@1.3.0", "", {}, "sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g=="],
 
     "@vercel/oidc": ["@vercel/oidc@3.1.0", "", {}, "sha512-Fw28YZpRnA3cAHHDlkt7xQHiJ0fcL+NRcIqsocZQUSmbzeIKRpwttJjik5ZGanXP+vlA4SbTg+AbA3bP363l+w=="],
-
-    "@waniwani/sdk": ["@waniwani/sdk@0.6.1-beta.8", "", { "dependencies": { "@waniwani/sdk": "^0.2.2-beta.0" }, "peerDependencies": { "@ai-sdk/mcp": ">=1.0.0", "@ai-sdk/react": ">=1.0.0", "@modelcontextprotocol/ext-apps": "1.0.1", "@modelcontextprotocol/sdk": "1.25.2", "ai": ">=4.0.0", "autoevals": ">=0.0.100", "braintrust": ">=3.0.0", "react": ">=18.0.0", "zod": ">=4.0.0" }, "optionalPeers": ["@ai-sdk/mcp", "@ai-sdk/react", "@modelcontextprotocol/ext-apps", "@modelcontextprotocol/sdk", "ai", "autoevals", "braintrust", "react", "zod"] }, "sha512-c8lC53JJRaA081QnYjm93tJvZ/XLpH2RH7p6tKnJ1uS4iBC2UzM2AnkDAZ1rD5s3g/dITKHJINQF19w2PD7dgA=="],
 
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 
@@ -966,8 +960,6 @@
     "@tailwindcss/oxide-wasm32-wasi/@tybys/wasm-util": ["@tybys/wasm-util@0.10.1", "", { "dependencies": { "tslib": "^2.4.0" }, "bundled": true }, "sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg=="],
 
     "@tailwindcss/oxide-wasm32-wasi/tslib": ["tslib@2.8.1", "", { "bundled": true }, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
-
-    "@waniwani/sdk/@waniwani/sdk": ["@waniwani/sdk@0.2.2-beta.0", "", { "peerDependencies": { "@ai-sdk/mcp": ">=1.0.0", "@ai-sdk/react": ">=1.0.0", "@modelcontextprotocol/ext-apps": "1.0.1", "@modelcontextprotocol/sdk": "1.25.2", "ai": ">=4.0.0", "react": ">=18.0.0", "zod": ">=4.0.0" }, "optionalPeers": ["@ai-sdk/mcp", "@ai-sdk/react", "@modelcontextprotocol/ext-apps", "@modelcontextprotocol/sdk", "ai", "react", "zod"] }, "sha512-edsoXAKxHdPtstte+cW9ZYVhe86HW2GCVFotlUypx2WMKFk2QKx+eHYAiqvvxsZ5QFfjHMJ5YZ7OKoNuYDwLUQ=="],
 
     "ai/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@4.0.21", "", { "dependencies": { "@ai-sdk/provider": "3.0.8", "@standard-schema/spec": "^1.1.0", "eventsource-parser": "^3.0.6" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-MtFUYI1/8mgDvRmaBDjbLJPFFrMG777AvSgyIFQtZHIMzm88R/12vYBBpnk7pfiWLFE1DSZzY4WDYzGbKAcmiw=="],
 
