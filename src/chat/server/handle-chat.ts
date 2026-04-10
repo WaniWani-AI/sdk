@@ -112,6 +112,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
+					"X-WaniWani-Stream-Protocol": "2",
 					...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
 					...(clientUserAgent
 						? { "X-Client-User-Agent": clientUserAgent }
