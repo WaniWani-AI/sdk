@@ -253,7 +253,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				return {
 					content: {
 						status: "widget",
-						tool: result.tool.id,
+						tool: result.tool,
 						data: result.data,
 						description: result.description,
 						interactive: result.interactive !== false,
@@ -262,7 +262,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 						step: currentNode,
 						state,
 						field: widgetField,
-						widgetId: result.tool.id,
+						widgetId: result.tool,
 					},
 				};
 			}

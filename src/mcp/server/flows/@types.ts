@@ -1,3 +1,4 @@
+import type { ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { z } from "zod";
 import type { McpServer } from "../resources/types";
 import type { ScopedWaniWaniClient } from "../scoped-client";
@@ -49,8 +50,8 @@ export type InterruptSignal = {
 
 export type WidgetSignal = {
 	readonly __type: typeof WIDGET;
-	/** The display tool to delegate rendering to */
-	tool: RegisteredTool;
+	/** The id of the display tool to delegate rendering to */
+	tool: string;
 	/** Data to pass to the display tool */
 	data: Record<string, unknown>;
 	/** Description of what the widget does (for the AI's context) */
@@ -115,7 +116,7 @@ export function interrupt(
  * Used internally by the engine. Flow authors use the typed `showWidget` from the node context.
  */
 export function showWidget(
-	tool: RegisteredTool,
+	tool: RegisteredTool | string,
 	config: {
 		data: Record<string, unknown>;
 		description?: string;
@@ -123,7 +124,11 @@ export function showWidget(
 		field?: string;
 	},
 ): WidgetSignal {
-	return { __type: WIDGET, tool, ...config };
+	return {
+		__type: WIDGET,
+		tool: typeof tool === "string" ? tool : tool.id,
+		...config,
+	};
 }
 
 export function isInterrupt(value: unknown): value is InterruptSignal {
@@ -262,7 +267,7 @@ export type TypedInterrupt<TState> = (
  * The `field` parameter accepts field paths (flat or dot-path for nested state).
  */
 export type TypedShowWidget<TState> = (
-	tool: RegisteredTool,
+	tool: RegisteredTool | string,
 	config: {
 		data: Record<string, unknown>;
 		description?: string;

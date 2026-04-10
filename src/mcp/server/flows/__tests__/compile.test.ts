@@ -470,6 +470,52 @@ describe("compileFlow response contract", () => {
 		});
 	});
 
+	test("accepts a string tool id in showWidget", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "widget_flow_string_id",
+			title: "Widget Flow (string id)",
+			description: "Collect via widget using a string tool id",
+			state: {
+				plan: z.string().describe("Selected plan"),
+			},
+		})
+			.addNode("pick_plan", ({ showWidget }) =>
+				showWidget("plan_picker", {
+					data: { plans: ["starter", "pro"] },
+					description: "Pick your plan",
+					field: "plan",
+				}),
+			)
+			.addEdge(START, "pick_plan")
+			.addEdge("pick_plan", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed).toMatchObject({
+			status: "widget",
+			tool: "plan_picker",
+			data: { plans: ["starter", "pro"] },
+			description: "Pick your plan",
+		});
+		const tokenData = await store.get(TEST_SESSION_ID);
+		expect(tokenData).toMatchObject({
+			step: "pick_plan",
+			state: {},
+			field: "plan",
+			widgetId: "plan_picker",
+		});
+	});
+
 	test("marks display-only widget steps as non-interactive", async () => {
 		const store = new TestFlowStateStore();
 		const flow = createFlow({

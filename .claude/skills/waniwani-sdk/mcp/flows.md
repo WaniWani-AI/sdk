@@ -648,7 +648,7 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `tool` | `RegisteredTool` | yes | The display tool (from `createTool()`) |
+| `tool` | `RegisteredTool \| string` | yes | The display tool (from `createTool()`) or its id as a string |
 | `data` | `Record<string, unknown>` | yes | Data to pass to the display tool |
 | `field` | `FieldPaths<TState>` | no | State field path this widget fills — enables auto-skip. Supports dot-paths for nested state. |
 | `description` | `string` | no | Description for the AI |
@@ -667,7 +667,6 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 - **Using the old handler signature** — Handlers receive a context object, not `(state, meta?)`. Use `({ state }) => ...` instead of `(state) => ...`.
 - **Using the old `interrupt({ question, field })` syntax** — Use the object-key syntax: `interrupt({ fieldName: { question: "..." } })`. Context goes in the second argument: `interrupt({...}, { context: "..." })`.
 - **Forgetting `START`/`END` edges** — Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`.
-- **Passing a string to `showWidget()`** — `showWidget` takes a `RegisteredTool` reference, not a string ID.
 - **Missing display tool registration** — The display tool must be registered alongside the flow via `registerTools(server, [displayTool, flow])`.
 - **Widget callback** — Use `sendFollowUp` to communicate the user's selection back to the AI.
 - **Validate returning an error string** — `validate` must **throw** an `Error` to signal failure, not return a string. Return `void` or an object for success.
