@@ -290,4 +290,45 @@ describe("withWaniwani", () => {
 		});
 		expect(meta.waniwani).toBe(undefined);
 	});
+
+	test("deep-merges _meta.ui sub-keys from tool definition into result", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		// Tool definition has full ui meta (resourceUri + httpUrl + autoHeight)
+		// Handler (Skybridge-style) returns just ui.resourceUri in the result.
+		mock.registerTool(
+			"widget",
+			{
+				description: "Widget",
+				_meta: {
+					ui: {
+						resourceUri: "ui://widgets/ext-apps/widget.html",
+						httpUrl: "https://example.com/widget",
+						autoHeight: true,
+					},
+				},
+			},
+			async () => ({
+				content: [],
+				structuredContent: { ok: true },
+				_meta: {
+					ui: { resourceUri: "ui://widgets/ext-apps/widget.html" },
+				},
+			}),
+		);
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.({}, {})) as Record<string, unknown>;
+		const meta = result._meta as Record<string, unknown>;
+		const ui = meta.ui as Record<string, unknown>;
+
+		// Handler's resourceUri is preserved
+		expect(ui.resourceUri).toBe("ui://widgets/ext-apps/widget.html");
+		// Definition's httpUrl and autoHeight are merged in
+		expect(ui.httpUrl).toBe("https://example.com/widget");
+		expect(ui.autoHeight).toBe(true);
+	});
 });

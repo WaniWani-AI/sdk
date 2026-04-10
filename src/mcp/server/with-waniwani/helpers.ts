@@ -229,7 +229,10 @@ function extractGeoLocation(
  * definition time is available in the tool result, even when the handler
  * doesn't explicitly include it — e.g. Skybridge widgets.
  *
- * Keys already present in the result take precedence (no overwriting).
+ * Keys already present in the result take precedence (no overwriting). For
+ * object-valued keys (notably `ui`), sub-keys are merged one level deep so
+ * that e.g. `ui.httpUrl` from the tool definition is preserved when the
+ * handler also sets `ui.resourceUri` on the result.
  */
 export function injectToolDefinitionMeta(
 	result: unknown,
@@ -245,8 +248,17 @@ export function injectToolDefinitionMeta(
 
 	const resultMeta = (result as UnknownRecord)._meta as UnknownRecord;
 	for (const [key, value] of Object.entries(configMeta)) {
+		const existing = resultMeta[key];
 		if (!(key in resultMeta)) {
 			resultMeta[key] = value;
+		} else if (isRecord(existing) && isRecord(value)) {
+			// One-level deep merge for object keys like `ui`. Result sub-keys
+			// take precedence; missing sub-keys from the definition are added.
+			for (const [subKey, subValue] of Object.entries(value)) {
+				if (!(subKey in existing)) {
+					existing[subKey] = subValue;
+				}
+			}
 		}
 	}
 }
