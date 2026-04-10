@@ -229,7 +229,7 @@ The `toNextJsHandler` is just a thin proxy that connects a chat UI to the MCP vi
 
 ### The open endpoint problem
 
-The customer's `/api/waniwani` is open by default. Without protection, anyone can POST and start chatting.
+The customer's `/api/waniwani` is open by default. CORS is permissive (`Access-Control-Allow-Origin: *`) so any domain can call it — CORS is not an abuse defense, it only stops browsers on other origins from reading responses, not scripts/curl/servers. Without additional protection, anyone can POST and start chatting.
 
 **Customer's responsibility:**
 
@@ -245,11 +245,9 @@ toNextJsHandler(client, {
 ```
 
 2. **Rate limiting** — at the infra level (Vercel/Cloudflare rate limiting)
-3. **CORS** — only allow their own domain(s)
 
 **WaniWani should consider adding:**
-- Built-in rate limiter option in `toNextJsHandler`
-- Default CORS helper
+- Built-in rate limiter option in `toNextJsHandler` (IP + session based)
 - Server-side abuse detection (flag abnormal session volumes)
 
 ## Current Quirk: Platform Showcase

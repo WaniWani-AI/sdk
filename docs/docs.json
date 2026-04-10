@@ -1,0 +1,74 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "WaniWani SDK",
+  "colors": {
+    "primary": "#6366F1",
+    "light": "#A5B4FC",
+    "dark": "#4338CA"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Setup",
+            "pages": [
+              "setup/installation",
+              "setup/api-key",
+              "setup/wrap-server"
+            ]
+          },
+          {
+            "group": "Event Tracking",
+            "pages": [
+              "tracking/overview",
+              "tracking/events",
+              "tracking/sessions",
+              "tracking/identify"
+            ]
+          },
+          {
+            "group": "Flows",
+            "pages": [
+              "flows/overview",
+              "flows/state",
+              "flows/nodes",
+              "flows/interrupts",
+              "flows/edges",
+              "flows/register"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Dashboard",
+        "href": "https://app.waniwani.ai"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get API Key",
+      "href": "https://app.waniwani.ai"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/waniwani-ai",
+      "website": "https://waniwani.ai"
+    }
+  }
+}

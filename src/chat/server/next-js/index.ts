@@ -44,13 +44,12 @@ export function toNextJsHandler(
 		apiKey,
 		apiUrl,
 		source: options?.source,
-		allowedOrigins: options?.allowedOrigins,
 		debug: debugEnabled,
 	});
 
 	return {
 		POST: handler.routePost,
 		GET: handler.routeGet,
-		OPTIONS: (request: Request) => handler.handleOptions(request),
+		OPTIONS: () => handler.handleOptions(),
 	};
 }

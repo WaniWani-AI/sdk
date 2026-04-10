@@ -123,12 +123,6 @@ export interface ApiHandlerOptions {
 	debug?: boolean;
 
 	/**
-	 * Additional origins allowed for cross-origin requests.
-	 * The WaniWani platform URL (apiUrl) is always included.
-	 */
-	allowedOrigins?: string[];
-
-	/**
 	 * Enable web search as an additional tool alongside MCP tools.
 	 * Pass `true` to enable with defaults, or a config object to restrict domains.
 	 */
@@ -151,7 +145,7 @@ export interface ApiHandler {
 	/** Routes POST sub-paths (e.g. /tool), defaults to chat */
 	routePost: (request: Request) => Promise<Response>;
 	/** Handles CORS preflight requests */
-	handleOptions: (request?: Request) => Response;
+	handleOptions: () => Response;
 }
 
 // ============================================================================
