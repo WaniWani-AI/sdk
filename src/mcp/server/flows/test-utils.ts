@@ -48,7 +48,7 @@ export async function createFlowTestHarness(
 
 	const handler = registered[0]?.[2];
 	if (!handler) {
-		throw new Error(`Flow "${flow.id}" did not register a handler`);
+		throw new Error(`Flow "${flow.name}" did not register a handler`);
 	}
 
 	const extra = { _meta: { sessionId } };
