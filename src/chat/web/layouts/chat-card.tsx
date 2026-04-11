@@ -223,6 +223,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 							onCallTool={handleCallTool}
 							fullscreenToolCallId={fullscreenToolCallId}
 							debug={effectiveDebug}
+							toolDefinitions={engine.toolDefinitions}
 							onWidgetDisplayModeChange={(mode, widget) => {
 								setFullscreenToolCallId(
 									mode === "fullscreen" ? widget.toolCallId : null,

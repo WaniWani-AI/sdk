@@ -265,6 +265,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 								onFollowUp={handleWidgetMessage}
 								onCallTool={handleCallTool}
 								fullscreenToolCallId={fullscreenToolCallId}
+								toolDefinitions={engine.toolDefinitions}
 								onWidgetDisplayModeChange={(mode, widget) => {
 									setFullscreenToolCallId(
 										mode === "fullscreen" ? widget.toolCallId : null,

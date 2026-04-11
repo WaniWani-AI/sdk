@@ -13,10 +13,11 @@ import {
 } from "../ai-elements/message";
 import { Reasoning } from "../ai-elements/reasoning";
 import {
-	getAutoHeight,
-	getResourceUri,
+	resolveWidgetAutoHeight,
+	resolveWidgetResourceUri,
 	Tool,
 	ToolContent,
+	type ToolDefinitionsMap,
 	ToolHeader,
 	ToolInput,
 	ToolOutput,
@@ -79,6 +80,14 @@ interface MessageListProps {
 	fullscreenToolCallId?: string | null;
 	/** When true, show _meta in tool call inputs and outputs. */
 	debug?: boolean;
+	/**
+	 * Cached tool catalog keyed by tool name. Drives spec-canonical widget
+	 * resolution: if a tool's definition `_meta` carries a widget resource
+	 * URI, the widget renders regardless of whether the server echoed it
+	 * on the tool call result. Populated by `useChatEngine` from
+	 * `GET /api/waniwani/tools`.
+	 */
+	toolDefinitions?: ToolDefinitionsMap;
 }
 
 export function MessageList({
@@ -95,6 +104,7 @@ export function MessageList({
 	onWidgetDisplayModeChange,
 	fullscreenToolCallId,
 	debug,
+	toolDefinitions,
 }: MessageListProps) {
 	const isLoading = status === "submitted" || status === "streaming";
 	const lastMessage = messages[messages.length - 1];
@@ -158,10 +168,16 @@ export function MessageList({
 							))}
 						{toolParts.map((part) => {
 							const output = "output" in part ? part.output : undefined;
-							const resourceUri =
-								output !== undefined ? getResourceUri(output) : undefined;
-							const autoHeight =
-								output !== undefined ? getAutoHeight(output) : false;
+							const resourceUri = resolveWidgetResourceUri(
+								part.toolName,
+								output,
+								toolDefinitions,
+							);
+							const autoHeight = resolveWidgetAutoHeight(
+								part.toolName,
+								output,
+								toolDefinitions,
+							);
 							const isFullscreen = part.toolCallId === fullscreenToolCallId;
 
 							return (
@@ -229,6 +245,7 @@ export function MessageList({
 												chatSessionId={chatSessionId}
 												isDark={isDark}
 												autoHeight={autoHeight}
+												toolDefinitions={toolDefinitions}
 												onFollowUp={onFollowUp}
 												onCallTool={onCallTool}
 												onDisplayModeChange={

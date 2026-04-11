@@ -5,6 +5,10 @@ import {
 	type ModelContextUpdate,
 	mergeModelContext,
 } from "../../../shared/model-context";
+import {
+	resolveWidgetResourceUri,
+	type ToolDefinitionsMap,
+} from "../ai-elements/tool";
 import { cn } from "../lib/utils";
 
 const DEFAULT_RESOURCE_ENDPOINT = "/api/mcp/resource";
@@ -48,10 +52,23 @@ export function resultProducesWidget(result: {
 	return Boolean(resourceUri);
 }
 
-function shouldAutoInjectToolResultText(result: {
-	_meta?: Record<string, unknown>;
-}): boolean {
-	if (resultProducesWidget(result)) {
+/**
+ * Decide whether the text of a tool call result should be auto-injected as
+ * a follow-up user message. We skip auto-injection when the tool produces
+ * a widget — in that case the widget will render instead of a text bubble.
+ *
+ * Checks widget binding the spec-canonical way: look up the tool by name
+ * in the cached definition catalog first, then fall back to the result's
+ * own `_meta` (legacy path).
+ */
+function shouldAutoInjectToolResultText(
+	toolName: string | undefined,
+	result: {
+		_meta?: Record<string, unknown>;
+	},
+	toolDefinitions: ToolDefinitionsMap | undefined,
+): boolean {
+	if (resolveWidgetResourceUri(toolName, result, toolDefinitions)) {
 		return false;
 	}
 	return result._meta?.["waniwani/autoInjectResultText"] !== false;
@@ -94,6 +111,13 @@ export interface McpAppFrameProps {
 	onDisplayModeChange?: (mode: McpAppDisplayMode) => void;
 	/** When true, the iframe fills its container (fullscreen mode). */
 	isFullscreen?: boolean;
+	/**
+	 * Cached tool catalog keyed by tool name. Passed through so that
+	 * follow-up `tools/call` requests from the widget iframe can be
+	 * correctly classified as widget-producing (spec-canonical definition
+	 * lookup) vs. plain (result text auto-injected).
+	 */
+	toolDefinitions?: ToolDefinitionsMap;
 }
 
 export function McpAppFrame({
@@ -110,6 +134,7 @@ export function McpAppFrame({
 	onCallTool,
 	onDisplayModeChange,
 	isFullscreen = false,
+	toolDefinitions,
 }: McpAppFrameProps) {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const toolInputRef = useRef(toolInput);
@@ -126,6 +151,7 @@ export function McpAppFrame({
 	const onCallToolRef = useRef(onCallTool);
 	const onDisplayModeChangeRef = useRef(onDisplayModeChange);
 	const chatSessionIdRef = useRef(chatSessionId);
+	const toolDefinitionsRef = useRef(toolDefinitions);
 
 	toolInputRef.current = toolInput;
 	toolResultRef.current = toolResult;
@@ -134,6 +160,7 @@ export function McpAppFrame({
 	onCallToolRef.current = onCallTool;
 	onDisplayModeChangeRef.current = onDisplayModeChange;
 	chatSessionIdRef.current = chatSessionId;
+	toolDefinitionsRef.current = toolDefinitions;
 
 	const clampHeight = useCallback(
 		(h: number) => {
@@ -446,8 +473,9 @@ export function McpAppFrame({
 					});
 					return;
 				}
+				const calledToolName = data.params?.name;
 				handler({
-					name: data.params?.name,
+					name: calledToolName,
 					arguments: data.params?.arguments ?? {},
 				})
 					.then((result) => {
@@ -460,7 +488,14 @@ export function McpAppFrame({
 							?.map((c) => c.text ?? "")
 							.join("")
 							.trim();
-						if (text && shouldAutoInjectToolResultText(result)) {
+						if (
+							text &&
+							shouldAutoInjectToolResultText(
+								calledToolName,
+								result,
+								toolDefinitionsRef.current,
+							)
+						) {
 							if (pendingToolResult) {
 								clearTimeout(pendingToolResult.timer);
 							}

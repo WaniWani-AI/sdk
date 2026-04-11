@@ -29,6 +29,54 @@ export interface QueuedMessage {
 	modelContext?: ModelContextUpdate;
 }
 
+/**
+ * Per-tool definition metadata, keyed by tool name. The chat UI caches the
+ * MCP `tools/list` response here so widget resolution
+ * (`_meta.ui.resourceUri`, `_meta["openai/outputTemplate"]`, etc.) can
+ * happen by tool name, per MCP Apps spec. This is the browser-side
+ * equivalent of what a stateful MCP host (e.g. Claude Desktop, MCP Jam)
+ * caches for the lifetime of its MCP session.
+ */
+export type ToolDefinitionsMap = Record<
+	string,
+	{
+		name: string;
+		title?: string;
+		description?: string;
+		_meta?: Record<string, unknown>;
+	}
+>;
+
+interface ToolsListResponse {
+	tools: Array<{
+		name: string;
+		title?: string;
+		description?: string;
+		_meta?: Record<string, unknown>;
+	}>;
+}
+
+async function fetchToolDefinitions(api: string): Promise<ToolDefinitionsMap> {
+	const url = `${api.replace(/\/$/, "")}/tools`;
+	const response = await fetch(url, { method: "GET" });
+	if (!response.ok) {
+		throw new Error(
+			`[WaniWani] Failed to fetch /tools: ${response.status} ${response.statusText}`,
+		);
+	}
+	const data = (await response.json()) as ToolsListResponse;
+	if (!data || !Array.isArray(data.tools)) {
+		return {};
+	}
+	const map: ToolDefinitionsMap = {};
+	for (const tool of data.tools) {
+		if (tool && typeof tool.name === "string") {
+			map[tool.name] = tool;
+		}
+	}
+	return map;
+}
+
 type ChatEngineMessage = PromptInputMessage & {
 	modelContext?: ModelContextUpdate;
 };
@@ -151,6 +199,31 @@ export function useChatEngine(props: ChatBaseProps) {
 		reject: (err: Error) => void;
 	} | null>(null);
 
+	// Tool catalog cached for the lifetime of this ChatCard mount. Fetched
+	// once on mount via GET /api/waniwani/tools (spec: the host calls
+	// tools/list once per session and caches the result). A mutation counter
+	// drives re-renders when the catalog refreshes without making the whole
+	// ref reactive.
+	const toolDefinitionsRef = useRef<ToolDefinitionsMap>({});
+	const [toolDefinitionsRevision, setToolDefinitionsRevision] = useState(0);
+
+	const refreshToolDefinitions = useCallback(async () => {
+		try {
+			const map = await fetchToolDefinitions(api);
+			toolDefinitionsRef.current = map;
+			setToolDefinitionsRevision((r) => r + 1);
+		} catch (error) {
+			console.warn(
+				"[WaniWani] Failed to fetch tool definitions:",
+				error instanceof Error ? error.message : error,
+			);
+		}
+	}, [api]);
+
+	useEffect(() => {
+		void refreshToolDefinitions();
+	}, [refreshToolDefinitions]);
+
 	const { messages, sendMessage, setMessages, status } = useChat({
 		messages: props.initialMessages,
 		transport: transportRef.current,
@@ -256,7 +329,10 @@ export function useChatEngine(props: ChatBaseProps) {
 		setQueuedMessages([]);
 		clearSessionId();
 		setText("");
-	}, [setMessages, clearSessionId]);
+		toolDefinitionsRef.current = {};
+		setToolDefinitionsRevision((r) => r + 1);
+		void refreshToolDefinitions();
+	}, [setMessages, clearSessionId, refreshToolDefinitions]);
 
 	const handleTextChange = useCallback(
 		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -269,6 +345,12 @@ export function useChatEngine(props: ChatBaseProps) {
 	const hasMessages = messages.length > 0;
 	const showLoaderBubble =
 		isLoading && (!hasMessages || lastMessage.role === "user");
+
+	// Read through the revision counter so consumers (MessageList) re-render
+	// when the catalog refreshes. Taking a snapshot here keeps the returned
+	// object referentially stable between revisions.
+	void toolDefinitionsRevision;
+	const toolDefinitions = toolDefinitionsRef.current;
 
 	return {
 		messages,
@@ -288,5 +370,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		queueFull,
 		removeQueuedMessage,
 		sessionId,
+		toolDefinitions,
+		refreshToolDefinitions,
 	};
 }

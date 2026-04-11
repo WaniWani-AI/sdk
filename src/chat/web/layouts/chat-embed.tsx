@@ -205,6 +205,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 							onCallTool={handleCallTool}
 							fullscreenToolCallId={fullscreenToolCallId}
 							debug={debug}
+							toolDefinitions={engine.toolDefinitions}
 							onWidgetDisplayModeChange={(mode, widget) => {
 								setFullscreenToolCallId(
 									mode === "fullscreen" ? widget.toolCallId : null,

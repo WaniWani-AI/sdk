@@ -395,30 +395,136 @@ export type ToolOutputProps = HTMLAttributes<HTMLDivElement> & {
 	debug?: boolean;
 };
 
-function getUiMeta(output: unknown): Record<string, unknown> | undefined {
-	if (typeof output !== "object" || output === null) {
+/**
+ * Per-tool definition metadata, keyed by tool name. The chat UI caches the
+ * MCP `tools/list` response here so widget resolution can happen by tool
+ * name (spec-canonical) rather than by inspecting every tool call result.
+ */
+export type ToolDefinitionsMap = Record<
+	string,
+	{ _meta?: Record<string, unknown> }
+>;
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+	if (typeof value !== "object" || value === null) {
 		return undefined;
 	}
-	const meta = (output as Record<string, unknown>)._meta;
-	if (typeof meta !== "object" || meta === null) {
-		return undefined;
-	}
-	const ui = (meta as Record<string, unknown>).ui;
-	if (typeof ui !== "object" || ui === null) {
-		return undefined;
-	}
-	return ui as Record<string, unknown>;
+	return value as Record<string, unknown>;
 }
 
-/** Extract the MCP app resource URI from `output._meta.ui.resourceUri`, if present. */
+function getUiObject(
+	meta: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+	return asRecord(meta?.ui);
+}
+
+function extractOutputMeta(
+	output: unknown,
+): Record<string, unknown> | undefined {
+	return asRecord(asRecord(output)?._meta);
+}
+
+/**
+ * Extract a widget resource URI from a `_meta` object, checking all three
+ * shapes the spec and in-the-wild servers use, in priority order:
+ *
+ * 1. `_meta.ui.resourceUri` — MCP Apps preferred (nested)
+ * 2. `_meta["ui/resourceUri"]` — MCP Apps legacy/compat (flat)
+ * 3. `_meta["openai/outputTemplate"]` — OpenAI Apps SDK
+ */
+function extractResourceUriFromMeta(
+	meta: Record<string, unknown> | undefined,
+): string | undefined {
+	if (!meta) {
+		return undefined;
+	}
+	const nested = getUiObject(meta)?.resourceUri;
+	if (typeof nested === "string" && nested.length > 0) {
+		return nested;
+	}
+	const flat = meta["ui/resourceUri"];
+	if (typeof flat === "string" && flat.length > 0) {
+		return flat;
+	}
+	const openai = meta["openai/outputTemplate"];
+	if (typeof openai === "string" && openai.length > 0) {
+		return openai;
+	}
+	return undefined;
+}
+
+function extractAutoHeightFromMeta(
+	meta: Record<string, unknown> | undefined,
+): boolean {
+	return getUiObject(meta)?.autoHeight === true;
+}
+
+/**
+ * Resolve the widget resource URI for a tool part.
+ *
+ * Prefers the tool **definition**'s `_meta` (spec-canonical, matches how
+ * stateful MCP hosts like Claude and MCP Jam work) and falls back to the
+ * tool **result**'s `_meta` (legacy path for servers that echo widget
+ * metadata into the result, e.g. WaniWani's own `createTool` or the
+ * `withWaniwani` compat shim).
+ *
+ * @param toolName - The tool name, used to look up definition metadata in
+ *   the cached catalog.
+ * @param output - The tool call result (result-side fallback).
+ * @param toolDefinitions - Map of tool name → definition `_meta`, loaded
+ *   once per ChatCard mount from `GET /api/waniwani/tools`.
+ */
+export function resolveWidgetResourceUri(
+	toolName: string | undefined,
+	output: unknown,
+	toolDefinitions?: ToolDefinitionsMap,
+): string | undefined {
+	if (toolName) {
+		const fromDef = extractResourceUriFromMeta(
+			toolDefinitions?.[toolName]?._meta,
+		);
+		if (fromDef) {
+			return fromDef;
+		}
+	}
+	return extractResourceUriFromMeta(extractOutputMeta(output));
+}
+
+/**
+ * Resolve the `autoHeight` flag for a tool part. Follows the same
+ * definition-first / result-fallback precedence as
+ * {@link resolveWidgetResourceUri}.
+ */
+export function resolveWidgetAutoHeight(
+	toolName: string | undefined,
+	output: unknown,
+	toolDefinitions?: ToolDefinitionsMap,
+): boolean {
+	if (toolName) {
+		if (extractAutoHeightFromMeta(toolDefinitions?.[toolName]?._meta)) {
+			return true;
+		}
+	}
+	return extractAutoHeightFromMeta(extractOutputMeta(output));
+}
+
+/**
+ * @deprecated Prefer {@link resolveWidgetResourceUri} which also looks at
+ * the cached tool definition metadata. This legacy helper only inspects
+ * the tool result and misses spec-compliant widget servers that put
+ * widget metadata on the tool definition only (skybridge,
+ * `@modelcontextprotocol/ext-apps`, raw MCP with `_meta`, OpenAI Apps SDK).
+ */
 export function getResourceUri(output: unknown): string | undefined {
-	const uri = getUiMeta(output)?.resourceUri;
-	return typeof uri === "string" ? uri : undefined;
+	return resolveWidgetResourceUri(undefined, output);
 }
 
-/** Extract the auto-height flag from `output._meta.ui.autoHeight`, if present. */
+/**
+ * @deprecated Prefer {@link resolveWidgetAutoHeight}. See
+ * {@link getResourceUri} for the rationale.
+ */
 export function getAutoHeight(output: unknown): boolean {
-	return getUiMeta(output)?.autoHeight === true;
+	return resolveWidgetAutoHeight(undefined, output);
 }
 
 /** Displays the tool call result as a collapsible JSON section labeled "Response", or an error block if `errorText` is set. */

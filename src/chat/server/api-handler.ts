@@ -10,6 +10,7 @@ import { createCors, createJsonResponse } from "./@utils";
 import { createChatRequestHandler } from "./handle-chat";
 import { createResourceHandler } from "./handle-resource";
 import { createToolHandler } from "./handle-tool";
+import { createToolsListHandler } from "./handle-tools-list";
 import { createMcpConfigResolver } from "./mcp-config-resolver";
 
 const DEFAULT_API_URL = "https://app.waniwani.ai";
@@ -47,6 +48,12 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 	});
 
 	const handleResource = createResourceHandler({
+		mcpServerUrl,
+		resolveConfig,
+		debug,
+	});
+
+	const handleToolsList = createToolsListHandler({
 		mcpServerUrl,
 		resolveConfig,
 		debug,
@@ -97,6 +104,13 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 			if (subRoute === "config") {
 				log("dispatching to config handler");
 				return json({ debug, eval: evalEnabled }, 200);
+			}
+
+			if (subRoute === "tools") {
+				log("dispatching to tools-list handler");
+				const response = await handleToolsList();
+				log("← tools-list handler returned", response.status);
+				return cors(response);
 			}
 
 			log("← 404 no matching sub-route for", subRoute);
