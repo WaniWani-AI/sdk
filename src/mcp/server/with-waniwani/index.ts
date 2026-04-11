@@ -10,6 +10,7 @@ import {
 	extractMeta,
 	injectRequestMetadata,
 	injectWidgetConfig,
+	injectWidgetDefinitionMeta,
 	isRecord,
 	safeFlush,
 	safeTrack,
@@ -82,10 +83,13 @@ type WrapContext = {
 	injectToken: boolean;
 };
 
+type UnknownRecordOrUndefined = UnknownRecord | undefined;
+
 function createWrappedHandler(
 	toolName: string,
 	originalHandler: RawHandler,
 	ctx: WrapContext,
+	definitionMeta: UnknownRecordOrUndefined,
 ): MaybeWrappedHandler {
 	const { server, tracker, opts, tokenCache, injectToken } = ctx;
 
@@ -157,6 +161,7 @@ function createWrappedHandler(
 			}
 
 			injectRequestMetadata(result, extra);
+			injectWidgetDefinitionMeta(result, definitionMeta);
 
 			if (injectToken) {
 				await injectWidgetConfig(
@@ -218,6 +223,12 @@ function createWrappedHandler(
  * When `injectWidgetToken` is enabled (default), tracking config is injected
  * into tool response `_meta.waniwani` so browser widgets can post events
  * directly to the WaniWani backend without a server-side proxy.
+ *
+ * Widget metadata declared on the tool **definition** (e.g. skybridge's
+ * `registerWidget`, raw MCP `_meta["ui/resourceUri"]` / `_meta.ui.resourceUri`,
+ * OpenAI's `_meta["openai/outputTemplate"]`) is also forwarded into each tool
+ * result's `_meta`, so chat UIs that only see tool results (and not
+ * `tools/list`) can still render widgets. Handler-set keys take precedence.
  */
 export function withWaniwani(
 	server: McpServer,
@@ -265,10 +276,16 @@ export function withWaniwani(
 				? toolNameRaw
 				: "unknown";
 
+		const definitionMeta =
+			isRecord(config) && isRecord((config as UnknownRecord)._meta)
+				? ((config as UnknownRecord)._meta as UnknownRecord)
+				: undefined;
+
 		const wrapped = createWrappedHandler(
 			toolName,
 			handlerRaw as RawHandler,
 			ctx,
+			definitionMeta,
 		);
 		return originalRegisterTool(toolNameRaw, config, wrapped);
 	}) as McpServer["registerTool"];
@@ -282,7 +299,7 @@ export function withWaniwani(
 	// Skybridge's McpServer subclass uses the same storage via `super.registerTool`.
 	const registeredTools = (
 		server as unknown as {
-			_registeredTools?: Record<string, { handler?: unknown }>;
+			_registeredTools?: Record<string, { handler?: unknown; _meta?: unknown }>;
 		}
 	)._registeredTools;
 
@@ -299,7 +316,16 @@ export function withWaniwani(
 				continue;
 			}
 
-			entry.handler = createWrappedHandler(toolName, existing, ctx);
+			const definitionMeta = isRecord(entry._meta)
+				? (entry._meta as UnknownRecord)
+				: undefined;
+
+			entry.handler = createWrappedHandler(
+				toolName,
+				existing,
+				ctx,
+				definitionMeta,
+			);
 		}
 	}
 

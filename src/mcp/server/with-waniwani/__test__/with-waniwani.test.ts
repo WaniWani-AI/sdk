@@ -55,7 +55,10 @@ function mockClient() {
 
 type Handler = (input: unknown, extra: unknown) => Promise<unknown>;
 type RegisterToolArgs = [string, Record<string, unknown>, Handler];
-type RegisteredToolEntry = { handler: Handler };
+type RegisteredToolEntry = {
+	handler: Handler;
+	_meta?: Record<string, unknown>;
+};
 
 function mockServer() {
 	const registered: RegisterToolArgs[] = [];
@@ -65,10 +68,15 @@ function mockServer() {
 		registerTool: (...args: unknown[]) => {
 			const typed = args as RegisterToolArgs;
 			registered.push(typed);
-			// Mirror the MCP SDK: store the (possibly wrapped) handler in
-			// `_registeredTools[name].handler` so that in-place wrapping can
-			// reassign it and the resolved handler is what runtime execution uses.
-			_registeredTools[typed[0]] = { handler: typed[2] };
+			// Mirror the MCP SDK: store the (possibly wrapped) handler plus the
+			// definition `_meta` in `_registeredTools[name]`. In-place wrapping
+			// reassigns `entry.handler` and reads `entry._meta`.
+			const definitionMeta = (typed[1] as { _meta?: Record<string, unknown> })
+				?._meta;
+			_registeredTools[typed[0]] = {
+				handler: typed[2],
+				...(definitionMeta && { _meta: definitionMeta }),
+			};
 		},
 	};
 	return {
@@ -355,6 +363,154 @@ describe("withWaniwani", () => {
 		const names = tracked.map((t) => (t.properties as { name: string }).name);
 		expect(names).toContain("before");
 		expect(names).toContain("after");
+	});
+
+	test("forwards widget metadata from tool definition into tool result", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		// Register a widget tool the way skybridge does — widget metadata lives
+		// on the tool definition _meta, the handler itself returns nothing widget-y.
+		mock.registerTool(
+			"magic-8-ball",
+			{
+				description: "For fortune-telling",
+				_meta: {
+					"openai/outputTemplate": "ui://widgets/apps-sdk/magic-8-ball.html",
+					"ui/resourceUri": "ui://widgets/ext-apps/magic-8-ball.html",
+					ui: {
+						resourceUri: "ui://widgets/ext-apps/magic-8-ball.html",
+					},
+				},
+			},
+			async () => ({
+				structuredContent: { answer: "It is certain" },
+				content: [],
+				isError: false,
+			}),
+		);
+
+		const handler = mock._registeredTools["magic-8-ball"]?.handler;
+		const result = (await handler?.({}, {})) as Record<string, unknown>;
+
+		const meta = result._meta as Record<string, unknown>;
+		expect(meta["openai/outputTemplate"]).toBe(
+			"ui://widgets/apps-sdk/magic-8-ball.html",
+		);
+		expect(meta["ui/resourceUri"]).toBe(
+			"ui://widgets/ext-apps/magic-8-ball.html",
+		);
+		expect(meta.ui).toEqual({
+			resourceUri: "ui://widgets/ext-apps/magic-8-ball.html",
+		});
+	});
+
+	test("forwards widget metadata for tools registered before withWaniwani()", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		// Register first (skybridge-style, with definition _meta) then wrap.
+		mock.registerTool(
+			"magic-8-ball",
+			{
+				description: "For fortune-telling",
+				_meta: {
+					"ui/resourceUri": "ui://widgets/ext-apps/magic-8-ball.html",
+					ui: {
+						resourceUri: "ui://widgets/ext-apps/magic-8-ball.html",
+					},
+				},
+			},
+			async () => ({
+				structuredContent: { answer: "It is certain" },
+				content: [],
+				isError: false,
+			}),
+		);
+
+		withWaniwani(mock.server, { client });
+
+		const handler = mock._registeredTools["magic-8-ball"]?.handler;
+		const result = (await handler?.({}, {})) as Record<string, unknown>;
+
+		const meta = result._meta as Record<string, unknown>;
+		expect(meta["ui/resourceUri"]).toBe(
+			"ui://widgets/ext-apps/magic-8-ball.html",
+		);
+		expect(meta.ui).toEqual({
+			resourceUri: "ui://widgets/ext-apps/magic-8-ball.html",
+		});
+	});
+
+	test("handler-set widget metadata wins over tool definition", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool(
+			"magic-8-ball",
+			{
+				description: "For fortune-telling",
+				_meta: {
+					"ui/resourceUri": "ui://widgets/ext-apps/from-definition.html",
+					ui: {
+						resourceUri: "ui://widgets/ext-apps/from-definition.html",
+					},
+				},
+			},
+			async () => ({
+				structuredContent: { answer: "Ask again later" },
+				content: [],
+				isError: false,
+				_meta: {
+					"ui/resourceUri": "ui://widgets/ext-apps/from-handler.html",
+					ui: {
+						resourceUri: "ui://widgets/ext-apps/from-handler.html",
+					},
+				},
+			}),
+		);
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.({}, {})) as Record<string, unknown>;
+
+		const meta = result._meta as Record<string, unknown>;
+		expect(meta["ui/resourceUri"]).toBe(
+			"ui://widgets/ext-apps/from-handler.html",
+		);
+		expect(meta.ui).toEqual({
+			resourceUri: "ui://widgets/ext-apps/from-handler.html",
+		});
+	});
+
+	test("does not touch _meta when the tool definition has no widget keys", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client, injectWidgetToken: false });
+
+		mock.registerTool(
+			"plain-tool",
+			{
+				description: "No widget",
+				_meta: { "waniwani/internalFlag": true },
+			},
+			async () => ({
+				content: [{ type: "text", text: "ok" }],
+				isError: false,
+			}),
+		);
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.({}, {})) as Record<string, unknown>;
+
+		const meta = result._meta as Record<string, unknown> | undefined;
+		expect(meta?.["openai/outputTemplate"]).toBe(undefined);
+		expect(meta?.["ui/resourceUri"]).toBe(undefined);
+		expect(meta?.ui).toBe(undefined);
 	});
 
 	test("injects request metadata even when widget token injection is disabled", async () => {

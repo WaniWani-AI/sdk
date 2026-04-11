@@ -179,6 +179,71 @@ export async function injectWidgetConfig(
 	meta.waniwani = waniwaniConfig;
 }
 
+/**
+ * Widget-related keys from a tool's **definition** `_meta` that the chat UI
+ * and MCP hosts look for on tool call **results**. The MCP protocol exposes
+ * these in `tools/list`, but chat clients that stream results via AI SDK
+ * proxies (e.g. `@ai-sdk/mcp`) don't forward definition metadata to the
+ * UI layer — the chat UI only sees the result's `_meta`.
+ *
+ * Forwarding these keys into every tool result makes widgets registered via
+ * any MCP framework (skybridge, raw `@modelcontextprotocol/sdk`, etc.) render
+ * in WaniWani chat without the handler having to set them manually.
+ *
+ * Keys:
+ * - `openai/outputTemplate` — OpenAI Apps SDK widget URI (ChatGPT).
+ * - `ui/resourceUri` — MCP Apps extension flat-key form (Claude, per spec).
+ * - `ui` — MCP Apps extension nested form `{ resourceUri, autoHeight, ... }`.
+ * - `openai/widgetAccessible`, `openai/resultCanProduceWidget`,
+ *   `openai/toolInvocation/invoking`, `openai/toolInvocation/invoked` —
+ *   additional OpenAI metadata widgets depend on.
+ */
+const WIDGET_META_KEYS = [
+	"openai/outputTemplate",
+	"openai/widgetAccessible",
+	"openai/resultCanProduceWidget",
+	"openai/toolInvocation/invoking",
+	"openai/toolInvocation/invoked",
+	"ui/resourceUri",
+	"ui",
+] as const;
+
+export function injectWidgetDefinitionMeta(
+	result: unknown,
+	definitionMeta: UnknownRecord | undefined,
+): void {
+	if (!definitionMeta || !isRecord(result)) {
+		return;
+	}
+
+	let hasAnyKey = false;
+	for (const key of WIDGET_META_KEYS) {
+		if (key in definitionMeta) {
+			hasAnyKey = true;
+			break;
+		}
+	}
+	if (!hasAnyKey) {
+		return;
+	}
+
+	if (!isRecord(result._meta)) {
+		(result as UnknownRecord)._meta = {};
+	}
+	const resultMeta = (result as UnknownRecord)._meta as UnknownRecord;
+
+	for (const key of WIDGET_META_KEYS) {
+		if (!(key in definitionMeta)) {
+			continue;
+		}
+		// Handler-set values win: never overwrite something the tool returned.
+		if (key in resultMeta) {
+			continue;
+		}
+		resultMeta[key] = definitionMeta[key];
+	}
+}
+
 export function injectRequestMetadata(result: unknown, extra: unknown): void {
 	const requestMeta = extractMeta(extra);
 	if (!requestMeta) {
