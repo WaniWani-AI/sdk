@@ -1,0 +1,156 @@
+---
+title: Interrupts
+description: "Pause a flow to ask the user one or more questions."
+---
+
+An **interrupt** is what makes a flow feel conversational. When a node returns `interrupt(...)`, the flow pauses, the model asks the user the question(s), and execution resumes on the next tool call with the answers merged into state.
+
+## Basic interrupt
+
+The simplest form asks a single question that writes its answer to a state field.
+
+```ts
+.addNode("ask_email", async ({ interrupt }) =>
+  interrupt({
+    email: { question: "What's your work email?" },
+  }),
+)
+```
+
+The shape is `interrupt({ [fieldName]: { question } })`. `fieldName` must be a key declared in your flow's state schema — TypeScript will enforce this.
+
+## Suggestions
+
+Pass `suggestions` to give the model a list of values to present as options. This is especially powerful when paired with a `z.enum()` field — the model will lean toward offering exactly those values.
+
+```ts
+.addNode("ask_level", async ({ interrupt }) =>
+  interrupt({
+    level: {
+      question: "What's your ski level?",
+      suggestions: ["beginner", "intermediate", "advanced"],
+    },
+  }),
+)
+```
+
+## Hidden context for the assistant
+
+Sometimes the way you phrase a question to the user is different from the guidance you want to give the assistant. Use the second argument's `context` field for **hidden** instructions that shape how the assistant asks, but never reach the user directly.
+
+```ts
+.addNode("ask_date", async ({ interrupt }) =>
+  interrupt(
+    {
+      date: {
+        question: "When would you like to book?",
+        suggestions: ["today", "tomorrow", "next week"],
+      },
+    },
+    {
+      context:
+        "If the user is unsure, help them commit to a relative date. Never suggest dates in the past.",
+    },
+  ),
+)
+```
+
+You can also attach context to a **single** question via its own `context` field:
+
+```ts
+interrupt({
+  email: {
+    question: "What's your work email?",
+    context: "Reject generic providers like gmail.com politely.",
+  },
+});
+```
+
+## Multi-question interrupts
+
+A single interrupt can ask multiple related questions at once. The model will ask all of them in a single natural-sounding message.
+
+```ts
+.addNode("ask_date_and_time", async ({ interrupt }) =>
+  interrupt(
+    {
+      date: {
+        question: "What date do you want to book?",
+        suggestions: ["today", "tomorrow", "next week"],
+      },
+      time: {
+        question: "And what time of day?",
+        suggestions: ["morning", "afternoon", "evening"],
+      },
+    },
+    {
+      context: "Ask both together in one conversational message.",
+    },
+  ),
+)
+```
+
+<Tip>
+  Multi-question interrupts keep flows feeling human. Instead of asking "What's your name?" → wait → "What's your email?" → wait → "What's your company?", you can ask all three together and let the model sort the answers.
+</Tip>
+
+## Validation
+
+Add a `validate` function to run after the user answers. It receives the raw value and can:
+
+- Return `void` (no updates — the value is accepted as-is).
+- Return a **partial state update** to be merged before advancing.
+- Throw to reject the answer and re-ask.
+
+```ts
+interrupt({
+  email: {
+    question: "What's your work email?",
+    validate: (value) => {
+      if (typeof value !== "string" || !value.includes("@")) {
+        throw new Error("That doesn't look like an email.");
+      }
+      // Normalize and return updates
+      return { email: value.trim().toLowerCase() };
+    },
+  },
+});
+```
+
+Validation runs **before** the flow advances to the next node, so any updates it returns are visible in the following node's `ctx.state`.
+
+## Nested fields
+
+If your state uses a `z.object()` for one level of nesting, you can target sub-fields with dot-paths.
+
+```ts
+state: {
+  driver: z.object({
+    name: z.string().describe("Driver name"),
+    license: z.string().describe("License number"),
+  }),
+}
+
+// In a node:
+interrupt({
+  "driver.name": { question: "What's the driver's name?" },
+  "driver.license": { question: "What's their license number?" },
+})
+```
+
+Only one level of nesting is supported. See [State](/flows/state) for details.
+
+## Skipping interrupts with pre-filled state
+
+If a field is already populated when the flow reaches its interrupt node — for example, because the user mentioned the value up front and the host pre-filled it via `_meta.flow.state` — the engine skips the question automatically and moves on. You don't need to write conditional logic to handle this.
+
+## Resuming after an interrupt
+
+When the user answers, the host sends a new tool call with `{ action: "continue", stateUpdates: { email: "..." } }`. The engine:
+
+1. Merges the updates into persisted state.
+2. Runs the interrupted node's `validate` function (if any).
+3. Advances along the node's outgoing edge.
+4. Executes subsequent action nodes until it either hits the next interrupt, a widget, or `END`.
+
+This all happens in a single tool call — the user experiences a fluid conversation even though there can be many internal steps between questions.

@@ -1,0 +1,90 @@
+---
+title: API Keys
+description: "How to create, configure, and secure WaniWani API keys."
+---
+
+Every WaniWani SDK client authenticates with a single API key scoped to one **MCP environment**. Think of an environment as a single deployment target — typically one per MCP server, per stage (production, staging, local dev).
+
+## Create an environment
+
+<Steps>
+  <Step title="Sign in">
+    Open [app.waniwani.ai](https://app.waniwani.ai) and sign in with your account.
+  </Step>
+  <Step title="Create an MCP environment">
+    From the dashboard, create a new MCP environment. Give it a name that identifies both the server and the stage, for example:
+
+    - `ski-lessons-prod`
+    - `ski-lessons-staging`
+    - `ski-lessons-local`
+  </Step>
+  <Step title="Copy the API key">
+    Each environment exposes an API key in its settings. Copy it — the full key is only shown once.
+  </Step>
+</Steps>
+
+<Warning>
+  API keys grant access to ingest events and mint widget tokens for the environment. Treat them like any other server-side secret: never commit them to git, never expose them in client-side bundles.
+</Warning>
+
+## Configure the key
+
+The SDK looks for the key in two places, in order of priority:
+
+1. The `apiKey` field passed to `waniwani({ apiKey })`
+2. The `WANIWANI_API_KEY` environment variable
+
+### Option 1: environment variable (recommended)
+
+Set it wherever you manage secrets — a `.env` file in local dev, your platform's environment config in production (Vercel, Alpic, Fly, Railway, etc.).
+
+```bash .env
+WANIWANI_API_KEY=ww_live_...
+```
+
+Then create the client with no arguments:
+
+```ts
+import { waniwani } from "@waniwani/sdk";
+
+const wani = waniwani();
+```
+
+### Option 2: explicit configuration
+
+Useful when you need to run multiple clients in the same process (e.g. multi-tenant setups):
+
+```ts
+import { waniwani } from "@waniwani/sdk";
+
+const wani = waniwani({
+  apiKey: process.env.MY_CUSTOM_ENV_VAR,
+});
+```
+
+## Per-environment keys
+
+Use a separate key per stage. The dashboard lets you compare data across environments side by side, and keeping them isolated means staging noise never pollutes production metrics.
+
+A typical layout:
+
+| Stage       | Environment name      | Env var location                    |
+| ----------- | --------------------- | ----------------------------------- |
+| Production  | `my-app-prod`         | Platform secret manager             |
+| Staging     | `my-app-staging`      | Platform secret manager             |
+| Local dev   | `my-app-local`        | `.env` (gitignored)                 |
+
+## Rotation
+
+If a key is leaked, rotate it from the environment settings in the WaniWani dashboard. Existing clients will start receiving `401 Unauthorized` responses; the SDK's transport detects auth failures and stops retrying permanently, so you'll see a clean shutdown rather than a retry storm.
+
+## Verifying the key works
+
+The simplest way to confirm your key is wired up correctly is to wrap your MCP server and trigger any tool call — see [Wrap your server](/setup/wrap-server). Events show up in the dashboard within a few seconds.
+
+If you don't see events:
+
+1. Check that `WANIWANI_API_KEY` is actually set in the process running your MCP server.
+2. Confirm there are no typos in the key.
+3. Look at your server logs for errors prefixed with `[waniwani]`.
+4. Make sure your server is actually being called — the dashboard only shows events from real traffic.

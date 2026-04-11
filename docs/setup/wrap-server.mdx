@@ -1,0 +1,156 @@
+---
+title: Wrap your MCP server
+description: "Enable automatic event tracking for every tool call with withWaniwani()."
+---
+
+`withWaniwani(server)` is the one-line way to turn any MCP server into a fully instrumented WaniWani server. It:
+
+- Intercepts `server.registerTool(...)` so every subsequent tool registration is automatically wrapped.
+- Emits a `tool.called` event for every invocation, tagged with duration, status, and client info.
+- Captures errors — including tool handlers that throw, and tool handlers that return `{ isError: true }`.
+- Makes a **session-scoped** WaniWani client available inside tool handlers and flow nodes.
+
+## Basic usage
+
+```ts server/src/index.ts
+import { waniwani } from "@waniwani/sdk";
+import { withWaniwani } from "@waniwani/sdk/mcp";
+import { McpServer } from "skybridge/server";
+import "dotenv/config";
+
+const server = new McpServer(
+  { name: "my-mcp-app", version: "0.0.1" },
+  { capabilities: {} },
+);
+
+// Register tools as usual
+server.registerTool(/* ... */);
+server.registerTool(/* ... */);
+
+// Wrap before calling .run()
+withWaniwani(server, { client: waniwani() });
+
+server.run();
+```
+
+<Tip>
+  Call `withWaniwani` **after** creating the server but **before** `server.run()`. Tools registered after the wrapper is installed are instrumented automatically.
+</Tip>
+
+## How it works
+
+Under the hood, `withWaniwani` replaces `server.registerTool` with a version that wraps every handler in an instrumentation layer. When a tool is called, the wrapper:
+
+1. Records a start timestamp.
+2. Invokes your original handler.
+3. Measures duration.
+4. Tracks a `tool.called` event with `{ name, durationMs, status, input, output }`.
+5. Forwards the handler's result to the MCP runtime unchanged.
+
+The wrapper is idempotent — calling `withWaniwani(server)` twice on the same server is a no-op, so it's safe to call in reloaders and tests.
+
+## Options
+
+```ts
+withWaniwani(server, {
+  client: waniwani(),
+  toolType: "support",
+  metadata: { deployment: "production" },
+  flushAfterToolCall: false,
+  injectWidgetToken: true,
+  onError: (err) => console.error("[waniwani]", err),
+});
+```
+
+<ResponseField name="client" type="WaniwaniClient">
+  The client instance to use for tracking. When omitted, a client is created automatically with `waniwani()`.
+</ResponseField>
+
+<ResponseField name="toolType" type='string | (name) => string'>
+  Classify tools into high-level buckets that show up in the dashboard. Accepts one of `"pricing" | "product_info" | "availability" | "support" | "other"`, or a function that maps a tool name to its type.
+
+  ```ts
+  withWaniwani(server, {
+    toolType: (name) => {
+      if (name.startsWith("get_price")) return "pricing";
+      if (name.startsWith("check_stock")) return "availability";
+      return "other";
+    },
+  });
+  ```
+</ResponseField>
+
+<ResponseField name="metadata" type="Record<string, unknown>">
+  Extra key/value pairs merged into every `tool.called` event. Great for marking deployments, tenants, or release trains.
+</ResponseField>
+
+<ResponseField name="flushAfterToolCall" type="boolean" default={false}>
+  Force a flush after every tool call. Useful in serverless environments where the process may be frozen between invocations. In long-running Node processes, leave this `false` and rely on the default buffered transport.
+</ResponseField>
+
+<ResponseField name="injectWidgetToken" type="boolean" default={true}>
+  Whether to inject a short-lived widget tracking token into tool response `_meta.waniwani`. Keep this on unless you have a very specific reason to disable it.
+</ResponseField>
+
+<ResponseField name="onError" type="(error: Error) => void">
+  Callback invoked for non-fatal tracking errors. Tracking failures never block tool execution — if you need visibility into them, provide a handler here.
+</ResponseField>
+
+## Session-scoped client inside flows
+
+When you build a [flow](/flows/overview) on top of a wrapped server, each node handler receives a **session-scoped** WaniWani client on its context as `ctx.waniwani`. It's a lightweight wrapper around the main client that automatically attaches the current MCP session's correlation metadata to every event — no need to pass `meta: extra._meta` by hand.
+
+```ts
+import { createFlow, START, END } from "@waniwani/sdk/mcp";
+import { z } from "zod";
+
+const flow = createFlow({
+  id: "qualify_lead",
+  title: "Qualify Lead",
+  description: "Collects email and notifies the tracker.",
+  state: { email: z.string().describe("Work email") },
+})
+  .addNode("ask_email", async ({ interrupt }) =>
+    interrupt({ email: { question: "What's your work email?" } }),
+  )
+  .addNode("notify", async ({ state, waniwani }) => {
+    await waniwani?.track({
+      event: "quote.requested",
+      properties: { email: state.email },
+    });
+    return {};
+  })
+  .addEdge(START, "ask_email")
+  .addEdge("ask_email", "notify")
+  .addEdge("notify", END)
+  .compile();
+```
+
+For plain `server.registerTool` handlers, call `waniwani().track(...)` directly and pass `meta: extra._meta` to keep events correlated with the session:
+
+```ts
+await wani.track({
+  event: "quote.succeeded",
+  properties: { amount, currency },
+  meta: extra._meta,
+});
+```
+
+## What gets tracked automatically
+
+With `withWaniwani` in place, every tool invocation produces a `tool.called` event containing:
+
+| Field           | Description                                         |
+| --------------- | --------------------------------------------------- |
+| `name`          | The tool's registered name                          |
+| `type`          | High-level category (from the `toolType` option)    |
+| `durationMs`    | How long the handler took to run                    |
+| `status`        | `"ok"` or `"error"`                                 |
+| `errorMessage`  | Present when the tool errored                       |
+| `input`         | The tool's input arguments                          |
+| `output`        | The tool's response (redacted where configured)     |
+| `clientName`    | MCP client name (e.g. `"chatgpt"`, `"claude"`)      |
+| `clientVersion` | MCP client version                                  |
+| `sessionId`     | Correlated from `_meta` (see [Sessions](/tracking/sessions)) |
+
+Custom events (`quote.succeeded`, `purchase.completed`, your own names) are additive — call `client.track(...)` anywhere in your tool handler and they'll ship alongside the automatic events. See the [events reference](/tracking/events) for the full list.

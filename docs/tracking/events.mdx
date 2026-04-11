@@ -1,0 +1,184 @@
+---
+title: Events
+description: "The full list of event types the SDK understands, plus how to send custom events."
+---
+
+Every call to `client.track()` produces an **event**. Events are typed: known event names (`tool.called`, `quote.succeeded`, etc.) come with a typed `properties` shape, and unknown properties pass through untouched.
+
+## Anatomy of an event
+
+```ts
+await wani.track({
+  event: "quote.succeeded",           // required — the event name
+  properties: {                        // optional — event-specific data
+    amount: 99,
+    currency: "USD",
+  },
+  meta: extra._meta,                   // optional — MCP correlation metadata
+});
+```
+
+<ResponseField name="event" type="string" required>
+  The event name. Use one of the built-in types below, or a custom string.
+</ResponseField>
+
+<ResponseField name="properties" type="Record<string, unknown>">
+  Arbitrary key/value pairs carrying the event's payload. For built-in event types, the shape is typed.
+</ResponseField>
+
+<ResponseField name="meta" type="Record<string, unknown>">
+  MCP request metadata — typically `extra._meta` inside a tool handler. This is what associates the event with a session. See [Sessions](/tracking/sessions).
+</ResponseField>
+
+<ResponseField name="sessionId" type="string">
+  Explicit session ID override. Only use this when you can't route `_meta` (e.g. background jobs reacting to a past session).
+</ResponseField>
+
+<ResponseField name="externalUserId" type="string">
+  External user identifier, if you have one. Equivalent to calling `client.identify(userId)` in-line.
+</ResponseField>
+
+`track()` is fire-and-forget — it returns `{ eventId }` as soon as the envelope is queued, regardless of whether the network delivery has completed.
+
+## Built-in event types
+
+These names unlock typed `properties` and show up with richer affordances in the dashboard.
+
+| Event               | Typed properties                                     | When to use                                                            |
+| ------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------- |
+| `session.started`   | —                                                    | Fired automatically by the WaniWani platform when a new session begins |
+| `tool.called`       | `{ name?: string; type?: ToolType }`                 | Emitted automatically by `withWaniwani()` — you rarely send it yourself |
+| `quote.requested`   | —                                                    | The user asked for a price                                             |
+| `quote.succeeded`   | `{ amount?: number; currency?: string }`             | A quote was produced                                                   |
+| `quote.failed`      | —                                                    | A quote request could not be fulfilled                                 |
+| `link.clicked`      | `{ url?: string }`                                   | The user followed a link in a widget or message                        |
+| `purchase.completed`| `{ amount?: number; currency?: string }`             | A purchase finished successfully                                       |
+| `user.identified`   | (use `identify()` instead)                           | Associates the session with an external user id                        |
+
+`ToolType` is one of `"pricing" | "product_info" | "availability" | "support" | "other"`.
+
+### `tool.called`
+
+Automatically emitted by `withWaniwani(server)` — you should almost never send it yourself. Properties include the tool name and high-level type.
+
+```ts
+// Emitted for you by withWaniwani
+{
+  event: "tool.called",
+  properties: { name: "get_price", type: "pricing" },
+}
+```
+
+### `quote.succeeded`
+
+Send this from any tool that produces a price for the user.
+
+```ts
+await wani.track({
+  event: "quote.succeeded",
+  properties: { amount: 1299, currency: "EUR" },
+  meta: extra._meta,
+});
+```
+
+### `quote.requested` / `quote.failed`
+
+Fire these to track the top of a pricing funnel and its drop-offs.
+
+```ts
+await wani.track({ event: "quote.requested", meta: extra._meta });
+
+try {
+  const price = await pricingEngine.quote(input);
+  await wani.track({
+    event: "quote.succeeded",
+    properties: { amount: price, currency: "USD" },
+    meta: extra._meta,
+  });
+} catch (err) {
+  await wani.track({ event: "quote.failed", meta: extra._meta });
+  throw err;
+}
+```
+
+### `link.clicked`
+
+Track outbound link clicks from widgets or rich content.
+
+```ts
+await wani.track({
+  event: "link.clicked",
+  properties: { url: "https://example.com/pricing" },
+  meta: extra._meta,
+});
+```
+
+### `purchase.completed`
+
+The bottom-of-funnel event. Fire when the user actually pays.
+
+```ts
+await wani.track({
+  event: "purchase.completed",
+  properties: { amount: 4999, currency: "USD" },
+  meta: extra._meta,
+});
+```
+
+## Custom events
+
+Any string that isn't a built-in name becomes a **custom event**. Custom events are fully supported — they just don't carry a typed `properties` shape.
+
+```ts
+await wani.track({
+  event: "ski_lesson.booked",
+  properties: {
+    level: "beginner",
+    date: "2026-04-15",
+    duration: "half_day",
+  },
+  meta: extra._meta,
+});
+```
+
+<Tip>
+  Use `dot.case` for event names and `snake_case` for property keys. This keeps names consistent across dashboards and makes funnels easier to build.
+</Tip>
+
+## Legacy input shape
+
+The SDK still accepts the pre-V2 legacy shape for backward compatibility. New integrations should use the modern shape above, but if you're migrating an older code base:
+
+```ts
+await wani.track({
+  eventType: "tool.called",
+  sessionId: "session-123",
+  toolName: "pricing",
+  toolType: "pricing",
+  metadata: { source: "legacy" },
+});
+```
+
+The SDK maps these shapes internally to canonical V2 envelopes.
+
+## Return value
+
+```ts
+const { eventId } = await wani.track({ /* ... */ });
+```
+
+`eventId` is a deterministic, client-generated identifier. It's safe to persist and reference in logs — even if the event hasn't shipped yet, the ID is stable.
+
+## Flushing
+
+Tracking is buffered. In long-running Node processes this is handled automatically. In serverless functions or short-lived scripts, call `flush()` before the process exits:
+
+```ts
+await wani.flush();
+```
+
+Or let `shutdown()` do it as part of a clean stop:
+
+```ts
+const { timedOut, pendingEvents } = await wani.shutdown({ timeoutMs: 5000 });
+```

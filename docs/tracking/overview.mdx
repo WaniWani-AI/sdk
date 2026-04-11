@@ -1,0 +1,92 @@
+---
+title: Event Tracking Overview
+description: "How the WaniWani SDK sends events from your MCP server to the dashboard."
+---
+
+The tracking module is what gets your MCP server's activity — tool calls, quotes, purchases, custom funnel steps — into the WaniWani dashboard. It's designed to be **fire-and-forget**: you call `track()`, and the SDK takes care of batching, retrying, and flushing.
+
+## Core concepts
+
+<CardGroup cols={2}>
+  <Card title="Events" icon="bolt" href="/tracking/events">
+    Typed records of something that happened: a tool call, a quote, a purchase. Each event has a name and optional properties.
+  </Card>
+  <Card title="Sessions" icon="link" href="/tracking/sessions">
+    A session correlates all events from a single MCP conversation. Sessions are derived from MCP request metadata (`_meta`) — you almost never create them by hand.
+  </Card>
+  <Card title="Identify" icon="user" href="/tracking/identify">
+    Attach an external user identifier to the current session so events get tied to real users across multiple sessions.
+  </Card>
+  <Card title="Automatic tracking" icon="wand-magic-sparkles" href="/setup/wrap-server">
+    `withWaniwani()` auto-tracks every tool call with zero code. Layer custom events on top as needed.
+  </Card>
+</CardGroup>
+
+## How tracking works
+
+When you call `client.track(...)`, the SDK:
+
+1. Validates the input shape (modern or legacy).
+2. Maps it to a canonical **Events API V2** envelope.
+3. Enqueues the envelope on an in-memory buffer.
+4. Returns `{ eventId }` immediately — tracking never blocks your tool handler.
+5. A background transport flushes the buffer on a short interval, or whenever the buffer size threshold is crossed.
+6. On transient failures, the transport retries with exponential backoff. On auth failures, it stops retrying permanently to avoid retry storms.
+
+The transport is designed for both long-running Node servers and short-lived serverless functions:
+
+- **Long-running** processes rely on the default interval flush and a `beforeExit` / `SIGTERM` hook.
+- **Serverless** functions should either enable `flushAfterToolCall: true` when wrapping the server, or explicitly call `await client.flush()` (or `await client.shutdown()`) before the function returns.
+
+## Minimal example
+
+```ts
+import { waniwani } from "@waniwani/sdk";
+
+const wani = waniwani();
+
+await wani.track({
+  event: "quote.succeeded",
+  properties: { amount: 99, currency: "USD" },
+  meta: extra._meta,
+});
+
+await wani.flush();
+```
+
+## What `withWaniwani()` tracks for free
+
+Once your server is wrapped with [`withWaniwani(server)`](/setup/wrap-server), a `tool.called` event is emitted automatically for every tool invocation. You still use `client.track()` for **domain events** — quotes, purchases, link clicks, custom funnel steps — but you never need to hand-roll `tool.called` tracking.
+
+## Client API
+
+```ts
+interface TrackingClient {
+  track(event: TrackInput): Promise<{ eventId: string }>;
+  identify(
+    userId: string,
+    properties?: Record<string, unknown>,
+    meta?: Record<string, unknown>,
+  ): Promise<{ eventId: string }>;
+  flush(): Promise<void>;
+  shutdown(options?: { timeoutMs?: number }): Promise<{
+    timedOut: boolean;
+    pendingEvents: number;
+  }>;
+}
+```
+
+<CardGroup cols={2}>
+  <Card title="track(event)" icon="plus" href="/tracking/events">
+    Enqueue a typed event.
+  </Card>
+  <Card title="identify(userId)" icon="user" href="/tracking/identify">
+    Attach a user identifier to the session.
+  </Card>
+  <Card title="flush()" icon="water">
+    Force any buffered events to send immediately.
+  </Card>
+  <Card title="shutdown()" icon="power-off">
+    Flush and stop the transport. Returns `{ timedOut, pendingEvents }`.
+  </Card>
+</CardGroup>

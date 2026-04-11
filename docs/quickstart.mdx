@@ -1,0 +1,174 @@
+---
+title: Quickstart
+description: "Add WaniWani to an existing MCP server in under 5 minutes."
+---
+
+This guide assumes you already have a working MCP server — for example, an [Alpic](https://alpic.ai/) / [Skybridge](https://github.com/alpic-ai/skybridge) project, a `@modelcontextprotocol/sdk` server, or a `@vercel/mcp-handler` route.
+
+If you don't, start from the [Alpic Apps SDK template](https://github.com/alpic-ai/apps-sdk-template) — it takes about two minutes to scaffold.
+
+## 1. Install the SDK
+
+<CodeGroup>
+
+```bash npm
+npm install @waniwani/sdk
+```
+
+```bash pnpm
+pnpm add @waniwani/sdk
+```
+
+```bash bun
+bun add @waniwani/sdk
+```
+
+</CodeGroup>
+
+## 2. Get an API key
+
+<Steps>
+  <Step title="Sign in to the WaniWani dashboard">
+    Head to [app.waniwani.ai](https://app.waniwani.ai) and sign in.
+  </Step>
+  <Step title="Create an MCP environment">
+    Each environment represents a single deployed MCP server (e.g. `ski-lessons-prod`, `ski-lessons-staging`).
+  </Step>
+  <Step title="Copy the API key">
+    In the environment settings, copy the API key. Treat it like any other server-side secret.
+  </Step>
+  <Step title="Expose it to your server">
+    Set it as an environment variable. The SDK picks up `WANIWANI_API_KEY` automatically.
+
+    ```bash .env
+    WANIWANI_API_KEY=ww_live_...
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  The SDK never requires the API key to be passed in code — if `WANIWANI_API_KEY` is set, `waniwani()` picks it up. You can still override it explicitly: `waniwani({ apiKey: "..." })`.
+</Note>
+
+## 3. Wrap your MCP server
+
+The fastest way to start sending data is `withWaniwani(server)`. It intercepts `server.registerTool(...)` and automatically emits a `tool.called` event for every invocation — no changes needed inside your tool handlers.
+
+```ts server/src/index.ts
+import { waniwani } from "@waniwani/sdk";
+import { withWaniwani } from "@waniwani/sdk/mcp";
+import { McpServer } from "skybridge/server";
+import "dotenv/config";
+
+const server = new McpServer(
+  { name: "my-mcp-app", version: "0.0.1" },
+  { capabilities: {} },
+);
+
+// Register your tools as usual
+server.registerTool(/* ... */);
+
+// Wrap the server so every tool call is tracked
+withWaniwani(server, { client: waniwani() });
+
+server.run();
+```
+
+That's it. Restart the server, trigger a tool call, and the event will show up in your WaniWani dashboard within a few seconds.
+
+<Tip>
+  `withWaniwani` works with any server that implements the `registerTool` contract — Skybridge, `@modelcontextprotocol/sdk`, and custom wrappers all work out of the box.
+</Tip>
+
+## 4. Track a custom event
+
+When you need to record something beyond `tool.called` — a successful quote, a purchase, a custom funnel step — use `client.track()`.
+
+```ts
+import { waniwani } from "@waniwani/sdk";
+
+const wani = waniwani();
+
+server.registerTool(
+  "get_quote",
+  { /* config */ },
+  async ({ amount, currency }, extra) => {
+    // ... your quote logic
+
+    await wani.track({
+      event: "quote.succeeded",
+      properties: { amount, currency },
+      meta: extra._meta, // passes through MCP session correlation
+    });
+
+    return { content: [{ type: "text", text: `Quoted ${amount} ${currency}` }] };
+  },
+);
+```
+
+Passing `meta: extra._meta` is what links the event to the current MCP session — see [Sessions](/tracking/sessions).
+
+## 5. Build a flow (optional)
+
+Once tracking works, you can start replacing multi-step tool chains with **flows**. A flow is a single MCP tool that internally drives a multi-turn conversation (ask questions, validate, branch, persist state).
+
+```ts server/src/journey/onboarding.ts
+import { createFlow, END, START } from "@waniwani/sdk/mcp";
+import { z } from "zod";
+
+export const onboardingFlow = createFlow({
+  id: "onboarding",
+  title: "User Onboarding",
+  description: "Collect a new user's email and primary use case.",
+  state: {
+    email: z.string().describe("Work email"),
+    useCase: z.string().describe("What they want to do"),
+  },
+})
+  .addNode("ask_email", async ({ interrupt }) =>
+    interrupt({ email: { question: "What's your work email?" } }),
+  )
+  .addNode("ask_use_case", async ({ interrupt }) =>
+    interrupt({
+      useCase: {
+        question: "What do you want to build?",
+        suggestions: ["Analytics", "Support", "Lead capture"],
+      },
+    }),
+  )
+  .addEdge(START, "ask_email")
+  .addEdge("ask_email", "ask_use_case")
+  .addEdge("ask_use_case", END)
+  .compile();
+```
+
+Register it alongside your other tools:
+
+```ts server/src/index.ts
+import { onboardingFlow } from "./journey/onboarding.js";
+
+server.registerTool(
+  onboardingFlow.name,
+  onboardingFlow.config,
+  onboardingFlow.handler,
+);
+```
+
+Next stop: the [Flows overview](/flows/overview) to learn about state, interrupts, and branching.
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Configure the client" icon="gear" href="/setup/installation">
+    Customize batch sizes, retries, and shutdown behavior.
+  </Card>
+  <Card title="Track custom events" icon="chart-line" href="/tracking/events">
+    Learn every event type the SDK supports.
+  </Card>
+  <Card title="Sessions & correlation" icon="link" href="/tracking/sessions">
+    Understand how `_meta` links events to MCP sessions.
+  </Card>
+  <Card title="Build a flow" icon="diagram-project" href="/flows/overview">
+    Design multi-turn, stateful MCP tools.
+  </Card>
+</CardGroup>

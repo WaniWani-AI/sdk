@@ -1,0 +1,150 @@
+---
+title: Compile & Register
+description: "Turn a flow graph into a registered MCP tool."
+---
+
+Once your nodes and edges are in place, you compile the graph into a `RegisteredFlow` and register it on your MCP server. This is where the flow becomes a real tool the model can call.
+
+## Compile
+
+`.compile()` validates the graph and returns a `RegisteredFlow`:
+
+```ts
+const onboardingFlow = createFlow({
+  id: "onboarding",
+  title: "User Onboarding",
+  description: "Use when a new user wants to get started.",
+  state: { /* ... */ },
+})
+  .addNode(/* ... */)
+  .addEdge(/* ... */)
+  .compile();
+```
+
+Validation at compile time catches:
+
+- Missing entry point (`START` has no edge).
+- Dangling edge targets (pointing at undeclared nodes).
+- Dead-end nodes (nodes with no outgoing edge).
+- Reserved names (`START` / `END` can't be used as regular node names).
+
+If any check fails, `.compile()` throws immediately — you'll see the error in your build or startup logs before any traffic hits the server.
+
+## The `RegisteredFlow` shape
+
+```ts
+type RegisteredFlow = {
+  name: string;
+  config: {
+    title: string;
+    description: string;
+    inputSchema: Record<string, unknown>;
+    annotations?: { /* ... */ };
+  };
+  handler: ToolCallback;
+  register: (server: McpServer) => Promise<void>;
+  graph: () => string;
+};
+```
+
+The three fields that matter at registration time are `name`, `config`, and `handler` — they map one-to-one onto the `server.registerTool(name, config, handler)` contract used by every MCP server library.
+
+## Registering
+
+The flow exposes a `register()` shortcut that wires itself onto your server in one line:
+
+```ts
+await onboardingFlow.register(server);
+```
+
+If you prefer to be explicit (or you're wiring many tools at once), call `registerTool` directly:
+
+```ts
+server.registerTool(
+  onboardingFlow.name,
+  onboardingFlow.config,
+  onboardingFlow.handler,
+);
+```
+
+Both forms produce the same result.
+
+## Registering multiple tools together
+
+The SDK also provides `registerTools(server, tools[])` for batch registration — handy when a flow depends on widget display tools that need to be registered alongside it.
+
+```ts
+import { registerTools } from "@waniwani/sdk/mcp";
+
+await registerTools(server, [onboardingFlow, quoteFlow, supportFlow]);
+```
+
+Mix flows and regular tools freely.
+
+## Putting it all together
+
+A realistic `server/src/index.ts` looks like this:
+
+```ts server/src/index.ts
+import { waniwani } from "@waniwani/sdk";
+import { withWaniwani } from "@waniwani/sdk/mcp";
+import { McpServer } from "skybridge/server";
+import "dotenv/config";
+import { onboardingFlow } from "./journey/onboarding.js";
+import { quoteFlow } from "./journey/quote.js";
+
+const server = new McpServer(
+  { name: "my-mcp-app", version: "0.0.1" },
+  { capabilities: {} },
+);
+
+// Wrap first — every subsequent registerTool call is auto-tracked.
+withWaniwani(server, { client: waniwani() });
+
+// Register flows.
+await onboardingFlow.register(server);
+await quoteFlow.register(server);
+
+server.run();
+```
+
+## Debugging a compiled flow
+
+### Inspect the graph
+
+`flow.graph()` returns a Mermaid diagram of the compiled flow. Log it at startup in development:
+
+```ts
+if (process.env.NODE_ENV !== "production") {
+  console.log(onboardingFlow.graph());
+}
+```
+
+Paste the output into any Mermaid renderer (or the Mermaid Live Editor) to visualize the flow.
+
+### Test with the flow test harness
+
+The SDK ships a `createFlowTestHarness` utility for unit-testing flows without running a full MCP server. Import it from `@waniwani/sdk/mcp`:
+
+```ts
+import { createFlowTestHarness } from "@waniwani/sdk/mcp";
+import { onboardingFlow } from "./journey/onboarding.js";
+
+const harness = createFlowTestHarness(onboardingFlow);
+
+const first = await harness.start({ intent: "Get onboarded" });
+// first.content.status === "interrupt"
+// first.content.questions[0].field === "email"
+
+const second = await harness.continue({ email: "alice@example.com" });
+// second.content.status === "interrupt"
+// second.content.questions[0].field === "useCase"
+```
+
+This lets you write deterministic tests for branching logic, validation, and state transitions without spinning up a real transport.
+
+## Reload-safe registration
+
+`withWaniwani` is idempotent (calling it twice on the same server is a no-op). `flow.register()` delegates to `server.registerTool`, which may or may not be idempotent depending on the runtime — check your server's documentation if you're building a hot-reload setup.
+
+For Skybridge and `@modelcontextprotocol/sdk`, the safe pattern is to create a fresh server on each reload rather than re-registering tools on an existing instance.

@@ -1,0 +1,136 @@
+---
+title: Installation
+description: "Install and configure the WaniWani SDK."
+---
+
+## Install the package
+
+The SDK ships as a single package on npm.
+
+<CodeGroup>
+
+```bash npm
+npm install @waniwani/sdk
+```
+
+```bash pnpm
+pnpm add @waniwani/sdk
+```
+
+```bash bun
+bun add @waniwani/sdk
+```
+
+</CodeGroup>
+
+## Requirements
+
+- **Node.js** 18.17 or newer (Node 20+ recommended)
+- An MCP server runtime — any of the following work out of the box:
+  - [Skybridge](https://github.com/alpic-ai/skybridge) (Alpic's MCP runtime)
+  - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk)
+  - [`@vercel/mcp-handler`](https://www.npmjs.com/package/@vercel/mcp-handler)
+- A WaniWani account — sign up at [app.waniwani.ai](https://app.waniwani.ai)
+
+<Note>
+  The SDK has **zero runtime dependencies** and targets a sub-5KB bundle. It's safe to ship in serverless functions, edge runtimes, and long-running Node processes alike.
+</Note>
+
+## Create a client
+
+A WaniWani client is created by calling the `waniwani()` factory.
+
+```ts
+import { waniwani } from "@waniwani/sdk";
+
+const wani = waniwani();
+```
+
+With no arguments, the client reads its API key from the `WANIWANI_API_KEY` environment variable and uses the default base URL (`https://app.waniwani.ai`). This is the most common setup for production.
+
+For explicit configuration, pass an object:
+
+```ts
+import { waniwani } from "@waniwani/sdk";
+
+const wani = waniwani({
+  apiKey: process.env.WANIWANI_API_KEY,
+  apiUrl: "https://app.waniwani.ai",
+});
+```
+
+## Configuration reference
+
+All fields are optional. Anything not provided falls back to sensible defaults.
+
+<ResponseField name="apiKey" type="string">
+  Your MCP environment API key. Defaults to `process.env.WANIWANI_API_KEY`. If neither is set, tracking calls will throw at runtime.
+</ResponseField>
+
+<ResponseField name="apiUrl" type="string" default="https://app.waniwani.ai">
+  Base URL of the WaniWani API. Override this for self-hosted deployments or staging environments.
+</ResponseField>
+
+<ResponseField name="tracking" type="object">
+  Fine-tune the event tracking transport.
+
+  <Expandable title="tracking options">
+    <ResponseField name="endpointPath" type="string" default="/api/mcp/events/v2/batch">
+      Path appended to `apiUrl` to POST batches of events.
+    </ResponseField>
+    <ResponseField name="flushIntervalMs" type="number" default={1000}>
+      How often the buffered transport flushes events.
+    </ResponseField>
+    <ResponseField name="maxBatchSize" type="number" default={20}>
+      Maximum number of events sent in a single HTTP request.
+    </ResponseField>
+    <ResponseField name="maxBufferSize" type="number" default={1000}>
+      Maximum in-memory buffer size. Once exceeded, the oldest events are dropped.
+    </ResponseField>
+    <ResponseField name="maxRetries" type="number" default={3}>
+      Number of retry attempts on transient failures.
+    </ResponseField>
+    <ResponseField name="retryBaseDelayMs" type="number" default={200}>
+      Base delay used for exponential backoff between retries.
+    </ResponseField>
+    <ResponseField name="retryMaxDelayMs" type="number" default={2000}>
+      Maximum backoff delay between retries.
+    </ResponseField>
+    <ResponseField name="shutdownTimeoutMs" type="number" default={2000}>
+      How long `shutdown()` waits for in-flight events before returning.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example: fully configured client
+
+```ts
+import { waniwani } from "@waniwani/sdk";
+
+const wani = waniwani({
+  apiKey: process.env.WANIWANI_API_KEY,
+  apiUrl: "https://app.waniwani.ai",
+  tracking: {
+    flushIntervalMs: 500,
+    maxBatchSize: 50,
+    maxRetries: 5,
+    shutdownTimeoutMs: 5000,
+  },
+});
+```
+
+## Graceful shutdown
+
+The SDK automatically flushes buffered events on `beforeExit`, `SIGINT`, and `SIGTERM` in Node environments. For platforms where you need to flush explicitly (edge runtimes, tests, short-lived scripts), call `shutdown()`:
+
+```ts
+await wani.shutdown({ timeoutMs: 5000 });
+```
+
+The returned object tells you whether any events were dropped:
+
+```ts
+{ timedOut: false, pendingEvents: 0 }
+```
+
+Next, [get your API key](/setup/api-key) and then [wrap your MCP server](/setup/wrap-server).
