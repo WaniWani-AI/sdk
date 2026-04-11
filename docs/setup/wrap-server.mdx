@@ -8,9 +8,10 @@ description: "Automatically track every tool call with withWaniwani()."
 ## Usage
 
 ```ts server/src/index.ts
+import express from "express";
 import { withWaniwani } from "@waniwani/sdk/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import "dotenv/config";
 
 const server = new McpServer({ name: "my-mcp-app", version: "0.0.1" });
@@ -22,7 +23,14 @@ server.registerTool(/* ... */);
 // Instrument the server
 withWaniwani(server);
 
-await server.connect(new StdioServerTransport());
+// Connect the Streamable HTTP transport
+const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+await server.connect(transport);
+
+const app = express();
+app.use(express.json());
+app.post("/mcp", (req, res) => transport.handleRequest(req, res, req.body));
+app.listen(3000);
 ```
 
 With no `client` option, `withWaniwani` creates one internally via `waniwani()`, which reads `WANIWANI_API_KEY` from the environment.

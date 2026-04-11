@@ -13,9 +13,23 @@ If you do not have an MCP server yet, scaffold one from the [Alpic Apps SDK temp
 
 <Steps>
   <Step title="Install the SDK">
-    ```bash
-    npm install @waniwani/sdk
-    ```
+    <CodeGroup>
+      ```bash bun
+      bun add @waniwani/sdk
+      ```
+
+      ```bash pnpm
+      pnpm add @waniwani/sdk
+      ```
+
+      ```bash npm
+      npm install @waniwani/sdk
+      ```
+
+      ```bash yarn
+      yarn add @waniwani/sdk
+      ```
+    </CodeGroup>
   </Step>
 
   <Step title="Get an API key">
@@ -35,9 +49,10 @@ If you do not have an MCP server yet, scaffold one from the [Alpic Apps SDK temp
     Call `withWaniwani(server)` once, after creating the server and before connecting the transport. It intercepts `registerTool` and emits a `tool.called` event for every invocation.
 
     ```ts server/src/index.ts
+    import express from "express";
     import { withWaniwani } from "@waniwani/sdk/mcp";
     import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-    import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+    import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
     import "dotenv/config";
 
     const server = new McpServer({ name: "my-mcp-app", version: "0.0.1" });
@@ -48,7 +63,14 @@ If you do not have an MCP server yet, scaffold one from the [Alpic Apps SDK temp
     // Enable automatic tracking
     withWaniwani(server);
 
-    await server.connect(new StdioServerTransport());
+    // Connect the Streamable HTTP transport
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    await server.connect(transport);
+
+    const app = express();
+    app.use(express.json());
+    app.post("/mcp", (req, res) => transport.handleRequest(req, res, req.body));
+    app.listen(3000);
     ```
 
     With no arguments, `withWaniwani` creates a client from `WANIWANI_API_KEY`. Tools registered before or after the wrap call are both instrumented.

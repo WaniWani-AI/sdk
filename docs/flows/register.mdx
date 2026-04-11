@@ -92,7 +92,7 @@ withWaniwani(server, { client: waniwani() });
 // Register flows (and any regular tools or display tools).
 await registerTools(server, [onboardingFlow, quoteFlow]);
 
-// Start your transport (stdio, HTTP, etc.) as usual.
+// Connect your Streamable HTTP transport as usual.
 ```
 
 `withWaniwani` is idempotent, so calling it twice on the same server is a no-op. Because it wraps `registerTool` at the point of call, it must run before you register your flows.
