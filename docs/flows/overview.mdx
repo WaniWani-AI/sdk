@@ -1,43 +1,21 @@
 ---
 title: Flows Overview
-description: "Multi-step, stateful conversations compiled into a single MCP tool."
+description: "Multi-step, stateful MCP tools defined as a graph."
 ---
 
-A **flow** is a LangGraph-inspired state graph that compiles into a single MCP tool. The engine drives the conversation step by step: it asks questions, validates answers, branches on conditions, and persists state across tool calls — all from one declarative definition.
+A flow is a graph of nodes that compiles into a single MCP tool. Each tool call runs the engine one step at a time: it asks a question, validates the answer, branches on state, then persists progress server-side under the MCP session id. The model never has to carry a token between calls.
 
-<Note>
-  If you've ever tried to build a multi-turn MCP tool by hand — ask a question, return, hope the model asks the next one, handle state via raw string parsing — flows are the abstraction you wanted.
-</Note>
+Flows exist because MCP tools are stateless. Anything longer than a single-shot Q&A (onboarding, quoting, qualification, triage) otherwise becomes a hand-rolled state machine serialized through the model.
 
-## Why flows?
+## What you declare
 
-MCP tools are stateless. Every call starts from scratch. Building anything beyond a single-shot Q&A — onboarding, quoting, qualification, booking, support triage — usually means:
+1. **State.** The fields the flow collects, as a map of Zod schemas. State is type-inferred.
+2. **Nodes.** Handlers that return state updates, an interrupt signal, or a widget signal.
+3. **Edges.** How nodes connect. Direct or conditional.
 
-- Hand-rolling a state machine.
-- Serializing state into tokens the model has to remember.
-- Praying the model actually passes them back.
-- Gluing together retry and resume logic.
+You call `.compile()` on the graph to get a `RegisteredFlow`, then register it on your MCP server.
 
-Flows remove all of that. You define:
-
-1. **State** — the fields you want to collect, as a Zod schema.
-2. **Nodes** — handlers that either ask a question, run business logic, or show a widget.
-3. **Edges** — the order in which nodes run, with optional branching.
-
-You then `compile()` the graph into a `RegisteredFlow` and register it on your MCP server. The engine handles everything else.
-
-## What you get for free
-
-- **Automatic state persistence.** State lives server-side, keyed by the MCP session id — no round-tripping tokens through the model.
-- **Step-by-step execution.** The engine advances one "step" per tool call: it runs action nodes, pauses at interrupts, resumes automatically on the next call.
-- **Typed state.** State is inferred from your Zod schema, so `ctx.state` is fully typed inside every node.
-- **Validation hooks.** Interrupt questions can include a `validate` function that runs after the user answers.
-- **Resumability.** If the user wanders off and comes back, the flow picks up exactly where it left off.
-- **Mermaid diagrams.** `flow.graph()` returns a ready-to-render Mermaid `flowchart TD` for documentation or debugging.
-
-## A minimal flow
-
-Here's a complete onboarding flow that asks for an email and a use case:
+## Minimal flow
 
 ```ts
 import { createFlow, END, START } from "@waniwani/sdk/mcp";
@@ -52,10 +30,10 @@ export const onboardingFlow = createFlow({
     useCase: z.string().describe("What they want to build"),
   },
 })
-  .addNode("ask_email", async ({ interrupt }) =>
-    interrupt({ email: { question: "What's your work email?" } }),
+  .addNode("ask_email", ({ interrupt }) =>
+    interrupt({ email: { question: "What is your work email?" } }),
   )
-  .addNode("ask_use_case", async ({ interrupt }) =>
+  .addNode("ask_use_case", ({ interrupt }) =>
     interrupt({
       useCase: {
         question: "What do you want to build?",
@@ -72,79 +50,56 @@ export const onboardingFlow = createFlow({
 Register it on your server:
 
 ```ts
-import { onboardingFlow } from "./journey/onboarding.js";
-
-server.registerTool(
-  onboardingFlow.name,
-  onboardingFlow.config,
-  onboardingFlow.handler,
-);
+await onboardingFlow.register(server);
 ```
 
-That's it. The model will call `onboarding` with `{ action: "start", intent: "..." }`, receive an interrupt asking for the email, return it with `{ action: "continue", stateUpdates: { email: "..." } }`, and so on until the flow hits `END`.
+That is a complete, working flow. See [Register](/flows/register) for full server wiring.
 
-## How execution works
+## Execution model
 
-Each tool call to a flow runs the engine until it either:
+Every tool call drives the engine until it hits one of three outcomes:
 
-- **Pauses** at an interrupt or widget node, returning an `interrupt` or `widget` response to the model; or
-- **Completes** by reaching `END`, returning a `complete` response.
+- **Interrupt.** Pause and ask the user one or more questions. The response carries `status: "interrupt"`.
+- **Widget.** Pause and delegate rendering to a display tool. The response carries `status: "widget"`.
+- **Complete.** The graph reached `END`. The response carries `status: "complete"` and server-side state is deleted.
 
-Between calls, state is persisted server-side in a key-value store, keyed by the session id from `_meta`. The model never has to carry a token — when it calls the flow again on the same session, the engine loads the state automatically.
+Between those pause points, the engine auto-advances through action nodes (nodes that return a plain state update). No round-trip to the model. A single tool call can run several action nodes before hitting the next interrupt.
 
-The engine auto-advances through **action nodes** (nodes that return plain state updates, not signals) without any round-trip to the model. Only `interrupt` and `showWidget` signals actually pause the flow.
-
-## Anatomy of a flow
-
-<CardGroup cols={2}>
-  <Card title="State schema" icon="database" href="/flows/state">
-    Declare the fields your flow collects using Zod. State is typed end-to-end.
-  </Card>
-  <Card title="Nodes" icon="circle-nodes" href="/flows/nodes">
-    Each node is a handler. It can update state, ask a question, or show a widget.
-  </Card>
-  <Card title="Interrupts" icon="hand" href="/flows/interrupts">
-    Pause the flow to ask the user one or more questions.
-  </Card>
-  <Card title="Edges" icon="arrow-right" href="/flows/edges">
-    Wire nodes together — direct edges, conditional branching, loops.
-  </Card>
-  <Card title="Register" icon="plug" href="/flows/register">
-    Compile the flow and register it as an MCP tool.
-  </Card>
-</CardGroup>
+State persists between calls in the flow store, keyed by the session id extracted from `_meta`. The default store is `WaniwaniFlowStore`, backed by the WaniWani API (reads `WANIWANI_API_KEY` and `WANIWANI_API_URL` from env). It works out of the box in serverless runtimes.
 
 ## Tool contract
 
-Flow tools accept a very small input shape:
+A compiled flow exposes a tool with this input shape:
 
 ```ts
-type FlowToolInput =
-  | { action: "start"; intent: string; stateUpdates?: Record<string, unknown> }
-  | { action: "continue"; stateUpdates?: Record<string, unknown> };
+type FlowToolInput = {
+  action: "start" | "continue";
+  intent?: string; // required when action is "start"
+  stateUpdates?: Record<string, unknown>;
+};
 ```
 
-- `start` — begins a new flow execution. `intent` is a short description of what the user is trying to do (used for dashboards and debugging).
-- `continue` — resumes the current flow. `stateUpdates` carries the user's latest answer(s).
+- `start` begins a new run. `intent` is a short summary of why the user triggered the flow. `stateUpdates` can pre-fill any known fields so the engine auto-skips those questions.
+- `continue` resumes the current run with the user's latest answers in `stateUpdates`.
 
-Flow tools return one of these shapes as their `content`:
+Responses are JSON with `status: "interrupt" | "widget" | "complete" | "error"`. The protocol is documented inside the generated tool description, so the model knows how to call it. You do not parse responses yourself in normal usage.
 
-| Status      | Meaning                                                                 |
-| ----------- | ----------------------------------------------------------------------- |
-| `interrupt` | Pause and ask one or more questions. Response includes `questions[]`.   |
-| `widget`    | Pause and delegate rendering to a display tool.                         |
-| `complete`  | Flow finished successfully.                                             |
-| `error`     | Something went wrong. Response includes an `error` message.             |
-
-You generally don't need to parse this yourself — the engine and the model handle the protocol. But it's useful to know when debugging.
-
-## Next steps
+## What to read next
 
 <CardGroup cols={2}>
-  <Card title="Define state" icon="database" href="/flows/state">
-    Learn the Zod schema conventions flows expect.
+  <Card title="State" icon="database" href="/flows/state">
+    Declare the fields the flow collects. Type inference flows from here.
   </Card>
-  <Card title="Write your first node" icon="circle-nodes" href="/flows/nodes">
-    The three kinds of nodes and when to use each.
+  <Card title="Nodes" icon="circle-nodes" href="/flows/nodes">
+    The three kinds of nodes and the context they receive.
+  </Card>
+  <Card title="Edges" icon="arrow-right" href="/flows/edges">
+    Direct edges, conditional edges, loops, and compile-time validation.
+  </Card>
+  <Card title="Interrupts" icon="hand" href="/flows/interrupts">
+    Pausing, resuming, validation, and re-ask on error.
+  </Card>
+  <Card title="Register" icon="plug" href="/flows/register">
+    Wire the compiled flow onto an MCP server end-to-end.
   </Card>
 </CardGroup>

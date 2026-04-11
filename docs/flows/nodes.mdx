@@ -1,25 +1,25 @@
 ---
 title: Nodes
-description: "The three kinds of nodes that drive a flow forward."
+description: "Handlers that advance the flow: action, interrupt, or widget."
 ---
 
-A **node** is a single step in a flow. Each node is a handler function that receives the flow's context and returns one of three things:
+A node is one step in a flow. You register it with `.addNode(name, handler)`. The handler receives a context object and returns one of three things:
 
-1. A **state update** (plain object) — merged into state and the engine auto-advances.
-2. An **interrupt signal** — the flow pauses and asks the user one or more questions.
-3. A **widget signal** — the flow pauses and delegates rendering to a display tool (covered in a future guide).
+1. A plain state update (action node).
+2. An interrupt signal (pause and ask).
+3. A widget signal (pause and delegate to a display tool).
 
-Nodes are added with `.addNode(name, handler)`:
+The return type determines what the engine does next.
 
 ```ts
-flow.addNode("ask_email", async ({ interrupt }) =>
-  interrupt({ email: { question: "What's your work email?" } }),
+flow.addNode("ask_email", ({ interrupt }) =>
+  interrupt({ email: { question: "What is your work email?" } }),
 );
 ```
 
 ## Node context
 
-Every handler receives a single `ctx` argument with these fields:
+Every handler receives a single argument with this shape:
 
 ```ts
 type NodeContext<TState> = {
@@ -32,61 +32,55 @@ type NodeContext<TState> = {
 ```
 
 <ResponseField name="state" type="Partial<TState>">
-  The current flow state. Partial because earlier nodes may not have filled every field yet.
+  Current flow state. Partial because earlier nodes may not have filled every field yet.
 </ResponseField>
 
-<ResponseField name="meta" type="Record<string, unknown>">
-  The MCP request metadata for the current tool call. You rarely need to touch this directly — tracking inside a flow goes through `ctx.waniwani`, which already has the correct session attached.
+<ResponseField name="meta" type="Record<string, unknown> | undefined">
+  The MCP request `_meta` for this tool call. Rarely needed directly. Use `waniwani` for tracking.
 </ResponseField>
 
-<ResponseField name="interrupt" type="function">
-  Typed helper to create an interrupt signal. See [Interrupts](/flows/interrupts).
+<ResponseField name="interrupt" type="TypedInterrupt<TState>">
+  Helper to build an interrupt signal. Field keys are typed against the state schema. See [Interrupts](/flows/interrupts).
 </ResponseField>
 
-<ResponseField name="showWidget" type="function">
-  Typed helper to create a widget signal. Covered in the widgets guide (coming soon).
+<ResponseField name="showWidget" type="TypedShowWidget<TState>">
+  Helper to build a widget signal. Accepts a `RegisteredTool` (from `createTool()`) or its id as a string.
 </ResponseField>
 
 <ResponseField name="waniwani" type="ScopedWaniWaniClient | undefined">
-  A session-scoped WaniWani client, available when the server is wrapped with [`withWaniwani()`](/setup/wrap-server). Calls on this client automatically include the current session's metadata.
+  A session-scoped tracking client. Present when the MCP server is wrapped with [`withWaniwani()`](/setup/wrap-server). Undefined otherwise.
 </ResponseField>
 
 ## Action nodes
 
-An **action node** is a node that returns a plain state update. The engine merges the update into state and immediately advances to the next edge — no round-trip to the model.
+An action node returns a plain state update. The engine deep-merges the update into state and advances along the node's outgoing edge without pausing.
 
 ```ts
-.addNode("normalize_email", async ({ state }) => {
+.addNode("normalize_email", ({ state }) => {
   if (!state.email) return {};
   return { email: state.email.trim().toLowerCase() };
 })
 ```
 
-Action nodes are where you put business logic, transformations, external API calls, database writes, analytics — anything that doesn't need to prompt the user.
+Action nodes are where you put transformations, API calls, database writes, and analytics. Multiple action nodes in a row all run inside one tool call. The engine only pauses when a node returns an interrupt or widget signal.
 
 ```ts
 .addNode("check_stock", async ({ state, waniwani }) => {
   const inStock = await stockService.check(state.sku);
-
   await waniwani?.track({
     event: "tool.called",
-    properties: { name: "check_stock" },
+    properties: { name: "check_stock", type: "other" },
   });
-
   return { inStock };
 })
 ```
 
-<Tip>
-  Multiple action nodes in a row all run in a single tool call. The engine only pauses when it hits an interrupt or widget signal. Use this to keep the conversation snappy — the user doesn't need to see each internal step.
-</Tip>
-
 ## Interrupt nodes
 
-An **interrupt node** returns `interrupt(...)`. The engine pauses the flow, the model asks the user the question(s), and execution resumes on the next tool call with the answers merged into state.
+An interrupt node returns `interrupt(...)`. The engine stores the graph step, returns `status: "interrupt"` to the model, and waits for a `continue` call. When the user answers, the node's validators run (if any) and the engine advances.
 
 ```ts
-.addNode("ask_ski_level", async ({ interrupt }) =>
+.addNode("ask_ski_level", ({ interrupt }) =>
   interrupt({
     level: {
       question: "What's your ski level?",
@@ -96,66 +90,47 @@ An **interrupt node** returns `interrupt(...)`. The engine pauses the flow, the 
 )
 ```
 
-See [Interrupts](/flows/interrupts) for the full interrupt syntax, multi-question interrupts, validation, and hidden context.
+See [Interrupts](/flows/interrupts) for multi-question interrupts, hidden context, validation, and re-ask on error.
 
 ## Widget nodes
 
-A **widget node** returns `showWidget(...)`. The engine pauses the flow and asks the model to call a display tool to render a rich UI. The flow resumes once the user has interacted with the widget.
-
-Widget nodes integrate with the broader WaniWani UI SDK and have their own guide — coming soon. For now, you can see them used in the Alpic demo's `confirmation` step:
+A widget node returns `showWidget(tool, config)`. The engine returns `status: "widget"` pointing at a display tool (created with `createTool()`) and the flow pauses. When the user interacts, the host calls the flow back with `action: "continue"` and whatever values you want stored in `stateUpdates`.
 
 ```ts
-.addNode("confirmation", async ({ state, showWidget }) =>
-  showWidget("show-ski-lesson-confirmation", {
+.addNode("show_pricing", ({ state, showWidget }) =>
+  showWidget(showPricingTool, {
     data: {
-      level: state.level,
-      date: state.date,
-      time: state.time,
-      notes: state.notes,
+      postalCode: state.postalCode!,
+      sqm: Number(state.squareMeters),
     },
-    description: "Show the confirmation and wait for the user's approval.",
+    description: "User must pick a plan.",
+    field: "selectedPlan",
   }),
 )
 ```
 
+Setting `field` enables the same auto-skip behavior as interrupts: if `selectedPlan` is already filled when the flow reaches this node, the widget is skipped. Setting `interactive: false` makes the widget display-only and auto-advances after it renders.
+
+<Note>
+  The flow itself is a data-only tool. It never returns `structuredContent`. The display tool referenced by `showWidget` is the one that renders the widget. Register both alongside each other with `registerTools(server, [displayTool, flow])`.
+</Note>
+
 ## Async handlers
 
-Node handlers can be sync or async. Most real-world handlers are async because they call external services:
+Handlers can be sync or async. Most real handlers are async because they touch external services:
 
 ```ts
 .addNode("fetch_pricing", async ({ state }) => {
   const prices = await pricingApi.quote({
-    postalCode: state.postalCode,
-    size: state.squareMeters,
+    postalCode: state.postalCode!,
+    size: state.squareMeters!,
   });
   return { prices };
 })
 ```
 
-## Using the scoped tracker
+## Naming and uniqueness
 
-When your server is wrapped with `withWaniwani()`, every node gets a session-scoped client on `ctx.waniwani`. Use it to fire domain events without worrying about correlation:
+Node names are internal identifiers. They appear in Mermaid diagrams (`flow.graph()`), compile-time validation errors, and error messages at runtime. Use `snake_case`, keep them short, prefer verbs for actions and `ask_*` for interrupts.
 
-```ts
-.addNode("record_quote", async ({ state, waniwani }) => {
-  await waniwani?.track({
-    event: "quote.succeeded",
-    properties: { amount: state.quotedAmount, currency: "EUR" },
-  });
-  return {};
-})
-```
-
-If the server isn't wrapped, `ctx.waniwani` is `undefined` — the optional-chain above keeps things safe.
-
-## Naming nodes
-
-Node names are internal identifiers. They show up in:
-
-- Mermaid diagrams generated by `flow.graph()`.
-- Error messages during graph validation.
-- Dashboards that inspect flow execution history.
-
-Use `snake_case`, keep names short and descriptive, and prefer verbs for actions (`normalize_email`, `fetch_pricing`) and `ask_*` for interrupts (`ask_email`, `ask_postal_code`).
-
-Node names are **unique within a single flow** — trying to add a duplicate throws at build time.
+Node names must be unique within a flow. Adding the same name twice throws at build time. `START` and `END` are reserved and cannot be used as node names.

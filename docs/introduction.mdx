@@ -1,52 +1,21 @@
 ---
 title: Introduction
-description: "The WaniWani SDK turns any MCP server into an intelligent, analytics-aware agent."
+description: "Event tracking and flow orchestration for MCP servers."
 ---
 
-## What is WaniWani?
+`@waniwani/sdk` plugs into an existing MCP server and ships two things:
 
-**WaniWani** is a platform for building, shipping, and measuring conversational MCP (Model Context Protocol) apps — the tools your AI assistant calls inside ChatGPT, Claude, and any other MCP-compatible host.
+- **Event tracking.** Automatic `tool.called` events (name, duration, status, input, output, client info) plus custom events, batched and forwarded to the WaniWani dashboard.
+- **Flows.** A typed state machine compiled into a single MCP tool that can pause on `interrupt`, branch on conditions, and persist state across turns, all keyed by the MCP session.
 
-The **WaniWani SDK** (`@waniwani/sdk`) is the developer-facing library that plugs into your MCP server and gives you:
+## Who this is for
 
-<CardGroup cols={2}>
-  <Card title="Event tracking" icon="chart-line" href="/tracking/overview">
-    Automatic `tool.called` tracking, plus custom events, sessions, and user identification — all batched and shipped to the WaniWani dashboard.
-  </Card>
-  <Card title="Flows" icon="diagram-project" href="/flows/overview">
-    LangGraph-inspired, multi-step conversational flows. Define a state graph, compile it into a single MCP tool, and let the engine drive the conversation.
-  </Card>
-</CardGroup>
+You already run an MCP server (via `@modelcontextprotocol/sdk`, `@vercel/mcp-handler`, Skybridge, or similar) and you want analytics, multi-turn conversations, or both without rewriting your transport or auth layer.
 
-## Why flows?
+## What it is not
 
-MCP tools are stateless by default. Every call starts from scratch, which makes it painful to build anything beyond a single-shot Q&A — quoting, onboarding, qualification, lead capture, booking, support triage.
+This is not an MCP runtime. It sits on top of the server you already deploy. Zero runtime dependencies, sub-5KB core bundle.
 
-A **flow** is a typed state machine that:
+## Next step
 
-- Declares the data it needs to collect via a Zod schema.
-- Pauses to ask the user questions (`interrupt`).
-- Branches on conditions (`addConditionalEdge`).
-- Persists state server-side, keyed by the MCP session.
-- Resumes automatically on the next tool call — the model does not need to pass a token.
-
-The result: multi-turn conversations that feel native to the assistant, without you having to handle state, retries, or correlation by hand.
-
-## What this SDK is not
-
-This SDK is **not** a replacement for your MCP server runtime. It works on top of the servers you already have — Skybridge, `@modelcontextprotocol/sdk`, `@vercel/mcp-handler`, and others. You keep control of your transport, auth, and deployment.
-
-<Tip>
-  If you already have a working MCP server (for example, an Alpic/Skybridge template), adding WaniWani takes a few lines: install the package, set an API key, and wrap your server with `withWaniwani()`.
-</Tip>
-
-## Ready to start?
-
-<CardGroup cols={2}>
-  <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Go from zero to tracked MCP server in under 5 minutes.
-  </Card>
-  <Card title="Build your first flow" icon="wand-magic-sparkles" href="/flows/overview">
-    Turn a regular MCP tool into a multi-step, stateful conversation.
-  </Card>
-</CardGroup>
+Head to the [Quickstart](/quickstart) to wire up an existing server in under 5 minutes.

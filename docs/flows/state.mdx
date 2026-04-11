@@ -1,16 +1,16 @@
 ---
 title: State
-description: "Define the typed data your flow collects with a Zod schema."
+description: "Typed fields collected by the flow, defined with Zod."
 ---
 
-Every flow starts by declaring its **state** — a Zod schema that describes every field the flow will collect during its execution. State does two jobs:
+Every flow starts with a `state` declaration: a map of field names to Zod schemas. State serves two purposes.
 
-1. **Type inference.** The flow's runtime state type is derived from the schema, so `ctx.state` is fully typed inside every node handler. No generics to pass around.
-2. **AI protocol.** Field names, types, and `.describe()` text are surfaced in the compiled tool description. The model uses this to pre-fill answers (via `_meta.flow.state`) and to understand what data the flow needs.
+1. **Type inference.** The runtime state type is inferred from the Zod map, so `ctx.state` is fully typed inside every node. No generics to pass.
+2. **Model protocol.** Field names, types, and `.describe()` strings are embedded into the compiled tool description. The model uses this to know what data to collect and which values it can pre-fill from the user's message.
 
-## Basic state
+## Shape
 
-State is a flat `Record<string, z.ZodType>` on the flow config.
+State is a flat object where each value is a Zod schema.
 
 ```ts
 import { createFlow } from "@waniwani/sdk/mcp";
@@ -30,51 +30,50 @@ const flow = createFlow({
 });
 ```
 
-Inside a node handler, the state type is automatically inferred:
+Inside a node, the type is inferred:
 
 ```ts
-.addNode("summarize", async ({ state }) => {
-  //                         ^? Partial<{
-  //                              postalCode: string;
-  //                              squareMeters: number;
-  //                              heating: "gas" | "electric" | "oil" | "heat_pump";
-  //                            }>
-  return { summary: `${state.postalCode}, ${state.squareMeters}m²` };
+.addNode("summarize", ({ state }) => {
+  // state is Partial<{
+  //   postalCode: string;
+  //   squareMeters: number;
+  //   heating: "gas" | "electric" | "oil" | "heat_pump";
+  // }>
+  return { summary: `${state.postalCode}, ${state.squareMeters}m2` };
 })
 ```
 
 <Tip>
-  Always call `.describe()` on every field. The description is what the assistant reads when deciding how to phrase questions and what values to pre-fill. It's the most important piece of documentation your flow ships with.
+  Always add `.describe()` to every field. The description is what the model reads when phrasing questions and deciding which values it can pre-fill. It is the most load-bearing piece of documentation your flow ships with.
 </Tip>
 
-## Why state is always `Partial`
+## State is always partial
 
-At any point during execution, some fields may not be set yet. For example, after the first interrupt, only the first field is known. The engine therefore types `ctx.state` as `Partial<TState>` — you always need to guard against missing fields when building summaries or derived values.
+At any point during execution, only the fields filled by earlier nodes are populated. The engine types `ctx.state` as `Partial<TState>`, so always guard when reading fields.
 
 ```ts
-.addNode("review", async ({ state }) => {
+.addNode("review", ({ state }) => {
   if (!state.email || !state.company) {
-    // This shouldn't happen if the flow is wired correctly, but it's typed this way for safety.
     return {};
   }
   return { reviewed: true };
 })
 ```
 
-## Choosing field types
+## Field types
 
-Use Zod primitives and enums aggressively. The more constrained a field, the better the model is at filling it.
+Prefer constrained types. The more constrained a field, the better the model fills it.
 
-| Field shape                      | Use                                                  |
-| -------------------------------- | ---------------------------------------------------- |
-| Fixed choices                    | `z.enum([...])`                                      |
-| Free-form text                   | `z.string()`                                         |
-| Numbers with bounds              | `z.number().min(0).max(100)`                         |
-| Booleans                         | `z.boolean()`                                        |
-| Structured sub-objects (1 level) | `z.object({ ... })`                                  |
-| Lists                            | `z.array(z.string())`                                |
+| Field shape           | Use                                      |
+| --------------------- | ---------------------------------------- |
+| Fixed choices         | `z.enum([...])`                          |
+| Free-form text        | `z.string()`                             |
+| Bounded numbers       | `z.number().min(0).max(100)`             |
+| Booleans              | `z.boolean()`                            |
+| Lists                 | `z.array(z.string())`                    |
+| Nested group (1 deep) | `z.object({ ... })`                      |
 
-### Enums are great for suggestions
+### Enums pair well with suggestions
 
 ```ts
 state: {
@@ -84,11 +83,11 @@ state: {
 }
 ```
 
-Paired with an `interrupt` that lists the same values as `suggestions`, the model will phrase the question naturally and validate the answer against the enum.
+An interrupt that lists the same values as `suggestions` will lead the model to offer exactly those and validate the answer against the enum.
 
-### Nested state (one level)
+## Nested state
 
-You can nest one level deep using `z.object({ ... })`. This is useful when a logical sub-entity has multiple fields.
+Use `z.object()` when a sub-entity has multiple fields. Only one level of nesting is supported.
 
 ```ts
 state: {
@@ -102,10 +101,10 @@ state: {
 }
 ```
 
-Interrupts can then target nested fields via a dot-path:
+Interrupts target nested fields with dot-paths:
 
 ```ts
-.addNode("ask_driver", async ({ interrupt }) =>
+.addNode("ask_driver", ({ interrupt }) =>
   interrupt({
     "driver.name": { question: "What's the driver's name?" },
     "driver.licenseNumber": { question: "What's their license number?" },
@@ -113,30 +112,28 @@ Interrupts can then target nested fields via a dot-path:
 )
 ```
 
+Action nodes that return nested objects are deep-merged, so returning `{ driver: { name: "John" } }` does not wipe `driver.licenseNumber`.
+
 <Warning>
-  Only **one** level of nesting is supported. `driver.address.city` won't work — flatten deeper hierarchies into the top level or use a single `z.object()` and handle the whole sub-object in one question.
+  `driver.address.city` will not work. Flatten deeper hierarchies or handle the sub-object in one question that fills the whole `z.object()` at once.
 </Warning>
 
-## State updates
+## Pre-filling from the user's message
 
-Nodes can update state in three ways:
+When the user's opening message already contains answers (for example, "I'm in 75011, quote me a half-day lesson"), the model can pass them in `stateUpdates` on the very first call:
 
-1. **Return a plain object.** The engine merges it into state and auto-advances.
+```json
+{ "action": "start", "intent": "...", "stateUpdates": { "postalCode": "75011" } }
+```
 
-   ```ts
-   .addNode("normalize_email", ({ state }) => ({
-     email: state.email?.toLowerCase(),
-   }))
-   ```
+The engine auto-skips any node whose target field is already filled (values of `undefined`, `null`, or `""` do not count as filled). No extra configuration is needed. Just make sure field descriptions are clear enough for the model to map message content to field names.
 
-2. **Call `interrupt({ field: { question } })`.** The user's answer is stored at `field`.
+## How state updates happen
 
-3. **Return updates from an interrupt `validate` function.** See [Interrupts](/flows/interrupts).
+Nodes update state in three places:
 
-All three paths are typed — returning a key that isn't in your state schema will fail type-checking.
+1. **Action nodes** return a plain object that is deep-merged into state.
+2. **Interrupts** store the user's answer at the field key used in `interrupt({ field: { question } })`.
+3. **Interrupt validators** (see [Interrupts](/flows/interrupts)) can return additional state updates after a user answer passes validation.
 
-## Pre-filling state from the host
-
-When the MCP host has context about the user (for example, they just said "I'm in the 75011 postal code, quote me a half-day ski lesson"), the assistant can pre-fill state fields at flow start by passing `_meta.flow.state`. The engine merges pre-filled values into state before running the first node, so your flow can skip questions whose answers are already known.
-
-No extra configuration is required — just make sure your state fields are clearly described.
+All three paths are typed against the state schema.

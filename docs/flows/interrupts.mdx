@@ -1,30 +1,42 @@
 ---
 title: Interrupts
-description: "Pause a flow to ask the user one or more questions."
+description: "Pause the flow to ask the user one or more questions."
 ---
 
-An **interrupt** is what makes a flow feel conversational. When a node returns `interrupt(...)`, the flow pauses, the model asks the user the question(s), and execution resumes on the next tool call with the answers merged into state.
+An interrupt is the mechanism by which a flow collects information from the user. When a node returns `interrupt(...)`, the engine returns `status: "interrupt"` to the model, persists the current step, and waits. On the next `action: "continue"` call, the user's answers arrive in `stateUpdates`, validators run, and the engine advances along the node's outgoing edge.
 
-## Basic interrupt
+## What gets persisted
 
-The simplest form asks a single question that writes its answer to a state field.
+Between an interrupt and the matching continue call, the flow store holds:
+
+- The current step name (which node is paused).
+- The full state snapshot at the time of pause.
+- For single-question interrupts, the field being asked.
+
+Everything else (handler closures, validator functions) lives in the compiled flow in memory. Validators are registered when a handler first returns an interrupt and are keyed by `"nodeName:fieldName"`. They are not serialized.
+
+This has one operational consequence: if the server process restarts between the interrupt and the continue call, persisted state is reloaded but validator functions are rebuilt from the handler's return value as the interrupt re-executes. The interrupt handler must therefore be deterministic enough to produce the same validator for a given state.
+
+## Single question
+
+The smallest interrupt asks one question that writes its answer to one field.
 
 ```ts
-.addNode("ask_email", async ({ interrupt }) =>
+.addNode("ask_email", ({ interrupt }) =>
   interrupt({
     email: { question: "What's your work email?" },
   }),
 )
 ```
 
-The shape is `interrupt({ [fieldName]: { question } })`. `fieldName` must be a key declared in your flow's state schema — TypeScript will enforce this.
+The key (`email`) must be a field in the flow's state schema. TypeScript enforces this.
 
 ## Suggestions
 
-Pass `suggestions` to give the model a list of values to present as options. This is especially powerful when paired with a `z.enum()` field — the model will lean toward offering exactly those values.
+Pass `suggestions` to give the model a concrete list to offer. Pairs well with `z.enum()` state fields so the model validates the user's choice against a fixed set.
 
 ```ts
-.addNode("ask_level", async ({ interrupt }) =>
+.addNode("ask_level", ({ interrupt }) =>
   interrupt({
     level: {
       question: "What's your ski level?",
@@ -34,94 +46,89 @@ Pass `suggestions` to give the model a list of values to present as options. Thi
 )
 ```
 
-## Hidden context for the assistant
+## Hidden context
 
-Sometimes the way you phrase a question to the user is different from the guidance you want to give the assistant. Use the second argument's `context` field for **hidden** instructions that shape how the assistant asks, but never reach the user directly.
+Sometimes the question you show the user differs from the guidance you want to give the model. Put the guidance in `context`. It is passed through the protocol marked as hidden, so the model uses it to shape phrasing without showing it verbatim.
 
-```ts
-.addNode("ask_date", async ({ interrupt }) =>
-  interrupt(
-    {
-      date: {
-        question: "When would you like to book?",
-        suggestions: ["today", "tomorrow", "next week"],
-      },
-    },
-    {
-      context:
-        "If the user is unsure, help them commit to a relative date. Never suggest dates in the past.",
-    },
-  ),
-)
-```
-
-You can also attach context to a **single** question via its own `context` field:
+Per-question context lives inside the question config:
 
 ```ts
 interrupt({
   email: {
     question: "What's your work email?",
-    context: "Reject generic providers like gmail.com politely.",
+    context: "Politely reject generic domains like gmail.com.",
   },
 });
 ```
 
-## Multi-question interrupts
-
-A single interrupt can ask multiple related questions at once. The model will ask all of them in a single natural-sounding message.
+Interrupt-wide context lives in the second argument:
 
 ```ts
-.addNode("ask_date_and_time", async ({ interrupt }) =>
+interrupt(
+  {
+    date: { question: "When would you like to book?" },
+  },
+  {
+    context: "Help the user commit to a relative date. Never suggest past dates.",
+  },
+);
+```
+
+## Multi-question interrupts
+
+A single interrupt can ask several questions at once. The model asks them in one conversational message and the user's answers arrive together.
+
+```ts
+.addNode("ask_contact", ({ interrupt }) =>
   interrupt(
     {
-      date: {
-        question: "What date do you want to book?",
-        suggestions: ["today", "tomorrow", "next week"],
-      },
-      time: {
-        question: "And what time of day?",
-        suggestions: ["morning", "afternoon", "evening"],
-      },
+      name: { question: "What's your name?" },
+      email: { question: "What's your email?" },
     },
-    {
-      context: "Ask both together in one conversational message.",
-    },
+    { context: "Ask both in one natural message." },
   ),
 )
 ```
 
-<Tip>
-  Multi-question interrupts keep flows feeling human. Instead of asking "What's your name?" → wait → "What's your email?" → wait → "What's your company?", you can ask all three together and let the model sort the answers.
-</Tip>
+If the user only answers some of the questions, the engine re-presents the interrupt with the unanswered ones filtered in. Validators run only once every field in the interrupt is filled.
 
-## Validation
+## Validation and re-ask
 
-Add a `validate` function to run after the user answers. It receives the raw value and can:
-
-- Return `void` (no updates — the value is accepted as-is).
-- Return a **partial state update** to be merged before advancing.
-- Throw to reject the answer and re-ask.
+Add a `validate` function to reject bad answers or enrich state.
 
 ```ts
 interrupt({
   email: {
     question: "What's your work email?",
     validate: (value) => {
-      if (typeof value !== "string" || !value.includes("@")) {
+      if (!value.includes("@")) {
         throw new Error("That doesn't look like an email.");
       }
-      // Normalize and return updates
       return { email: value.trim().toLowerCase() };
     },
   },
 });
 ```
 
-Validation runs **before** the flow advances to the next node, so any updates it returns are visible in the following node's `ctx.state`.
+`value` is typed from the Zod schema for that field. The function can:
+
+- Return `void` to accept the answer as-is.
+- Return a `Partial<TState>` object to merge extra updates (for example, an enriched lookup result).
+- Throw an `Error` (not return a string) to reject the answer.
+
+On a thrown error, the engine:
+
+1. Clears the offending field from state.
+2. Re-presents the same interrupt.
+3. Prepends `ERROR: <message>` to that specific question's `context` so the model can relay the reason naturally.
+
+Other questions in a multi-question interrupt are not cleared. Only the failing field is re-asked.
+
+Validators run after all fields for an interrupt are filled, and before the engine advances along the outgoing edge. Any updates they return are visible in the next node.
 
 ## Nested fields
 
-If your state uses a `z.object()` for one level of nesting, you can target sub-fields with dot-paths.
+If state uses `z.object()` for one level of nesting, target sub-fields with dot-paths.
 
 ```ts
 state: {
@@ -138,19 +145,17 @@ interrupt({
 })
 ```
 
-Only one level of nesting is supported. See [State](/flows/state) for details.
+Only one level of nesting is supported. See [State](/flows/state).
 
-## Skipping interrupts with pre-filled state
+## Auto-skip when a field is already filled
 
-If a field is already populated when the flow reaches its interrupt node — for example, because the user mentioned the value up front and the host pre-filled it via `_meta.flow.state` — the engine skips the question automatically and moves on. You don't need to write conditional logic to handle this.
+If the user's opening message provides an answer (passed via `stateUpdates` on `action: "start"`), the engine skips any interrupt whose fields are already populated. For multi-question interrupts, already-answered questions are filtered out and only the unanswered ones are presented. An interrupt whose fields are all filled is skipped entirely.
 
-## Resuming after an interrupt
+Values of `undefined`, `null`, and `""` do not count as filled.
 
-When the user answers, the host sends a new tool call with `{ action: "continue", stateUpdates: { email: "..." } }`. The engine:
+## Gotchas
 
-1. Merges the updates into persisted state.
-2. Runs the interrupted node's `validate` function (if any).
-3. Advances along the node's outgoing edge.
-4. Executes subsequent action nodes until it either hits the next interrupt, a widget, or `END`.
-
-This all happens in a single tool call — the user experiences a fluid conversation even though there can be many internal steps between questions.
+- **Throw, do not return strings.** A validator that returns a string is treated as `void`, so the answer is accepted. Throw `new Error("...")` to reject.
+- **Validators run on all-filled, not per-question.** In a multi-question interrupt, a validator for question A will not fire until question B is also answered. Design validations accordingly.
+- **Validator closures can reference `state` from the handler.** That `state` is the snapshot at the time the handler ran, not at the time the user answered. If you need the freshest state, do the lookup inside the validator using the value argument plus your own fetch, not the closed-over `state`.
+- **The field is cleared on error, not the whole interrupt.** After a failed validation, only the failing field is empty. The user's other answers remain.

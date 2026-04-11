@@ -1,24 +1,24 @@
 ---
 title: Edges
-description: "Wire nodes together — direct edges, conditional branching, and terminal states."
+description: "Wire nodes together: direct edges, conditional branching, loops."
 ---
 
-Edges define the order in which your nodes run. A flow without edges is just a collection of handlers; edges are what make it a graph.
+Edges define the order in which nodes run. Every node needs an outgoing edge. Every flow needs an edge out of `START` and must be able to reach `END`.
 
-## Sentinels: `START` and `END`
+## Sentinels
 
-Two special node names control where a flow starts and ends:
+Two reserved node names control flow boundaries:
 
-- **`START`** — the entry point. Every flow must have exactly one edge out of `START`.
-- **`END`** — the terminal marker. Any node that should finish the flow points to `END`.
+- `START`: the entry point. Exactly one edge must originate from it.
+- `END`: the terminal marker. Any node pointing to `END` finishes the flow when reached.
 
 ```ts
-import { createFlow, START, END } from "@waniwani/sdk/mcp";
+import { createFlow, END, START } from "@waniwani/sdk/mcp";
 ```
 
 ## Direct edges
 
-The most common edge is a direct one from node A to node B. Use `.addEdge(from, to)`:
+Use `.addEdge(from, to)` for unconditional transitions. Each node can have at most one outgoing edge.
 
 ```ts
 flow
@@ -28,19 +28,17 @@ flow
   .addEdge("record", END);
 ```
 
-Each node can have **at most one outgoing edge**. If you need the flow to branch, use a conditional edge.
-
 <Warning>
-  Calling `addEdge` twice from the same node throws at build time. Replace the second `addEdge` with `addConditionalEdge` if you need branching.
+  Calling `addEdge` twice from the same node throws at build time. If you need a second outgoing path, replace the first call with `addConditionalEdge`.
 </Warning>
 
 ## Conditional edges
 
-Use `addConditionalEdge` when the next step depends on the current state. The condition function receives the current state (partial, as always) and returns the name of the next node.
+Use `.addConditionalEdge(from, condition)` when the next node depends on state. The condition function receives `Partial<TState>` and must return a node name (or `END`). It can be async.
 
 ```ts
 flow
-  .addNode("ask_email", async ({ interrupt }) =>
+  .addNode("ask_email", ({ interrupt }) =>
     interrupt({ email: { question: "What's your email?" } }),
   )
   .addNode("analyze_email", ({ state }) => {
@@ -48,7 +46,7 @@ flow
     const generic = new Set(["gmail.com", "yahoo.com", "outlook.com"]);
     return { isCompanyEmail: !generic.has(domain) };
   })
-  .addNode("ask_company", async ({ interrupt }) =>
+  .addNode("ask_company", ({ interrupt }) =>
     interrupt({ companyName: { question: "What company are you with?" } }),
   )
   .addNode("done", () => ({ ready: true }))
@@ -61,26 +59,20 @@ flow
   .addEdge("done", END);
 ```
 
-The condition function can be `async` — handy when the branch depends on an external lookup.
+Async conditions work for branches that depend on external lookups:
 
 ```ts
 .addConditionalEdge("check_inventory", async (state) => {
-  const inStock = await inventoryService.check(state.sku);
+  const inStock = await inventoryService.check(state.sku!);
   return inStock ? "confirm_order" : "offer_alternative";
 })
 ```
 
-## Reaching `END`
+The return type is checked against registered node names, so a typo in a branch target fails type-checking.
 
-A flow ends when execution reaches `END`. At that point, the engine returns a `complete` status to the model and deletes the session's flow state.
+## Reaching END
 
-Any node can point to `END`:
-
-```ts
-.addEdge("confirmation", END)
-```
-
-You can also branch to `END` conditionally:
+When execution reaches `END`, the engine returns `status: "complete"` to the model and deletes the session's flow state so a stale `continue` call cannot resume it. Any node can point to `END`, directly or conditionally.
 
 ```ts
 .addConditionalEdge("review", (state) =>
@@ -88,25 +80,43 @@ You can also branch to `END` conditionally:
 )
 ```
 
-## Validation at compile time
+## Loops
 
-When you call `.compile()`, the engine validates the graph:
+A conditional edge that points back to an earlier node creates a loop. Useful for retries or collection gathering.
 
-- **Entry point exists.** There must be an edge from `START`.
-- **All static edge targets exist.** No dangling references to undeclared nodes.
-- **Every node has an outgoing edge.** A node without an outgoing edge is a dead end — the engine throws at compile time rather than at runtime.
+```ts
+.addNode("ask_item", ({ interrupt }) =>
+  interrupt({ item: { question: "Add an item (or say 'done')" } }),
+)
+.addNode("append", ({ state }) => ({
+  items: [...(state.items ?? []), state.item].filter(Boolean) as string[],
+}))
+.addEdge("ask_item", "append")
+.addConditionalEdge("append", (state) =>
+  state.item === "done" ? "finalize" : "ask_item",
+)
+```
 
-If validation fails, `.compile()` throws a descriptive error before your server ever starts.
+The engine enforces a hard cap of 50 iterations per tool call to prevent runaway loops between action nodes. You will still need `END` reachable from every branch or the flow can stall.
+
+## Compile-time validation
+
+`.compile()` validates the graph before returning. It throws if:
+
+- No edge exists from `START`.
+- A `START` edge or direct edge points at an undeclared node.
+- A node has no outgoing edge.
+- An edge is declared `from` a non-existent node.
+
+Errors surface immediately at startup, not at the first user interaction.
 
 ## Visualizing the graph
 
-Every flow exposes a `graph()` method that returns a Mermaid `flowchart TD` string. Drop it into documentation, a debug panel, or a GitHub README:
+Both the builder and the compiled flow expose `graph()`, which returns a Mermaid `flowchart TD` string. Conditional edges render as dashed arrows to a placeholder because branch targets are decided at runtime.
 
 ```ts
 console.log(flow.graph());
 ```
-
-Direct edges render as solid arrows; conditional edges render as dashed arrows to a placeholder (because their target is decided at runtime).
 
 ```mermaid
 flowchart TD
@@ -122,23 +132,3 @@ flowchart TD
   ask_company --> done
   done --> __end__
 ```
-
-## Loops
-
-There's nothing special about loops — a conditional edge that points back to an earlier node creates one. Use them for retry logic, collection gathering, or "are you sure?" confirmations.
-
-```ts
-.addNode("ask_item", async ({ interrupt }) =>
-  interrupt({ item: { question: "Add an item (or type 'done')" } }),
-)
-.addNode("append", ({ state }) => ({
-  items: [...(state.items ?? []), state.item].filter(Boolean),
-}))
-.addConditionalEdge("append", (state) =>
-  state.item === "done" ? "finalize" : "ask_item",
-)
-```
-
-<Warning>
-  The engine does not enforce a maximum loop count. If your loop condition never terminates, the flow will too — make sure every path eventually reaches `END`.
-</Warning>

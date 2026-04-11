@@ -1,25 +1,26 @@
 ---
 title: Sessions
-description: "How the SDK correlates events to MCP conversations via _meta."
+description: "How the SDK derives a session id from MCP _meta and attaches it to events."
 ---
 
-A **session** in WaniWani represents one continuous conversation between a user and an MCP client (ChatGPT, Claude, etc.). Every event you track belongs to a session — that's how the dashboard groups events into funnels, counts unique users, and replays past conversations.
+A session represents one conversation between a user and an MCP client. Events are grouped into a session by a `sessionId` that the SDK extracts from the MCP request metadata (`_meta`).
 
-The important thing to know: **you almost never create a session manually**. The SDK derives it from the MCP request metadata that every tool handler receives as `extra._meta`.
+You do not create sessions. You pass `meta: extra._meta` on every `track()` call, and the SDK does the correlation.
 
-## Why sessions come from `_meta`
+## How session correlation works
 
-Every MCP tool handler is called with two arguments:
+The SDK reads the first non-empty string value it finds under these keys of `_meta`, in order:
 
-```ts
-async (input, extra) => {
-  // extra._meta contains the host-provided correlation context
-}
-```
+1. `waniwani/sessionId`
+2. `openai/sessionId`
+3. `openai/session`
+4. `sessionId`
+5. `conversationId`
+6. `anthropic/sessionId`
 
-`extra._meta` carries the correlation identifiers needed to link a tool call back to a specific conversation. The SDK reads these identifiers and turns them into a stable session id. By passing `meta: extra._meta` into `client.track()`, you tell the SDK: _"this event belongs to the same conversation as the tool call that triggered it."_
+The matched value becomes the `correlation.sessionId` field on the outgoing V2 envelope. The SDK also extracts `requestId`, `traceId`, `correlationId`, and `externalUserId` from `_meta` using the same approach. Source is derived from the session key (`openai/sessionId` -> `chatgpt`, `anthropic/sessionId` -> `claude`, `waniwani/sessionId` -> `chatbar`).
 
-## The golden rule
+## The rule
 
 <Check>
   Always pass `meta: extra._meta` when tracking events from inside a tool handler.
@@ -30,40 +31,60 @@ server.registerTool(
   "get_quote",
   { /* config */ },
   async ({ amount, currency }, extra) => {
-    // ... do work
+    // ... run your business logic
 
     await wani.track({
       event: "quote.succeeded",
       properties: { amount, currency },
-      meta: extra._meta, // 👈 this is how sessions work
+      meta: extra._meta,
     });
 
-    return { content: [{ type: "text", text: "Quoted!" }] };
+    return { content: [{ type: "text", text: "Quoted" }] };
   },
 );
 ```
 
-If you forget `meta`, the event still ships — but it arrives without a session id and can't be grouped with the rest of the conversation.
+If you omit `meta` and do not set `sessionId` explicitly, the envelope ships without a session id and the dashboard cannot group it with the rest of the conversation.
 
 ## Where `_meta` lives
 
-Different MCP libraries expose request metadata in slightly different places. The SDK accepts all of them:
+| MCP library | Location |
+| --- | --- |
+| `@modelcontextprotocol/sdk` | `request.params._meta` (on the raw request), surfaced as `extra._meta` in tool handlers |
+| `@vercel/mcp-handler` | `extra._meta` |
 
-| Library                          | Where to find metadata           |
-| -------------------------------- | -------------------------------- |
-| `@modelcontextprotocol/sdk`      | `request.params._meta`           |
-| `@vercel/mcp-handler`            | `extra._meta`                    |
-| Skybridge (`skybridge/server`)   | `extra._meta`                    |
+Wherever you see `extra._meta` in these docs, substitute the equivalent for your runtime.
 
-Anywhere you see `extra._meta` in the docs, substitute the equivalent for your runtime.
+## The scoped client inside tools and flows
 
-## Inside a flow
+When a server is wrapped with `withWaniwani(server)`, each tool invocation receives a request-scoped WaniWani client on `extra["waniwani/client"]`. The scoped client is also surfaced as `context.waniwani` inside `createTool` handlers and as `waniwani` inside flow nodes. Its `track()` and `identify()` methods merge the current request's `_meta` automatically, so you do not pass it yourself.
 
-Flows handle session correlation for you. Each flow execution loads and saves its state keyed by the session id from `_meta`, so the user's progress survives across tool calls without the model having to pass any token. And the **session-scoped client** on `ctx.waniwani` automatically attaches `meta` for you:
+```ts
+import { createTool } from "@waniwani/sdk/mcp";
+import { z } from "zod";
+
+createTool(
+  {
+    id: "get_quote",
+    title: "Get quote",
+    description: "Return a price quote",
+    inputSchema: { amount: z.number() },
+  },
+  async ({ amount }, context) => {
+    // context.waniwani is the scoped client, meta is already attached
+    await context.waniwani?.track({
+      event: "quote.succeeded",
+      properties: { amount, currency: "USD" },
+    });
+    return { text: `Quoted ${amount}` };
+  },
+);
+```
+
+Inside a flow node:
 
 ```ts
 .addNode("record", async ({ state, waniwani }) => {
-  // No need to pass meta — the scoped client already has it
   await waniwani?.track({
     event: "quote.succeeded",
     properties: { amount: state.amount },
@@ -72,11 +93,11 @@ Flows handle session correlation for you. Each flow execution loads and saves it
 })
 ```
 
-See [Flows overview](/flows/overview) for the full picture.
+See [Flows](/flows/overview) for the full node context.
 
 ## Manual session ids
 
-In rare cases — background jobs reacting to a finished session, retroactive data backfills, tests — you may need to set the session id explicitly. Do that with the `sessionId` field:
+For background jobs, backfills, or tests where `_meta` is not available, you can set `sessionId` explicitly:
 
 ```ts
 await wani.track({
@@ -87,11 +108,11 @@ await wani.track({
 ```
 
 <Warning>
-  Only use manual `sessionId` as an escape hatch. Inside normal tool handlers, passing `meta: extra._meta` is simpler and less error-prone.
+  Use manual `sessionId` only when there is no `_meta` to pass. Inside tool handlers, always prefer `meta: extra._meta`.
 </Warning>
 
 ## Session lifecycle
 
-The WaniWani platform generates `session.started` events automatically when it sees the first event carrying a new session id. You don't need to send `session.started` yourself.
+The WaniWani backend emits `session.started` automatically the first time it sees a new `sessionId`. You do not send it yourself, and `session.started` in the SDK's `EventType` union exists only to type the ingestion envelope.
 
-Sessions don't have a hard "end" — they're considered closed after an idle timeout on the server side. If the user comes back later, they either resume the same session (if within the window) or start a fresh one, depending on how the host client re-connects.
+Sessions do not have a hard close. The backend treats them as closed after an idle window. If the user comes back, they either resume the same session (within the window) or start a fresh one, depending on what the host client sends in `_meta`.

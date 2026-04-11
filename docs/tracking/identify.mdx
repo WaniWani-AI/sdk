@@ -1,38 +1,45 @@
 ---
 title: Identify Users
-description: "Attach a real-world user identifier to a WaniWani session."
+description: "Attach an external user id to the current session."
 ---
 
-Sessions correlate events within a single conversation. **Identify** is how you link a session back to a real user — an email, an internal user id, a Stripe customer id, whatever is stable for your product.
+`identify()` sends a `user.identified` event and attaches an `externalUserId` to the current session's correlation ids. Use it once you know who the user is (an email, a database id, a Stripe customer id, or any stable identifier in your system).
 
-Once you identify a session, every subsequent event in that session is attributed to the user. Users that were previously anonymous get back-filled too.
+## Signature
+
+```ts
+identify(
+  userId: string,
+  properties?: Record<string, unknown>,
+  meta?: Record<string, unknown>,
+): Promise<{ eventId: string }>;
+```
+
+Under the hood it calls `track()` with `event: "user.identified"` and passes `userId` as `externalUserId`. The call returns `{ eventId }` immediately, the same as `track()`.
+
+<ResponseField name="userId" type="string" required>
+  A stable external identifier for the user. Database id, CRM record id, Stripe customer id, or similar. Emails work but are not ideal because they change.
+</ResponseField>
+
+<ResponseField name="properties" type="Record<string, unknown>">
+  User-level traits (name, email, plan, signup date, and so on). These land in the event `properties` payload.
+</ResponseField>
+
+<ResponseField name="meta" type="Record<string, unknown>">
+  MCP request metadata, typically `extra._meta`. Required so the identify call can be correlated with the current session.
+</ResponseField>
 
 ## Usage
 
 ```ts
-await wani.identify("user_01HX123ABC", {
-  email: "customer@example.com",
-  plan: "pro",
-}, extra._meta);
+await wani.identify(
+  "user_01HX123ABC",
+  { email: "customer@example.com", plan: "pro" },
+  extra._meta,
+);
 ```
 
-<ResponseField name="userId" type="string" required>
-  An external, stable identifier for the user. Use whatever is canonical in your system: a database id, a Stripe customer id, a CRM record id. Emails work too but are not ideal because they change.
-</ResponseField>
-
-<ResponseField name="properties" type="Record<string, unknown>">
-  Key/value pairs describing the user: name, email, plan, signup date, etc. These become user-level traits in the WaniWani dashboard.
-</ResponseField>
-
-<ResponseField name="meta" type="Record<string, unknown>">
-  MCP request metadata — typically `extra._meta`. Needed so the identify call is linked to the right session.
-</ResponseField>
-
-`identify()` returns `{ eventId }` just like `track()`.
-
-## When to call it
-
-The most common pattern is: identify as soon as you know who the user is, and nowhere else.
+A typical pattern is to call `identify()` from the tool that first learns the user's identity:
 
 ```ts
 server.registerTool(
@@ -40,13 +47,14 @@ server.registerTool(
   { /* ... */ },
   async ({ email }, extra) => {
     await wani.identify(email, { email }, extra._meta);
-
-    return { content: [{ type: "text", text: "Thanks!" }] };
+    return { content: [{ type: "text", text: "Thanks" }] };
   },
 );
 ```
 
-You can also identify **inline** with a `track()` call by passing `externalUserId`:
+## Identify inline with `track()`
+
+If the same tool call both learns the identity and produces a domain event, pass `externalUserId` on the `track()` call instead of making a separate `identify()` call:
 
 ```ts
 await wani.track({
@@ -57,13 +65,14 @@ await wani.track({
 });
 ```
 
-This is handy when the tool that produced the event is also the first place you learn the user's identity — it saves an extra call.
+This produces one event instead of two.
 
-## Inside a flow
+## Inside tools and flows
 
-Flow nodes get a session-scoped client on `ctx.waniwani` that already knows about the current session's metadata. You can call `identify` on it without passing `meta`:
+When the server is wrapped with `withWaniwani()`, the scoped client on `context.waniwani` (in `createTool`) or `waniwani` (in flow nodes) already has the request's `_meta` attached, so `identify()` takes only `userId` and optional `properties`:
 
 ```ts
+// Inside a flow node
 .addNode("record_email", async ({ state, waniwani }) => {
   if (state.email) {
     await waniwani?.identify(state.email, { email: state.email });
@@ -72,10 +81,10 @@ Flow nodes get a session-scoped client on `ctx.waniwani` that already knows abou
 })
 ```
 
-## Anonymous vs identified sessions
+## Anonymous vs. identified sessions
 
-Sessions start out anonymous — you'll see them in the dashboard with a session id but no user. The moment you call `identify()` (or pass `externalUserId` on a `track()` call), all existing events in the session are retroactively linked to the user, and all future events are attributed directly.
+Sessions start anonymous. They get a `sessionId` from `_meta` but no `externalUserId`. When you call `identify()` (or pass `externalUserId` on a `track()` call), future events in the session carry the user id. How the backend back-fills earlier events in the same session for a newly identified user is a server-side concern, not something the SDK controls.
 
 <Tip>
-  Don't worry about over-calling `identify()`. Calling it with the same `userId` multiple times within a session is cheap and idempotent — it's an event like any other.
+  Calling `identify()` multiple times with the same `userId` is fine. Each call is an independent `user.identified` event.
 </Tip>

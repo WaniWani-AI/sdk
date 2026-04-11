@@ -1,44 +1,30 @@
 ---
 title: Installation
-description: "Install and configure the WaniWani SDK."
+description: "Install @waniwani/sdk and create a client."
 ---
-
-## Install the package
-
-The SDK ships as a single package on npm.
-
-<CodeGroup>
-
-```bash npm
-npm install @waniwani/sdk
-```
-
-```bash pnpm
-pnpm add @waniwani/sdk
-```
-
-```bash bun
-bun add @waniwani/sdk
-```
-
-</CodeGroup>
 
 ## Requirements
 
-- **Node.js** 18.17 or newer (Node 20+ recommended)
-- An MCP server runtime — any of the following work out of the box:
-  - [Skybridge](https://github.com/alpic-ai/skybridge) (Alpic's MCP runtime)
+- Node.js 18.17 or newer (Node 20+ recommended)
+- An MCP server runtime. The SDK is tested against:
   - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk)
+  - [Skybridge](https://github.com/alpic-ai/skybridge) (Alpic)
   - [`@vercel/mcp-handler`](https://www.npmjs.com/package/@vercel/mcp-handler)
-- A WaniWani account — sign up at [app.waniwani.ai](https://app.waniwani.ai)
+- A WaniWani account at [app.waniwani.ai](https://app.waniwani.ai)
+
+`@modelcontextprotocol/sdk` and `zod` are peer dependencies. Install them in your project if you do not already have them.
+
+## Install
+
+```bash
+npm install @waniwani/sdk
+```
 
 <Note>
-  The SDK has **zero runtime dependencies** and targets a sub-5KB bundle. It's safe to ship in serverless functions, edge runtimes, and long-running Node processes alike.
+  The SDK has zero runtime dependencies and targets a sub-5KB core bundle. It runs in long-lived Node processes, serverless functions, and edge runtimes.
 </Note>
 
 ## Create a client
-
-A WaniWani client is created by calling the `waniwani()` factory.
 
 ```ts
 import { waniwani } from "@waniwani/sdk";
@@ -46,29 +32,20 @@ import { waniwani } from "@waniwani/sdk";
 const wani = waniwani();
 ```
 
-With no arguments, the client reads its API key from the `WANIWANI_API_KEY` environment variable and uses the default base URL (`https://app.waniwani.ai`). This is the most common setup for production.
+With no arguments, the client reads `WANIWANI_API_KEY` from the environment and uses `https://app.waniwani.ai` as the base URL. This is the recommended setup.
 
-For explicit configuration, pass an object:
-
-```ts
-import { waniwani } from "@waniwani/sdk";
-
-const wani = waniwani({
-  apiKey: process.env.WANIWANI_API_KEY,
-  apiUrl: "https://app.waniwani.ai",
-});
-```
+See [API keys](/setup/api-key) for how to obtain and configure the key.
 
 ## Configuration reference
 
-All fields are optional. Anything not provided falls back to sensible defaults.
+All fields are optional.
 
 <ResponseField name="apiKey" type="string">
-  Your MCP environment API key. Defaults to `process.env.WANIWANI_API_KEY`. If neither is set, tracking calls will throw at runtime.
+  Your MCP environment API key. Defaults to `process.env.WANIWANI_API_KEY`. If both are missing, `track()` / `flush()` / `shutdown()` throw at runtime.
 </ResponseField>
 
 <ResponseField name="apiUrl" type="string" default="https://app.waniwani.ai">
-  Base URL of the WaniWani API. Override this for self-hosted deployments or staging environments.
+  Base URL of the WaniWani API. Override for self-hosted deployments or staging backends.
 </ResponseField>
 
 <ResponseField name="tracking" type="object">
@@ -76,22 +53,22 @@ All fields are optional. Anything not provided falls back to sensible defaults.
 
   <Expandable title="tracking options">
     <ResponseField name="endpointPath" type="string" default="/api/mcp/events/v2/batch">
-      Path appended to `apiUrl` to POST batches of events.
+      Path appended to `apiUrl` when POSTing batches.
     </ResponseField>
     <ResponseField name="flushIntervalMs" type="number" default={1000}>
       How often the buffered transport flushes events.
     </ResponseField>
     <ResponseField name="maxBatchSize" type="number" default={20}>
-      Maximum number of events sent in a single HTTP request.
+      Maximum events per HTTP request.
     </ResponseField>
     <ResponseField name="maxBufferSize" type="number" default={1000}>
-      Maximum in-memory buffer size. Once exceeded, the oldest events are dropped.
+      Maximum in-memory buffer size. Oldest events are dropped beyond this.
     </ResponseField>
     <ResponseField name="maxRetries" type="number" default={3}>
-      Number of retry attempts on transient failures.
+      Retry attempts on transient failures.
     </ResponseField>
     <ResponseField name="retryBaseDelayMs" type="number" default={200}>
-      Base delay used for exponential backoff between retries.
+      Base delay for exponential backoff between retries.
     </ResponseField>
     <ResponseField name="retryMaxDelayMs" type="number" default={2000}>
       Maximum backoff delay between retries.
@@ -102,7 +79,7 @@ All fields are optional. Anything not provided falls back to sensible defaults.
   </Expandable>
 </ResponseField>
 
-## Example: fully configured client
+## Fully configured client
 
 ```ts
 import { waniwani } from "@waniwani/sdk";
@@ -121,16 +98,16 @@ const wani = waniwani({
 
 ## Graceful shutdown
 
-The SDK automatically flushes buffered events on `beforeExit`, `SIGINT`, and `SIGTERM` in Node environments. For platforms where you need to flush explicitly (edge runtimes, tests, short-lived scripts), call `shutdown()`:
+In Node environments, the SDK attaches handlers for `beforeExit`, `SIGINT`, and `SIGTERM` that flush buffered events automatically. For serverless, edge runtimes, tests, or short-lived scripts, call `shutdown()` explicitly:
 
 ```ts
-await wani.shutdown({ timeoutMs: 5000 });
+const result = await wani.shutdown({ timeoutMs: 5000 });
+// => { timedOut: false, pendingEvents: 0 }
 ```
 
-The returned object tells you whether any events were dropped:
+## Also supported
 
-```ts
-{ timedOut: false, pendingEvents: 0 }
-```
+- **Project config file.** Create a `waniwani.config.ts` with `defineConfig({ ... })` from `@waniwani/sdk`, then import it once at startup. Subsequent calls to `waniwani()` pick up the registered config.
+- **Framework adapters.** Pass the client to `toNextJsHandler(wani, { ... })` from `@waniwani/sdk/next-js` for Next.js route handlers.
 
-Next, [get your API key](/setup/api-key) and then [wrap your MCP server](/setup/wrap-server).
+Next: [get your API key](/setup/api-key), then [wrap your MCP server](/setup/wrap-server).

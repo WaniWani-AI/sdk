@@ -1,62 +1,64 @@
 ---
 title: Event Tracking Overview
-description: "How the WaniWani SDK sends events from your MCP server to the dashboard."
+description: "Send events from your MCP server to the WaniWani dashboard."
 ---
 
-The tracking module is what gets your MCP server's activity — tool calls, quotes, purchases, custom funnel steps — into the WaniWani dashboard. It's designed to be **fire-and-forget**: you call `track()`, and the SDK takes care of batching, retrying, and flushing.
+The tracking module ships events from your MCP server to the WaniWani backend. You call `client.track()`, the SDK enqueues the event in memory, and a background transport batches and posts it to `POST /api/mcp/events/v2/batch`. Tracking never blocks your tool handler.
 
-## Core concepts
+## Mental model
 
 <CardGroup cols={2}>
   <Card title="Events" icon="bolt" href="/tracking/events">
-    Typed records of something that happened: a tool call, a quote, a purchase. Each event has a name and optional properties.
+    A typed record of something that happened (a tool call, a quote, a purchase). Has a name, properties, and correlation ids.
   </Card>
   <Card title="Sessions" icon="link" href="/tracking/sessions">
-    A session correlates all events from a single MCP conversation. Sessions are derived from MCP request metadata (`_meta`) — you almost never create them by hand.
+    A session groups events from one MCP conversation. The SDK reads the session id from MCP `_meta`, so you pass `meta: extra._meta` on every call.
   </Card>
   <Card title="Identify" icon="user" href="/tracking/identify">
-    Attach an external user identifier to the current session so events get tied to real users across multiple sessions.
+    Attach an `externalUserId` to the current session so events get linked to a real user.
   </Card>
-  <Card title="Automatic tracking" icon="wand-magic-sparkles" href="/setup/wrap-server">
-    `withWaniwani()` auto-tracks every tool call with zero code. Layer custom events on top as needed.
+  <Card title="Automatic tool tracking" icon="wand-magic-sparkles" href="/setup/wrap-server">
+    `withWaniwani(server)` wraps every tool handler and emits `tool.called` for you with timing and status.
   </Card>
 </CardGroup>
 
-## How tracking works
-
-When you call `client.track(...)`, the SDK:
-
-1. Validates the input shape (modern or legacy).
-2. Maps it to a canonical **Events API V2** envelope.
-3. Enqueues the envelope on an in-memory buffer.
-4. Returns `{ eventId }` immediately — tracking never blocks your tool handler.
-5. A background transport flushes the buffer on a short interval, or whenever the buffer size threshold is crossed.
-6. On transient failures, the transport retries with exponential backoff. On auth failures, it stops retrying permanently to avoid retry storms.
-
-The transport is designed for both long-running Node servers and short-lived serverless functions:
-
-- **Long-running** processes rely on the default interval flush and a `beforeExit` / `SIGTERM` hook.
-- **Serverless** functions should either enable `flushAfterToolCall: true` when wrapping the server, or explicitly call `await client.flush()` (or `await client.shutdown()`) before the function returns.
-
-## Minimal example
+## Track your first event
 
 ```ts
 import { waniwani } from "@waniwani/sdk";
 
-const wani = waniwani();
+const wani = waniwani(); // reads WANIWANI_API_KEY from env
 
+// Inside a tool handler
 await wani.track({
   event: "quote.succeeded",
-  properties: { amount: 99, currency: "USD" },
-  meta: extra._meta,
+  properties: { amount: 1299, currency: "EUR" },
+  meta: extra._meta, // associates the event with the current session
 });
 
+// In serverless runtimes, flush before the function returns
 await wani.flush();
 ```
 
-## What `withWaniwani()` tracks for free
+That is the whole happy path. Everything else on the following pages is detail.
 
-Once your server is wrapped with [`withWaniwani(server)`](/setup/wrap-server), a `tool.called` event is emitted automatically for every tool invocation. You still use `client.track()` for **domain events** — quotes, purchases, link clicks, custom funnel steps — but you never need to hand-roll `tool.called` tracking.
+## How the transport behaves
+
+When you call `track()`, the SDK:
+
+1. Normalizes the input into a canonical Events API V2 envelope (see [events-api-v2-contract](https://github.com/waniwani-ai/sdk)).
+2. Generates a deterministic event id (`evt_<uuid>`).
+3. Pushes the envelope on an in-memory buffer and returns `{ eventId }` immediately.
+4. A background timer flushes the buffer every `flushIntervalMs` (default `1000`), or sooner when the batch fills (`maxBatchSize`, default `20`).
+5. Retries transient failures (`408`, `425`, `429`, `5xx`) with exponential backoff, up to `maxRetries` (default `3`).
+6. Stops retrying on `401` / `403` auth errors to avoid retry storms.
+
+### Long-running vs. serverless
+
+| Runtime | How to make sure events ship |
+| --- | --- |
+| Long-running Node process | Nothing. The SDK attaches `beforeExit`, `SIGINT`, and `SIGTERM` hooks that call `shutdown()` automatically. |
+| Serverless / short-lived | Call `await wani.flush()` before the function returns, or pass `flushAfterToolCall: true` to `withWaniwani()`. |
 
 ## Client API
 
@@ -78,15 +80,19 @@ interface TrackingClient {
 
 <CardGroup cols={2}>
   <Card title="track(event)" icon="plus" href="/tracking/events">
-    Enqueue a typed event.
+    Enqueue an event.
   </Card>
-  <Card title="identify(userId)" icon="user" href="/tracking/identify">
-    Attach a user identifier to the session.
+  <Card title="identify(userId, properties?, meta?)" icon="user" href="/tracking/identify">
+    Send a `user.identified` event and attach the user id to the session.
   </Card>
   <Card title="flush()" icon="water">
-    Force any buffered events to send immediately.
+    Wait for the current buffer to drain.
   </Card>
-  <Card title="shutdown()" icon="power-off">
+  <Card title="shutdown({ timeoutMs? })" icon="power-off">
     Flush and stop the transport. Returns `{ timedOut, pendingEvents }`.
   </Card>
 </CardGroup>
+
+<Note>
+  All four methods throw synchronously if no `apiKey` was resolved (from config or `WANIWANI_API_KEY`). If you instantiate `waniwani()` without an api key, the client is inert and calling `track()` will throw.
+</Note>
