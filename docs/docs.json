@@ -3,9 +3,15 @@
   "theme": "mint",
   "name": "WaniWani SDK",
   "colors": {
-    "primary": "#6366F1",
-    "light": "#A5B4FC",
-    "dark": "#4338CA"
+    "primary": "#03d916",
+    "light": "#5EFF73",
+    "dark": "#02A811"
+  },
+  "background": {
+    "colors": {
+      "light": "#fffaf0"
+    },
+    "decoration": "gradient"
   },
   "favicon": "/favicon.svg",
   "navigation": {
