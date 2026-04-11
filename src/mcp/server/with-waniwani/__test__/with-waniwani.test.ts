@@ -55,17 +55,26 @@ function mockClient() {
 
 type Handler = (input: unknown, extra: unknown) => Promise<unknown>;
 type RegisterToolArgs = [string, Record<string, unknown>, Handler];
+type RegisteredToolEntry = { handler: Handler };
 
 function mockServer() {
 	const registered: RegisterToolArgs[] = [];
+	const _registeredTools: Record<string, RegisteredToolEntry> = {};
 	const server = {
+		_registeredTools,
 		registerTool: (...args: unknown[]) => {
-			registered.push(args as RegisterToolArgs);
+			const typed = args as RegisterToolArgs;
+			registered.push(typed);
+			// Mirror the MCP SDK: store the (possibly wrapped) handler in
+			// `_registeredTools[name].handler` so that in-place wrapping can
+			// reassign it and the resolved handler is what runtime execution uses.
+			_registeredTools[typed[0]] = { handler: typed[2] };
 		},
 	};
 	return {
 		server: server as unknown as Parameters<typeof withWaniwani>[0],
 		registered,
+		_registeredTools,
 		registerTool: (...args: unknown[]) => {
 			(server.registerTool as (...a: unknown[]) => void)(...args);
 		},
@@ -252,6 +261,100 @@ describe("withWaniwani", () => {
 			country: "SK",
 			city: "Bratislava",
 		});
+	});
+
+	test("wraps tools registered before withWaniwani() in place", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		// Register FIRST (the register-then-wrap footgun)
+		let rawCalls = 0;
+		mock.registerTool("pricing", { description: "Get pricing" }, async () => {
+			rawCalls += 1;
+			return { text: "done" };
+		});
+
+		// Then wrap
+		withWaniwani(mock.server, { client });
+
+		// The handler stored on `_registeredTools` is the one the MCP runtime
+		// invokes — that's what should now be wrapped.
+		const handler = mock._registeredTools.pricing?.handler;
+		expect(handler).toBeDefined();
+
+		const extra: Record<string, unknown> = { _meta: { requestId: "req-1" } };
+		const result = (await handler?.({}, extra)) as Record<string, unknown>;
+
+		expect(rawCalls).toBe(1);
+		expect(result).toMatchObject({ text: "done" });
+		expect(tracked).toHaveLength(1);
+		expect(tracked[0]).toMatchObject({
+			event: "tool.called",
+			properties: {
+				name: "pricing",
+				type: "other",
+				status: "ok",
+				input: {},
+				output: { text: "done" },
+			},
+		});
+
+		// Scoped client was injected into extra (same behavior as register-after path)
+		expect(extra["waniwani/client"]).toBeDefined();
+
+		// Widget endpoint metadata injected into the result
+		const meta = result._meta as Record<string, unknown>;
+		const waniwaniConfig = meta.waniwani as Record<string, unknown>;
+		expect(waniwaniConfig.endpoint).toBe(
+			"https://test.waniwani.ai/api/mcp/events/v2/batch",
+		);
+	});
+
+	test("does not double-wrap across two withWaniwani() calls", async () => {
+		const mockA = mockClient();
+		const mockB = mockClient();
+		const mock = mockServer();
+
+		mock.registerTool("pricing", { description: "Get pricing" }, async () => ({
+			text: "done",
+		}));
+
+		withWaniwani(mock.server, { client: mockA.client });
+		// Second call is a no-op due to `__waniwaniWrapped`
+		withWaniwani(mock.server, { client: mockB.client });
+
+		const handler = mock._registeredTools.pricing?.handler;
+		await handler?.({}, {});
+
+		// Only the first wrap's client tracked the event; no double emission
+		expect(mockA.tracked).toHaveLength(1);
+		expect(mockB.tracked).toHaveLength(0);
+	});
+
+	test("wraps tools registered both before and after withWaniwani()", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		mock.registerTool("before", { description: "Before" }, async () => ({
+			text: "before-result",
+		}));
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("after", { description: "After" }, async () => ({
+			text: "after-result",
+		}));
+
+		const beforeHandler = mock._registeredTools.before?.handler;
+		const afterHandler = mock._registeredTools.after?.handler;
+
+		await beforeHandler?.({}, {});
+		await afterHandler?.({}, {});
+
+		expect(tracked).toHaveLength(2);
+		const names = tracked.map((t) => (t.properties as { name: string }).name);
+		expect(names).toContain("before");
+		expect(names).toContain("after");
 	});
 
 	test("injects request metadata even when widget token injection is disabled", async () => {

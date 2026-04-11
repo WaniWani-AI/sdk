@@ -17,10 +17,18 @@ import {
 } from "./helpers.js";
 
 type UnknownRecord = Record<string, unknown>;
+type RawHandler = (
+	input: unknown,
+	extra: unknown,
+) => Promise<unknown> | unknown;
 
 type WrappedServer = McpServer & {
 	__waniwaniWrapped?: true;
 };
+
+const WRAPPED_HANDLER = Symbol.for("waniwani.wrappedHandler");
+
+type MaybeWrappedHandler = RawHandler & { [WRAPPED_HANDLER]?: true };
 
 /**
  * Options for withWaniwani().
@@ -66,11 +74,146 @@ const log = createLogger("mcp", !!process.env.WANIWANI_DEBUG);
 
 const DEFAULT_BASE_URL = "https://app.waniwani.ai";
 
+type WrapContext = {
+	server: McpServer;
+	tracker: WaniwaniTracker;
+	opts: WithWaniwaniOptions;
+	tokenCache: WidgetTokenCache | null;
+	injectToken: boolean;
+};
+
+function createWrappedHandler(
+	toolName: string,
+	originalHandler: RawHandler,
+	ctx: WrapContext,
+): MaybeWrappedHandler {
+	const { server, tracker, opts, tokenCache, injectToken } = ctx;
+
+	const wrappedHandler: MaybeWrappedHandler = async (
+		input: unknown,
+		extra: unknown,
+	) => {
+		// Inject scoped client into extra so createTool/flows can surface it
+		const meta = extractMeta(extra) ?? {};
+		const scopedClient = createScopedClient(tracker, meta, {
+			apiUrl: tracker._config.apiUrl,
+			apiKey: tracker._config.apiKey,
+		});
+		if (isRecord(extra)) {
+			extra[SCOPED_CLIENT_KEY] = scopedClient;
+		}
+
+		const startTime = performance.now();
+		const clientInfo = (
+			server as {
+				server?: {
+					getClientVersion?: () =>
+						| { name: string; version: string }
+						| undefined;
+				};
+			}
+		).server?.getClientVersion?.();
+		try {
+			const result = await originalHandler(input, extra);
+			const durationMs = Math.round(performance.now() - startTime);
+
+			log(
+				`tool "${toolName}" handler returned in ${durationMs}ms, running post-processing...`,
+			);
+
+			const isErrorResult =
+				isRecord(result) && (result as UnknownRecord).isError === true;
+
+			if (isErrorResult) {
+				const errorText = extractErrorText(result);
+				console.error(
+					`[waniwani] Tool "${toolName}" returned error${errorText ? `: ${errorText}` : ""}`,
+				);
+			}
+
+			await safeTrack(
+				tracker,
+				buildTrackInput(
+					toolName,
+					extra,
+					opts,
+					{
+						durationMs,
+						status: isErrorResult ? "error" : "ok",
+						...(isErrorResult && {
+							errorMessage: extractErrorText(result) ?? "Unknown tool error",
+						}),
+					},
+					clientInfo,
+					{ input, output: result },
+				),
+				opts.onError,
+			);
+
+			log(`tool "${toolName}" tracking done`);
+
+			if (opts.flushAfterToolCall) {
+				await safeFlush(tracker, opts.onError);
+			}
+
+			injectRequestMetadata(result, extra);
+
+			if (injectToken) {
+				await injectWidgetConfig(
+					result,
+					tokenCache,
+					tracker._config.apiUrl ?? DEFAULT_BASE_URL,
+					extra,
+					opts.onError,
+				);
+				log(`tool "${toolName}" widget config injected`);
+			}
+
+			log(`tool "${toolName}" post-processing complete, returning result`);
+
+			return result;
+		} catch (error) {
+			const durationMs = Math.round(performance.now() - startTime);
+
+			await safeTrack(
+				tracker,
+				buildTrackInput(
+					toolName,
+					extra,
+					opts,
+					{
+						durationMs,
+						status: "error",
+						errorMessage:
+							error instanceof Error ? error.message : String(error),
+					},
+					clientInfo,
+					{ input },
+				),
+				opts.onError,
+			);
+
+			if (opts.flushAfterToolCall) {
+				await safeFlush(tracker, opts.onError);
+			}
+
+			throw error;
+		}
+	};
+
+	wrappedHandler[WRAPPED_HANDLER] = true;
+	return wrappedHandler;
+}
+
 /**
  * Wrap an MCP server so tool handlers automatically emit `tool.called` events.
  *
- * The wrapper intercepts `server.registerTool(...)`, tracks each invocation,
- * then forwards execution to the original tool handler.
+ * The wrapper intercepts `server.registerTool(...)` for future registrations
+ * and also walks `server._registeredTools` to wrap any tools already registered
+ * at the time of the call. This means either call order works:
+ *
+ *   withWaniwani(server); server.registerTool(...);   // wrap then register
+ *   server.registerTool(...); withWaniwani(server);   // register then wrap
  *
  * When `injectWidgetToken` is enabled (default), tracking config is injected
  * into tool response `_meta.waniwani` so browser widgets can post events
@@ -98,137 +241,67 @@ export function withWaniwani(
 			})
 		: null;
 
+	const ctx: WrapContext = {
+		server,
+		tracker,
+		opts,
+		tokenCache,
+		injectToken,
+	};
+
 	const originalRegisterTool = server.registerTool.bind(server) as (
 		...args: unknown[]
 	) => unknown;
 
 	wrappedServer.registerTool = ((...args: unknown[]) => {
 		const [toolNameRaw, config, handlerRaw] = args;
-		const toolName =
-			typeof toolNameRaw === "string" && toolNameRaw.trim().length > 0
-				? toolNameRaw
-				: "unknown";
 
 		if (typeof handlerRaw !== "function") {
 			return originalRegisterTool(...args);
 		}
 
-		const handler = handlerRaw as (
-			input: unknown,
-			extra: unknown,
-		) => Promise<unknown> | unknown;
+		const toolName =
+			typeof toolNameRaw === "string" && toolNameRaw.trim().length > 0
+				? toolNameRaw
+				: "unknown";
 
-		const wrappedHandler = async (input: unknown, extra: unknown) => {
-			// Inject scoped client into extra so createTool/flows can surface it
-			const meta = extractMeta(extra) ?? {};
-			const scopedClient = createScopedClient(tracker, meta, {
-				apiUrl: tracker._config.apiUrl,
-				apiKey: tracker._config.apiKey,
-			});
-			if (isRecord(extra)) {
-				extra[SCOPED_CLIENT_KEY] = scopedClient;
-			}
-
-			const startTime = performance.now();
-			const clientInfo = (
-				server as {
-					server?: {
-						getClientVersion?: () =>
-							| { name: string; version: string }
-							| undefined;
-					};
-				}
-			).server?.getClientVersion?.();
-			try {
-				const result = await handler(input, extra);
-				const durationMs = Math.round(performance.now() - startTime);
-
-				log(
-					`tool "${toolName}" handler returned in ${durationMs}ms, running post-processing...`,
-				);
-
-				const isErrorResult =
-					isRecord(result) && (result as UnknownRecord).isError === true;
-
-				if (isErrorResult) {
-					const errorText = extractErrorText(result);
-					console.error(
-						`[waniwani] Tool "${toolName}" returned error${errorText ? `: ${errorText}` : ""}`,
-					);
-				}
-
-				await safeTrack(
-					tracker,
-					buildTrackInput(
-						toolName,
-						extra,
-						opts,
-						{
-							durationMs,
-							status: isErrorResult ? "error" : "ok",
-							...(isErrorResult && {
-								errorMessage: extractErrorText(result) ?? "Unknown tool error",
-							}),
-						},
-						clientInfo,
-						{ input, output: result },
-					),
-					opts.onError,
-				);
-
-				log(`tool "${toolName}" tracking done`);
-
-				if (opts.flushAfterToolCall) {
-					await safeFlush(tracker, opts.onError);
-				}
-
-				injectRequestMetadata(result, extra);
-
-				if (injectToken) {
-					await injectWidgetConfig(
-						result,
-						tokenCache,
-						tracker._config.apiUrl ?? DEFAULT_BASE_URL,
-						extra,
-						opts.onError,
-					);
-					log(`tool "${toolName}" widget config injected`);
-				}
-
-				log(`tool "${toolName}" post-processing complete, returning result`);
-
-				return result;
-			} catch (error) {
-				const durationMs = Math.round(performance.now() - startTime);
-
-				await safeTrack(
-					tracker,
-					buildTrackInput(
-						toolName,
-						extra,
-						opts,
-						{
-							durationMs,
-							status: "error",
-							errorMessage:
-								error instanceof Error ? error.message : String(error),
-						},
-						clientInfo,
-						{ input },
-					),
-					opts.onError,
-				);
-
-				if (opts.flushAfterToolCall) {
-					await safeFlush(tracker, opts.onError);
-				}
-
-				throw error;
-			}
-		};
-
-		return originalRegisterTool(toolNameRaw, config, wrappedHandler);
+		const wrapped = createWrappedHandler(
+			toolName,
+			handlerRaw as RawHandler,
+			ctx,
+		);
+		return originalRegisterTool(toolNameRaw, config, wrapped);
 	}) as McpServer["registerTool"];
+
+	// Wrap any tools that were already registered before withWaniwani() ran.
+	// MCP SDK internal: `_registeredTools` is the dictionary used by the
+	// `tools/call` request handler; each entry has a mutable `handler` field
+	// that is looked up by name and invoked by reference at call time
+	// (see @modelcontextprotocol/sdk/dist/esm/server/mcp.js:_createRegisteredTool),
+	// so reassigning `entry.handler` safely upgrades existing tools in place.
+	// Skybridge's McpServer subclass uses the same storage via `super.registerTool`.
+	const registeredTools = (
+		server as unknown as {
+			_registeredTools?: Record<string, { handler?: unknown }>;
+		}
+	)._registeredTools;
+
+	if (isRecord(registeredTools)) {
+		for (const [toolName, entry] of Object.entries(registeredTools)) {
+			if (!isRecord(entry)) {
+				continue;
+			}
+			const existing = entry.handler as MaybeWrappedHandler | undefined;
+			if (typeof existing !== "function") {
+				continue;
+			}
+			if (existing[WRAPPED_HANDLER]) {
+				continue;
+			}
+
+			entry.handler = createWrappedHandler(toolName, existing, ctx);
+		}
+	}
 
 	return wrappedServer;
 }
