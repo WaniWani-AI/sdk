@@ -155,4 +155,6 @@ Most users only need `@waniwani/sdk` and `@waniwani/sdk/mcp`.
 
 ## License
 
-[MIT](./LICENSE) © WaniWani
+[AGPL-3.0-or-later](./LICENSE) © WaniWani
+
+"WaniWani" is a trademark of WaniWani. The license covers the code, not the name.
