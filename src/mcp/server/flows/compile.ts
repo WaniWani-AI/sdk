@@ -10,6 +10,7 @@ import { extractScopedClient } from "../scoped-client";
 import { extractSessionId } from "../utils";
 import type {
 	CompileInput,
+	FlowToolHandler,
 	FlowToolInput,
 	McpServer,
 	RegisteredFlow,
@@ -264,7 +265,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		// MCP-compatible — server.registerTool(flow.name, flow.config, flow.handler)
 		name: config.id,
 		config: toolConfig,
-		handler: toolHandler as unknown as ToolCallback,
+		handler: toolHandler as unknown as FlowToolHandler,
 
 		async register(server: McpServer): Promise<void> {
 			server.registerTool(config.id, toolConfig, toolHandler);
