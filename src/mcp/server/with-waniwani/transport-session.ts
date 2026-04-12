@@ -16,6 +16,12 @@ export function extractTransportSessionId(
 		Object.keys(extra),
 	);
 
+	console.log(
+		"[waniwani:debug] extractTransportSessionId extra.sessionId:",
+		typeof extra.sessionId,
+		extra.sessionId,
+	);
+
 	if (typeof extra.sessionId === "string" && extra.sessionId) {
 		console.log(
 			"[waniwani:debug] extractTransportSessionId found extra.sessionId:",
