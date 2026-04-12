@@ -3,6 +3,7 @@ import { createLogger } from "../../../utils/logger.js";
 import { waniwani } from "../../../waniwani.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../tools/types";
+import { extractSessionId } from "../utils.js";
 import { WidgetTokenCache } from "../widget-token.js";
 import {
 	buildTrackInput,
@@ -16,6 +17,7 @@ import {
 	safeTrack,
 	type WaniwaniTracker,
 } from "./helpers.js";
+import { extractTransportSessionId } from "./transport-session.js";
 
 type UnknownRecord = Record<string, unknown>;
 type RawHandler = (
@@ -99,6 +101,17 @@ function createWrappedHandler(
 	) => {
 		// Inject scoped client into extra so createTool/flows can surface it
 		const meta = extractMeta(extra) ?? {};
+
+		// Bridge transport-level session ID into _meta when the host doesn't
+		// include one directly (e.g. Mcp-Session-Id HTTP header).
+		if (!extractSessionId(meta) && isRecord(extra)) {
+			const transportSid = extractTransportSessionId(extra as UnknownRecord);
+			if (transportSid) {
+				meta["waniwani/sessionId"] = transportSid;
+				(extra as UnknownRecord)._meta = meta;
+			}
+		}
+
 		const scopedClient = createScopedClient(tracker, meta, {
 			apiUrl: tracker._config.apiUrl,
 			apiKey: tracker._config.apiKey,

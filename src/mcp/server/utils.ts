@@ -24,7 +24,7 @@ const SESSION_ID_KEYS = [
 	"openai/session",
 	"sessionId",
 	"conversationId",
-	"anthropic/sessionId",
+	"mcp-session-id",
 ] as const;
 
 const REQUEST_ID_KEYS = [
@@ -89,7 +89,6 @@ const SOURCE_SESSION_KEYS = [
 	{ key: "waniwani/sessionId", source: "chatbar" },
 	{ key: "openai/sessionId", source: "chatgpt" },
 	{ key: "openai/session", source: "chatgpt" },
-	{ key: "anthropic/sessionId", source: "claude" },
 ] as const;
 
 export function extractSource(

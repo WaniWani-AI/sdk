@@ -486,6 +486,85 @@ describe("withWaniwani", () => {
 		});
 	});
 
+	test("bridges extra.sessionId into _meta when host provides no session ID", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.(
+			{},
+			{ sessionId: "transport-sid-123" },
+		)) as Record<string, unknown>;
+
+		// Session ID should appear in tracked event meta
+		expect(tracked[0]?.meta).toMatchObject({
+			"waniwani/sessionId": "transport-sid-123",
+		});
+
+		// Session ID should be injected into result _meta
+		const meta = result._meta as Record<string, unknown>;
+		expect(meta["waniwani/sessionId"]).toBe("transport-sid-123");
+	});
+
+	test("bridges mcp-session-id header into _meta when host provides no session ID", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{},
+			{
+				requestInfo: {
+					headers: { "mcp-session-id": "header-sid-456" },
+				},
+			},
+		);
+
+		expect(tracked[0]?.meta).toMatchObject({
+			"waniwani/sessionId": "header-sid-456",
+		});
+	});
+
+	test("does not override existing _meta session ID with transport session ID", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{},
+			{
+				sessionId: "transport-sid",
+				_meta: { "openai/sessionId": "host-sid" },
+			},
+		);
+
+		// Host-provided session ID takes precedence
+		expect(tracked[0]?.meta).toMatchObject({
+			"openai/sessionId": "host-sid",
+		});
+		expect(
+			(tracked[0]?.meta as Record<string, unknown>)["waniwani/sessionId"],
+		).toBe(undefined);
+	});
+
 	test("does not touch _meta when the tool definition has no widget keys", async () => {
 		const { client } = mockClient();
 		const mock = mockServer();
