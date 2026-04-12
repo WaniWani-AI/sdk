@@ -11,18 +11,39 @@ function isRecord(v: unknown): v is UnknownRecord {
 export function extractTransportSessionId(
 	extra: UnknownRecord,
 ): string | undefined {
+	console.log(
+		"[waniwani:debug] extractTransportSessionId extra keys:",
+		Object.keys(extra),
+	);
+
 	if (typeof extra.sessionId === "string" && extra.sessionId) {
+		console.log(
+			"[waniwani:debug] extractTransportSessionId found extra.sessionId:",
+			extra.sessionId,
+		);
 		return extra.sessionId;
 	}
 
 	if (isRecord(extra.requestInfo)) {
 		const headers = (extra.requestInfo as UnknownRecord).headers;
+		console.log(
+			"[waniwani:debug] extractTransportSessionId requestInfo.headers:",
+			isRecord(headers) ? Object.keys(headers) : headers,
+		);
 		if (isRecord(headers)) {
 			const sid = (headers as UnknownRecord)["mcp-session-id"];
+			console.log(
+				"[waniwani:debug] extractTransportSessionId headers['mcp-session-id']:",
+				sid,
+			);
 			if (typeof sid === "string" && sid) {
 				return sid;
 			}
 		}
+	} else {
+		console.log(
+			"[waniwani:debug] extractTransportSessionId no requestInfo on extra",
+		);
 	}
 
 	return undefined;
