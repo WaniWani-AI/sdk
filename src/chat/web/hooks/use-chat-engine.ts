@@ -198,6 +198,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		resolve: (msg: unknown) => void;
 		reject: (err: Error) => void;
 	} | null>(null);
+	const finishedMessageRef = useRef<unknown>(null);
 
 	// Tool catalog cached for the lifetime of this ChatCard mount. Fetched
 	// once on mount via GET /api/waniwani/tools (spec: the host calls
@@ -230,8 +231,9 @@ export function useChatEngine(props: ChatBaseProps) {
 		onFinish({ message }) {
 			onResponseReceived?.();
 			if (pendingWaitRef.current) {
-				pendingWaitRef.current.resolve(message);
-				pendingWaitRef.current = null;
+				// Stash the message — resolve only after React commits the
+				// messages state update (see useEffect on `status` below).
+				finishedMessageRef.current = message;
 			}
 		},
 		onError(error) {
@@ -242,6 +244,23 @@ export function useChatEngine(props: ChatBaseProps) {
 			}
 		},
 	});
+
+	// Resolve sendMessageAndWait only after React has committed the messages
+	// state update. `onFinish` fires before the re-render, so resolving there
+	// would expose stale `messages` to the caller.
+	useEffect(() => {
+		if (
+			status === "ready" &&
+			pendingWaitRef.current &&
+			finishedMessageRef.current
+		) {
+			const pending = pendingWaitRef.current;
+			const message = finishedMessageRef.current;
+			pendingWaitRef.current = null;
+			finishedMessageRef.current = null;
+			pending.resolve(message);
+		}
+	}, [status]);
 
 	const [text, setText] = useState("");
 	const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
