@@ -28,7 +28,7 @@ export function useScenarios(api: string, enabled: boolean) {
 		setIsLoading(true);
 		fetch(`${api}/scenarios`)
 			.then((r) => r.json())
-			.then((data: EvalScenario[]) => setScenarios(data))
+			.then((data) => setScenarios(Array.isArray(data) ? data : []))
 			.catch(() => {})
 			.finally(() => setIsLoading(false));
 	}, [api, enabled]);
