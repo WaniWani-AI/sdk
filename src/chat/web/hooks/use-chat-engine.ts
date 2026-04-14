@@ -185,12 +185,12 @@ export function useChatEngine(props: ChatBaseProps) {
 
 				return resolvedBody;
 			},
-			fetch: async (input, init) => {
+			fetch: (async (input, init) => {
 				const response = await fetch(input, init);
 				pendingModelContextRef.current = undefined;
 				setSessionId(response.headers.get(SESSION_HEADER_NAME));
 				return response;
-			},
+			}) as typeof fetch,
 		}),
 	);
 

@@ -9,6 +9,8 @@ import type {
 	V2EventEnvelope,
 } from "./v2-types.js";
 
+type FetchFn = (input: URL | RequestInfo, init?: RequestInit) => Promise<Response>;
+
 const DEFAULT_ENDPOINT_PATH = "/api/mcp/events/v2/batch";
 const DEFAULT_FLUSH_INTERVAL_MS = 1_000;
 const DEFAULT_MAX_BATCH_SIZE = 20;
@@ -39,7 +41,7 @@ export interface V2TransportOptions {
 	retryMaxDelayMs?: number;
 	shutdownTimeoutMs?: number;
 	sdkVersion?: string;
-	fetchFn?: typeof fetch;
+	fetchFn?: FetchFn;
 	logger?: Logger;
 	now?: () => Date;
 	sleep?: (delayMs: number) => Promise<void>;
@@ -81,7 +83,7 @@ class BatchingV2Transport implements V2BatchTransport {
 	private readonly retryMaxDelayMs: number;
 	private readonly shutdownTimeoutMs: number;
 	private readonly sdkVersion?: string;
-	private readonly fetchFn: typeof fetch;
+	private readonly fetchFn: FetchFn;
 	private readonly logger: Logger;
 	private readonly now: () => Date;
 	private readonly sleep: (delayMs: number) => Promise<void>;

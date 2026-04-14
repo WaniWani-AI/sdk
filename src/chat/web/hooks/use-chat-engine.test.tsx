@@ -78,7 +78,7 @@ const originalFetch = globalThis.fetch;
 beforeEach(() => {
 	globalThis.fetch = mock(async () =>
 		Response.json({ tools: [] }),
-	) as typeof fetch;
+	) as unknown as typeof fetch;
 });
 afterEach(() => {
 	globalThis.fetch = originalFetch;
