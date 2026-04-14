@@ -1,0 +1,123 @@
+---
+title: Knowledge Base
+description: "Ingest markdown files and search with embeddings."
+---
+
+The SDK includes a knowledge base client for semantic search. Ingest markdown files, then search from any tool handler.
+
+## Setup
+
+The KB client is available on the WaniWani client instance:
+
+```ts
+import { waniwani } from "@waniwani/sdk";
+
+const wani = waniwani(); // reads WANIWANI_API_KEY from env
+```
+
+## Ingest files
+
+Load markdown content into your knowledge base. Ingestion is **destructive** — it replaces all existing chunks.
+
+```ts
+await wani.kb.ingest([
+  {
+    filename: "pricing.md",
+    content: "# Pricing\n\nOur plans start at $9/month...",
+    metadata: { category: "billing" },
+  },
+  {
+    filename: "returns.md",
+    content: "# Return Policy\n\n30-day return window...",
+    metadata: { category: "support" },
+  },
+]);
+```
+
+The managed project template includes an `embed` script that reads markdown files from a `knowledge-base/` directory:
+
+```bash
+bun embed
+```
+
+### Ingest input
+
+<ResponseField name="filename" type="string" required>
+  Identifier for the source file.
+</ResponseField>
+
+<ResponseField name="content" type="string" required>
+  Markdown content. Chunked server-side.
+</ResponseField>
+
+<ResponseField name="metadata" type="Record<string, string>">
+  Arbitrary key-value pairs stored with each chunk. Can be used to filter search results.
+</ResponseField>
+
+### Ingest response
+
+```ts
+{ chunksIngested: number; filesProcessed: number }
+```
+
+## Search
+
+```ts
+const results = await wani.kb.search("What is the return policy?", {
+  topK: 5,       // 1–20, default 5
+  minScore: 0.3, // 0–1, default 0.3
+  metadata: { category: "support" }, // exact-match filter
+});
+```
+
+Each result contains:
+
+```ts
+{
+  source: string;    // filename
+  heading: string;   // section heading
+  content: string;   // chunk text
+  score: number;     // similarity score (0–1)
+  metadata?: Record<string, string>;
+}
+```
+
+### Using search in a tool
+
+```ts
+server.registerTool(
+  "faq",
+  {
+    title: "FAQ",
+    description: "Answer questions from the knowledge base",
+    inputSchema: { question: z.string() },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ question }) => {
+    const results = await wani.kb.search(question, { topK: 5 });
+
+    if (results.length === 0) {
+      return {
+        content: [{ type: "text", text: "No relevant information found." }],
+      };
+    }
+
+    const formatted = results
+      .map((r) => `### ${r.heading}\n${r.content}`)
+      .join("\n\n");
+
+    return {
+      content: [{ type: "text", text: formatted }],
+    };
+  },
+);
+```
+
+## List sources
+
+List all ingested files with their chunk counts:
+
+```ts
+const sources = await wani.kb.sources();
+// [{ source: "pricing.md", chunkCount: 12, createdAt: "2025-..." }, ...]
+```

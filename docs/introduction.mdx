@@ -1,21 +1,31 @@
 ---
 title: Introduction
-description: "Event tracking and flow orchestration for MCP servers."
+description: "Event tracking, flows, and knowledge base for MCP servers."
 ---
 
-`@waniwani/sdk` plugs into an existing MCP server and ships two things:
+`@waniwani/sdk` plugs into an MCP server and gives you three things:
 
 - **Event tracking.** Automatic `tool.called` events (name, duration, status, input, output, client info) plus custom events, batched and forwarded to the WaniWani dashboard.
-- **Flows.** A typed state machine compiled into a single MCP tool that can pause on `interrupt`, branch on conditions, and persist state across turns, all keyed by the MCP session.
+- **Flows.** A typed state machine compiled into a single MCP tool. Pause on interrupts, branch on conditions, persist state across turns — all keyed by the MCP session.
+- **Knowledge base.** Ingest markdown files, search with embeddings. One function call from any tool handler.
 
-## Who this is for
+## Two ways to start
 
-You already run an MCP server (via `@modelcontextprotocol/sdk`, `@vercel/mcp-handler`, Skybridge, or similar) and you want analytics, multi-turn conversations, or both without rewriting your transport or auth layer.
+| Path | When to use |
+| --- | --- |
+| **Managed project** | WaniWani provisions a repo, deploys to Vercel, and auto-tunnels local dev to ChatGPT/Claude. Start from the template. |
+| **External project** | You already have an MCP server and want to add tracking, flows, or knowledge base to it. |
 
-## What it is not
+Both paths use the same SDK. The difference is infrastructure.
 
-This is not an MCP runtime. It sits on top of the server you already deploy. Zero runtime dependencies, sub-5KB core bundle.
+## SDK entry points
+
+```
+@waniwani/sdk       # Core client (tracking, config, KB)
+@waniwani/sdk/mcp   # Server framework (createFlow, withWaniwani, registerTools)
+@waniwani/sdk/kb    # Knowledge base client (ingest, search)
+```
 
 ## Next step
 
-Head to the [Quickstart](/quickstart) to wire up an existing server in under 5 minutes.
+Head to the [Quickstart](/quickstart) to get a working MCP server in under 5 minutes.

@@ -44,6 +44,12 @@
             ]
           },
           {
+            "group": "Knowledge Base",
+            "pages": [
+              "knowledge-base/overview"
+            ]
+          },
+          {
             "group": "Flows",
             "pages": [
               "flows/overview",

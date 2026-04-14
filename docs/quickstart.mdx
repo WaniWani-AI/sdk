@@ -1,15 +1,62 @@
 ---
 title: Quickstart
-description: "Wire WaniWani into an existing MCP server in under 5 minutes."
+description: "Get a working MCP server with analytics in under 5 minutes."
 ---
 
-## Prerequisites
+## Option A: Managed project (recommended)
 
-- Node.js 18.17+ (Node 20+ recommended)
-- A running MCP server using `@modelcontextprotocol/sdk` (or compatible: Skybridge, `@vercel/mcp-handler`)
-- A WaniWani account at [app.waniwani.ai](https://app.waniwani.ai)
+WaniWani provisions a GitHub repo, deploys to Vercel, and auto-tunnels local dev so ChatGPT and Claude can reach your server instantly.
 
-If you do not have an MCP server yet, scaffold one from the [Alpic Apps SDK template](https://github.com/alpic-ai/apps-sdk-template) and come back here.
+<Steps>
+  <Step title="Create a managed project">
+    1. Open [app.waniwani.ai/mcp](https://app.waniwani.ai/mcp) and sign in.
+    2. Click **Create project** and choose **Managed** ("We host your MCP").
+    3. WaniWani creates a GitHub repo and Vercel project for you. Two environments are provisioned automatically: **Staging** and **Production**.
+    4. Clone the repo locally.
+  </Step>
+
+  <Step title="Install and run">
+    ```bash
+    bun install
+    bun dev
+    ```
+
+    `bun dev` starts a Cloudflare tunnel automatically. Your local server is now reachable from ChatGPT and Claude — no ngrok, no port forwarding.
+  </Step>
+
+  <Step title="Open the playground">
+    The dev server prints a tunnel URL. Open it in your browser to access the built-in chat playground, or connect from ChatGPT/Claude using the tunnel URL + `/mcp`.
+  </Step>
+</Steps>
+
+### Project structure
+
+```
+lib/<your-mcp>/
+├── tools/           # MCP tools
+│   ├── index.ts     # Tool registry
+│   └── hello.ts     # Example tool
+└── widgets/         # Rich UI components
+    └── greeting/
+        └── index.ts
+
+app/
+├── mcp/route.ts     # MCP server endpoint
+└── api/waniwani/    # WaniWani SDK handler
+
+knowledge-base/      # Markdown files for KB search
+scripts/
+├── dev.ts           # Dev server + Cloudflare tunnel
+└── embed.ts         # Ingest knowledge base files
+```
+
+Add tools in `lib/<your-mcp>/tools/`, register them in `app/mcp/route.ts`, push to GitHub — Vercel deploys automatically.
+
+---
+
+## Option B: External project
+
+You already have an MCP server and want to add WaniWani to it.
 
 <Steps>
   <Step title="Install the SDK">
@@ -25,101 +72,60 @@ If you do not have an MCP server yet, scaffold one from the [Alpic Apps SDK temp
       ```bash npm
       npm install @waniwani/sdk
       ```
-
-      ```bash yarn
-      yarn add @waniwani/sdk
-      ```
     </CodeGroup>
   </Step>
 
-  <Step title="Get an API key">
+  <Step title="Create an external project and get an API key">
     1. Open [app.waniwani.ai/mcp](https://app.waniwani.ai/mcp) and sign in.
-    2. Create an MCP environment (one per deployment target, for example `my-app-prod`).
-    3. Copy the API key from the environment settings. Keys start with `wwk_` and are shown in full only once.
-    4. Expose it to your server process:
+    2. Click **Create project** and choose **External** ("You host your MCP").
+    3. Set your server URL for the production environment.
+    4. Copy the API key (`wwk_...`) — it is shown only once.
 
     ```bash .env
     WANIWANI_API_KEY=wwk_...
     ```
-
-    The SDK reads `WANIWANI_API_KEY` from the environment by default.
   </Step>
 
-  <Step title="Wrap your MCP server">
-    Call `withWaniwani(server)` once, after creating the server and before connecting the transport. It intercepts `registerTool` and emits a `tool.called` event for every invocation.
+  <Step title="Wrap your server">
+    Call `withWaniwani(server)` once. Every tool call now emits a `tool.called` event to your dashboard.
 
     ```ts server/src/index.ts
-    import express from "express";
-    import { withWaniwani } from "@waniwani/sdk/mcp";
     import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
     import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+    import { withWaniwani } from "@waniwani/sdk/mcp";
     import "dotenv/config";
 
-    const server = new McpServer({ name: "my-mcp-app", version: "0.0.1" });
+    const server = new McpServer({ name: "my-mcp", version: "0.0.1" });
 
-    // Register tools as usual
     server.registerTool(/* ... */);
 
-    // Enable automatic tracking
     withWaniwani(server);
 
-    // Connect the Streamable HTTP transport
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     await server.connect(transport);
-
-    const app = express();
-    app.use(express.json());
-    app.post("/mcp", (req, res) => transport.handleRequest(req, res, req.body));
-    app.listen(3000);
     ```
-
-    With no arguments, `withWaniwani` creates a client from `WANIWANI_API_KEY`. Tools registered before or after the wrap call are both instrumented.
   </Step>
 
-  <Step title="Verify it works">
-    Restart the server, trigger any tool call from your MCP client (Claude Desktop, ChatGPT, inspector, etc.), then open the WaniWani dashboard. The `tool.called` event should appear within a few seconds.
+  <Step title="Verify">
+    Trigger any tool call, then check the [WaniWani dashboard](https://app.waniwani.ai). The event should appear within seconds.
 
-    If nothing shows up, check that `WANIWANI_API_KEY` is set in the process running the server and look for `[waniwani]` lines in your server logs.
+    If nothing shows up, confirm `WANIWANI_API_KEY` is set and look for `[waniwani]` lines in your server logs.
   </Step>
 </Steps>
-
-## Track a custom event
-
-For anything beyond `tool.called` (a completed purchase, a successful quote, a custom funnel step), call `client.track()` from inside a tool handler. Pass `meta: extra._meta` so the event is linked to the current MCP session.
-
-```ts
-import { waniwani } from "@waniwani/sdk";
-
-const wani = waniwani();
-
-server.registerTool(
-  "get_quote",
-  { /* tool config */ },
-  async ({ amount, currency }, extra) => {
-    await wani.track({
-      event: "quote.succeeded",
-      properties: { amount, currency },
-      meta: extra._meta,
-    });
-
-    return { content: [{ type: "text", text: `Quoted ${amount} ${currency}` }] };
-  },
-);
-```
 
 ## What's next
 
 <CardGroup cols={2}>
-  <Card title="Client configuration" icon="gear" href="/setup/installation">
-    Requirements, options, and graceful shutdown.
+  <Card title="Event tracking" icon="chart-line" href="/tracking/overview">
+    Custom events, sessions, and user identification.
   </Card>
-  <Card title="API keys" icon="key" href="/setup/api-key">
-    Per-environment keys, rotation, and troubleshooting.
+  <Card title="Build a flow" icon="diagram-project" href="/flows/overview">
+    Multi-turn stateful conversations.
+  </Card>
+  <Card title="Knowledge base" icon="book" href="/knowledge-base/overview">
+    Ingest files and search with embeddings.
   </Card>
   <Card title="withWaniwani reference" icon="wand-magic-sparkles" href="/setup/wrap-server">
     All options for the server wrapper.
-  </Card>
-  <Card title="Build a flow" icon="diagram-project" href="/flows/overview">
-    Multi-turn, stateful MCP tools.
   </Card>
 </CardGroup>
