@@ -188,7 +188,11 @@ function InlineRenameInput({
 			return;
 		}
 		setSaving(true);
-		await onSave(value.trim());
+		try {
+			await onSave(value.trim());
+		} finally {
+			setSaving(false);
+		}
 	}
 
 	function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -219,16 +223,14 @@ function InlineRenameInput({
 			>
 				{saving ? <LoaderIcon /> : <CheckIcon />}
 			</button>
-			{!saving && (
-				<button
-					type="button"
-					onClick={onCancel}
-					className="ww:bg-foreground ww:text-background ww:rounded-full ww:p-1 ww:transition-colors ww:cursor-pointer ww:shrink-0"
-					title="Cancel"
-				>
-					<XIcon />
-				</button>
-			)}
+			<button
+				type="button"
+				onClick={onCancel}
+				className="ww:bg-foreground ww:text-background ww:rounded-full ww:p-1 ww:transition-colors ww:cursor-pointer ww:shrink-0"
+				title="Cancel"
+			>
+				<XIcon />
+			</button>
 		</div>
 	);
 }
