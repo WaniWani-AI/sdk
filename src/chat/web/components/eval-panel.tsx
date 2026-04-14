@@ -309,7 +309,7 @@ export function ScenarioPanel({ api, chatRef }: ScenarioPanelProps) {
 			const msg = e instanceof Error ? e.message : "Failed to rename scenario";
 			setRenameError(msg);
 		}
-		setEditingId(null);
+		setEditingId((prev) => (prev === id ? null : prev));
 	}
 
 	if (!config.eval) {
