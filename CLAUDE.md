@@ -47,13 +47,26 @@ Pre-commit: Always run `bun biome check . --fix` before committing
 
 ## Skills
 
-When making changes to the SDK's public API or behavior, **always update the corresponding skill docs** in `.claude/skills/waniwani-sdk/` to keep them in sync. Key mappings:
+When making changes to the SDK's public API or behavior, **always update the corresponding skill docs** in both `.claude/skills/waniwani-sdk/` (internal) and `skills/waniwani-sdk/` (external, published to skills.sh) to keep them in sync.
+
+### Internal skills (`.claude/skills/waniwani-sdk/`)
 
 - `src/mcp/server/flows/` → `.claude/skills/waniwani-sdk/mcp/flows.md`
 - `src/mcp/server/widgets/` → `.claude/skills/waniwani-sdk/mcp/server.md`
 - `src/mcp/react/` → `.claude/skills/waniwani-sdk/mcp/react.md`
 - `src/chat/web/` → `.claude/skills/waniwani-sdk/chat/react.md`
 - `src/chat/web/embed/` → `.claude/skills/waniwani-sdk/chat/embed.md`
+
+### External skills (`skills/waniwani-sdk/`)
+
+Published to [skills.sh](https://skills.sh) via `npx skills add WaniWani-AI/sdk`. These target SDK **users** (not SDK developers).
+
+- `src/mcp/server/flows/` → `skills/waniwani-sdk/references/flows.md` + `flows-api-reference.md`
+- `src/mcp/server/widgets/` → `skills/waniwani-sdk/references/tools-and-widgets.md`
+- `src/mcp/react/` → `skills/waniwani-sdk/references/widget-react-hooks.md`
+- `src/chat/web/` → `skills/waniwani-sdk/references/chat-widget.md`
+- `src/chat/server/` → `skills/waniwani-sdk/references/chat-server.md`
+- `src/kb/` → `skills/waniwani-sdk/references/knowledge-base.md`
 
 ## CSS / Tailwind
 
