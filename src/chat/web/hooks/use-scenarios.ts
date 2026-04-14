@@ -45,7 +45,10 @@ export function useScenarios(api: string, enabled: boolean) {
 				body: JSON.stringify({ name }),
 			});
 			if (!res.ok) {
-				throw new Error("Failed to rename scenario");
+				const data = await res.json().catch(() => null);
+				throw new Error(
+					data?.error ?? `Failed to rename scenario (${res.status})`,
+				);
 			}
 			setScenarios((prev) =>
 				prev.map((s) => (s.id === id ? { ...s, name } : s)),
