@@ -74,6 +74,49 @@ function PencilIcon({ className }: { className?: string }) {
 	);
 }
 
+function CheckIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			width="12"
+			height="12"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2.5"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			role="img"
+		>
+			<title>Confirm</title>
+			<path d="M20 6 9 17l-5-5" />
+		</svg>
+	);
+}
+
+function XIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			width="12"
+			height="12"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2.5"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			role="img"
+		>
+			<title>Cancel</title>
+			<path d="M18 6 6 18" />
+			<path d="m6 6 12 12" />
+		</svg>
+	);
+}
+
 function LoaderIcon({ className }: { className?: string }) {
 	return (
 		<svg
@@ -126,50 +169,67 @@ function InlineRenameInput({
 	onCancel,
 }: {
 	initialName: string;
-	onSave: (name: string) => void;
+	onSave: (name: string) => Promise<void>;
 	onCancel: () => void;
 }) {
 	const inputRef = useRef<HTMLInputElement>(null);
-	const doneRef = useRef(false);
 	const [value, setValue] = useState(initialName);
+	const [saving, setSaving] = useState(false);
 
 	useEffect(() => {
 		inputRef.current?.focus();
 		inputRef.current?.select();
 	}, []);
 
-	function commit() {
-		if (doneRef.current) {
+	const canSave = value.trim() !== "" && value.trim() !== initialName;
+
+	async function commit() {
+		if (!canSave || saving) {
 			return;
 		}
-		doneRef.current = true;
-		const trimmed = value.trim();
-		if (trimmed && trimmed !== initialName) {
-			onSave(trimmed);
-		} else {
-			onCancel();
-		}
+		setSaving(true);
+		await onSave(value.trim());
 	}
 
 	function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
 		if (e.key === "Enter") {
 			commit();
 		} else if (e.key === "Escape") {
-			doneRef.current = true;
 			onCancel();
 		}
 	}
 
 	return (
-		<input
-			ref={inputRef}
-			type="text"
-			value={value}
-			onChange={(e) => setValue(e.target.value)}
-			onKeyDown={handleKeyDown}
-			onBlur={commit}
-			className="ww:w-full ww:bg-transparent ww:text-xs ww:font-mono ww:text-foreground ww:outline-none ww:border-b ww:border-foreground/30 ww:py-0.5"
-		/>
+		<div className="ww:flex ww:items-center ww:gap-1">
+			<input
+				ref={inputRef}
+				type="text"
+				value={value}
+				onChange={(e) => setValue(e.target.value)}
+				onKeyDown={handleKeyDown}
+				disabled={saving}
+				className="ww:flex-1 ww:min-w-0 ww:bg-transparent ww:text-xs ww:leading-normal ww:font-mono ww:text-foreground ww:outline-none ww:border-b ww:border-foreground/30 ww:p-0 ww:disabled:opacity-50"
+			/>
+			<button
+				type="button"
+				onClick={commit}
+				disabled={!canSave || saving}
+				className="ww:bg-foreground ww:text-background ww:rounded-full ww:p-1 ww:disabled:opacity-30 ww:transition-colors ww:cursor-pointer ww:shrink-0"
+				title="Confirm rename"
+			>
+				{saving ? <LoaderIcon /> : <CheckIcon />}
+			</button>
+			{!saving && (
+				<button
+					type="button"
+					onClick={onCancel}
+					className="ww:bg-foreground ww:text-background ww:rounded-full ww:p-1 ww:transition-colors ww:cursor-pointer ww:shrink-0"
+					title="Cancel"
+				>
+					<XIcon />
+				</button>
+			)}
+		</div>
 	);
 }
 
@@ -258,18 +318,19 @@ export function ScenarioPanel({ api, chatRef }: ScenarioPanelProps) {
 
 	return (
 		<div
+			data-waniwani-chat=""
 			className="ww:flex ww:flex-col ww:h-full ww:overflow-hidden ww:text-foreground ww:border-l ww:border-border ww:shrink-0"
 			style={{ width: PANEL_WIDTH }}
 		>
 			{/* Header */}
 			<div className="ww:px-3 ww:py-2 ww:border-b ww:border-border/50 ww:flex ww:items-center ww:justify-between">
-				<span className="ww:text-[10px] ww:font-mono ww:uppercase ww:tracking-widest ww:text-muted-foreground">
+				<span className="ww:text-[10px] ww:font-mono ww:uppercase ww:tracking-widest ww:text-foreground/60">
 					Scenarios
 				</span>
 				<button
 					type="button"
 					onClick={reload}
-					className="ww:text-muted-foreground ww:hover:text-foreground ww:transition-colors ww:cursor-pointer"
+					className="ww:bg-foreground ww:text-background ww:rounded-full ww:p-1 ww:transition-colors ww:cursor-pointer"
 					title="Reload scenarios"
 				>
 					<svg
@@ -310,7 +371,7 @@ export function ScenarioPanel({ api, chatRef }: ScenarioPanelProps) {
 				{isLoading ? (
 					<ScenarioSkeleton />
 				) : scenarios.length === 0 ? (
-					<p className="ww:text-xs ww:font-mono ww:text-muted-foreground ww:text-center ww:py-8 ww:px-4">
+					<p className="ww:text-xs ww:font-mono ww:text-foreground/50 ww:text-center ww:py-8 ww:px-4">
 						No scenarios found
 					</p>
 				) : (
@@ -328,17 +389,6 @@ export function ScenarioPanel({ api, chatRef }: ScenarioPanelProps) {
 										: "ww:border-transparent ww:hover:bg-muted/50",
 								)}
 							>
-								{/* Play / spinner */}
-								<button
-									type="button"
-									onClick={() => runScenario(s)}
-									disabled={runningId !== null}
-									className="ww:shrink-0 ww:text-muted-foreground ww:hover:text-[#03d916] ww:disabled:opacity-40 ww:transition-colors ww:cursor-pointer ww:p-0.5"
-									title="Run scenario"
-								>
-									{isRunning ? <LoaderIcon /> : <PlayIcon />}
-								</button>
-
 								{/* Name (inline editable) */}
 								<div className="ww:flex-1 ww:min-w-0">
 									{isEditing ? (
@@ -348,32 +398,38 @@ export function ScenarioPanel({ api, chatRef }: ScenarioPanelProps) {
 											onCancel={() => setEditingId(null)}
 										/>
 									) : (
-										<button
-											type="button"
-											className="ww:block ww:truncate ww:text-xs ww:font-mono ww:text-foreground ww:cursor-default ww:bg-transparent ww:border-none ww:p-0 ww:text-left"
-											onDoubleClick={() => setEditingId(s.id)}
-											onKeyDown={(e) => {
-												if (e.key === "F2") {
-													setEditingId(s.id);
-												}
-											}}
+										<span
+											className="ww:block ww:truncate ww:text-xs ww:font-mono ww:text-foreground"
 											title={s.name}
 										>
 											{s.name}
-										</button>
+										</span>
 									)}
 								</div>
 
-								{/* Rename button */}
-								{!isEditing && !isRunning && (
-									<button
-										type="button"
-										onClick={() => setEditingId(s.id)}
-										className="ww:shrink-0 ww:opacity-0 ww:group-hover:opacity-100 ww:text-muted-foreground ww:hover:text-foreground ww:transition-all ww:cursor-pointer ww:p-0.5"
-										title="Rename scenario"
-									>
-										<PencilIcon />
-									</button>
+								{/* Action buttons (right side) */}
+								{!isEditing && (
+									<div className="ww:flex ww:items-center ww:gap-1 ww:shrink-0">
+										{!isRunning && (
+											<button
+												type="button"
+												onClick={() => setEditingId(s.id)}
+												className="ww:opacity-0 ww:group-hover:opacity-100 ww:bg-foreground ww:text-background ww:rounded-full ww:p-1 ww:transition-all ww:cursor-pointer"
+												title="Rename scenario"
+											>
+												<PencilIcon />
+											</button>
+										)}
+										<button
+											type="button"
+											onClick={() => runScenario(s)}
+											disabled={runningId !== null}
+											className="ww:bg-foreground ww:text-background ww:rounded-full ww:p-1 ww:disabled:opacity-40 ww:transition-colors ww:cursor-pointer"
+											title="Run scenario"
+										>
+											{isRunning ? <LoaderIcon /> : <PlayIcon />}
+										</button>
+									</div>
 								)}
 							</div>
 						);
