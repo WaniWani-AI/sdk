@@ -34,11 +34,44 @@ await wani.kb.ingest([
 ]);
 ```
 
-The managed project template includes an `embed` script that reads markdown files from a `knowledge-base/` directory:
+The managed project template includes a ready-made `embed` script:
 
 ```bash
 bun embed
 ```
+
+### Ingest script for external projects
+
+If you're running your own MCP server, create a simple script to read your docs and push them to WaniWani:
+
+```ts scripts/embed.ts
+import { waniwani } from "@waniwani/sdk";
+import fs from "node:fs";
+import path from "node:path";
+
+const wani = waniwani(); // reads WANIWANI_API_KEY from env
+const docsDir = "./knowledge-base"; // your markdown files
+
+const files = fs.readdirSync(docsDir)
+  .filter((f) => f.endsWith(".md"))
+  .map((f) => ({
+    filename: f,
+    content: fs.readFileSync(path.join(docsDir, f), "utf-8"),
+  }));
+
+// Batch in groups of 10
+for (let i = 0; i < files.length; i += 10) {
+  const batch = files.slice(i, i + 10);
+  const result = await wani.kb.ingest(batch);
+  console.log(`Ingested ${result.filesProcessed} files (${result.chunksIngested} chunks)`);
+}
+```
+
+Run it with `npx tsx scripts/embed.ts` or `bun scripts/embed.ts`.
+
+<Info>
+  A built-in `waniwani embed` CLI command is coming soon to `@waniwani/cli`, so you won't need a custom script.
+</Info>
 
 ### Ingest input
 

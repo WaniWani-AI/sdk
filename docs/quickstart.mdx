@@ -3,7 +3,20 @@ title: Quickstart
 description: "Get a working MCP server with analytics in under 5 minutes."
 ---
 
-## Option A: Managed project (recommended)
+## Choose your setup
+
+<CardGroup cols={2}>
+  <Card title="Managed project" icon="cloud" href="#option-a-managed-project">
+    WaniWani provisions a repo, deploys to Vercel, and auto-tunnels local dev. Best for **new MCP servers** — zero infrastructure to manage.
+  </Card>
+  <Card title="External project" icon="server" href="#option-b-external-project">
+    You host your own MCP server and add the SDK to it. Best for **existing MCP servers** where you want to add tracking, flows, or knowledge base.
+  </Card>
+</CardGroup>
+
+---
+
+## Option A: Managed project
 
 WaniWani provisions a GitHub repo, deploys to Vercel, and auto-tunnels local dev so ChatGPT and Claude can reach your server instantly.
 
@@ -16,6 +29,8 @@ WaniWani provisions a GitHub repo, deploys to Vercel, and auto-tunnels local dev
   </Step>
 
   <Step title="Install and run">
+    <Note>Managed projects use **Bun** as the package manager.</Note>
+
     ```bash
     bun install
     bun dev
@@ -28,29 +43,6 @@ WaniWani provisions a GitHub repo, deploys to Vercel, and auto-tunnels local dev
     The dev server prints a tunnel URL. Open it in your browser to access the built-in chat playground, or connect from ChatGPT/Claude using the tunnel URL + `/mcp`.
   </Step>
 </Steps>
-
-### Project structure
-
-```
-lib/<your-mcp>/
-├── tools/           # MCP tools
-│   ├── index.ts     # Tool registry
-│   └── hello.ts     # Example tool
-└── widgets/         # Rich UI components
-    └── greeting/
-        └── index.ts
-
-app/
-├── mcp/route.ts     # MCP server endpoint
-└── api/waniwani/    # WaniWani SDK handler
-
-knowledge-base/      # Markdown files for KB search
-scripts/
-├── dev.ts           # Dev server + Cloudflare tunnel
-└── embed.ts         # Ingest knowledge base files
-```
-
-Add tools in `lib/<your-mcp>/tools/`, register them in `app/mcp/route.ts`, push to GitHub — Vercel deploys automatically.
 
 ---
 

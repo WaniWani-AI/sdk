@@ -3,32 +3,19 @@ title: API Keys
 description: "Create, configure, and rotate WaniWani API keys."
 ---
 
-Every WaniWani client authenticates with a single API key scoped to one **MCP environment**. An environment maps to one deployment target, typically one per server and per stage (prod, staging, local).
+Every WaniWani client authenticates with a single API key scoped to one **MCP environment**. When you create a project, two environments are provisioned automatically — **Staging** and **Production** — each with its own unique API key.
 
-## Create an environment
+The key you use determines which environment your data (events, sessions, knowledge base) is stored in. Use the Staging key during development and the Production key for live traffic — this keeps your data cleanly separated.
 
-<Steps>
-  <Step title="Sign in">
-    Open [app.waniwani.ai/mcp](https://app.waniwani.ai/mcp) and sign in.
-  </Step>
-  <Step title="Create an MCP environment">
-    From the dashboard, create a new MCP environment. Name it after the server and stage, for example:
-    - `my-app-prod`
-    - `my-app-staging`
-    - `my-app-local`
-  </Step>
-  <Step title="Copy the API key">
-    Open the environment settings and copy the API key. Keys are prefixed with `wwk_` (for example `wwk_abc123...`) and shown in full only once.
-  </Step>
-</Steps>
+## Managed projects
 
-<Warning>
-  API keys grant rights to ingest events and mint widget tokens for their environment. Treat them as server-side secrets. Never commit them to git, never ship them in client-side bundles.
-</Warning>
+Both API keys (Staging and Production) are pre-configured in your deployed instance. You can view and rotate them from your MCP app page under **Settings > API Keys**.
 
-## Configure the key
+No manual setup needed — keys are injected into your environments automatically.
 
-Set `WANIWANI_API_KEY` in the environment where your MCP server runs. The SDK reads it automatically when you call `waniwani()` with no arguments.
+## External projects
+
+When you create an external project, you get your **Production** API key right away. Set it in the environment where your MCP server runs:
 
 ```bash .env
 WANIWANI_API_KEY=wwk_...
@@ -37,20 +24,25 @@ WANIWANI_API_KEY=wwk_...
 ```ts
 import { waniwani } from "@waniwani/sdk";
 
-const wani = waniwani();
+const wani = waniwani(); // reads WANIWANI_API_KEY from env
 ```
 
-Manage the variable wherever you normally keep secrets (a local `.env` file, your platform's secret manager on Vercel, Alpic, Fly, Railway, and so on).
+Manage the variable wherever you normally keep secrets (`.env` file, your platform's secret manager, etc.).
+
+To set up a **Staging** environment, create one from your project's dashboard and use its key for local dev and preview deploys.
+
+<Warning>
+  API keys grant rights to ingest events and mint widget tokens for their environment. Treat them as server-side secrets. Never commit them to git, never ship them in client-side bundles.
+</Warning>
 
 ## Per-environment keys
 
-Use a separate key per stage. Mixing environments pollutes your metrics and makes rotation harder.
+Use the **Staging** key during development and the **Production** key for your live deployment. Mixing environments pollutes your metrics and makes rotation harder.
 
-| Stage       | Environment name | Where the env var lives |
-| ----------- | ---------------- | ----------------------- |
-| Production  | `my-app-prod`    | Platform secret manager |
-| Staging     | `my-app-staging` | Platform secret manager |
-| Local dev   | `my-app-local`   | `.env` (gitignored)     |
+| Environment | When to use | Where the env var lives |
+| ----------- | ----------- | ----------------------- |
+| Production  | Live traffic | Platform secret manager |
+| Staging     | Local dev and preview deploys | `.env` (gitignored) / preview secrets |
 
 ## Rotate a key
 

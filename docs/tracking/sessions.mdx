@@ -16,9 +16,8 @@ The SDK reads the first non-empty string value it finds under these keys of `_me
 3. `openai/session`
 4. `sessionId`
 5. `conversationId`
-6. `anthropic/sessionId`
 
-The matched value becomes the `correlation.sessionId` field on the outgoing V2 envelope. The SDK also extracts `requestId`, `traceId`, `correlationId`, and `externalUserId` from `_meta` using the same approach. Source is derived from the session key (`openai/sessionId` -> `chatgpt`, `anthropic/sessionId` -> `claude`, `waniwani/sessionId` -> `chatbar`).
+The matched value becomes the `correlation.sessionId` field on the outgoing V2 envelope. The SDK also extracts `requestId`, `traceId`, `correlationId`, and `externalUserId` from `_meta` using the same approach. Source is derived from the session key (`openai/sessionId` -> `chatgpt`, `waniwani/sessionId` -> `chatbar`).
 
 ## The rule
 
