@@ -5,7 +5,10 @@ export type CorsFunction = (response: Response) => Response;
 export function createCors(): CorsFunction {
 	return function applyCors(response: Response): Response {
 		response.headers.set("Access-Control-Allow-Origin", "*");
-		response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+		response.headers.set(
+			"Access-Control-Allow-Methods",
+			"GET, POST, PATCH, OPTIONS",
+		);
 		response.headers.set(
 			"Access-Control-Allow-Headers",
 			"Content-Type, Authorization, X-Session-Id, X-Client-User-Agent",

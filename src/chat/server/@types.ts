@@ -144,6 +144,8 @@ export interface ApiHandler {
 	routeGet: (request: Request) => Promise<Response>;
 	/** Routes POST sub-paths (e.g. /tool), defaults to chat */
 	routePost: (request: Request) => Promise<Response>;
+	/** Routes PATCH sub-paths (e.g. /scenarios/:id) */
+	routePatch: (request: Request) => Promise<Response>;
 	/** Handles CORS preflight requests */
 	handleOptions: () => Response;
 }

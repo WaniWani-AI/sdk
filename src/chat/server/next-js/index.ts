@@ -50,6 +50,7 @@ export function toNextJsHandler(
 	return {
 		POST: handler.routePost,
 		GET: handler.routeGet,
+		PATCH: handler.routePatch,
 		OPTIONS: () => handler.handleOptions(),
 	};
 }

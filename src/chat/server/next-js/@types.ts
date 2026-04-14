@@ -79,6 +79,8 @@ export interface NextJsHandlerResult {
 	GET: (request: Request) => Promise<Response>;
 	/** POST handler: proxies chat messages to the WaniWani API */
 	POST: (request: Request) => Promise<Response>;
+	/** PATCH handler: routes updates (e.g. /scenarios/:id) */
+	PATCH: (request: Request) => Promise<Response>;
 	/** OPTIONS handler: CORS preflight */
 	OPTIONS: (request: Request) => Response;
 }

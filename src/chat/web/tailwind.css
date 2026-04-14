@@ -99,6 +99,26 @@
 	--ww-font-sans: var(--ww-font, system-ui, -apple-system, "Segoe UI", sans-serif);
 }
 
+.dark [data-waniwani-chat],
+[data-waniwani-chat].dark {
+	--ww-color-background: var(--ww-bg, #212121);
+	--ww-color-foreground: var(--ww-text, #ececec);
+	--ww-color-primary: var(--ww-primary, #6366f1);
+	--ww-color-primary-foreground: var(--ww-primary-fg, #ffffff);
+	--ww-color-muted-foreground: var(--ww-muted, #8e8ea0);
+	--ww-color-border: var(--ww-border, #444444);
+	--ww-color-input: var(--ww-input-bg, #2f2f2f);
+	--ww-color-accent: var(--ww-assistant-bubble, #2f2f2f);
+	--ww-color-accent-foreground: var(--ww-text, #ececec);
+	--ww-color-user-bubble: var(--ww-user-bubble, #303030);
+	--ww-color-card: var(--ww-bg, #212121);
+	--ww-color-card-foreground: var(--ww-text, #ececec);
+	--ww-color-card-header: var(--ww-header-bg, #1e1e1e);
+	--ww-color-card-header-foreground: var(--ww-header-text, #ececec);
+	--ww-color-status: var(--ww-status, #22c55e);
+	--ww-color-tool-card: var(--ww-tool-card, #262626);
+}
+
 /* ─── Streamdown overrides ─────────────────────────────────────────────
    Streamdown uses unprefixed Tailwind classes internally, but our CSS is
    compiled with prefix(ww). We re-apply the styles via data-streamdown
