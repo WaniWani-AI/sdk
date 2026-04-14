@@ -117,7 +117,9 @@ Example: user says "I want to open a bank account in France" -- AI sends `{ "act
 
 ## Node Handlers
 
-Every handler receives a context object: `({ state, meta, interrupt, showWidget }) => ...`
+Every handler receives a context object: `({ state, meta, interrupt, showWidget, waniwani }) => ...`
+
+The `waniwani` property is a session-scoped `ScopedWaniWaniClient` for tracking events within flow handlers (e.g. `waniwani.track(...)`, `waniwani.identify(...)`). It is automatically scoped to the current session.
 
 | Return value | Behavior |
 |---|---|
@@ -345,6 +347,22 @@ const flow = createFlow({
 
 await registerTools(server, [flow]);
 ```
+
+## Annotations
+
+Pass MCP tool annotation hints to the flow's compiled tool via the `annotations` field in `createFlow`:
+
+```ts
+const flow = createFlow({
+  id: "lookup",
+  title: "Lookup",
+  description: "Look up information",
+  state: { query: z.string().describe("Search query") },
+  annotations: { readOnlyHint: true, idempotentHint: true },
+})
+```
+
+Supported annotations: `readOnlyHint`, `idempotentHint`, `openWorldHint`, `destructiveHint`.
 
 ## Common Mistakes
 

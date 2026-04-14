@@ -12,6 +12,7 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 | `title` | `string` | yes | Display title |
 | `description` | `string` | yes | Tells the AI when to use this flow |
 | `state` | `Record<string, z.ZodType>` | yes | State schema. Values are Zod schemas with `.describe()`. Use `z.object()` for grouped nested fields (1 level max). |
+| `annotations` | `object` | no | MCP tool annotation hints: `readOnlyHint`, `idempotentHint`, `openWorldHint`, `destructiveHint` |
 
 ```ts
 import { createFlow } from "@waniwani/sdk/mcp";
@@ -34,7 +35,7 @@ All methods return `this` for chaining (except `compile` and `graph`).
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `addNode` | `(name: string, handler: NodeHandler<TState>)` | Add a node. Handler receives `{ state, meta, interrupt, showWidget }`. Return `interrupt(...)`, `showWidget(...)`, or a plain object. |
+| `addNode` | `(name: string, handler: NodeHandler<TState>)` | Add a node. Handler receives `{ state, meta, interrupt, showWidget, waniwani }`. Return `interrupt(...)`, `showWidget(...)`, or a plain object. |
 | `addEdge` | `(from: string, to: string)` | Static edge. `START` and `END` are valid values. |
 | `addConditionalEdge` | `(from: string, condition: (state) => string)` | Dynamic routing. `condition(state)` returns the next node name. TypeScript enforces the return type matches registered node names. |
 | `compile` | `(options?: { store?: FlowStore })` | Validate graph, return a `RegisteredFlow`. |
@@ -193,7 +194,8 @@ const flow = createFlow({ ... }).compile({ store: new RedisFlowStore() });
 | `WaniwaniFlowStore` | `class` | Default API-backed state store (see above) |
 | `FlowStore` | `interface` | Interface for custom store implementations |
 | `RegisteredFlow` | `type` | Compiled flow returned by `compile()`. Has `name`, `config`, `handler`, `register`, and `graph`. |
-| `NodeContext<TState>` | `type` | Context object passed to node handlers: `{ state, meta, interrupt, showWidget }` |
+| `NodeContext<TState>` | `type` | Context object passed to node handlers: `{ state, meta, interrupt, showWidget, waniwani }` |
+| `ScopedWaniWaniClient` | `type` | Session-scoped tracking client available as `waniwani` in node handler context. Provides `track()`, `identify()`, scoped to the current session. |
 | `InferFlowState<T>` | `type` | Utility type to extract the runtime state type from a flow's state schema |
 | `StateGraph` | `class` | The builder class returned by `createFlow()`. Exposes `addNode`, `addEdge`, `addConditionalEdge`, `compile`, `graph`. |
 | `createFlowTestHarness` | `function` | Test utility for running flows in tests without an MCP server |

@@ -1,55 +1,203 @@
 # Chat Widget (`@waniwani/sdk/chat`)
 
-React component and embed script for adding an AI chat widget to any website, with theming and automatic event tracking.
+React components for embedding an AI chat widget with theming, MCP Apps support, and automatic event tracking. Three layout variants for different use cases.
 
-## React Component
-
-### Import
+## Import
 
 ```tsx
-import { ChatWidget } from "@waniwani/sdk/chat";
+import { ChatBar, ChatCard, ChatEmbed } from "@waniwani/sdk/chat";
 import "@waniwani/sdk/chat/styles.css";
 ```
 
+`ChatWidget` is a backward-compatible alias for `ChatBar`.
+
 Peer dependencies: `react`, `react-dom`, `@ai-sdk/react`, `ai`
 
-All other dependencies (icons, markdown rendering, scroll utilities, styling helpers) are bundled into the SDK.
+All other dependencies (icons, markdown rendering, scroll utilities) are bundled into the SDK.
 
-### Usage
+## Layout Components
+
+### `ChatBar` (default)
+
+Compact floating bar that expands upward into a chat panel. Best for bottom-of-page placement.
 
 ```tsx
-<ChatWidget
+<ChatBar
   apiKey="ww_..."
   title="Support"
-  subtitle="Ask us anything"
-  welcomeMessage="Hi! How can I help?"
-  width={400}
-  height={600}
+  width={600}
+  expandedWidth={720}
+  expandedHeight={400}
   theme={{ primaryColor: "#6366f1" }}
-  onMessageSent={(msg) => console.log(msg)}
 />
 ```
 
-### ChatWidgetProps
+**ChatBar-specific props:**
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `apiKey` | `string` | `undefined` | WaniWani project API key |
-| `api` | `string` | `https://app.waniwani.ai/api/chat` | Chat API endpoint URL |
-| `welcomeMessage` | `string` | `undefined` | Initial greeting before user types |
-| `title` | `string` | `"Chat"` | Header title |
-| `subtitle` | `string` | `undefined` | Header subtitle |
+| `width` | `number` | `600` | Bar width in pixels |
+| `expandedWidth` | `number` | `width * 1.2` | Expanded card width |
+| `expandedHeight` | `number` | `400` | Max height of expanded messages panel |
+| `title` | `string` | `"Assistant"` | Header title when expanded |
+
+### `ChatCard`
+
+Always-visible card with a header, status dot, and optional subtitle. Best for dedicated chat sections.
+
+```tsx
+<ChatCard
+  apiKey="ww_..."
+  title="Support"
+  subtitle="Ask us anything"
+  showStatus={true}
+  width={500}
+  height={600}
+  theme={{ primaryColor: "#6366f1" }}
+/>
+```
+
+**ChatCard-specific props:**
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `title` | `string` | `"Assistant"` | Header title |
+| `subtitle` | `string` | -- | Subtitle text under the title |
+| `showStatus` | `boolean` | `true` | Show the status dot in header |
+| `width` | `number \| string` | `500` | Card width (px number or CSS value like `"100%"`) |
+| `height` | `number \| string` | `600` | Card height (px number or CSS value like `"80vh"`) |
+| `className` | `string` | -- | Additional CSS class names |
+
+### `ChatEmbed`
+
+Borderless, bring-your-own-backend chat. Fills its parent container. No header, border, or shadow. Does not call the WaniWani hosted backend -- you provide the `api` endpoint.
+
+```tsx
+<ChatEmbed
+  api="/api/my-chat-endpoint"
+  body={{ environmentId, sessionId }}
+  theme={{ backgroundColor: "#fff" }}
+/>
+
+// With MCP Apps widget support
+<ChatEmbed
+  api="/api/my-chat-endpoint"
+  mcp={{ resourceEndpoint: "/api/mcp/resource" }}
+/>
+```
+
+**ChatEmbed-specific props:**
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `api` | `string` | Yes | Chat API endpoint (no default) |
+| `className` | `string` | No | Additional CSS class names |
+| `mcp` | `ChatEmbedMcpConfig` | No | MCP Apps config for widget iframes |
+
+**`ChatEmbedMcpConfig`:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `resourceEndpoint` | `string` | Endpoint serving MCP app resources (`GET ${endpoint}?uri=...`) |
+| `onCallTool` | `CallToolHandler` | Handler for MCP tool calls from widgets |
+
+## Shared Props (`ChatBaseProps`)
+
+All layout components share these props:
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `apiKey` | `string` | -- | WaniWani project API key |
+| `api` | `string` | WaniWani hosted endpoint | Chat API endpoint URL |
+| `initialMessages` | `UIMessage[]` | -- | Pre-loaded messages on mount |
+| `welcomeMessage` | `string` | -- | Initial greeting text |
+| `welcome` | `WelcomeConfig` | -- | Rich welcome screen (takes precedence over `welcomeMessage`) |
 | `theme` | `ChatTheme` | `DEFAULT_THEME` | Theme overrides |
-| `headers` | `Record<string, string>` | `undefined` | Additional headers for chat API requests |
-| `body` | `Record<string, unknown>` | `undefined` | Additional body fields per request |
-| `width` | `number` | `400` | Panel width in pixels |
-| `height` | `number` | `600` | Panel height in pixels |
-| `onMessageSent` | `(message: string) => void` | `undefined` | Callback on message sent |
-| `onResponseReceived` | `() => void` | `undefined` | Callback on response received |
+| `headers` | `Record<string, string>` | -- | Additional headers for API requests |
+| `body` | `Record<string, unknown>` | -- | Additional body fields per request |
+| `allowAttachments` | `boolean` | `false` | Enable file attachments in input |
+| `placeholder` | `string` | `"Ask me anything..."` | Input placeholder (typing animation) |
+| `triggerEvent` | `string \| false` | `"triggerDemoRequest"` | DOM event to trigger focus/send. Dispatch via `new CustomEvent('triggerDemoRequest', { detail: { message: 'Hi!' } })`. Set `false` to disable. |
+| `suggestions` | `boolean \| SuggestionsConfig` | -- | AI-generated suggestions. `true` for defaults, object for config. |
+| `onCallTool` | `CallToolHandler` | -- | Handler for MCP tool calls from widgets |
+| `debug` | `boolean` | `false` | Show `_meta` in tool call inputs/outputs |
+| `onMessageSent` | `(message: string) => void` | -- | Callback on message sent |
+| `onResponseReceived` | `() => void` | -- | Callback on response received |
 
-### Theming
+### `WelcomeConfig`
 
-Pass a `theme` object to override defaults:
+Rich welcome screen replacing `welcomeMessage`. Shown when the conversation is empty.
+
+```tsx
+<ChatCard
+  welcome={{
+    icon: <Logo />,
+    title: "Welcome to Support",
+    description: "Ask me anything about our product.",
+    suggestions: ["How does pricing work?", "Show me a demo"],
+  }}
+/>
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `icon` | `React.ReactNode` | No | Icon above the title (SVG, img, etc.) |
+| `title` | `string` | Yes | Title text |
+| `description` | `string` | No | Description below the title |
+| `suggestions` | `string[]` | No | Clickable suggestion cards (disappear after first message) |
+
+### `SuggestionsConfig`
+
+```tsx
+<ChatCard suggestions={{ initial: ["Pricing", "Demo"], dynamic: true }} />
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `initial` | `string[]` | `[]` | Suggestions before user's first message |
+| `dynamic` | `boolean` | `true` | Enable AI-generated suggestions after each response |
+
+## Imperative Handle (`ChatHandle`)
+
+Access chat methods via a ref. Works with all layout components.
+
+```tsx
+import { useRef } from "react";
+import { ChatCard } from "@waniwani/sdk/chat";
+import type { ChatHandle } from "@waniwani/sdk/chat";
+
+function App() {
+  const chatRef = useRef<ChatHandle>(null);
+
+  return (
+    <>
+      <ChatCard ref={chatRef} apiKey="ww_..." />
+      <button onClick={() => chatRef.current?.sendMessage("Show pricing")}>
+        Ask about pricing
+      </button>
+    </>
+  );
+}
+```
+
+| Method | Description |
+|--------|-------------|
+| `sendMessage(text)` | Programmatically send a user message |
+| `sendMessageAndWait(text)` | Send and wait for the assistant response to complete |
+| `reset()` | Clear all messages and start fresh |
+| `focus()` | Scroll to input, focus it, and show a highlight glow |
+| `messages` | Current chat messages (readonly) |
+
+## Theming
+
+Pass a `theme` object to override defaults. A `DARK_THEME` preset is also available.
+
+```tsx
+import { DARK_THEME, mergeTheme } from "@waniwani/sdk/chat";
+
+<ChatCard theme={DARK_THEME} />
+<ChatCard theme={mergeTheme(DARK_THEME, { primaryColor: "#6366f1" })} />
+```
 
 | Property | CSS Variable | Default |
 |----------|-------------|---------|
@@ -62,13 +210,19 @@ Pass a `theme` object to override defaults:
 | `assistantBubbleColor` | `--ww-assistant-bubble` | `#f3f4f6` |
 | `userBubbleColor` | `--ww-user-bubble` | (primary) |
 | `inputBackgroundColor` | `--ww-input-bg` | `#f9fafb` |
+| `headerBackgroundColor` | -- | (backgroundColor) |
+| `headerTextColor` | -- | (textColor) |
+| `statusColor` | -- | `#22c55e` |
+| `toolCardColor` | -- | light gray / `#262626` in dark |
 | `borderRadius` | `--ww-radius` | `16px` |
 | `messageBorderRadius` | `--ww-msg-radius` | `12px` |
 | `fontFamily` | `--ww-font` | system stack |
 
-### Event Tracking
+Theme utilities: `DEFAULT_THEME`, `DARK_THEME`, `mergeTheme(base, overrides)`, `themeToCSSProperties(theme)`.
 
-When `apiKey` is provided, the widget automatically tracks these events:
+## Event Tracking
+
+When `apiKey` is provided, the widget automatically tracks:
 
 | Event | Trigger |
 |-------|---------|
@@ -80,7 +234,7 @@ Tracking is fire-and-forget -- failures never break the chat.
 
 ## Embed Script (Non-React)
 
-For non-React sites, use the embed script. It renders the same chat widget inside a Shadow DOM for full CSS isolation from the host page.
+For non-React sites, use the embed script with Shadow DOM for CSS isolation:
 
 ### Script Tag
 
@@ -104,21 +258,20 @@ const chat = window.WaniWani.chat.init({
   theme: { primaryColor: "#6366f1" },
 });
 
-// Cleanup when done
+// Cleanup
 chat.destroy();
 ```
 
-### ChatEmbedConfig
+## Additional Components
 
-Same as `ChatWidgetProps` without callbacks (`onMessageSent`, `onResponseReceived`), plus:
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `container` | `HTMLElement` | `document.body` | DOM element to mount into |
+- **`McpAppFrame`** -- Renders MCP App widget iframes inside chat. Forwards tool result `_meta` via `ui/notifications/tool-result` for widget tracking config.
+- **`ScenarioPanel`** -- Eval/scenario panel component for testing chat flows.
 
 ## Common Mistakes
 
 - **Wrong import path** -- Use `@waniwani/sdk/chat`, not `@waniwani/sdk`
-- **Missing peer deps** -- Requires `react`, `react-dom`, `@ai-sdk/react`, and `ai`. Everything else is bundled -- do NOT add them as peer deps or externals
+- **Missing stylesheet** -- Import `@waniwani/sdk/chat/styles.css` alongside the component
+- **Missing peer deps** -- Requires `react`, `react-dom`, `@ai-sdk/react`, and `ai`. Everything else is bundled.
 - **Embed cleanup** -- Always call `chat.destroy()` on unmount to prevent memory leaks
-- **Shadow DOM styling** -- The embed uses Shadow DOM; external CSS will not affect widget styles. Use the `theme` prop instead
+- **Shadow DOM styling** -- The embed script uses Shadow DOM; external CSS won't affect widget styles. Use the `theme` prop instead.
+- **Using `ChatWidget` for new code** -- `ChatWidget` is a deprecated alias for `ChatBar`. Use `ChatBar`, `ChatCard`, or `ChatEmbed` directly.

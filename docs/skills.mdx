@@ -1,0 +1,45 @@
+---
+title: Agent Skills
+description: "Install the WaniWani SDK skill for Claude Code, Cursor, and other AI agents."
+---
+
+The WaniWani SDK is available as an [agent skill](https://agentskills.io) for Claude Code, Cursor, GitHub Copilot, and 20+ other AI coding agents. Once installed, your agent knows how to integrate the SDK without you having to explain the API.
+
+## Install
+
+<CodeGroup>
+  ```bash npx
+  npx skills add WaniWani-AI/sdk -s waniwani-sdk
+  ```
+
+  ```bash bunx
+  bunx skills add WaniWani-AI/sdk -s waniwani-sdk
+  ```
+</CodeGroup>
+
+The skill is installed into your project's `.claude/skills/` directory (or equivalent for other agents).
+
+## What's included
+
+The skill teaches your agent how to:
+
+- **Set up the SDK** -- install, configure env vars, create a client singleton
+- **Track events** -- `withWaniwani` auto-tracking, custom events, sessions
+- **Build flows** -- multi-step conversational state machines with interrupts, validation, conditional edges
+- **Create tools with widgets** -- `createResource`, `createTool`, React hooks for widget UIs
+- **Add a knowledge base** -- ingest markdown, search with embeddings, build FAQ tools
+- **Embed chat** -- React component and script-tag embed with theming
+
+## Usage
+
+After installing, just describe what you want in natural language. Your agent will use the skill automatically:
+
+- *"Add WaniWani tracking to my MCP server"*
+- *"Create a multi-step onboarding flow"*
+- *"Add a knowledge base FAQ tool"*
+- *"Embed a chat widget on my landing page"*
+
+## Learn more
+
+- [skills.sh](https://skills.sh) -- Browse and discover agent skills
+- [agentskills.io](https://agentskills.io) -- The open Agent Skills specification

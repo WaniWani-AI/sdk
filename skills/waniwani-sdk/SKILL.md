@@ -69,6 +69,8 @@ server.registerTool("get_pricing", /* ... */);
 | `@waniwani/sdk/chat/styles.css` | Chat widget stylesheet | [chat-widget](references/chat-widget.md) | -- |
 | `@waniwani/sdk/next-js` | Next.js route handler adapter | [chat-server](references/chat-server.md) | -- |
 | `@waniwani/sdk/kb` | Knowledge base client | [knowledge-base](references/knowledge-base.md) | None |
+| `@waniwani/sdk/chat/server` | Chat API handler (server-side) | [chat-server](references/chat-server.md) | `ai` |
+| `@waniwani/sdk/evals` | Eval framework (chat, conversation, scenarios) | -- | `ai` |
 
 ## Core: Event Tracking (`@waniwani/sdk`)
 
@@ -89,6 +91,18 @@ const client = waniwani({
 ```
 
 Create one client in `lib/waniwani.ts` and import it everywhere. Do not call `waniwani()` in multiple files.
+
+### `defineConfig(config)`
+
+Used in `waniwani.config.ts` to define project-level configuration:
+
+```typescript
+import { defineConfig } from "@waniwani/sdk";
+
+export default defineConfig({
+  // WaniWaniProjectConfig fields
+});
+```
 
 ### `client.track(event)`
 
@@ -220,6 +234,16 @@ await registerTools(server, [flow]);
 ```
 
 Flows support interrupt validation, conditional edges, widget steps, nested state, and pre-filling. See [references/flows.md](references/flows.md) for the full guide.
+
+## Guided Playbooks
+
+Step-by-step scripts for common tasks. Follow these when the user wants to build something from scratch.
+
+| User wants to... | Playbook |
+|------------------|----------|
+| Create their first flow | [scripts/create-flow.md](scripts/create-flow.md) |
+
+When a playbook exists for the user's task, **follow the playbook step by step** instead of writing code directly. The playbooks include prerequisite checks, interactive design steps, and testing instructions.
 
 ## Reading Guide
 
