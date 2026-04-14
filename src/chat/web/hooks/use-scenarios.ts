@@ -9,6 +9,7 @@ type ScenarioMessage = {
 	parts: ScenarioPart[];
 };
 export type EvalScenario = {
+	id: string;
 	name: string;
 	type?: "regulatory" | "functional" | "adversarial";
 	mode?: "regenerate" | "inject";
@@ -36,5 +37,22 @@ export function useScenarios(api: string, enabled: boolean) {
 		load();
 	}, [load]);
 
-	return { scenarios, isLoading, reload: load };
+	const rename = useCallback(
+		async (id: string, name: string) => {
+			const res = await fetch(`${api}/scenarios/${id}`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ name }),
+			});
+			if (!res.ok) {
+				throw new Error("Failed to rename scenario");
+			}
+			setScenarios((prev) =>
+				prev.map((s) => (s.id === id ? { ...s, name } : s)),
+			);
+		},
+		[api],
+	);
+
+	return { scenarios, isLoading, reload: load, rename };
 }

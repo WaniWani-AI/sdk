@@ -182,6 +182,56 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		}
 	}
 
+	async function routePatch(request: Request): Promise<Response> {
+		log("→ PATCH", request.url);
+		try {
+			const url = new URL(request.url);
+			const segments = url.pathname
+				.replace(/\/$/, "")
+				.split("/")
+				.filter(Boolean);
+			const scenarioId = segments.at(-1);
+			const subRoute = segments.at(-2);
+			log("pathname:", url.pathname, "subRoute:", subRoute, "id:", scenarioId);
+
+			if (evalEnabled && subRoute === "scenarios" && scenarioId) {
+				log("dispatching to update-scenario handler (proxy to app API)");
+				try {
+					const body = await request.json();
+					const res = await fetch(`${apiUrl}/api/mcp/scenarios/${scenarioId}`, {
+						method: "PATCH",
+						headers: {
+							"Content-Type": "application/json",
+							...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+						},
+						body: JSON.stringify(body),
+					});
+					const data = await res.json();
+					if (!res.ok) {
+						return json(
+							{ error: data.message ?? "Failed to update scenario" },
+							res.status,
+						);
+					}
+					return json({ ok: true, scenario: data.data }, 200);
+				} catch (e) {
+					const msg =
+						e instanceof Error ? e.message : "Failed to update scenario";
+					return json({ error: msg }, 400);
+				}
+			}
+
+			log("← 404 no matching sub-route for PATCH", subRoute);
+			return json({ error: "Not found" }, 404);
+		} catch (error) {
+			console.error("[waniwani:router] PATCH handler error:", error);
+			const message =
+				error instanceof Error ? error.message : "Unknown error occurred";
+			log("← 500 from caught error");
+			return json({ error: message }, 500);
+		}
+	}
+
 	function handleOptions(): Response {
 		return cors(new Response(null, { status: 204 }));
 	}
@@ -192,6 +242,7 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		handleTool,
 		routeGet,
 		routePost,
+		routePatch,
 		handleOptions,
 	};
 }
