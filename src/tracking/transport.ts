@@ -9,7 +9,10 @@ import type {
 	V2EventEnvelope,
 } from "./v2-types.js";
 
-type FetchFn = (input: URL | RequestInfo, init?: RequestInit) => Promise<Response>;
+type FetchFn = (
+	input: URL | RequestInfo,
+	init?: RequestInit,
+) => Promise<Response>;
 
 const DEFAULT_ENDPOINT_PATH = "/api/mcp/events/v2/batch";
 const DEFAULT_FLUSH_INTERVAL_MS = 1_000;
