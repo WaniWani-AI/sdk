@@ -111,7 +111,7 @@ export function InitializeNextJsInChatGpt({ baseUrl }: { baseUrl: string }) {
 						if (isInIframe && window.location.origin !== appOrigin) {
 							const originalFetch = window.fetch;
 
-							window.fetch = (
+							(window as { fetch: typeof window.fetch }).fetch = ((
 								input: URL | RequestInfo,
 								init?: RequestInit,
 							): Promise<Response> => {
@@ -155,7 +155,7 @@ export function InitializeNextJsInChatGpt({ baseUrl }: { baseUrl: string }) {
 								}
 
 								return originalFetch.call(window, input, init);
-							};
+							}) as typeof window.fetch;
 						}
 					}).toString() +
 					")()"}
