@@ -127,6 +127,15 @@ export interface ApiHandlerOptions {
 	 * Pass `true` to enable with defaults, or a config object to restrict domains.
 	 */
 	webSearch?: boolean | WebSearchConfig;
+
+	/**
+	 * Embed token authentication. When set, incoming requests with an
+	 * Authorization Bearer token are verified against this public key.
+	 * POST requests without a valid token are rejected with 401.
+	 */
+	embedAuth?: {
+		publicKey: string;
+	};
 }
 
 // ============================================================================
@@ -171,6 +180,9 @@ export interface ApiHandlerDeps {
 	resolveConfig: ConfigResolver;
 	debug: boolean;
 	webSearch?: WebSearchConfig;
+	embedAuth?: {
+		publicKey: string;
+	};
 }
 
 /** Normalize `true` to `{}` so the upstream API always receives an object or undefined */

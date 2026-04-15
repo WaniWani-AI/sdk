@@ -46,6 +46,15 @@ export interface ChatOptions {
 	 * Pass `true` to enable with defaults, or a config object to restrict domains.
 	 */
 	webSearch?: boolean | WebSearchConfig;
+
+	/**
+	 * Embed token authentication for the embeddable chat widget.
+	 * When set, POST requests must include a valid Bearer token.
+	 * The token is verified against this RSA public key.
+	 */
+	embedAuth?: {
+		publicKey: string;
+	};
 }
 
 // ============================================================================

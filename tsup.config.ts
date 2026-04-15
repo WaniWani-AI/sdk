@@ -156,4 +156,32 @@ export default defineConfig([
 		outDir: "dist",
 		external: ["ai", "braintrust", "autoevals", "zod"],
 	},
+	// Chat embed (self-contained IIFE for any website)
+	{
+		entry: { "chat/embed": "src/chat/web/embed/embed.ts" },
+		format: ["iife"],
+		globalName: "WaniWaniChatEmbed",
+		target: "es2020",
+		dts: false,
+		clean: false,
+		splitting: false,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		noExternal: [/.*/], // bundle everything including React
+		outExtension() {
+			return { js: ".js" };
+		},
+		platform: "browser",
+		define: {
+			"process.env.NODE_ENV": '"production"',
+		},
+		esbuildOptions(options) {
+			// Stub Node built-ins that some deps reference but never call in browser
+			options.alias = {
+				...options.alias,
+				crypto: "./src/chat/web/embed/shims/crypto.ts",
+			};
+		},
+	},
 ]);

@@ -45,6 +45,7 @@ export function toNextJsHandler(
 		apiUrl,
 		source: options?.source,
 		debug: debugEnabled,
+		embedAuth: options?.chat?.embedAuth,
 	});
 
 	return {
