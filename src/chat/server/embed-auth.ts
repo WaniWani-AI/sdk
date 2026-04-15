@@ -15,6 +15,11 @@ export interface EmbedTokenClaims {
 
 export interface EmbedAuthOptions {
 	publicKey: string;
+	/**
+	 * Comma-separated list of revoked token IDs (jti claims).
+	 * Defaults to reading `WANIWANI_EMBED_REVOKED_JTIS` env var.
+	 */
+	revokedJtis?: string;
 }
 
 // ============================================================================
@@ -115,7 +120,23 @@ export async function verifyEmbedToken(
 // Middleware
 // ============================================================================
 
+function parseRevokedJtis(options: EmbedAuthOptions): Set<string> {
+	const raw =
+		options.revokedJtis ?? process.env.WANIWANI_EMBED_REVOKED_JTIS ?? "";
+	if (!raw) {
+		return new Set();
+	}
+	return new Set(
+		raw
+			.split(",")
+			.map((s) => s.trim())
+			.filter(Boolean),
+	);
+}
+
 export function createEmbedAuthMiddleware(options: EmbedAuthOptions) {
+	const revokedJtis = parseRevokedJtis(options);
+
 	return async function verifyEmbed(
 		request: Request,
 	): Promise<{ claims: EmbedTokenClaims | null } | Response> {
@@ -145,6 +166,14 @@ export function createEmbedAuthMiddleware(options: EmbedAuthOptions) {
 					headers: { "Content-Type": "application/json" },
 				},
 			);
+		}
+
+		// Check jti revocation
+		if (claims.jti && revokedJtis.has(claims.jti)) {
+			return new Response(JSON.stringify({ error: "Token has been revoked" }), {
+				status: 401,
+				headers: { "Content-Type": "application/json" },
+			});
 		}
 
 		// Check origin restriction
