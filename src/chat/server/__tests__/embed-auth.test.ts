@@ -14,16 +14,16 @@ let privateKey: string;
 let otherPublicKey: string;
 
 beforeAll(() => {
-	const kp = generateKeyPairSync("rsa", {
-		modulusLength: 2048,
+	const kp = generateKeyPairSync("ec", {
+		namedCurve: "prime256v1",
 		publicKeyEncoding: { type: "spki", format: "pem" },
 		privateKeyEncoding: { type: "pkcs8", format: "pem" },
 	});
 	publicKey = kp.publicKey as string;
 	privateKey = kp.privateKey as string;
 
-	const kp2 = generateKeyPairSync("rsa", {
-		modulusLength: 2048,
+	const kp2 = generateKeyPairSync("ec", {
+		namedCurve: "prime256v1",
 		publicKeyEncoding: { type: "spki", format: "pem" },
 		privateKeyEncoding: { type: "pkcs8", format: "pem" },
 	});
@@ -40,7 +40,7 @@ function base64url(data: string | Buffer): string {
 
 function signToken(
 	payload: Record<string, unknown>,
-	header: Record<string, unknown> = { alg: "RS256", typ: "JWT" },
+	header: Record<string, unknown> = { alg: "ES256", typ: "JWT" },
 	key: string = privateKey,
 ): string {
 	const headerB64 = base64url(JSON.stringify(header));
@@ -49,7 +49,7 @@ function signToken(
 
 	const sign = createSign("SHA256");
 	sign.update(signingInput);
-	const signature = sign.sign(key);
+	const signature = sign.sign({ key, dsaEncoding: "ieee-p1363" });
 
 	return `${signingInput}.${base64url(signature)}`;
 }
@@ -125,10 +125,10 @@ describe("verifyEmbedToken", () => {
 	});
 
 	test("rejects token with unsupported algorithm", async () => {
-		const token = signToken(validPayload(), { alg: "HS256", typ: "JWT" });
+		const token = signToken(validPayload(), { alg: "RS256", typ: "JWT" });
 
 		await expect(verifyEmbedToken(token, publicKey)).rejects.toThrow(
-			"Unsupported JWT algorithm: HS256",
+			"Unsupported JWT algorithm: RS256",
 		);
 	});
 

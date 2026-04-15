@@ -1,4 +1,4 @@
-// Embed Token Authentication - JWT verification using Web Crypto API (RS256)
+// Embed Token Authentication - JWT verification using Web Crypto API (ES256)
 
 // ============================================================================
 // Types
@@ -64,7 +64,7 @@ export async function verifyEmbedToken(
 	const header = JSON.parse(
 		new TextDecoder().decode(base64urlDecode(headerB64)),
 	);
-	if (header.alg !== "RS256") {
+	if (header.alg !== "ES256") {
 		throw new Error(`Unsupported JWT algorithm: ${header.alg}`);
 	}
 
@@ -86,7 +86,7 @@ export async function verifyEmbedToken(
 	const key = await crypto.subtle.importKey(
 		"spki",
 		keyData.buffer as ArrayBuffer,
-		{ name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+		{ name: "ECDSA", namedCurve: "P-256" },
 		false,
 		["verify"],
 	);
@@ -95,7 +95,7 @@ export async function verifyEmbedToken(
 	const signingInput = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
 	const signature = base64urlDecode(signatureB64);
 	const valid = await crypto.subtle.verify(
-		"RSASSA-PKCS1-v1_5",
+		{ name: "ECDSA", hash: "SHA-256" },
 		key,
 		signature.buffer as ArrayBuffer,
 		signingInput,
