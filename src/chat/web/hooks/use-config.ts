@@ -9,13 +9,18 @@ export interface WaniWaniConfig {
 
 const defaultConfig: WaniWaniConfig = { debug: false, eval: false };
 
-export function useConfig(api = "/api/waniwani"): WaniWaniConfig {
+export function useConfig(
+	api = "/api/waniwani",
+	headers?: Record<string, string>,
+): WaniWaniConfig {
 	const [config, setConfig] = useState<WaniWaniConfig>(defaultConfig);
 
 	useEffect(() => {
 		(async () => {
 			try {
-				const r = await fetch(`${api}/config`);
+				const r = await fetch(`${api}/config`, {
+					headers: headers ? { ...headers } : undefined,
+				});
 				const data = await r.json();
 				setConfig({
 					debug: data.debug === true,
@@ -23,7 +28,7 @@ export function useConfig(api = "/api/waniwani"): WaniWaniConfig {
 				});
 			} catch {}
 		})();
-	}, [api]);
+	}, [api, headers]);
 
 	return config;
 }
