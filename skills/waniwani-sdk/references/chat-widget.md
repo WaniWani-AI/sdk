@@ -234,33 +234,85 @@ Tracking is fire-and-forget -- failures never break the chat.
 
 ## Embed Script (Non-React)
 
-For non-React sites, use the embed script with Shadow DOM for CSS isolation:
+Self-contained IIFE bundle (~186KB gzipped) with React bundled. Drop a `<script>` tag on any website to get a floating chat bubble. Uses Shadow DOM for CSS isolation.
 
-### Script Tag
+### Prerequisites
+
+1. Generate embed token in WaniWani dashboard
+2. Set up chat route in your MCP app (see [chat-server.md](chat-server.md))
+3. Add `WANIWANI_EMBED_PUBLIC_KEY` to your MCP app's env vars
+
+### Script Tag (declarative)
 
 ```html
 <script
-  src="https://cdn.waniwani.ai/chat/embed.js"
-  data-api-key="ww_..."
+  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@1/dist/chat/embed.js"
+  defer
+  data-api="https://your-mcp-app.vercel.app/api/chat"
+  data-token="eyJ..."
   data-title="Support"
   data-welcome-message="Hi! How can I help?"
   data-primary-color="#6366f1"
 ></script>
 ```
 
+### Script Tag Options
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `data-api` | Yes | Your MCP app's chat endpoint URL |
+| `data-token` | Yes | Embed JWT from WaniWani dashboard |
+| `data-title` | No | Chat header title (default: `"Assistant"`) |
+| `data-welcome-message` | No | Greeting shown before first message |
+| `data-placeholder` | No | Input field placeholder text |
+| `data-suggestions` | No | Comma-separated suggestion chips |
+| `data-position` | No | `"bottom-right"` (default) or `"bottom-left"` |
+| `data-width` | No | Panel width in px (default: `400`) |
+| `data-height` | No | Panel height in px (default: `600`) |
+| `data-container` | No | CSS selector for inline mode (no floating bubble) |
+| `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |
+| `data-primary-color` | No | Primary color hex |
+| `data-background-color` | No | Background color hex |
+| `data-text-color` | No | Text color hex |
+| `data-font-family` | No | Font family |
+
+### Inline Mode
+
+Render inside an existing container instead of floating:
+
+```html
+<div id="chat" style="width: 400px; height: 600px;"></div>
+<script
+  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@1/dist/chat/embed.js"
+  defer
+  data-api="https://your-mcp-app.vercel.app/api/chat"
+  data-token="eyJ..."
+  data-container="#chat"
+></script>
+```
+
 ### Programmatic Init
 
 ```js
-const chat = window.WaniWani.chat.init({
-  apiKey: "ww_...",
-  title: "Support",
-  container: document.getElementById("chat-container"),
-  theme: { primaryColor: "#6366f1" },
-});
+<script src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@1/dist/chat/embed.js" defer></script>
+<script>
+  window.addEventListener('DOMContentLoaded', function() {
+    var chat = window.WaniWani.chat.init({
+      api: 'https://your-mcp-app.vercel.app/api/chat',
+      token: 'eyJ...',
+      title: 'Support',
+      theme: { primaryColor: '#6366f1' },
+    });
 
-// Cleanup
-chat.destroy();
+    // Cleanup
+    chat.destroy();
+  });
+</script>
 ```
+
+### How Auth Works
+
+The embed widget sends `Authorization: Bearer <token>` on every request to your MCP app. Your MCP app verifies the token using `WANIWANI_EMBED_PUBLIC_KEY`. See [Embed Auth in chat-server.md](chat-server.md#embed-auth).
 
 ## Additional Components
 

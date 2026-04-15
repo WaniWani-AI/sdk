@@ -9,6 +9,12 @@ WANIWANI_API_KEY=wwk_...
 
 # Optional -- defaults to https://app.waniwani.ai
 WANIWANI_API_URL=https://app.waniwani.ai
+
+# For embeddable chat widget auth (customer MCP apps only)
+WANIWANI_EMBED_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+
+# Comma-separated list of revoked embed token IDs (optional)
+WANIWANI_EMBED_REVOKED_JTIS=
 ```
 
 All SDK modules (tracking, flows, chat) read from these env vars automatically.
@@ -88,10 +94,13 @@ lib/waniwani.ts             (waniwani() -- creates client from env vars)
        +---> app/mcp/route.ts               (withWaniwani -- auto-tracks tools)
        |
        +---> app/api/waniwani/.../route.ts   (toNextJsHandler -- chat API + resources)
+       |
+       +---> app/api/chat/[[...path]]/route.ts (createChatAgent -- embed chat + auth)
 ```
 
 - `WANIWANI_API_KEY` is the single source of truth for authentication
 - `waniwani()` reads from env vars when called with no arguments
+- `createChatAgent()` creates client + handlers in one call (reads env vars automatically)
 - Flow state reads `WANIWANI_API_KEY` and `WANIWANI_API_URL` directly from env
 
 ## WithWaniwaniOptions Reference
@@ -111,3 +120,5 @@ lib/waniwani.ts             (waniwani() -- creates client from env vars)
 - **Creating multiple clients** -- Create one client in `lib/waniwani.ts` and import it everywhere. Do not call `waniwani()` in multiple files.
 - **Wrong import paths** -- Tracking: `@waniwani/sdk`. MCP tools: `@waniwani/sdk/mcp`. Chat server: `@waniwani/sdk/next-js`. Chat widget: `@waniwani/sdk/chat`.
 - **Forgetting `source` on `toNextJsHandler`** -- The `source` field is required and identifies this chat instance in analytics.
+- **Using `toNextJsHandler` for embed** -- Use `createChatAgent()` instead. It handles client creation and auth setup in one call.
+- **PEM key format in .env** -- Escape newlines as `\n` in the env var string. The SDK handles unescaping.
