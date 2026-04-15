@@ -10,6 +10,7 @@ export interface EmbedTokenClaims {
 	scope: string[];
 	origins?: string[];
 	iat: number;
+	jti?: string;
 }
 
 export interface EmbedAuthOptions {

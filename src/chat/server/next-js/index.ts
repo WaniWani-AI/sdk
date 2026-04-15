@@ -5,6 +5,8 @@ import { createApiHandler } from "../api-handler.js";
 import type { NextJsHandlerOptions, NextJsHandlerResult } from "./@types.js";
 
 export type { NextJsHandlerOptions, NextJsHandlerResult } from "./@types.js";
+export type { ChatAgentOptions } from "./agent.js";
+export { createChatAgent } from "./agent.js";
 
 /**
  * Create Next.js route handlers from a WaniWani client.
