@@ -177,10 +177,26 @@ export default defineConfig([
 			"process.env.NODE_ENV": '"production"',
 		},
 		esbuildOptions(options) {
-			// Stub Node built-ins that some deps reference but never call in browser
+			// Lighter alternatives for the embed IIFE bundle.
+			// The full deps are used in the ESM build (Next.js apps) where
+			// they're external / tree-shaken by the host bundler. For the
+			// self-contained IIFE we swap heavy deps with minimal shims.
 			options.alias = {
 				...options.alias,
+				// Node built-in → browser Web Crypto API
 				crypto: "./src/chat/web/embed/shims/crypto.ts",
+				// Shiki (8 MB of syntax grammars) → no-op code plugin
+				"@streamdown/code": "./src/chat/web/embed/shims/streamdown-code.ts",
+				// CJK line-break plugin → no-op
+				"@streamdown/cjk": "./src/chat/web/embed/shims/streamdown-cjk.ts",
+				// rehype-raw pulls in parse5 HTML parser (~100 KB) → passthrough
+				"rehype-raw": "./src/chat/web/embed/shims/rehype-raw.ts",
+				// tailwind-merge (~26 KB) → simple concat (Shadow DOM prevents conflicts)
+				"tailwind-merge": "./src/chat/web/embed/shims/tailwind-merge.ts",
+				// zod (~200 KB) → passthrough shim (schemas only validated server-side)
+				zod: "./src/chat/web/embed/shims/zod.ts",
+				"zod/v4": "./src/chat/web/embed/shims/zod.ts",
+				"zod/v3": "./src/chat/web/embed/shims/zod.ts",
 			};
 		},
 	},
