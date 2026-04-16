@@ -238,9 +238,9 @@ Self-contained IIFE bundle (~186KB gzipped) with React bundled. Drop a `<script>
 
 ### Prerequisites
 
-1. Generate embed token in WaniWani dashboard
-2. Set up chat route in your MCP app (see [chat-server.md](chat-server.md))
-3. Add `WANIWANI_EMBED_PUBLIC_KEY` to your MCP app's env vars
+1. Generate embed token in WaniWani dashboard (Environment → Embed → Generate Token)
+
+No MCP app changes needed — the embed talks to WaniWani API directly.
 
 ### Script Tag (declarative)
 
@@ -248,8 +248,7 @@ Self-contained IIFE bundle (~186KB gzipped) with React bundled. Drop a `<script>
 <script
   src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@1/dist/chat/embed.js"
   defer
-  data-api="https://your-mcp-app.vercel.app/api/chat"
-  data-token="eyJ..."
+  data-token="wwp_..."
   data-title="Support"
   data-welcome-message="Hi! How can I help?"
   data-primary-color="#6366f1"
@@ -260,8 +259,8 @@ Self-contained IIFE bundle (~186KB gzipped) with React bundled. Drop a `<script>
 
 | Attribute | Required | Description |
 |-----------|----------|-------------|
-| `data-api` | Yes | Your MCP app's chat endpoint URL |
-| `data-token` | Yes | Embed JWT from WaniWani dashboard |
+| `data-api` | No | Chat API URL (defaults to `https://app.waniwani.ai/api/mcp`) |
+| `data-token` | Yes | Embed token (`wwp_...`) from WaniWani dashboard |
 | `data-title` | No | Chat header title (default: `"Assistant"`) |
 | `data-welcome-message` | No | Greeting shown before first message |
 | `data-placeholder` | No | Input field placeholder text |
@@ -285,8 +284,7 @@ Render inside an existing container instead of floating:
 <script
   src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@1/dist/chat/embed.js"
   defer
-  data-api="https://your-mcp-app.vercel.app/api/chat"
-  data-token="eyJ..."
+  data-token="wwp_..."
   data-container="#chat"
 ></script>
 ```
@@ -298,8 +296,7 @@ Render inside an existing container instead of floating:
 <script>
   window.addEventListener('DOMContentLoaded', function() {
     var chat = window.WaniWani.chat.init({
-      api: 'https://your-mcp-app.vercel.app/api/chat',
-      token: 'eyJ...',
+      token: 'wwp_...',
       title: 'Support',
       theme: { primaryColor: '#6366f1' },
     });
@@ -312,7 +309,7 @@ Render inside an existing container instead of floating:
 
 ### How Auth Works
 
-The embed widget sends `Authorization: Bearer <token>` on every request to your MCP app. Your MCP app verifies the token using `WANIWANI_EMBED_PUBLIC_KEY`. See [Embed Auth in chat-server.md](chat-server.md#embed-auth).
+The embed widget sends `Authorization: Bearer wwp_...` on every request directly to the WaniWani API. The token is verified server-side against the `embed_tokens` table. No customer MCP app changes needed — generate tokens in the dashboard, paste the `<script>` tag.
 
 ## Additional Components
 

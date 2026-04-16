@@ -2,45 +2,9 @@
 
 Next.js App Router adapter that creates route handlers for the chat widget backend.
 
-## Quick Start: `createChatAgent` (recommended for embed)
+## Setup
 
-One-liner that creates client + route handlers. Best for MCP apps serving the embeddable chat widget.
-
-```typescript
-// app/api/chat/[[...path]]/route.ts
-import { createChatAgent } from "@waniwani/sdk/next-js";
-
-export const maxDuration = 60;
-
-export const { GET, POST, OPTIONS } = createChatAgent({
-  systemPrompt: "You are a helpful assistant.",
-  mcpServerUrl: process.env.MCP_SERVER_URL,
-  embedAuth: {
-    publicKey: process.env.WANIWANI_EMBED_PUBLIC_KEY!,
-  },
-});
-```
-
-Reads `WANIWANI_API_KEY` and `WANIWANI_API_URL` from env automatically.
-
-### `ChatAgentOptions`
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `systemPrompt` | `string` | -- | System prompt for the assistant |
-| `mcpServerUrl` | `string` | auto-detect | MCP server URL |
-| `embedAuth` | `{ publicKey: string }` | -- | Embed token verification (see [Embed Auth](#embed-auth)) |
-| `source` | `string` | `"embed"` | Analytics source name |
-| `maxSteps` | `number` | `5` | Max tool call steps per request |
-| `beforeRequest` | `(context) => result` | -- | Request interceptor hook |
-| `webSearch` | `boolean \| WebSearchConfig` | -- | Enable web search tool |
-| `debug` | `boolean` | `WANIWANI_DEBUG` env | Verbose logging |
-| `apiKey` | `string` | `WANIWANI_API_KEY` env | WaniWani API key override |
-| `apiUrl` | `string` | `https://app.waniwani.ai` | WaniWani API URL override |
-
-## Advanced: `toNextJsHandler`
-
-For more control, create the client separately:
+Mount at `app/api/waniwani/[[...path]]/route.ts`:
 
 ```typescript
 import { wani } from "../../../../lib/waniwani";
@@ -78,7 +42,6 @@ Nested under the `chat` key:
 | `maxSteps` | `number` | `5` | Maximum tool call steps per request |
 | `mcpServerUrl` | `string` | -- | Override MCP server URL (useful for local dev) |
 | `webSearch` | `boolean \| WebSearchConfig` | -- | Enable web search alongside MCP tools. `true` for defaults, or `{ includeDomains?, excludeDomains? }` |
-| `embedAuth` | `{ publicKey: string }` | -- | Embed token verification. When set, POST requests require a valid `Authorization: Bearer` token signed with the corresponding private key. |
 | `beforeRequest` | `(context) => BeforeRequestResult \| undefined` | -- | Hook to intercept/modify requests before forwarding |
 
 ### `beforeRequest` Hook
@@ -130,60 +93,6 @@ export const { GET, POST, PATCH, OPTIONS } = toNextJsHandler(wani, {
     },
   },
 });
-```
-
-## Embed Auth
-
-Asymmetric JWT authentication for the embeddable chat widget. WaniWani signs tokens (RS256 private key), customer MCP apps verify them (public key).
-
-### How it works
-
-1. Generate token in WaniWani dashboard (`POST /api/mcp/environments/[id]/embed-token`)
-2. Customer puts token in `<script data-token="eyJ...">`
-3. Embed widget sends `Authorization: Bearer <token>` on every request
-4. MCP app verifies with `WANIWANI_EMBED_PUBLIC_KEY` env var
-
-### Token claims
-
-```json
-{
-  "sub": "environment-uuid",
-  "iss": "waniwani",
-  "jti": "unique-token-id",
-  "scope": ["mcp:chat", "mcp:resources", "mcp:tools", "mcp:events"],
-  "origins": ["https://customer.com"],
-  "iat": 1750000000
-}
-```
-
-### Token revocation
-
-Revoke tokens by adding their `jti` to the MCP app's environment:
-
-```env
-WANIWANI_EMBED_REVOKED_JTIS=token-id-1,token-id-2
-```
-
-Or pass directly:
-
-```typescript
-createChatAgent({
-  embedAuth: {
-    publicKey: process.env.WANIWANI_EMBED_PUBLIC_KEY!,
-    revokedJtis: process.env.WANIWANI_EMBED_REVOKED_JTIS,
-  },
-});
-```
-
-### Standalone verification
-
-For custom auth flows outside `createChatAgent`:
-
-```typescript
-import { verifyEmbedToken } from "@waniwani/sdk/chat/server";
-
-const claims = await verifyEmbedToken(token, publicKeyPem);
-// claims.sub, claims.scope, claims.origins, claims.jti
 ```
 
 ## Common Mistakes
