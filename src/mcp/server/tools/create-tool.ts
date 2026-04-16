@@ -50,11 +50,16 @@ export function createTool<TInput extends z.ZodRawShape>(
 ): RegisteredTool {
 	const {
 		resource,
-		description,
+		description: rawDescription,
 		inputSchema,
 		annotations,
 		autoInjectResultText = true,
+		internal = false,
 	} = config;
+
+	const description = internal
+		? `[INTERNAL — flow-only tool] Do NOT call this tool directly. Only call it when a flow explicitly instructs you to (e.g. in a "widget" step response). Calling it outside of a flow will produce incorrect results.\n\n${rawDescription}`
+		: rawDescription;
 
 	const id = config.id ?? resource?.id;
 	const title = config.title ?? resource?.title;

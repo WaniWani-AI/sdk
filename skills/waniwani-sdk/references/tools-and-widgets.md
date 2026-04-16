@@ -61,6 +61,7 @@ Creates an MCP tool. When `resource` is provided, the tool returns `structuredCo
 | `inputSchema` | `ZodRawShape` | Yes | Input parameters using Zod |
 | `invoking` | `string` | No | Loading message (default: `"Loading..."`) |
 | `invoked` | `string` | No | Loaded message (default: `"Loaded"`) |
+| `internal` | `boolean` | No | Flag as flow-only. Prepends instructions to the description telling the AI not to call this tool directly. |
 | `annotations` | `object` | No | `readOnlyHint`, `idempotentHint`, `openWorldHint`, `destructiveHint` |
 
 **Handler signature:**
@@ -185,6 +186,24 @@ const searchTool = createTool({
 // 4. Register all tools
 await registerTools(server, [pricingTool, searchTool]);
 ```
+
+## Internal (Flow-Only) Tools
+
+Use `internal: true` to flag a tool that should only be called as part of a flow (e.g. a display tool referenced by `showWidget()`). The SDK prepends instructions to the tool description telling the AI not to call it directly.
+
+```typescript
+const showPricing = createTool({
+  resource: pricingUI,
+  description: "Show pricing comparison widget",
+  inputSchema: { postalCode: z.string(), plans: z.array(z.string()) },
+  internal: true,  // AI will only call this when a flow instructs it to
+}, async ({ postalCode, plans }) => ({
+  text: "Pricing loaded",
+  data: { postalCode, plans },
+}));
+```
+
+This is useful for widget tools that are designed to be called from a flow's `showWidget()` step and would produce confusing results if the AI called them independently.
 
 ## Common Mistakes
 

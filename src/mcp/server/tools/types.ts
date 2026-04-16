@@ -44,6 +44,12 @@ export type ToolConfig<TInput extends ZodRawShapeCompat> = {
 	 * result is consumed programmatically by the widget.
 	 */
 	autoInjectResultText?: boolean;
+	/**
+	 * Mark this tool as internal to a flow. When true, the tool description
+	 * will include instructions telling the AI to only call it when directed
+	 * by a flow (e.g. during a "widget" step), never on its own initiative.
+	 */
+	internal?: boolean;
 	/** Annotations describe the tool's potential impact. */
 	annotations?: {
 		readOnlyHint?: boolean;

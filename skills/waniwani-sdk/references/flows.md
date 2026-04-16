@@ -247,8 +247,8 @@ Show a widget UI at a specific step. Create a display tool with `createTool()`, 
 The flow is a **data-only tool**. It never returns `structuredContent` or renders widgets itself. When a `showWidget()` node is reached, the flow returns the tool name and data as text content. The AI then calls the display tool separately -- that tool returns `structuredContent` and the widget template.
 
 ```ts
-// 1. Create a display tool (see tools-and-widgets reference for createResource/createTool)
-const showPricing = createTool({ resource: pricingUI, /* ... */ });
+// 1. Create a display tool with internal: true so the AI only calls it from within a flow
+const showPricing = createTool({ resource: pricingUI, internal: true, /* ... */ });
 
 // 2. Reference the display tool in a flow node via showWidget
 const flow = createFlow({
