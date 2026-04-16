@@ -19,13 +19,14 @@ import type {
  */
 export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 	private app: App;
-	private toolResultCallback: ((result: ToolResult) => void) | null = null;
-	private toolResponseMetadataChangeCallback:
-		| ((metadata: UnknownObject | null) => void)
-		| null = null;
-	private themeChangeCallback: ((theme: Theme) => void) | null = null;
-	private displayModeChangeCallback: ((mode: DisplayMode) => void) | null =
-		null;
+	private toolResultCallbacks = new Set<(result: ToolResult) => void>();
+	private toolResponseMetadataChangeCallbacks = new Set<
+		(metadata: UnknownObject | null) => void
+	>();
+	private themeChangeCallbacks = new Set<(theme: Theme) => void>();
+	private displayModeChangeCallbacks = new Set<
+		(mode: DisplayMode) => void
+	>();
 	private hostContext: McpUiHostContext | undefined;
 	private latestToolResult: ToolResult | null = null;
 	private resizeCleanup: (() => void) | null = null;
@@ -62,25 +63,38 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 						: undefined,
 			};
 			this.latestToolResult = result;
-			this.toolResultCallback?.(result);
-			this.toolResponseMetadataChangeCallback?.(result._meta ?? null);
+			for (const cb of this.toolResultCallbacks) cb(result);
+			const resultMeta = result._meta ?? null;
+			for (const cb of this.toolResponseMetadataChangeCallbacks) cb(resultMeta);
 		};
 
 		this.app.onhostcontextchanged = (params) => {
 			this.hostContext = { ...this.hostContext, ...params };
 			if (params.theme) {
-				this.themeChangeCallback?.(params.theme as Theme);
+				for (const cb of this.themeChangeCallbacks) cb(params.theme as Theme);
 			}
 			if (params.displayMode) {
-				this.displayModeChangeCallback?.(params.displayMode as DisplayMode);
+				for (const cb of this.displayModeChangeCallbacks)
+					cb(params.displayMode as DisplayMode);
 			}
 		};
 	}
 
 	async connect(): Promise<void> {
-		await this.app.connect(
+		const CONNECTION_TIMEOUT_MS = 10_000;
+
+		const connectPromise = this.app.connect(
 			new PostMessageTransport(window.parent, window.parent),
 		);
+
+		const timeoutPromise = new Promise<never>((_, reject) => {
+			setTimeout(
+				() => reject(new Error("Widget connection timed out")),
+				CONNECTION_TIMEOUT_MS,
+			);
+		});
+
+		await Promise.race([connectPromise, timeoutPromise]);
 		this.hostContext = this.app.getHostContext();
 		this.resizeCleanup = this.setupAutoResize();
 	}
@@ -156,9 +170,9 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 	}
 
 	onToolResult(callback: (result: ToolResult) => void): () => void {
-		this.toolResultCallback = callback;
+		this.toolResultCallbacks.add(callback);
 		return () => {
-			this.toolResultCallback = null;
+			this.toolResultCallbacks.delete(callback);
 		};
 	}
 
@@ -213,9 +227,9 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 	}
 
 	onThemeChange(callback: (theme: Theme) => void): () => void {
-		this.themeChangeCallback = callback;
+		this.themeChangeCallbacks.add(callback);
 		return () => {
-			this.themeChangeCallback = null;
+			this.themeChangeCallbacks.delete(callback);
 		};
 	}
 
@@ -233,9 +247,9 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 	}
 
 	onDisplayModeChange(callback: (mode: DisplayMode) => void): () => void {
-		this.displayModeChangeCallback = callback;
+		this.displayModeChangeCallbacks.add(callback);
 		return () => {
-			this.displayModeChangeCallback = null;
+			this.displayModeChangeCallbacks.delete(callback);
 		};
 	}
 
@@ -268,9 +282,9 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 	onToolResponseMetadataChange(
 		callback: (metadata: UnknownObject | null) => void,
 	): () => void {
-		this.toolResponseMetadataChangeCallback = callback;
+		this.toolResponseMetadataChangeCallbacks.add(callback);
 		return () => {
-			this.toolResponseMetadataChangeCallback = null;
+			this.toolResponseMetadataChangeCallbacks.delete(callback);
 		};
 	}
 

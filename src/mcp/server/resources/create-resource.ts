@@ -69,11 +69,15 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 	const openaiUri = `ui://widgets/apps-sdk/${id}.html`;
 	const mcpUri = `ui://widgets/ext-apps/${id}.html`;
 
-	// Lazy HTML — fetched once, shared across all calls
+	// Lazy HTML — fetched once, shared across all calls.
+	// On failure the cached promise is cleared so the next call retries.
 	let htmlPromise: Promise<string> | null = null;
 	const getHtml = () => {
 		if (!htmlPromise) {
-			htmlPromise = fetchHtml(baseUrl, htmlPath);
+			htmlPromise = fetchHtml(baseUrl, htmlPath).catch((err) => {
+				htmlPromise = null;
+				throw err;
+			});
 		}
 		return htmlPromise;
 	};

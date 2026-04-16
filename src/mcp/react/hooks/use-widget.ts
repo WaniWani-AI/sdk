@@ -62,7 +62,10 @@ export function WidgetProvider({
 		let mounted = true;
 		let activeClient: UnifiedWidgetClient | null = null;
 
-		async function initClient() {
+		const MAX_RETRIES = 3;
+		const BASE_DELAY_MS = 500;
+
+		async function initClient(attempt = 0) {
 			try {
 				const widgetClient = await createWidgetClient();
 
@@ -77,11 +80,20 @@ export function WidgetProvider({
 					widgetClient.close();
 				}
 			} catch (err) {
-				if (mounted) {
-					console.error("error", err);
-					setError(err instanceof Error ? err : new Error(String(err)));
-					setIsConnecting(false);
+				if (!mounted) return;
+
+				if (attempt < MAX_RETRIES) {
+					const delay = BASE_DELAY_MS * 2 ** attempt;
+					await new Promise((r) => setTimeout(r, delay));
+					if (mounted) {
+						initClient(attempt + 1);
+					}
+					return;
 				}
+
+				console.error("Widget connection failed after retries:", err);
+				setError(err instanceof Error ? err : new Error(String(err)));
+				setIsConnecting(false);
 			}
 		}
 
