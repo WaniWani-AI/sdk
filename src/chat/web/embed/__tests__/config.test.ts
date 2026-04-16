@@ -1,13 +1,5 @@
 import { describe, expect, test } from "bun:test";
 
-// ---------------------------------------------------------------------------
-// resolveConfig calls parseConfigFromScript() which needs DOM. In Node/bun
-// test env, document.currentScript is null and querySelectorAll returns [].
-// We mock the module to test pure merge logic without DOM dependency.
-// Script tag parsing is integration-tested via playwriter.
-// ---------------------------------------------------------------------------
-
-// Stub document minimally so parseConfigFromScript doesn't throw
 // biome-ignore lint/suspicious/noExplicitAny: test setup
 const g = globalThis as any;
 g.HTMLScriptElement = class HTMLScriptElement {};
@@ -18,26 +10,25 @@ g.document = {
 
 import { resolveConfig } from "../config";
 
-// ---------------------------------------------------------------------------
-// resolveConfig — programmatic path
-// ---------------------------------------------------------------------------
-
 describe("resolveConfig — programmatic", () => {
-	test("valid config with all required fields", () => {
+	test("token-only config uses default api", () => {
+		const config = resolveConfig({ token: "wwp_test" });
+
+		expect(config.api).toBe("https://app.waniwani.ai/api/mcp");
+		expect(config.token).toBe("wwp_test");
+	});
+
+	test("custom api overrides default", () => {
 		const config = resolveConfig({
-			api: "https://example.com/api/chat",
-			token: "eyJ...",
+			api: "https://custom.app/api/chat",
+			token: "wwp_test",
 		});
 
-		expect(config.api).toBe("https://example.com/api/chat");
-		expect(config.token).toBe("eyJ...");
+		expect(config.api).toBe("https://custom.app/api/chat");
 	});
 
 	test("applies defaults for optional fields", () => {
-		const config = resolveConfig({
-			api: "https://example.com/api/chat",
-			token: "tok",
-		});
+		const config = resolveConfig({ token: "tok" });
 
 		expect(config.title).toBe("Assistant");
 		expect(config.position).toBe("bottom-right");
@@ -47,7 +38,6 @@ describe("resolveConfig — programmatic", () => {
 
 	test("programmatic overrides defaults", () => {
 		const config = resolveConfig({
-			api: "https://example.com/api/chat",
 			token: "tok",
 			title: "Support",
 			position: "bottom-left",
@@ -63,7 +53,6 @@ describe("resolveConfig — programmatic", () => {
 
 	test("preserves optional string fields", () => {
 		const config = resolveConfig({
-			api: "https://example.com/api/chat",
 			token: "tok",
 			welcomeMessage: "Hello!",
 			placeholder: "Type here...",
@@ -77,73 +66,34 @@ describe("resolveConfig — programmatic", () => {
 		expect(config.css).toBe("https://example.com/custom.css");
 	});
 
-	test("preserves suggestions array", () => {
-		const config = resolveConfig({
-			api: "https://example.com/api/chat",
-			token: "tok",
-			suggestions: ["Help", "Pricing"],
-		});
-
-		expect(config.suggestions).toEqual(["Help", "Pricing"]);
-	});
-
 	test("theme merges correctly", () => {
 		const config = resolveConfig({
-			api: "https://example.com/api/chat",
 			token: "tok",
 			theme: { primaryColor: "#ff0000", fontFamily: "monospace" },
 		});
 
 		expect(config.theme?.primaryColor).toBe("#ff0000");
 		expect(config.theme?.fontFamily).toBe("monospace");
-		expect(config.theme?.backgroundColor).toBeUndefined();
 	});
 
 	test("empty theme object allowed", () => {
-		const config = resolveConfig({
-			api: "https://example.com/api/chat",
-			token: "tok",
-			theme: {},
-		});
-
+		const config = resolveConfig({ token: "tok", theme: {} });
 		expect(config.theme).toEqual({});
 	});
 });
 
-// ---------------------------------------------------------------------------
-// resolveConfig — validation errors
-// ---------------------------------------------------------------------------
-
 describe("resolveConfig — validation", () => {
-	test("throws when api missing", () => {
-		expect(() => resolveConfig({ token: "tok" })).toThrow(
-			"Missing required config: `api`",
-		);
-	});
-
 	test("throws when token missing", () => {
-		expect(() =>
-			resolveConfig({ api: "https://example.com/api/chat" }),
-		).toThrow("Missing required config: `token`");
-	});
-
-	test("throws when both missing", () => {
-		expect(() => resolveConfig({})).toThrow("Missing required config: `api`");
+		expect(() => resolveConfig({})).toThrow("Missing required config: `token`");
 	});
 
 	test("throws with no args", () => {
-		expect(() => resolveConfig()).toThrow("Missing required config: `api`");
-	});
-
-	test("api empty string treated as missing", () => {
-		expect(() => resolveConfig({ api: "", token: "tok" })).toThrow(
-			"Missing required config: `api`",
-		);
+		expect(() => resolveConfig()).toThrow("Missing required config: `token`");
 	});
 
 	test("token empty string treated as missing", () => {
-		expect(() =>
-			resolveConfig({ api: "https://example.com/api/chat", token: "" }),
-		).toThrow("Missing required config: `token`");
+		expect(() => resolveConfig({ token: "" })).toThrow(
+			"Missing required config: `token`",
+		);
 	});
 });

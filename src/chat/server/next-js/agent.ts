@@ -21,20 +21,6 @@ export interface ChatAgentOptions {
 	mcpServerUrl?: string;
 
 	/**
-	 * Embed token authentication. When set, POST requests must include
-	 * a valid `Authorization: Bearer wwp_...` token from the allowlist.
-	 *
-	 * @example
-	 * ```typescript
-	 * embedAuth: { tokens: process.env.WANIWANI_EMBED_TOKENS }
-	 * ```
-	 */
-	embedAuth?: {
-		/** Comma-separated allowed tokens. Defaults to `WANIWANI_EMBED_TOKENS` env var. */
-		tokens?: string;
-	};
-
-	/**
 	 * Identifies this agent in analytics.
 	 * Defaults to `"embed"`.
 	 */
@@ -91,9 +77,6 @@ export interface ChatAgentOptions {
  * export const { GET, POST, OPTIONS } = createChatAgent({
  *   systemPrompt: "You are a helpful pet care assistant.",
  *   mcpServerUrl: process.env.MCP_SERVER_URL,
- *   embedAuth: {
- *     tokens: process.env.WANIWANI_EMBED_TOKENS,
- *   },
  * });
  * ```
  */
@@ -103,7 +86,6 @@ export function createChatAgent(
 	const {
 		systemPrompt,
 		mcpServerUrl,
-		embedAuth,
 		source = "embed",
 		maxSteps,
 		beforeRequest,
@@ -129,7 +111,6 @@ export function createChatAgent(
 		beforeRequest,
 		mcpServerUrl,
 		webSearch,
-		embedAuth,
 		debug: debugEnabled,
 	});
 

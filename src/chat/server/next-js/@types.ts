@@ -46,15 +46,6 @@ export interface ChatOptions {
 	 * Pass `true` to enable with defaults, or a config object to restrict domains.
 	 */
 	webSearch?: boolean | WebSearchConfig;
-
-	/**
-	 * Embed token authentication for the embeddable chat widget.
-	 * POST requests must include a valid `Authorization: Bearer wwp_...` token.
-	 */
-	embedAuth?: {
-		/** Comma-separated allowed tokens. Defaults to `WANIWANI_EMBED_TOKENS` env var. */
-		tokens?: string;
-	};
 }
 
 // ============================================================================

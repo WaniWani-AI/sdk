@@ -127,18 +127,6 @@ export interface ApiHandlerOptions {
 	 * Pass `true` to enable with defaults, or a config object to restrict domains.
 	 */
 	webSearch?: boolean | WebSearchConfig;
-
-	/**
-	 * Embed token authentication. When set, POST requests must include
-	 * a valid `Authorization: Bearer wwp_...` token from the allowlist.
-	 */
-	embedAuth?: {
-		/**
-		 * Comma-separated list of allowed tokens.
-		 * Defaults to `WANIWANI_EMBED_TOKENS` env var.
-		 */
-		tokens?: string;
-	};
 }
 
 // ============================================================================
@@ -183,9 +171,6 @@ export interface ApiHandlerDeps {
 	resolveConfig: ConfigResolver;
 	debug: boolean;
 	webSearch?: WebSearchConfig;
-	embedAuth?: {
-		tokens?: string;
-	};
 }
 
 /** Normalize `true` to `{}` so the upstream API always receives an object or undefined */

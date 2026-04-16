@@ -7,7 +7,6 @@ import {
 	resolveWebSearchConfig,
 } from "./@types";
 import { createCors, createJsonResponse } from "./@utils";
-import { createEmbedAuthMiddleware } from "./embed-auth.js";
 import { createChatRequestHandler } from "./handle-chat";
 import { createResourceHandler } from "./handle-resource";
 import { createToolHandler } from "./handle-tool";
@@ -27,7 +26,6 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		mcpServerUrl,
 		debug = false,
 		webSearch,
-		embedAuth,
 	} = options;
 
 	const log = createLogger("router", debug);
@@ -67,22 +65,6 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 		debug,
 		source,
 	});
-
-	const verifyEmbed = embedAuth ? createEmbedAuthMiddleware(embedAuth) : null;
-
-	async function withEmbedAuth(
-		request: Request,
-		handler: () => Promise<Response>,
-	): Promise<Response> {
-		if (!verifyEmbed) {
-			return handler();
-		}
-		const result = await verifyEmbed(request);
-		if (result instanceof Response) {
-			return cors(result);
-		}
-		return handler();
-	}
 
 	const evalEnabled = process.env.WANIWANI_EVAL === "1";
 
@@ -143,63 +125,61 @@ export function createApiHandler(options: ApiHandlerOptions = {}): ApiHandler {
 	}
 
 	async function routePost(request: Request): Promise<Response> {
-		return withEmbedAuth(request, async () => {
-			log("→ POST", request.url);
-			try {
-				const url = new URL(request.url);
-				const segments = url.pathname
-					.replace(/\/$/, "")
-					.split("/")
-					.filter(Boolean);
-				const subRoute = segments.at(-1);
-				log("pathname:", url.pathname, "subRoute:", subRoute);
+		log("→ POST", request.url);
+		try {
+			const url = new URL(request.url);
+			const segments = url.pathname
+				.replace(/\/$/, "")
+				.split("/")
+				.filter(Boolean);
+			const subRoute = segments.at(-1);
+			log("pathname:", url.pathname, "subRoute:", subRoute);
 
-				if (evalEnabled && subRoute === "scenarios") {
-					log("dispatching to save-scenario handler (proxy to app API)");
-					try {
-						const body = await request.json();
-						const res = await fetch(`${apiUrl}/api/mcp/scenarios`, {
-							method: "POST",
-							headers: {
-								"Content-Type": "application/json",
-								...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-							},
-							body: JSON.stringify(body),
-						});
-						const data = await res.json();
-						if (!res.ok) {
-							return json(
-								{ error: data.message ?? "Failed to save scenario" },
-								res.status,
-							);
-						}
-						return json({ ok: true, scenario: data.data }, 200);
-					} catch (e) {
-						const msg =
-							e instanceof Error ? e.message : "Failed to save scenario";
-						return json({ error: msg }, 400);
+			if (evalEnabled && subRoute === "scenarios") {
+				log("dispatching to save-scenario handler (proxy to app API)");
+				try {
+					const body = await request.json();
+					const res = await fetch(`${apiUrl}/api/mcp/scenarios`, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+						},
+						body: JSON.stringify(body),
+					});
+					const data = await res.json();
+					if (!res.ok) {
+						return json(
+							{ error: data.message ?? "Failed to save scenario" },
+							res.status,
+						);
 					}
+					return json({ ok: true, scenario: data.data }, 200);
+				} catch (e) {
+					const msg =
+						e instanceof Error ? e.message : "Failed to save scenario";
+					return json({ error: msg }, 400);
 				}
-
-				if (subRoute === "tool") {
-					log("dispatching to tool handler");
-					const response = await handleTool(request);
-					log("← tool handler returned", response.status);
-					return cors(response);
-				}
-
-				// Default: treat as chat request
-				log("dispatching to chat handler");
-				const chatResponse = await handleChat(request);
-				return cors(chatResponse);
-			} catch (error) {
-				console.error("[waniwani:router] POST handler error:", error);
-				const message =
-					error instanceof Error ? error.message : "Unknown error occurred";
-				log("← 500 from caught error");
-				return json({ error: message }, 500);
 			}
-		});
+
+			if (subRoute === "tool") {
+				log("dispatching to tool handler");
+				const response = await handleTool(request);
+				log("← tool handler returned", response.status);
+				return cors(response);
+			}
+
+			// Default: treat as chat request
+			log("dispatching to chat handler");
+			const chatResponse = await handleChat(request);
+			return cors(chatResponse);
+		} catch (error) {
+			console.error("[waniwani:router] POST handler error:", error);
+			const message =
+				error instanceof Error ? error.message : "Unknown error occurred";
+			log("← 500 from caught error");
+			return json({ error: message }, 500);
+		}
 	}
 
 	async function routePatch(request: Request): Promise<Response> {

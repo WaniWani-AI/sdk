@@ -9,9 +9,9 @@
  * attributes on the `<script>` tag > built-in defaults.
  */
 export interface EmbedConfig {
-	/** Customer's MCP app chat URL (required). */
-	api: string;
-	/** Embed JWT for authentication (required). */
+	/** WaniWani chat API URL. Defaults to `https://app.waniwani.ai/api/mcp`. */
+	api?: string;
+	/** Embed token (wwp_...) for authentication (required). */
 	token: string;
 	/** CSS selector for inline mode — renders ChatCard inside this element instead of a floating bubble. */
 	container?: string;
@@ -44,7 +44,10 @@ export interface EmbedConfig {
 // Defaults
 // ---------------------------------------------------------------------------
 
+const DEFAULT_API_URL = "https://app.waniwani.ai/api/mcp";
+
 const DEFAULTS = {
+	api: DEFAULT_API_URL,
 	title: "Assistant",
 	position: "bottom-right" as const,
 	width: 400,
@@ -194,8 +197,7 @@ export function resolveConfig(
 	const fromScript = parseConfigFromScript();
 
 	const merged: EmbedConfig = {
-		// Required — will validate below
-		api: "",
+		// Required — token validated below, api has default
 		token: "",
 
 		// Defaults
@@ -213,13 +215,6 @@ export function resolveConfig(
 			...programmatic?.theme,
 		},
 	};
-
-	if (!merged.api) {
-		throw new Error(
-			"[WaniWani] Missing required config: `api`. " +
-				"Set data-api on the script tag or pass it to WaniWani.chat.init().",
-		);
-	}
 
 	if (!merged.token) {
 		throw new Error(
