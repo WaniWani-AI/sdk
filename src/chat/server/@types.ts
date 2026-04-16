@@ -129,12 +129,15 @@ export interface ApiHandlerOptions {
 	webSearch?: boolean | WebSearchConfig;
 
 	/**
-	 * Embed token authentication. When set, incoming requests with an
-	 * Authorization Bearer token are verified against this public key.
-	 * POST requests without a valid token are rejected with 401.
+	 * Embed token authentication. When set, POST requests must include
+	 * a valid `Authorization: Bearer wwp_...` token from the allowlist.
 	 */
 	embedAuth?: {
-		publicKey: string;
+		/**
+		 * Comma-separated list of allowed tokens.
+		 * Defaults to `WANIWANI_EMBED_TOKENS` env var.
+		 */
+		tokens?: string;
 	};
 }
 
@@ -181,7 +184,7 @@ export interface ApiHandlerDeps {
 	debug: boolean;
 	webSearch?: WebSearchConfig;
 	embedAuth?: {
-		publicKey: string;
+		tokens?: string;
 	};
 }
 

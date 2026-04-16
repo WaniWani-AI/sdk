@@ -8,9 +8,10 @@
 // zod implementation. If a zod method IS called at runtime it returns
 // passthrough behavior (parse returns input as-is, safeParse always succeeds).
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// biome-ignore lint/suspicious/noExplicitAny: shim must match zod's loose types
 const noop = (): any => schema;
 
+// biome-ignore lint/suspicious/noExplicitAny: shim must match zod's loose types
 const schema: any = new Proxy(noop, {
 	get(_target, prop) {
 		if (prop === "parse" || prop === "parseAsync") {

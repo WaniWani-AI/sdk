@@ -49,11 +49,11 @@ export interface ChatOptions {
 
 	/**
 	 * Embed token authentication for the embeddable chat widget.
-	 * When set, POST requests must include a valid Bearer token.
-	 * The token is verified against this RSA public key.
+	 * POST requests must include a valid `Authorization: Bearer wwp_...` token.
 	 */
 	embedAuth?: {
-		publicKey: string;
+		/** Comma-separated allowed tokens. Defaults to `WANIWANI_EMBED_TOKENS` env var. */
+		tokens?: string;
 	};
 }
 

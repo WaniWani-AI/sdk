@@ -21,17 +21,17 @@ export interface ChatAgentOptions {
 	mcpServerUrl?: string;
 
 	/**
-	 * Embed token authentication. When set, requests must include
-	 * a valid `Authorization: Bearer <token>` header.
-	 * Token is verified against this RSA public key (PEM).
+	 * Embed token authentication. When set, POST requests must include
+	 * a valid `Authorization: Bearer wwp_...` token from the allowlist.
 	 *
 	 * @example
 	 * ```typescript
-	 * embedAuth: { publicKey: process.env.WANIWANI_EMBED_PUBLIC_KEY! }
+	 * embedAuth: { tokens: process.env.WANIWANI_EMBED_TOKENS }
 	 * ```
 	 */
 	embedAuth?: {
-		publicKey: string;
+		/** Comma-separated allowed tokens. Defaults to `WANIWANI_EMBED_TOKENS` env var. */
+		tokens?: string;
 	};
 
 	/**
@@ -92,7 +92,7 @@ export interface ChatAgentOptions {
  *   systemPrompt: "You are a helpful pet care assistant.",
  *   mcpServerUrl: process.env.MCP_SERVER_URL,
  *   embedAuth: {
- *     publicKey: process.env.WANIWANI_EMBED_PUBLIC_KEY!,
+ *     tokens: process.env.WANIWANI_EMBED_TOKENS,
  *   },
  * });
  * ```
