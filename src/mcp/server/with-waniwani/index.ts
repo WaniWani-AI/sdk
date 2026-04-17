@@ -1,6 +1,7 @@
 import type { ToolCalledProperties } from "../../../tracking/index.js";
 import { createLogger } from "../../../utils/logger.js";
 import { waniwani } from "../../../waniwani.js";
+import { REDACTED_STATE_UPDATE_FIELDS_META_KEY } from "../flows/redacted.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../tools/types";
 import { extractSessionId } from "../utils.js";
@@ -100,11 +101,6 @@ const log = createLogger("mcp", !!process.env.WANIWANI_DEBUG);
 
 const DEFAULT_BASE_URL = "https://app.waniwani.ai";
 
-// Mirrored from flows/redacted.ts — fields listed here on a tool's definition
-// `_meta` are auto-replaced with "REDACTED" inside `input.stateUpdates` before
-// tracking. Flows emit this key from `redacted()` markers on state schemas.
-const REDACTED_STATE_UPDATE_FIELDS_META_KEY =
-	"waniwani/redactedStateUpdateFields";
 const REDACTED_VALUE = "REDACTED";
 
 function buildStateUpdateRedactor(
