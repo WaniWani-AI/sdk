@@ -18,6 +18,8 @@ export { createFlow } from "./create-flow";
 // State store
 export type { FlowStore } from "./flow-store";
 export { WaniwaniFlowStore } from "./flow-store";
+// Schema field redaction marker
+export { redacted } from "./redacted";
 // Builder
 export { StateGraph } from "./state-graph";
 // Test utilities

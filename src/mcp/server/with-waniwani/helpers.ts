@@ -16,6 +16,43 @@ export type WaniwaniTracker = Pick<
 const SESSION_ID_KEY = "waniwani/sessionId";
 const GEO_LOCATION_KEY = "waniwani/geoLocation";
 const LEGACY_USER_LOCATION_KEY = "waniwani/userLocation";
+const OPENAI_USER_LOCATION_KEY = "openai/userLocation";
+
+const LOCATION_META_KEYS = [
+	OPENAI_USER_LOCATION_KEY,
+	GEO_LOCATION_KEY,
+	LEGACY_USER_LOCATION_KEY,
+] as const;
+
+const COORDINATE_KEYS = ["latitude", "longitude"] as const;
+
+export function stripGeoCoordinatesFromMeta(
+	meta: UnknownRecord,
+): UnknownRecord {
+	let next: UnknownRecord | undefined;
+	for (const key of LOCATION_META_KEYS) {
+		const value = meta[key];
+		if (!isRecord(value)) {
+			continue;
+		}
+		let stripped: UnknownRecord | undefined;
+		for (const coord of COORDINATE_KEYS) {
+			if (coord in value) {
+				if (!stripped) {
+					stripped = { ...value };
+				}
+				delete stripped[coord];
+			}
+		}
+		if (stripped) {
+			if (!next) {
+				next = { ...meta };
+			}
+			next[key] = stripped;
+		}
+	}
+	return next ?? meta;
+}
 
 export function isRecord(value: unknown): value is UnknownRecord {
 	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -65,19 +102,35 @@ export function buildTrackInput(
 			? T
 			: never;
 		metadata?: UnknownRecord;
+		stripGeoCoordinates?: boolean;
+		redactInput?: (input: unknown) => unknown;
 	},
 	timing?: { durationMs: number; status: string; errorMessage?: string },
 	clientInfo?: { name: string; version: string },
 	io?: { input?: unknown; output?: unknown },
 ): TrackInput {
 	const toolType = resolveToolType(toolName, options.toolType);
-	const meta = extractMeta(extra);
-	console.log(
-		"[waniwani:debug] buildTrackInput meta:",
-		JSON.stringify(meta),
-		"-> source:",
-		extractSource(meta),
-	);
+
+	const rawMeta = extractMeta(extra);
+	const meta =
+		rawMeta && options.stripGeoCoordinates
+			? stripGeoCoordinatesFromMeta(rawMeta)
+			: rawMeta;
+
+	const input =
+		io?.input !== undefined && options.redactInput
+			? options.redactInput(io.input)
+			: io?.input;
+
+	const output =
+		options.stripGeoCoordinates &&
+		isRecord(io?.output) &&
+		isRecord(io.output._meta)
+			? {
+					...(io.output as UnknownRecord),
+					_meta: stripGeoCoordinatesFromMeta(io.output._meta as UnknownRecord),
+				}
+			: io?.output;
 
 	return {
 		event: "tool.called",
@@ -85,8 +138,8 @@ export function buildTrackInput(
 			name: toolName,
 			type: toolType,
 			...(timing ?? {}),
-			...(io?.input !== undefined && { input: io.input }),
-			...(io?.output !== undefined && { output: io.output }),
+			...(input !== undefined && { input }),
+			...(output !== undefined && { output }),
 		},
 		meta,
 		source: extractSource(meta),
