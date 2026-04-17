@@ -1,10 +1,12 @@
 import type { ToolCalledProperties } from "../../../tracking/index.js";
 import { createLogger } from "../../../utils/logger.js";
 import { waniwani } from "../../../waniwani.js";
+import type { FlowGraph } from "../flows/@types.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../tools/types";
 import { extractSessionId } from "../utils.js";
 import { WidgetTokenCache } from "../widget-token.js";
+import { syncFlowGraphs } from "./funnel-sync.js";
 import {
 	buildTrackInput,
 	extractErrorText,
@@ -349,6 +351,40 @@ export function withWaniwani(
 				existing,
 				ctx,
 				definitionMeta,
+			);
+		}
+	}
+
+	if (tracker._config.apiKey) {
+		const registeredToolsMap = (
+			server as unknown as {
+				_registeredTools?: Record<string, { _meta?: unknown }>;
+			}
+		)._registeredTools;
+
+		const flowGraphs: FlowGraph[] = [];
+		if (registeredToolsMap && typeof registeredToolsMap === "object") {
+			for (const entry of Object.values(registeredToolsMap)) {
+				if (entry && typeof entry === "object") {
+					const meta = (entry as Record<string, unknown>)._meta;
+					const fg =
+						meta && typeof meta === "object"
+							? ((meta as Record<string, unknown>)._flowGraph as
+									| FlowGraph
+									| undefined)
+							: undefined;
+					if (fg?.nodes?.length) {
+						flowGraphs.push(fg);
+					}
+				}
+			}
+		}
+
+		if (flowGraphs.length > 0) {
+			syncFlowGraphs(
+				flowGraphs,
+				tracker._config.apiUrl ?? DEFAULT_BASE_URL,
+				tracker._config.apiKey,
 			);
 		}
 	}

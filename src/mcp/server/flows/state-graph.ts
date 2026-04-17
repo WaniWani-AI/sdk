@@ -1,4 +1,10 @@
-import type { Edge, FlowConfig, NodeHandler, RegisteredFlow } from "./@types";
+import type {
+	Edge,
+	FlowConfig,
+	NodeHandler,
+	NodeOptions,
+	RegisteredFlow,
+} from "./@types";
 import { END, START } from "./@types";
 import { compileFlow } from "./compile";
 import type { FlowStore } from "./flow-store";
@@ -47,6 +53,7 @@ export class StateGraph<
 > {
 	private nodes = new Map<string, NodeHandler<TState>>();
 	private edges = new Map<string, Edge<TState>>();
+	private nodeOptions = new Map<string, NodeOptions>();
 	private config: FlowConfig;
 
 	constructor(config: FlowConfig) {
@@ -61,6 +68,7 @@ export class StateGraph<
 	addNode<TName extends string>(
 		name: TName,
 		handler: NodeHandler<TState>,
+		options?: NodeOptions,
 	): StateGraph<TState, TNodes | TName> {
 		if (name === START || name === END) {
 			throw new Error(
@@ -72,6 +80,9 @@ export class StateGraph<
 		}
 
 		this.nodes.set(name, handler);
+		if (options) {
+			this.nodeOptions.set(name, options);
+		}
 		return this as unknown as StateGraph<TState, TNodes | TName>;
 	}
 
@@ -149,6 +160,7 @@ export class StateGraph<
 			edges: edgesCopy,
 			store: options?.store,
 			graph: () => buildMermaidGraph(nodesCopy, edgesCopy),
+			nodeOptions: new Map(this.nodeOptions),
 		});
 	}
 

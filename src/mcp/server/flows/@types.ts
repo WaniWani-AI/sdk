@@ -322,6 +322,27 @@ export type Edge<TState> =
 	| { type: "direct"; to: string }
 	| { type: "conditional"; condition: ConditionFn<TState> };
 
+export type NodeOptions = {
+	trackFunnel?: true | string;
+};
+
+export type FlowGraphNode = {
+	id: string;
+	type: "widget" | "interrupt" | "action";
+	trackFunnel: false | true | string;
+};
+
+export type FlowGraphEdge =
+	| { from: string; to: string; type: "direct" }
+	| { from: string; to: string[]; type: "conditional" };
+
+export type FlowGraph = {
+	flowId: string;
+	title: string;
+	nodes: FlowGraphNode[];
+	edges: FlowGraphEdge[];
+};
+
 // ============================================================================
 // Flow config & compiled output
 // ============================================================================
@@ -416,6 +437,7 @@ export type RegisteredFlow = {
 	register: (server: McpServer) => Promise<void>;
 	/** Returns a Mermaid `flowchart TD` diagram of the flow graph. */
 	graph: () => string;
+	flowGraph: FlowGraph;
 };
 
 export interface CompileInput<TState extends Record<string, unknown>> {
@@ -424,6 +446,7 @@ export interface CompileInput<TState extends Record<string, unknown>> {
 	edges: Map<string, Edge<TState>>;
 	store?: FlowStore;
 	graph: () => string;
+	nodeOptions: Map<string, NodeOptions>;
 }
 
 export type FlowToolInput = {
