@@ -94,19 +94,6 @@ export type WithWaniwaniOptions = {
 	 * @default false
 	 */
 	applyFieldRedactions?: boolean;
-	/**
-	 * Transform every `_meta` object before it is sent to the WaniWani API.
-	 * Applied after `stripGeoCoordinates`. Return a new object — do not mutate
-	 * the input. Use for custom PII redaction beyond the built-in flag.
-	 */
-	redactMeta?: (meta: UnknownRecord) => UnknownRecord;
-	/**
-	 * Transform tool input before it is sent to the WaniWani API. Return a new
-	 * value — do not mutate the input. Use to redact PII fields from tool
-	 * arguments (e.g. age, postcode). The original input handed to the tool
-	 * handler is unaffected.
-	 */
-	redactInput?: (input: unknown, toolName: string) => unknown;
 };
 
 const log = createLogger("mcp", !!process.env.WANIWANI_DEBUG);
@@ -182,16 +169,8 @@ function createWrappedHandler(
 		opts.applyFieldRedactions === true
 			? buildStateUpdateRedactor(definitionMeta)
 			: undefined;
-	const effectiveOpts: WithWaniwaniOptions = stateUpdateRedactor
-		? {
-				...opts,
-				redactInput: (input, tName) => {
-					const redacted = stateUpdateRedactor(input);
-					return opts.redactInput
-						? opts.redactInput(redacted, tName)
-						: redacted;
-				},
-			}
+	const effectiveOpts = stateUpdateRedactor
+		? { ...opts, redactInput: stateUpdateRedactor }
 		: opts;
 
 	const wrappedHandler: MaybeWrappedHandler = async (

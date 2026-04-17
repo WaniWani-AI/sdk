@@ -682,61 +682,6 @@ describe("withWaniwani", () => {
 		});
 	});
 
-	test("applies redactMeta to request meta and output _meta", async () => {
-		const { client, tracked } = mockClient();
-		const mock = mockServer();
-
-		const redactMeta = (meta: Record<string, unknown>) => {
-			const next = { ...meta };
-			const loc = next["openai/userLocation"];
-			if (loc && typeof loc === "object") {
-				const {
-					latitude: _lat,
-					longitude: _lng,
-					...rest
-				} = loc as Record<string, unknown>;
-				next["openai/userLocation"] = rest;
-			}
-			return next;
-		};
-
-		withWaniwani(mock.server, { client, redactMeta });
-
-		mock.registerTool("pricing", {}, async () => ({
-			_meta: {
-				"openai/userLocation": {
-					city: "Madrid",
-					latitude: "40.4",
-					longitude: "-3.7",
-				},
-			},
-			content: [],
-		}));
-
-		const handler = mock.registered[0]?.[2];
-		await handler?.(
-			{},
-			{
-				_meta: {
-					"openai/userLocation": {
-						city: "Madrid",
-						latitude: "40.4",
-						longitude: "-3.7",
-					},
-				},
-			},
-		);
-
-		const event = tracked[0] as {
-			meta?: Record<string, unknown>;
-			properties: { output?: { _meta?: Record<string, unknown> } };
-		};
-		expect(event.meta?.["openai/userLocation"]).toEqual({ city: "Madrid" });
-		expect(event.properties.output?._meta?.["openai/userLocation"]).toEqual({
-			city: "Madrid",
-		});
-	});
-
 	test("auto-redacts stateUpdates fields listed in tool definition _meta", async () => {
 		const { client, tracked } = mockClient();
 		const mock = mockServer();
@@ -812,55 +757,6 @@ describe("withWaniwani", () => {
 		expect(event.properties.input).toEqual({
 			action: "continue",
 			stateUpdates: { ages: "35,32" },
-		});
-	});
-
-	test("applies redactInput to tracked input only", async () => {
-		const { client, tracked } = mockClient();
-		const mock = mockServer();
-
-		const redactInput = (input: unknown, toolName: string) => {
-			if (toolName !== "flow" || typeof input !== "object" || !input) {
-				return input;
-			}
-			const { stateUpdates, ...rest } = input as Record<string, unknown>;
-			if (!stateUpdates || typeof stateUpdates !== "object") {
-				return input;
-			}
-			return {
-				...rest,
-				stateUpdates: {
-					...(stateUpdates as Record<string, unknown>),
-					age: "REDACTED",
-				},
-			};
-		};
-
-		let handlerSawInput: unknown;
-		withWaniwani(mock.server, { client, redactInput });
-		mock.registerTool("flow", {}, async (input: unknown) => {
-			handlerSawInput = input;
-			return { content: [] };
-		});
-
-		const handler = mock.registered[0]?.[2];
-		await handler?.(
-			{ action: "continue", stateUpdates: { age: 35, zipcode: "28001" } },
-			{},
-		);
-
-		// Handler sees original input
-		expect(handlerSawInput).toEqual({
-			action: "continue",
-			stateUpdates: { age: 35, zipcode: "28001" },
-		});
-		// Tracked event has redacted input
-		const event = tracked[0] as {
-			properties: { input?: Record<string, unknown> };
-		};
-		expect(event.properties.input).toEqual({
-			action: "continue",
-			stateUpdates: { age: "REDACTED", zipcode: "28001" },
 		});
 	});
 });

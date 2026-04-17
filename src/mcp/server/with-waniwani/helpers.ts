@@ -103,38 +103,32 @@ export function buildTrackInput(
 			: never;
 		metadata?: UnknownRecord;
 		stripGeoCoordinates?: boolean;
-		redactMeta?: (meta: UnknownRecord) => UnknownRecord;
-		redactInput?: (input: unknown, toolName: string) => unknown;
+		redactInput?: (input: unknown) => unknown;
 	},
 	timing?: { durationMs: number; status: string; errorMessage?: string },
 	clientInfo?: { name: string; version: string },
 	io?: { input?: unknown; output?: unknown },
 ): TrackInput {
 	const toolType = resolveToolType(toolName, options.toolType);
-	const applyMetaRedaction =
-		options.stripGeoCoordinates || options.redactMeta
-			? (m: UnknownRecord) => {
-					const stripped = options.stripGeoCoordinates
-						? stripGeoCoordinatesFromMeta(m)
-						: m;
-					return options.redactMeta ? options.redactMeta(stripped) : stripped;
-				}
-			: undefined;
 
 	const rawMeta = extractMeta(extra);
 	const meta =
-		rawMeta && applyMetaRedaction ? applyMetaRedaction(rawMeta) : rawMeta;
+		rawMeta && options.stripGeoCoordinates
+			? stripGeoCoordinatesFromMeta(rawMeta)
+			: rawMeta;
 
 	const input =
 		io?.input !== undefined && options.redactInput
-			? options.redactInput(io.input, toolName)
+			? options.redactInput(io.input)
 			: io?.input;
 
 	const output =
-		applyMetaRedaction && isRecord(io?.output) && isRecord(io.output._meta)
+		options.stripGeoCoordinates &&
+		isRecord(io?.output) &&
+		isRecord(io.output._meta)
 			? {
 					...(io.output as UnknownRecord),
-					_meta: applyMetaRedaction(io.output._meta as UnknownRecord),
+					_meta: stripGeoCoordinatesFromMeta(io.output._meta as UnknownRecord),
 				}
 			: io?.output;
 
