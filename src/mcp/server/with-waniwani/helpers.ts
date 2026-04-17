@@ -132,13 +132,6 @@ export function buildTrackInput(
 				}
 			: io?.output;
 
-	console.log(
-		"[waniwani:debug] buildTrackInput meta:",
-		JSON.stringify(meta),
-		"-> source:",
-		extractSource(meta),
-	);
-
 	return {
 		event: "tool.called",
 		properties: {
