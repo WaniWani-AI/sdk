@@ -85,13 +85,13 @@ export type WithWaniwaniOptions = {
 	stripGeoCoordinates?: boolean;
 	/**
 	 * Replace `input.stateUpdates[field]` with `"REDACTED"` for any field
-	 * marked via `redacted()` on a flow state schema. When `false`, the
-	 * declarative markers are ignored and raw values are tracked.
+	 * marked via `redacted()` on a flow state schema. When `false` (default),
+	 * the declarative markers are ignored and raw values are tracked.
 	 *
-	 * Wire this to an env var (e.g. `NODE_ENV === "production"`) when you want
-	 * real values in development logs but redacted values in production.
+	 * Wire this to an env var when you want real values in development logs
+	 * but redacted values in production.
 	 *
-	 * @default true
+	 * @default false
 	 */
 	applyFieldRedactions?: boolean;
 	/**
@@ -179,7 +179,7 @@ function createWrappedHandler(
 	const { server, tracker, opts, tokenCache, injectToken } = ctx;
 
 	const stateUpdateRedactor =
-		opts.applyFieldRedactions !== false
+		opts.applyFieldRedactions === true
 			? buildStateUpdateRedactor(definitionMeta)
 			: undefined;
 	const effectiveOpts: WithWaniwaniOptions = stateUpdateRedactor

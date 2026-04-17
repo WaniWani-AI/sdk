@@ -741,7 +741,7 @@ describe("withWaniwani", () => {
 		const { client, tracked } = mockClient();
 		const mock = mockServer();
 
-		withWaniwani(mock.server, { client });
+		withWaniwani(mock.server, { client, applyFieldRedactions: true });
 
 		let handlerSaw: unknown;
 		mock.registerTool(
@@ -784,11 +784,11 @@ describe("withWaniwani", () => {
 		});
 	});
 
-	test("applyFieldRedactions: false disables the built-in stateUpdates redaction", async () => {
+	test("applyFieldRedactions defaults to false — markers are ignored", async () => {
 		const { client, tracked } = mockClient();
 		const mock = mockServer();
 
-		withWaniwani(mock.server, { client, applyFieldRedactions: false });
+		withWaniwani(mock.server, { client });
 
 		mock.registerTool(
 			"flow_tool",
