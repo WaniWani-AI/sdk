@@ -20,6 +20,10 @@ import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
 import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
 import { deepMerge, expandDotPaths } from "./nested";
 import { buildFlowProtocol } from "./protocol";
+import {
+	collectRedactedStateFields,
+	REDACTED_STATE_UPDATE_FIELDS_META_KEY,
+} from "./redacted";
 
 // ============================================================================
 // Input schema
@@ -196,11 +200,19 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		};
 	}
 
+	const redactedStateFields = collectRedactedStateFields(
+		config.state as Record<string, z.ZodType> | undefined,
+	);
 	const toolConfig = {
 		title: config.title,
 		description: fullDescription,
 		inputSchema,
 		annotations: config.annotations,
+		...(redactedStateFields.length > 0 && {
+			_meta: {
+				[REDACTED_STATE_UPDATE_FIELDS_META_KEY]: redactedStateFields,
+			},
+		}),
 	};
 
 	const toolHandler = (async (args: FlowToolInput, extra: unknown) => {
