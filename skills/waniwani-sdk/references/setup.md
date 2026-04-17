@@ -9,9 +9,15 @@ WANIWANI_API_KEY=wwk_...
 
 # Optional -- defaults to https://app.waniwani.ai
 WANIWANI_API_URL=https://app.waniwani.ai
+
+# Optional -- encrypts flow state at rest (AES-256-GCM)
+# Generate with: openssl rand -base64 32
+WANIWANI_ENCRYPTION_KEY=<base64-encoded 32-byte key>
 ```
 
 All SDK modules (tracking, flows, chat) read from these env vars automatically.
+
+When `WANIWANI_ENCRYPTION_KEY` is set, all KV store values (flow state) are encrypted before being sent to the WaniWani API and decrypted on read. The server never sees plaintext flow state.
 
 ## Client Singleton (`lib/waniwani.ts`)
 

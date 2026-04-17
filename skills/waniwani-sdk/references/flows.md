@@ -12,6 +12,8 @@ LangGraph-inspired multi-step conversational flows for MCP tools. Define a state
 
 Flow state is stored **server-side** via the WaniWani API, keyed by the session ID from `_meta`. The AI does not need to round-trip any token -- state is recovered automatically on every call.
 
+Flow state can be **encrypted at rest** by setting the `WANIWANI_ENCRYPTION_KEY` env var (base64-encoded 32-byte key, generate with `openssl rand -base64 32`). When set, values are encrypted with AES-256-GCM before leaving the MCP server process. See [setup.md](setup.md) for details.
+
 ## Import
 
 ```ts
