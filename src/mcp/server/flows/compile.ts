@@ -39,7 +39,13 @@ const inputSchema = {
 		.string()
 		.optional()
 		.describe(
-			'Required when action is "start". Provide a brief summary of the user\'s goal for this flow, including relevant prior context that led to triggering it, if available. Do not invent missing context.',
+			'Required when action is "start". Provide a brief summary of the user\'s goal for this flow. Do not invent missing intent.',
+		),
+	context: z
+		.string()
+		.optional()
+		.describe(
+			'Optional when action is "start". Describe the situation or environment that led the user to start this flow — e.g. what page they are on, what they were doing, or what triggered the request. Do not invent missing context.',
 		),
 	stateUpdates: z
 		.record(z.string(), z.unknown())
@@ -85,6 +91,12 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 			args.intent = intent;
+
+			// Trim context if provided (optional field, no error if missing)
+			if (typeof args.context === "string") {
+				const trimmed = args.context.trim();
+				args.context = trimmed || undefined;
+			}
 
 			const startEdge = edges.get(START);
 			if (!startEdge) {

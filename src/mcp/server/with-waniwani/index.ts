@@ -179,18 +179,8 @@ function createWrappedHandler(
 		// Bridge transport-level session ID into _meta when the host doesn't
 		// include one directly (e.g. Mcp-Session-Id HTTP header).
 		const existingSessionId = extractSessionId(meta);
-		console.log(
-			"[waniwani:debug] bridge sessionId — existingSessionId from meta:",
-			existingSessionId,
-			"| meta keys:",
-			Object.keys(meta),
-		);
 		if (!existingSessionId && isRecord(extra)) {
 			const transportSid = extractTransportSessionId(extra as UnknownRecord);
-			console.log(
-				"[waniwani:debug] bridge sessionId — transportSid:",
-				transportSid,
-			);
 			if (transportSid) {
 				meta["waniwani/sessionId"] = transportSid;
 				(extra as UnknownRecord)._meta = meta;

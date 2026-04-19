@@ -1,0 +1,76 @@
+---
+title: Security
+description: "Encryption at rest, key management, and security best practices."
+---
+
+## Encryption at rest
+
+Flow state is stored server-side via the WaniWani KV store. The SDK supports **AES-256-GCM encryption** -- values are encrypted before they leave your MCP server process and decrypted on read. The WaniWani server never sees plaintext flow state.
+
+<CardGroup cols={2}>
+  <Card title="Managed project" icon="cloud" href="#managed-projects">
+    Encryption is automatic. WaniWani generates and manages the key for you -- nothing to configure.
+  </Card>
+  <Card title="External project" icon="server" href="#external-projects">
+    You generate a key and add it to your MCP server's environment.
+  </Card>
+</CardGroup>
+
+---
+
+### Managed projects
+
+Encryption is enabled automatically. WaniWani generates and stores the encryption key as an environment variable in your deployed instance. No setup is needed -- flow state is encrypted out of the box and the key is never exposed.
+
+### External projects
+
+You need to generate a key and add it to your MCP server's environment:
+
+```bash
+openssl rand -base64 32
+```
+
+```bash .env
+WANIWANI_ENCRYPTION_KEY=<base64-encoded 32-byte key>
+```
+
+The SDK picks up the key automatically -- no code changes required. When the key is not set, values are stored as plain JSON.
+
+### How it works
+
+When `WANIWANI_ENCRYPTION_KEY` is set:
+
+1. **On write** -- the SDK serializes the value to JSON, encrypts it with AES-256-GCM using a random 12-byte IV, and stores an encrypted envelope in the KV store.
+2. **On read** -- the SDK detects the encrypted envelope, decrypts the ciphertext, and returns the original value.
+
+### Key rotation
+
+The SDK does not support automatic key rotation. To rotate:
+
+1. Set the new key in your environment.
+2. Trigger each active flow so its state is re-read with the old key (which will fail) and re-written with the new key.
+
+In practice, the simplest approach is to let existing sessions expire naturally and apply the new key to new sessions only.
+
+<Warning>
+  If you lose the encryption key, encrypted flow state cannot be recovered. Back up the key in your secret manager.
+</Warning>
+
+## API key handling
+
+API keys (`WANIWANI_API_KEY`) authenticate your MCP server to the WaniWani platform. Treat them as server-side secrets:
+
+- Never commit them to version control.
+- Never include them in client-side bundles.
+- Store them in your platform's secret manager or a gitignored `.env` file.
+- Use separate keys for Staging and Production environments.
+
+See [API Keys](/setup/api-key) for setup and rotation details.
+
+## Transport security
+
+All communication between the SDK and the WaniWani API uses HTTPS (TLS 1.2+). No additional configuration is needed.
+
+## Tenant isolation
+
+Each API key is scoped to a single MCP environment. The WaniWani API enforces tenant isolation at the key level -- one key cannot access another environment's data (events, sessions, KV store, knowledge base).

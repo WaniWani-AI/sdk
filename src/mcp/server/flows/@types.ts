@@ -430,6 +430,8 @@ export type FlowToolInput = {
 	action: "start" | "continue";
 	/** Required when `action` is `"start"`. */
 	intent?: string;
+	/** Optional when `action` is `"start"`. Describes the situation/environment that led the user to start this flow. */
+	context?: string;
 	stateUpdates?: Record<string, unknown>;
 };
 

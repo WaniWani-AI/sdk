@@ -109,7 +109,9 @@ Rules for nested state:
 
 ## Pre-filling Answers
 
-When calling `action: "start"`, the AI can pass known answers via `stateUpdates`. The engine auto-skips nodes whose fields are already filled.
+When calling `action: "start"`, the AI provides `intent` (required -- the user's goal) and optionally `context` (the situation that led to starting the flow, e.g. what page the user is on or what triggered the request). Both are tool call arguments for the AI -- they are not passed to node handlers or stored in flow state.
+
+The AI can also pass known answers via `stateUpdates`. The engine auto-skips nodes whose fields are already filled.
 
 Example: user says "I want to open a bank account in France" -- AI sends `{ "action": "start", "stateUpdates": { "country": "France" } }` and the flow skips the country question.
 
