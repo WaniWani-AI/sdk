@@ -2,6 +2,7 @@ import type { ToolCalledProperties } from "../../../tracking/index.js";
 import { createLogger } from "../../../utils/logger.js";
 import { waniwani } from "../../../waniwani.js";
 import type { FlowGraph } from "../flows/@types.js";
+import { REDACTED_STATE_UPDATE_FIELDS_META_KEY } from "../flows/redacted.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../tools/types";
 import { extractSessionId } from "../utils.js";
@@ -73,11 +74,76 @@ export type WithWaniwaniOptions = {
 	 * @default true
 	 */
 	injectWidgetToken?: boolean;
+	/**
+	 * Strip `latitude`/`longitude` from known location `_meta` entries
+	 * (`openai/userLocation`, `waniwani/geoLocation`, `waniwani/userLocation`)
+	 * before events are sent to the WaniWani API. Applied to both the
+	 * request-level `_meta` and any `_meta` on the tool response.
+	 *
+	 * Enable this when precise geo coordinates should not reach the tracking
+	 * backend; city/region/country fields are preserved.
+	 *
+	 * @default false
+	 */
+	stripGeoCoordinates?: boolean;
+	/**
+	 * Replace `input.stateUpdates[field]` with `"REDACTED"` for any field
+	 * marked via `redacted()` on a flow state schema. When `false` (default),
+	 * the declarative markers are ignored and raw values are tracked.
+	 *
+	 * Wire this to an env var when you want real values in development logs
+	 * but redacted values in production.
+	 *
+	 * @default false
+	 */
+	applyFieldRedactions?: boolean;
 };
 
 const log = createLogger("mcp", !!process.env.WANIWANI_DEBUG);
 
 const DEFAULT_BASE_URL = "https://app.waniwani.ai";
+
+const REDACTED_VALUE = "REDACTED";
+
+function buildStateUpdateRedactor(
+	definitionMeta: UnknownRecord | undefined,
+): ((input: unknown) => unknown) | undefined {
+	if (!definitionMeta) {
+		return undefined;
+	}
+	const fields = definitionMeta[REDACTED_STATE_UPDATE_FIELDS_META_KEY];
+	if (!Array.isArray(fields) || fields.length === 0) {
+		return undefined;
+	}
+	const fieldSet = new Set(
+		fields.filter((f): f is string => typeof f === "string"),
+	);
+	if (fieldSet.size === 0) {
+		return undefined;
+	}
+
+	return (input: unknown) => {
+		if (!isRecord(input)) {
+			return input;
+		}
+		const stateUpdates = input.stateUpdates;
+		if (!isRecord(stateUpdates)) {
+			return input;
+		}
+		let changed = false;
+		const next: UnknownRecord = { ...stateUpdates };
+		for (const field of fieldSet) {
+			if (field in next) {
+				next[field] = REDACTED_VALUE;
+				changed = true;
+			}
+		}
+		if (!changed) {
+			return input;
+		}
+		return { ...input, stateUpdates: next };
+	};
+}
 
 type WrapContext = {
 	server: McpServer;
@@ -97,6 +163,14 @@ function createWrappedHandler(
 ): MaybeWrappedHandler {
 	const { server, tracker, opts, tokenCache, injectToken } = ctx;
 
+	const stateUpdateRedactor =
+		opts.applyFieldRedactions === true
+			? buildStateUpdateRedactor(definitionMeta)
+			: undefined;
+	const effectiveOpts = stateUpdateRedactor
+		? { ...opts, redactInput: stateUpdateRedactor }
+		: opts;
+
 	const wrappedHandler: MaybeWrappedHandler = async (
 		input: unknown,
 		extra: unknown,
@@ -107,18 +181,8 @@ function createWrappedHandler(
 		// Bridge transport-level session ID into _meta when the host doesn't
 		// include one directly (e.g. Mcp-Session-Id HTTP header).
 		const existingSessionId = extractSessionId(meta);
-		console.log(
-			"[waniwani:debug] bridge sessionId — existingSessionId from meta:",
-			existingSessionId,
-			"| meta keys:",
-			Object.keys(meta),
-		);
 		if (!existingSessionId && isRecord(extra)) {
 			const transportSid = extractTransportSessionId(extra as UnknownRecord);
-			console.log(
-				"[waniwani:debug] bridge sessionId — transportSid:",
-				transportSid,
-			);
 			if (transportSid) {
 				meta["waniwani/sessionId"] = transportSid;
 				(extra as UnknownRecord)._meta = meta;
@@ -166,7 +230,7 @@ function createWrappedHandler(
 				buildTrackInput(
 					toolName,
 					extra,
-					opts,
+					effectiveOpts,
 					{
 						durationMs,
 						status: isErrorResult ? "error" : "ok",
@@ -211,7 +275,7 @@ function createWrappedHandler(
 				buildTrackInput(
 					toolName,
 					extra,
-					opts,
+					effectiveOpts,
 					{
 						durationMs,
 						status: "error",

@@ -100,6 +100,43 @@ describe("compileFlow response contract", () => {
 		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
 	});
 
+	test("accepts optional context on start", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "context_flow",
+			title: "Context Flow",
+			description: "Test context field.",
+			state: {
+				useCase: z.string().describe("Primary use case"),
+			},
+		})
+			.addNode("ask_use_case", ({ interrupt }) =>
+				interrupt({
+					useCase: { question: "What's your primary use case?" },
+				}),
+			)
+			.addEdge(START, "ask_use_case")
+			.addEdge("ask_use_case", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(
+			{
+				action: "start",
+				intent: TEST_INTENT,
+				context: "User is on the pricing page and clicked 'Get a quote'.",
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("interrupt");
+		expect(parsed.question).toBe("What's your primary use case?");
+	});
+
 	test("returns interrupt JSON content", async () => {
 		const store = new TestFlowStateStore();
 		const flow = createFlow({
