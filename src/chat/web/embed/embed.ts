@@ -141,20 +141,32 @@ function createLoadingSkeleton(
 ): HTMLElement {
 	const isLeft = config.position === "bottom-left";
 	const primaryColor = config.theme?.primaryColor ?? "#6366f1";
+
 	const skeleton = document.createElement("div");
 	skeleton.setAttribute("data-waniwani-skeleton", "");
-	skeleton.innerHTML = `
-		<style>
-			@keyframes ww-skeleton-pulse { 0%,100% { opacity:1; } 50% { opacity:0.7; } }
-			[data-waniwani-skeleton] .ww-sk-bubble {
-				position:fixed; bottom:20px; ${isLeft ? "left" : "right"}:20px;
-				width:56px; height:56px; border-radius:50%;
-				background:${primaryColor}; z-index:2147483647;
-				animation: ww-skeleton-pulse 1.5s ease-in-out infinite;
-			}
-		</style>
-		<div class="ww-sk-bubble"></div>
+
+	// Build DOM programmatically — avoids innerHTML + interpolation so a
+	// hostile `primaryColor` (e.g. `red}</style><img onerror=…>`) cannot
+	// break out of the CSS context.
+	const style = document.createElement("style");
+	style.textContent = `
+		@keyframes ww-skeleton-pulse { 0%,100% { opacity:1; } 50% { opacity:0.7; } }
+		[data-waniwani-skeleton] .ww-sk-bubble {
+			position:fixed; bottom:20px; ${isLeft ? "left" : "right"}:20px;
+			width:56px; height:56px; border-radius:50%;
+			z-index:2147483647;
+			animation: ww-skeleton-pulse 1.5s ease-in-out infinite;
+		}
 	`;
+	skeleton.appendChild(style);
+
+	const bubble = document.createElement("div");
+	bubble.className = "ww-sk-bubble";
+	// Assigning via the CSSStyleDeclaration setter — browser rejects invalid
+	// CSS values silently, no string escape hazard.
+	bubble.style.backgroundColor = primaryColor;
+	skeleton.appendChild(bubble);
+
 	shadowRoot.appendChild(skeleton);
 	return skeleton;
 }
