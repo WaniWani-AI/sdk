@@ -29,6 +29,12 @@ export interface KvStore<T = Record<string, unknown>> {
 const SDK_NAME = "@waniwani/sdk";
 const DEFAULT_BASE_URL = "https://app.waniwani.ai";
 
+function kvDebug(...args: unknown[]): void {
+	if (process.env.WANIWANI_DEBUG) {
+		console.log("[waniwani:kv]", ...args);
+	}
+}
+
 export class WaniwaniKvStore<T = Record<string, unknown>>
 	implements KvStore<T>
 {
@@ -77,8 +83,12 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 				"[WaniWani KV] No API key configured. Set WANIWANI_API_KEY env var.",
 			);
 		}
-		const payload = this.encryptionKey
-			? await encryptValue(value as Record<string, unknown>, this.encryptionKey)
+		const encKey = this.encryptionKey;
+		kvDebug(
+			`set "${key}" — encryption ${encKey ? "enabled" : "disabled (no WANIWANI_ENCRYPTION_KEY)"}`,
+		);
+		const payload = encKey
+			? await encryptValue(value as Record<string, unknown>, encKey)
 			: value;
 		await this.request("/api/mcp/redis/set", { key, value: payload });
 	}
