@@ -18,6 +18,7 @@ import type {
 import { START } from "./@types";
 import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
 import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
+import { extractFlowGraph } from "./graph-extract";
 import { deepMerge, expandDotPaths } from "./nested";
 import { buildFlowProtocol } from "./protocol";
 import {
@@ -63,6 +64,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	input: CompileInput<TState>,
 ): RegisteredFlow {
 	const { config, nodes, edges } = input;
+	const flowGraph = extractFlowGraph(config, nodes, edges, input.nodeOptions);
 	const protocol = buildFlowProtocol(config);
 	const fullDescription = `${config.description}\n${protocol}`;
 
@@ -115,6 +117,8 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				validators,
 				meta,
 				waniwani,
+				input.nodeOptions,
+				config.id,
 			);
 		}
 
@@ -187,6 +191,8 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					validators,
 					meta,
 					waniwani,
+					input.nodeOptions,
+					config.id,
 				);
 			}
 
@@ -201,6 +207,8 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				validators,
 				meta,
 				waniwani,
+				input.nodeOptions,
+				config.id,
 			);
 		}
 
@@ -292,8 +300,17 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		handler: toolHandler as unknown as FlowToolHandler,
 
 		async register(server: McpServer): Promise<void> {
-			server.registerTool(config.id, toolConfig, toolHandler);
+			const configWithGraph = {
+				...toolConfig,
+				_meta: { ...toolConfig._meta, _flowGraph: flowGraph },
+			};
+			server.registerTool(
+				config.id,
+				configWithGraph as typeof toolConfig,
+				toolHandler,
+			);
 		},
 		graph: input.graph,
+		flowGraph,
 	};
 }
