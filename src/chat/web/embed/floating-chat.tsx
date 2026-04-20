@@ -33,6 +33,8 @@ export function buildChatTheme(config: EmbedConfig): ChatTheme | undefined {
 
 export interface FloatingChatProps {
 	config: EmbedConfig;
+	/** Called once after the component mounts (post-commit). */
+	onReady?: () => void;
 }
 
 export interface FloatingChatHandle {
@@ -103,11 +105,21 @@ const TRANSITION_MS = 200;
 // ---------------------------------------------------------------------------
 
 export const FloatingChat = forwardRef<FloatingChatHandle, FloatingChatProps>(
-	function FloatingChat({ config }, ref) {
+	function FloatingChat({ config, onReady }, ref) {
 		const [isOpen, setIsOpen] = useState(false);
-		const [lastSeenCount, setLastSeenCount] = useState(0);
+		const [unreadCount, setUnreadCount] = useState(0);
 		const [isMobile, setIsMobile] = useState(false);
 		const chatRef = useRef<ChatHandle>(null);
+		const isOpenRef = useRef(isOpen);
+		isOpenRef.current = isOpen;
+
+		// -----------------------------------------------------------------------
+		// Signal mount completion (used to hide the pre-render skeleton)
+		// -----------------------------------------------------------------------
+		// biome-ignore lint/correctness/useExhaustiveDependencies: fire once on mount
+		useEffect(() => {
+			onReady?.();
+		}, []);
 
 		// -----------------------------------------------------------------------
 		// Mobile detection
@@ -145,13 +157,21 @@ export const FloatingChat = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		}, [isOpen]);
 
 		// -----------------------------------------------------------------------
-		// Track last-seen count for unread dot
+		// Reset unread counter when the panel opens
 		// -----------------------------------------------------------------------
 		useEffect(() => {
 			if (isOpen) {
-				setLastSeenCount(chatRef.current?.messages.length ?? 0);
+				setUnreadCount(0);
 			}
 		}, [isOpen]);
+
+		// onResponseReceived fires from ChatCard when a streamed response finishes.
+		// Bump unread count only if the panel is closed at that moment.
+		const handleResponseReceived = useCallback(() => {
+			if (!isOpenRef.current) {
+				setUnreadCount((c) => c + 1);
+			}
+		}, []);
 
 		// -----------------------------------------------------------------------
 		// Imperative handle
@@ -172,8 +192,7 @@ export const FloatingChat = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// -----------------------------------------------------------------------
 		// Unread indicator
 		// -----------------------------------------------------------------------
-		const currentCount = chatRef.current?.messages.length ?? 0;
-		const hasUnread = !isOpen && currentCount > lastSeenCount;
+		const hasUnread = !isOpen && unreadCount > 0;
 
 		// -----------------------------------------------------------------------
 		// Position helpers
@@ -335,6 +354,7 @@ export const FloatingChat = forwardRef<FloatingChatHandle, FloatingChatProps>(
 							suggestions={
 								config.suggestions ? { initial: config.suggestions } : undefined
 							}
+							onResponseReceived={handleResponseReceived}
 							width="100%"
 							height="100%"
 						/>

@@ -175,10 +175,12 @@ function mountFloating(config: EmbedConfig): EmbedInstance {
 	shadowRoot.appendChild(mountContainer);
 
 	reactRoot = ReactDOM.createRoot(mountContainer);
-	reactRoot.render(React.createElement(FloatingChat, { config }));
-
-	// Remove skeleton once React mounts
-	requestAnimationFrame(() => skeleton.remove());
+	reactRoot.render(
+		React.createElement(FloatingChat, {
+			config,
+			onReady: () => skeleton.remove(),
+		}),
+	);
 
 	return {
 		destroy: () => {

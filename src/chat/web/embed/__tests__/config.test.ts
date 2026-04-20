@@ -14,7 +14,7 @@ describe("resolveConfig — programmatic", () => {
 	test("token-only config uses default api", () => {
 		const config = resolveConfig({ token: "wwp_test" });
 
-		expect(config.api).toBe("https://app.waniwani.ai/api/mcp");
+		expect(config.api).toBe("https://app.waniwani.ai/api/mcp/chat");
 		expect(config.token).toBe("wwp_test");
 	});
 
