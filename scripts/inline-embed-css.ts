@@ -41,7 +41,8 @@ if (!embedJs.includes(placeholder)) {
 	process.exit(1);
 }
 
-embedJs = embedJs.replace(placeholder, escaped);
+// Use function replacement to avoid `$`-pattern interpretation in the CSS
+embedJs = embedJs.replace(placeholder, () => escaped);
 
 // Write back
 writeFileSync(embedPath, embedJs, "utf-8");

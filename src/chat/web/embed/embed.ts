@@ -10,7 +10,7 @@ import ReactDOM from "react-dom/client";
 import { ChatCard } from "../layouts/chat-card";
 import type { EmbedConfig } from "./config";
 import { parseConfigFromScript, resolveConfig } from "./config";
-import { FloatingChat } from "./floating-chat";
+import { buildChatTheme, FloatingChat } from "./floating-chat";
 
 // ---------------------------------------------------------------------------
 // CSS placeholder — replaced at build time with the actual CSS string
@@ -44,23 +44,6 @@ interface EmbedInstance {
 let currentInstance: EmbedInstance | null = null;
 let reactRoot: ReactDOM.Root | null = null;
 let hostElement: HTMLElement | null = null;
-
-// ---------------------------------------------------------------------------
-// Theme helper (shared between inline + floating modes)
-// ---------------------------------------------------------------------------
-
-function buildChatTheme(config: EmbedConfig) {
-	if (!config.theme) {
-		return undefined;
-	}
-	const t = config.theme;
-	return {
-		...(t.primaryColor ? { primaryColor: t.primaryColor } : {}),
-		...(t.backgroundColor ? { backgroundColor: t.backgroundColor } : {}),
-		...(t.textColor ? { textColor: t.textColor } : {}),
-		...(t.fontFamily ? { fontFamily: t.fontFamily } : {}),
-	};
-}
 
 // ---------------------------------------------------------------------------
 // CSS injection helper

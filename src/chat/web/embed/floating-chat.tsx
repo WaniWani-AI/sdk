@@ -14,7 +14,7 @@ import type { ChatHandle, ChatTheme } from "../@types";
 import { ChatCard } from "../layouts/chat-card";
 import type { EmbedConfig } from "./config";
 
-function buildChatTheme(config: EmbedConfig): ChatTheme | undefined {
+export function buildChatTheme(config: EmbedConfig): ChatTheme | undefined {
 	if (!config.theme) {
 		return undefined;
 	}

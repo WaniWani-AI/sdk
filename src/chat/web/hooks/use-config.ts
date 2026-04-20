@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface WaniWaniConfig {
 	debug: boolean;
@@ -16,14 +16,22 @@ export function useConfig(
 ): WaniWaniConfig {
 	const [config, setConfig] = useState<WaniWaniConfig>(defaultConfig);
 
+	// Keep headers in a ref so identity changes don't re-trigger the fetch.
+	// Callers commonly pass a fresh object literal each render.
+	const headersRef = useRef(headers);
+	useEffect(() => {
+		headersRef.current = headers;
+	}, [headers]);
+
 	useEffect(() => {
 		if (skip) {
 			return;
 		}
 		(async () => {
 			try {
+				const current = headersRef.current;
 				const r = await fetch(`${api}/config`, {
-					headers: headers ? { ...headers } : undefined,
+					headers: current ? { ...current } : undefined,
 				});
 				const data = await r.json();
 				setConfig({
@@ -32,7 +40,7 @@ export function useConfig(
 				});
 			} catch {}
 		})();
-	}, [api, headers, skip]);
+	}, [api, skip]);
 
 	return config;
 }
