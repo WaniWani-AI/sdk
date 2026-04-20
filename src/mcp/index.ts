@@ -28,6 +28,7 @@ export {
 	createFlow,
 	createFlowTestHarness,
 	END,
+	redacted,
 	START,
 	StateGraph,
 } from "./server/flows";

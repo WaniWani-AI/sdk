@@ -11,31 +11,12 @@ function isRecord(v: unknown): v is UnknownRecord {
 export function extractTransportSessionId(
 	extra: UnknownRecord,
 ): string | undefined {
-	console.log(
-		"[waniwani:debug] extractTransportSessionId extra keys:",
-		Object.keys(extra),
-	);
-
-	console.log(
-		"[waniwani:debug] extractTransportSessionId extra.sessionId:",
-		typeof extra.sessionId,
-		extra.sessionId,
-	);
-
 	if (typeof extra.sessionId === "string" && extra.sessionId) {
-		console.log(
-			"[waniwani:debug] extractTransportSessionId found extra.sessionId:",
-			extra.sessionId,
-		);
 		return extra.sessionId;
 	}
 
 	if (isRecord(extra.requestInfo)) {
 		const rawHeaders = (extra.requestInfo as UnknownRecord).headers;
-		console.log(
-			"[waniwani:debug] extractTransportSessionId requestInfo.headers:",
-			isRecord(rawHeaders) ? Object.keys(rawHeaders) : rawHeaders,
-		);
 		if (isRecord(rawHeaders)) {
 			// Normalize keys to lowercase — HTTP headers are case-insensitive
 			// but the transport may preserve original casing (e.g. "Mcp-Session-Id").
@@ -44,18 +25,10 @@ export function extractTransportSessionId(
 				headers[key.toLowerCase()] = rawHeaders[key];
 			}
 			const sid = headers["mcp-session-id"];
-			console.log(
-				"[waniwani:debug] extractTransportSessionId headers['mcp-session-id']:",
-				sid,
-			);
 			if (typeof sid === "string" && sid) {
 				return sid;
 			}
 		}
-	} else {
-		console.log(
-			"[waniwani:debug] extractTransportSessionId no requestInfo on extra",
-		);
 	}
 
 	return undefined;

@@ -628,4 +628,135 @@ describe("withWaniwani", () => {
 		});
 		expect(meta.waniwani).toBe(undefined);
 	});
+
+	test("stripGeoCoordinates removes latitude/longitude from known location meta keys", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client, stripGeoCoordinates: true });
+
+		mock.registerTool("pricing", {}, async () => ({
+			_meta: {
+				"openai/userLocation": {
+					city: "Madrid",
+					country: "ES",
+					latitude: "40.4",
+					longitude: "-3.7",
+				},
+			},
+			content: [],
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{},
+			{
+				_meta: {
+					"openai/userLocation": {
+						city: "Madrid",
+						country: "ES",
+						latitude: "40.4",
+						longitude: "-3.7",
+					},
+					"waniwani/geoLocation": {
+						country: "ES",
+						latitude: "40.4",
+						longitude: "-3.7",
+					},
+				},
+			},
+		);
+
+		const event = tracked[0] as {
+			meta?: Record<string, unknown>;
+			properties: { output?: { _meta?: Record<string, unknown> } };
+		};
+		expect(event.meta?.["openai/userLocation"]).toEqual({
+			city: "Madrid",
+			country: "ES",
+		});
+		expect(event.meta?.["waniwani/geoLocation"]).toEqual({ country: "ES" });
+		expect(event.properties.output?._meta?.["openai/userLocation"]).toEqual({
+			city: "Madrid",
+			country: "ES",
+		});
+	});
+
+	test("auto-redacts stateUpdates fields listed in tool definition _meta", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client, applyFieldRedactions: true });
+
+		let handlerSaw: unknown;
+		mock.registerTool(
+			"flow_tool",
+			{
+				_meta: {
+					"waniwani/redactedStateUpdateFields": ["ages", "zipcode"],
+				},
+			},
+			async (input: unknown) => {
+				handlerSaw = input;
+				return { content: [] };
+			},
+		);
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { ages: "35,32", zipcode: "28001", modality: "all" },
+			},
+			{},
+		);
+
+		expect(handlerSaw).toEqual({
+			action: "continue",
+			stateUpdates: { ages: "35,32", zipcode: "28001", modality: "all" },
+		});
+
+		const event = tracked[0] as {
+			properties: { input?: Record<string, unknown> };
+		};
+		expect(event.properties.input).toEqual({
+			action: "continue",
+			stateUpdates: {
+				ages: "REDACTED",
+				zipcode: "REDACTED",
+				modality: "all",
+			},
+		});
+	});
+
+	test("applyFieldRedactions defaults to false — markers are ignored", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool(
+			"flow_tool",
+			{
+				_meta: {
+					"waniwani/redactedStateUpdateFields": ["ages"],
+				},
+			},
+			async () => ({ content: [] }),
+		);
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{ action: "continue", stateUpdates: { ages: "35,32" } },
+			{},
+		);
+
+		const event = tracked[0] as {
+			properties: { input?: Record<string, unknown> };
+		};
+		expect(event.properties.input).toEqual({
+			action: "continue",
+			stateUpdates: { ages: "35,32" },
+		});
+	});
 });

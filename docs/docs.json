@@ -32,6 +32,7 @@
             "pages": [
               "setup/installation",
               "setup/api-key",
+              "setup/security",
               "setup/wrap-server"
             ]
           },

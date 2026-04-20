@@ -12,6 +12,8 @@ LangGraph-inspired multi-step conversational flows for MCP tools. Define a state
 
 Flow state is stored **server-side** via the WaniWani API, keyed by the session ID from `_meta`. The AI does not need to round-trip any token -- state is recovered automatically on every call.
 
+Flow state can be **encrypted at rest** by setting the `WANIWANI_ENCRYPTION_KEY` env var (base64-encoded 32-byte key, generate with `openssl rand -base64 32`). When set, values are encrypted with AES-256-GCM before leaving the MCP server process. See [setup.md](setup.md) for details.
+
 ## Import
 
 ```ts
@@ -107,7 +109,9 @@ Rules for nested state:
 
 ## Pre-filling Answers
 
-When calling `action: "start"`, the AI can pass known answers via `stateUpdates`. The engine auto-skips nodes whose fields are already filled.
+When calling `action: "start"`, the AI provides `intent` (required -- the user's goal) and optionally `context` (the situation that led to starting the flow, e.g. what page the user is on or what triggered the request). Both are tool call arguments for the AI -- they are not passed to node handlers or stored in flow state.
+
+The AI can also pass known answers via `stateUpdates`. The engine auto-skips nodes whose fields are already filled.
 
 Example: user says "I want to open a bank account in France" -- AI sends `{ "action": "start", "stateUpdates": { "country": "France" } }` and the flow skips the country question.
 

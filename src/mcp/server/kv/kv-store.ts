@@ -7,7 +7,10 @@
  * Config is read from env vars:
  * - `WANIWANI_API_KEY` (required)
  * - `WANIWANI_API_URL` (optional, defaults to https://app.waniwani.ai)
+ * - `WANIWANI_ENCRYPTION_KEY` (optional, base64-encoded 32-byte key for AES-256-GCM encryption)
  */
+
+import { decryptValue, encryptValue, isEncryptedEnvelope } from "./crypto";
 
 // ============================================================================
 // Interface
@@ -40,14 +43,32 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 		return process.env.WANIWANI_API_KEY;
 	}
 
+	private get encryptionKey(): string | undefined {
+		return process.env.WANIWANI_ENCRYPTION_KEY;
+	}
+
 	async get(key: string): Promise<T | null> {
 		if (!this.apiKey) {
 			throw new Error(
 				"[WaniWani KV] No API key configured. Set WANIWANI_API_KEY env var.",
 			);
 		}
-		const data = await this.request<T | null>("/api/mcp/redis/get", { key });
-		return data ?? null;
+		const data = await this.request<Record<string, unknown> | null>(
+			"/api/mcp/redis/get",
+			{ key },
+		);
+		if (data == null) {
+			return null;
+		}
+		if (isEncryptedEnvelope(data)) {
+			if (!this.encryptionKey) {
+				throw new Error(
+					"[WaniWani KV] Encrypted data found but WANIWANI_ENCRYPTION_KEY is not set.",
+				);
+			}
+			return decryptValue<T>(data, this.encryptionKey);
+		}
+		return data as T;
 	}
 
 	async set(key: string, value: T): Promise<void> {
@@ -56,7 +77,10 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 				"[WaniWani KV] No API key configured. Set WANIWANI_API_KEY env var.",
 			);
 		}
-		await this.request("/api/mcp/redis/set", { key, value });
+		const payload = this.encryptionKey
+			? await encryptValue(value as Record<string, unknown>, this.encryptionKey)
+			: value;
+		await this.request("/api/mcp/redis/set", { key, value: payload });
 	}
 
 	async delete(key: string): Promise<void> {

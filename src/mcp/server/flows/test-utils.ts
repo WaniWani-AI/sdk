@@ -64,11 +64,13 @@ export async function createFlowTestHarness(
 		async start(
 			intent: string,
 			stateUpdates?: Record<string, unknown>,
+			context?: string,
 		): Promise<FlowTestResult> {
 			const result = (await handler(
 				{
 					action: "start",
 					intent,
+					...(context ? { context } : {}),
 					...(stateUpdates ? { stateUpdates } : {}),
 				},
 				extra,
