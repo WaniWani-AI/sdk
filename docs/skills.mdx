@@ -39,6 +39,26 @@ After installing, just describe what you want in natural language. Your agent wi
 - *"Add a knowledge base FAQ tool"*
 - *"Embed a chat widget on my landing page"*
 
+## OpenAI Submission Test Cases
+
+A separate skill is available to generate test cases for the OpenAI MCP submission process. It analyzes your project's tools and flows to produce 5 positive and 5 negative test cases in the required format.
+
+<CodeGroup>
+  ```bash npx
+  npx skills add WaniWani-AI/sdk -s openai-submission
+  ```
+
+  ```bash bunx
+  bunx skills add WaniWani-AI/sdk -s openai-submission
+  ```
+</CodeGroup>
+
+Then ask your agent:
+
+- *"Generate test cases for OpenAI submission"*
+
+It will read your tools, flows, and knowledge base content, then output structured test cases (scenario, user prompt, tool triggered, expected output) ready to paste into the submission form.
+
 ## Learn more
 
 - [skills.sh](https://skills.sh) -- Browse and discover agent skills
