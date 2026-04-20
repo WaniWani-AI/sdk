@@ -40,7 +40,7 @@
         "@ai-sdk/react": ">=1.0.0",
         "@modelcontextprotocol/ext-apps": "~1.5.0",
         "@modelcontextprotocol/sdk": "~1.29.0",
-        "ai": ">=4.0.0",
+        "ai": ">=6.0.138",
         "autoevals": ">=0.0.100",
         "braintrust": ">=3.0.0",
         "react": ">=18.0.0",

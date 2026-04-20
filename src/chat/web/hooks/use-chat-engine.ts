@@ -214,7 +214,12 @@ export function useChatEngine(props: ChatBaseProps) {
 	const toolDefinitionsRef = useRef<ToolDefinitionsMap>({});
 	const [toolDefinitionsRevision, setToolDefinitionsRevision] = useState(0);
 
+	const skipRemoteConfig = props.skipRemoteConfig === true;
+
 	const refreshToolDefinitions = useCallback(async () => {
+		if (skipRemoteConfig) {
+			return;
+		}
 		try {
 			const map = await fetchToolDefinitions(api, headersRef.current);
 			toolDefinitionsRef.current = map;
@@ -225,7 +230,7 @@ export function useChatEngine(props: ChatBaseProps) {
 				error instanceof Error ? error.message : error,
 			);
 		}
-	}, [api]);
+	}, [api, skipRemoteConfig]);
 
 	useEffect(() => {
 		void refreshToolDefinitions();

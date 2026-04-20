@@ -246,7 +246,7 @@ No MCP app changes needed — the embed talks to WaniWani API directly.
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@1/dist/chat/embed.js"
+  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
   defer
   data-token="wwp_..."
   data-title="Support"
@@ -259,7 +259,7 @@ No MCP app changes needed — the embed talks to WaniWani API directly.
 
 | Attribute | Required | Description |
 |-----------|----------|-------------|
-| `data-api` | No | Chat API URL (defaults to `https://app.waniwani.ai/api/mcp`) |
+| `data-api` | No | Chat API URL (defaults to `https://app.waniwani.ai/api/mcp/chat`) |
 | `data-token` | Yes | Embed token (`wwp_...`) from WaniWani dashboard |
 | `data-title` | No | Chat header title (default: `"Assistant"`) |
 | `data-welcome-message` | No | Greeting shown before first message |
@@ -282,7 +282,7 @@ Render inside an existing container instead of floating:
 ```html
 <div id="chat" style="width: 400px; height: 600px;"></div>
 <script
-  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@1/dist/chat/embed.js"
+  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
   defer
   data-token="wwp_..."
   data-container="#chat"
@@ -292,7 +292,7 @@ Render inside an existing container instead of floating:
 ### Programmatic Init
 
 ```js
-<script src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@1/dist/chat/embed.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js" defer></script>
 <script>
   window.addEventListener('DOMContentLoaded', function() {
     var chat = window.WaniWani.chat.init({

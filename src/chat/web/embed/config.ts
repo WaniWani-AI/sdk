@@ -9,10 +9,12 @@
  * attributes on the `<script>` tag > built-in defaults.
  */
 export interface EmbedConfig {
-	/** WaniWani chat API URL. Defaults to `https://app.waniwani.ai/api/mcp`. */
+	/** WaniWani chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
 	api?: string;
 	/** Embed token (wwp_...) for authentication (required). */
 	token: string;
+	/** Override MCP server URL (optional — resolved from environment by default). */
+	mcpServerUrl?: string;
 	/** CSS selector for inline mode — renders ChatCard inside this element instead of a floating bubble. */
 	container?: string;
 	/** Title shown in the chat header. Defaults to `"Assistant"`. */
@@ -44,7 +46,7 @@ export interface EmbedConfig {
 // Defaults
 // ---------------------------------------------------------------------------
 
-const DEFAULT_API_URL = "https://app.waniwani.ai/api/mcp";
+const DEFAULT_API_URL = "https://app.waniwani.ai/api/mcp/chat";
 
 const DEFAULTS = {
 	api: DEFAULT_API_URL,
@@ -129,6 +131,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const placeholder = str("data-placeholder");
 	if (placeholder) {
 		config.placeholder = placeholder;
+	}
+
+	const mcpServerUrl = str("data-mcp-server-url");
+	if (mcpServerUrl) {
+		config.mcpServerUrl = mcpServerUrl;
 	}
 
 	const css = str("data-css");

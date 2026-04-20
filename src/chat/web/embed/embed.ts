@@ -125,6 +125,10 @@ function mountInline(config: EmbedConfig): EmbedInstance {
 		React.createElement(ChatCard, {
 			api: config.api,
 			headers: { Authorization: `Bearer ${config.token}` },
+			skipRemoteConfig: true,
+			body: config.mcpServerUrl
+				? { mcpServerUrl: config.mcpServerUrl }
+				: undefined,
 			theme: buildChatTheme(config),
 			title: config.title ?? "Assistant",
 			welcomeMessage: config.welcomeMessage,
@@ -244,9 +248,9 @@ window.WaniWani.chat = { init, destroy };
 // ---------------------------------------------------------------------------
 
 function autoInit(): void {
-	// Only auto-init if the script tag has data-api set
+	// Only auto-init if the script tag has data-token set
 	const scriptConfig = parseConfigFromScript();
-	if (!scriptConfig.api) {
+	if (!scriptConfig.token) {
 		return;
 	}
 

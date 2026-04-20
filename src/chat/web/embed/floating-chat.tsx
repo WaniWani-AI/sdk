@@ -322,6 +322,12 @@ export const FloatingChat = forwardRef<FloatingChatHandle, FloatingChatProps>(
 							ref={chatRef}
 							api={config.api}
 							headers={{ Authorization: `Bearer ${config.token}` }}
+							skipRemoteConfig
+							body={
+								config.mcpServerUrl
+									? { mcpServerUrl: config.mcpServerUrl }
+									: undefined
+							}
 							theme={chatTheme}
 							title={config.title ?? "Assistant"}
 							welcomeMessage={config.welcomeMessage}

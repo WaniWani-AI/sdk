@@ -12,10 +12,14 @@ const defaultConfig: WaniWaniConfig = { debug: false, eval: false };
 export function useConfig(
 	api = "/api/waniwani",
 	headers?: Record<string, string>,
+	skip = false,
 ): WaniWaniConfig {
 	const [config, setConfig] = useState<WaniWaniConfig>(defaultConfig);
 
 	useEffect(() => {
+		if (skip) {
+			return;
+		}
 		(async () => {
 			try {
 				const r = await fetch(`${api}/config`, {
@@ -28,7 +32,7 @@ export function useConfig(
 				});
 			} catch {}
 		})();
-	}, [api, headers]);
+	}, [api, headers, skip]);
 
 	return config;
 }
