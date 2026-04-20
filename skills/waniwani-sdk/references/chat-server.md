@@ -19,7 +19,7 @@ export const { GET, POST, PATCH, OPTIONS } = toNextJsHandler(wani, {
 });
 ```
 
-This creates two routes:
+This creates these routes:
 
 - `POST /api/waniwani` -- chat message proxy (streams responses)
 - `GET /api/waniwani/resource?uri=...` -- MCP resource content (e.g. widget HTML)

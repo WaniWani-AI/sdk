@@ -94,6 +94,7 @@ lib/waniwani.ts             (waniwani() -- creates client from env vars)
        +---> app/mcp/route.ts               (withWaniwani -- auto-tracks tools)
        |
        +---> app/api/waniwani/.../route.ts   (toNextJsHandler -- chat API + resources)
+       |
 ```
 
 - `WANIWANI_API_KEY` is the single source of truth for authentication

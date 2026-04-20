@@ -60,7 +60,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 		const cssVars = themeToCSSProperties(resolvedTheme);
 		const isDark = isDarkTheme(resolvedTheme);
 
-		const config = useConfig(api);
+		const config = useConfig(api, props.headers, props.skipRemoteConfig);
 		const engine = useChatEngine(props);
 		const handleCallTool = useCallTool({
 			...props,

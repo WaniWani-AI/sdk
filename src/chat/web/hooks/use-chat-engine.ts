@@ -56,9 +56,15 @@ interface ToolsListResponse {
 	}>;
 }
 
-async function fetchToolDefinitions(api: string): Promise<ToolDefinitionsMap> {
+async function fetchToolDefinitions(
+	api: string,
+	headers?: Record<string, string>,
+): Promise<ToolDefinitionsMap> {
 	const url = `${api.replace(/\/$/, "")}/tools`;
-	const response = await fetch(url, { method: "GET" });
+	const response = await fetch(url, {
+		method: "GET",
+		headers: headers ? { ...headers } : undefined,
+	});
 	if (!response.ok) {
 		throw new Error(
 			`[WaniWani] Failed to fetch /tools: ${response.status} ${response.statusText}`,
@@ -208,9 +214,14 @@ export function useChatEngine(props: ChatBaseProps) {
 	const toolDefinitionsRef = useRef<ToolDefinitionsMap>({});
 	const [toolDefinitionsRevision, setToolDefinitionsRevision] = useState(0);
 
+	const skipRemoteConfig = props.skipRemoteConfig === true;
+
 	const refreshToolDefinitions = useCallback(async () => {
+		if (skipRemoteConfig) {
+			return;
+		}
 		try {
-			const map = await fetchToolDefinitions(api);
+			const map = await fetchToolDefinitions(api, headersRef.current);
 			toolDefinitionsRef.current = map;
 			setToolDefinitionsRevision((r) => r + 1);
 		} catch (error) {
@@ -219,7 +230,7 @@ export function useChatEngine(props: ChatBaseProps) {
 				error instanceof Error ? error.message : error,
 			);
 		}
-	}, [api]);
+	}, [api, skipRemoteConfig]);
 
 	useEffect(() => {
 		void refreshToolDefinitions();

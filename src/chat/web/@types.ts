@@ -128,6 +128,13 @@ export interface ChatBaseProps {
 	 * the server-side `WANIWANI_DEBUG` env var.
 	 */
 	debug?: boolean;
+	/**
+	 * Skip fetching `/config` and `/tools` from the API on mount.
+	 * Use when the chat endpoint doesn't serve these routes (e.g. embed widgets
+	 * talking directly to the WaniWani app).
+	 * @internal
+	 */
+	skipRemoteConfig?: boolean;
 }
 
 // ============================================================================

@@ -58,7 +58,11 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 		const cssVars = themeToCSSProperties(resolvedTheme);
 		const isDark = isDarkTheme(resolvedTheme);
 
-		const config = useConfig(effectiveApi);
+		const config = useConfig(
+			effectiveApi,
+			props.headers,
+			props.skipRemoteConfig,
+		);
 		const effectiveDebug = debug ?? config.debug;
 
 		const engine = useChatEngine({ ...props, api: effectiveApi });

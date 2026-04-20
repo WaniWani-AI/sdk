@@ -234,33 +234,82 @@ Tracking is fire-and-forget -- failures never break the chat.
 
 ## Embed Script (Non-React)
 
-For non-React sites, use the embed script with Shadow DOM for CSS isolation:
+Self-contained IIFE bundle (~186KB gzipped) with React bundled. Drop a `<script>` tag on any website to get a floating chat bubble. Uses Shadow DOM for CSS isolation.
 
-### Script Tag
+### Prerequisites
+
+1. Generate embed token in WaniWani dashboard (Environment → Embed → Generate Token)
+
+No MCP app changes needed — the embed talks to WaniWani API directly.
+
+### Script Tag (declarative)
 
 ```html
 <script
-  src="https://cdn.waniwani.ai/chat/embed.js"
-  data-api-key="ww_..."
+  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
+  defer
+  data-token="wwp_..."
   data-title="Support"
   data-welcome-message="Hi! How can I help?"
   data-primary-color="#6366f1"
 ></script>
 ```
 
+### Script Tag Options
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| `data-api` | No | Chat API URL (defaults to `https://app.waniwani.ai/api/mcp/chat`) |
+| `data-token` | Yes | Embed token (`wwp_...`) from WaniWani dashboard |
+| `data-title` | No | Chat header title (default: `"Assistant"`) |
+| `data-welcome-message` | No | Greeting shown before first message |
+| `data-placeholder` | No | Input field placeholder text |
+| `data-suggestions` | No | Comma-separated suggestion chips |
+| `data-position` | No | `"bottom-right"` (default) or `"bottom-left"` |
+| `data-width` | No | Panel width in px (default: `400`) |
+| `data-height` | No | Panel height in px (default: `600`) |
+| `data-container` | No | CSS selector for inline mode (no floating bubble) |
+| `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |
+| `data-primary-color` | No | Primary color hex |
+| `data-background-color` | No | Background color hex |
+| `data-text-color` | No | Text color hex |
+| `data-font-family` | No | Font family |
+
+### Inline Mode
+
+Render inside an existing container instead of floating:
+
+```html
+<div id="chat" style="width: 400px; height: 600px;"></div>
+<script
+  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
+  defer
+  data-token="wwp_..."
+  data-container="#chat"
+></script>
+```
+
 ### Programmatic Init
 
 ```js
-const chat = window.WaniWani.chat.init({
-  apiKey: "ww_...",
-  title: "Support",
-  container: document.getElementById("chat-container"),
-  theme: { primaryColor: "#6366f1" },
-});
+<script src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js" defer></script>
+<script>
+  window.addEventListener('DOMContentLoaded', function() {
+    var chat = window.WaniWani.chat.init({
+      token: 'wwp_...',
+      title: 'Support',
+      theme: { primaryColor: '#6366f1' },
+    });
 
-// Cleanup
-chat.destroy();
+    // Cleanup
+    chat.destroy();
+  });
+</script>
 ```
+
+### How Auth Works
+
+The embed widget sends `Authorization: Bearer wwp_...` on every request directly to the WaniWani API. The token is verified server-side against the `embed_tokens` table. No customer MCP app changes needed — generate tokens in the dashboard, paste the `<script>` tag.
 
 ## Additional Components
 
