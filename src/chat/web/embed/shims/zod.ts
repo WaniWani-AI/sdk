@@ -15,10 +15,10 @@ const noop = (): any => schema;
 const schema: any = new Proxy(noop, {
 	get(_target, prop) {
 		if (prop === "parse" || prop === "parseAsync") {
-			return (v: any) => v;
+			return (v: unknown) => v;
 		}
 		if (prop === "safeParse" || prop === "safeParseAsync") {
-			return (v: any) => ({ success: true as const, data: v });
+			return (v: unknown) => ({ success: true as const, data: v });
 		}
 		if (prop === "_def") {
 			return {};
@@ -35,9 +35,10 @@ const schema: any = new Proxy(noop, {
 });
 
 class ZodError extends Error {
-	issues: any[] = [];
+	issues: unknown[] = [];
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: shim must match zod's loose types
 const z: any = new Proxy(noop, {
 	get(_target, prop) {
 		if (prop === "ZodError") {

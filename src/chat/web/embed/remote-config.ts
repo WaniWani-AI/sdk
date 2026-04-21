@@ -39,7 +39,18 @@ export async function fetchRemoteConfig(
 		if (!res.ok) {
 			return {};
 		}
-		const data = (await res.json()) as RemoteConfigResponse;
+		// The WaniWani API wraps payloads in `{ success, message, data }`.
+		// Accept either shape so we stay compatible with raw endpoints too.
+		const raw = (await res.json()) as
+			| RemoteConfigResponse
+			| { success: boolean; data?: RemoteConfigResponse };
+		const data: RemoteConfigResponse | null =
+			raw && typeof raw === "object" && "data" in raw && raw.data
+				? raw.data
+				: (raw as RemoteConfigResponse);
+		if (!data) {
+			return {};
+		}
 		return remoteToConfigPartial(data);
 	} catch {
 		return {};
