@@ -39,6 +39,12 @@ export interface FloatingChatProps {
 	 * remote config once it lands, so user-supplied values still win.
 	 */
 	programmatic?: Partial<EmbedConfig>;
+	/**
+	 * `data-*` snapshot captured synchronously during script execution.
+	 * Threaded through so async re-resolution doesn't re-parse the script
+	 * tag (unsafe after the initial tick — see remote-config.ts).
+	 */
+	scriptConfig?: Partial<EmbedConfig>;
 	/** Called once after the component mounts (post-commit). */
 	onReady?: () => void;
 }
@@ -111,11 +117,18 @@ const TRANSITION_MS = 200;
 // ---------------------------------------------------------------------------
 
 export const FloatingChat = forwardRef<FloatingChatHandle, FloatingChatProps>(
-	function FloatingChat({ config: initialConfig, programmatic, onReady }, ref) {
+	function FloatingChat(
+		{ config: initialConfig, programmatic, scriptConfig, onReady },
+		ref,
+	) {
 		// Layered merge (defaults < remote < data-attrs < programmatic) lands
 		// in `config` once the `/config` fetch resolves. Until then we render
 		// with whatever the customer / data-attrs / defaults already gave us.
-		const config = useRemoteEmbedConfig(initialConfig, programmatic);
+		const config = useRemoteEmbedConfig(
+			initialConfig,
+			programmatic,
+			scriptConfig,
+		);
 		const [isOpen, setIsOpen] = useState(false);
 		const [unreadCount, setUnreadCount] = useState(0);
 		const [isMobile, setIsMobile] = useState(false);

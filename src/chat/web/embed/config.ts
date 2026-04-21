@@ -205,8 +205,14 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 export function resolveConfig(
 	programmatic?: Partial<EmbedConfig>,
 	remote?: Partial<EmbedConfig>,
+	scriptConfig?: Partial<EmbedConfig>,
 ): EmbedConfig {
-	const fromScript = parseConfigFromScript();
+	// Caller may pass a pre-parsed script config so async re-resolution
+	// (post-fetch) doesn't re-invoke `parseConfigFromScript` — by the time a
+	// promise settles, `document.currentScript` is null and the fallback
+	// heuristic can miss renamed/CDN-hosted bundles, silently dropping
+	// `data-*` overrides.
+	const fromScript = scriptConfig ?? parseConfigFromScript();
 
 	const merged: EmbedConfig = {
 		// Required — token validated below, api has default

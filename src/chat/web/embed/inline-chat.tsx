@@ -15,15 +15,22 @@ import { useRemoteEmbedConfig } from "./remote-config";
 export interface InlineChatProps {
 	config: EmbedConfig;
 	programmatic?: Partial<EmbedConfig>;
+	/** Pre-parsed `data-*` snapshot — see FloatingChatProps.scriptConfig. */
+	scriptConfig?: Partial<EmbedConfig>;
 	onReady?: () => void;
 }
 
 export function InlineChat({
 	config: initialConfig,
 	programmatic,
+	scriptConfig,
 	onReady,
 }: InlineChatProps) {
-	const config = useRemoteEmbedConfig(initialConfig, programmatic);
+	const config = useRemoteEmbedConfig(
+		initialConfig,
+		programmatic,
+		scriptConfig,
+	);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: fire once on mount
 	useEffect(() => {

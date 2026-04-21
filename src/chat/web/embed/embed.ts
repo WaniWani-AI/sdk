@@ -84,6 +84,7 @@ function injectStyles(shadowRoot: ShadowRoot, config: EmbedConfig): void {
 function mountInline(
 	config: EmbedConfig,
 	programmatic: Partial<EmbedConfig> | undefined,
+	scriptConfig: Partial<EmbedConfig> | undefined,
 ): EmbedInstance {
 	const selector = config.container as string;
 	const container = document.querySelector(selector);
@@ -107,7 +108,9 @@ function mountInline(
 	shadowRoot.appendChild(mountContainer);
 
 	reactRoot = ReactDOM.createRoot(mountContainer);
-	reactRoot.render(React.createElement(InlineChat, { config, programmatic }));
+	reactRoot.render(
+		React.createElement(InlineChat, { config, programmatic, scriptConfig }),
+	);
 
 	return {
 		destroy: () => {
@@ -159,6 +162,7 @@ function createLoadingSkeleton(
 function mountFloating(
 	config: EmbedConfig,
 	programmatic: Partial<EmbedConfig> | undefined,
+	scriptConfig: Partial<EmbedConfig> | undefined,
 ): EmbedInstance {
 	hostElement = document.createElement("div");
 	hostElement.id = "waniwani-chat-embed";
@@ -179,6 +183,7 @@ function mountFloating(
 		React.createElement(FloatingChat, {
 			config,
 			programmatic,
+			scriptConfig,
 			onReady: () => skeleton.remove(),
 		}),
 	);
@@ -206,15 +211,19 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 		return currentInstance;
 	}
 
-	const config = resolveConfig(options);
+	// Parse `data-*` once synchronously — `document.currentScript` is only
+	// valid during script execution, so we must capture it here and thread
+	// the result through to useRemoteEmbedConfig.
+	const scriptConfig = parseConfigFromScript();
+	const config = resolveConfig(options, undefined, scriptConfig);
 
-	// Pass the raw programmatic overrides through so the React-side
-	// useRemoteEmbedConfig hook can re-apply them on top of the server's
-	// config once it arrives. Without this the remote config could override
-	// fields the customer explicitly set.
+	// Pass the raw programmatic overrides + captured script config through
+	// so the React-side useRemoteEmbedConfig hook can re-apply them on top
+	// of the server's config once it arrives. Without this the remote
+	// config could override fields the customer explicitly set.
 	currentInstance = config.container
-		? mountInline(config, options)
-		: mountFloating(config, options);
+		? mountInline(config, options, scriptConfig)
+		: mountFloating(config, options, scriptConfig);
 
 	return currentInstance;
 }

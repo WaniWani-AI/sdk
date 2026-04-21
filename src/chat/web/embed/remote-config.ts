@@ -81,10 +81,16 @@ function remoteToConfigPartial(
  * re-resolves through the layered merge (defaults < remote < data-attrs <
  * programmatic) once it arrives. While the request is in flight, returns
  * the initial config untouched.
+ *
+ * `scriptConfig` must be the same `data-*` snapshot used for the initial
+ * resolve. Re-parsing post-fetch is unsafe: `document.currentScript` is
+ * null by then and the fallback heuristic can miss the embed script (CDN
+ * paths, renamed bundles), silently dropping `data-*` overrides.
  */
 export function useRemoteEmbedConfig(
 	initialConfig: EmbedConfig,
 	programmatic: Partial<EmbedConfig> | undefined,
+	scriptConfig: Partial<EmbedConfig> | undefined,
 ): EmbedConfig {
 	const [config, setConfig] = useState(initialConfig);
 
@@ -99,15 +105,26 @@ export function useRemoteEmbedConfig(
 			return;
 		}
 		const controller = new AbortController();
-		void fetchRemoteConfig(api, token, controller.signal).then((remote) => {
-			if (controller.signal.aborted) {
-				return;
-			}
-			if (Object.keys(remote).length === 0) {
-				return;
-			}
-			setConfig(resolveConfig(programmatic, remote));
-		});
+		void fetchRemoteConfig(api, token, controller.signal)
+			.then((remote) => {
+				if (controller.signal.aborted) {
+					return;
+				}
+				if (Object.keys(remote).length === 0) {
+					return;
+				}
+				try {
+					setConfig(resolveConfig(programmatic, remote, scriptConfig));
+				} catch (err) {
+					// `resolveConfig` throws if token is missing. Shouldn't happen
+					// here (initial resolve already validated), but swallow so a
+					// late failure doesn't become an unhandled rejection.
+					console.error("[WaniWani] Failed to apply remote config:", err);
+				}
+			})
+			.catch((err) => {
+				console.error("[WaniWani] Remote config fetch failed:", err);
+			});
 		return () => controller.abort();
 	}, [initialConfig.api, initialConfig.token]);
 
