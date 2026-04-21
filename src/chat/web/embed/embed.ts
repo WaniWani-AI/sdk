@@ -7,10 +7,10 @@
 
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { ChatCard } from "../layouts/chat-card";
 import type { EmbedConfig } from "./config";
 import { parseConfigFromScript, resolveConfig } from "./config";
-import { buildChatTheme, FloatingChat } from "./floating-chat";
+import { FloatingChat } from "./floating-chat";
+import { InlineChat } from "./inline-chat";
 
 // ---------------------------------------------------------------------------
 // CSS placeholder — replaced at build time with the actual CSS string
@@ -81,7 +81,11 @@ function injectStyles(shadowRoot: ShadowRoot, config: EmbedConfig): void {
 // Mount helpers
 // ---------------------------------------------------------------------------
 
-function mountInline(config: EmbedConfig): EmbedInstance {
+function mountInline(
+	config: EmbedConfig,
+	programmatic: Partial<EmbedConfig> | undefined,
+	scriptConfig: Partial<EmbedConfig> | undefined,
+): EmbedInstance {
 	const selector = config.container as string;
 	const container = document.querySelector(selector);
 	if (!container) {
@@ -105,23 +109,7 @@ function mountInline(config: EmbedConfig): EmbedInstance {
 
 	reactRoot = ReactDOM.createRoot(mountContainer);
 	reactRoot.render(
-		React.createElement(ChatCard, {
-			api: config.api,
-			headers: { Authorization: `Bearer ${config.token}` },
-			skipRemoteConfig: true,
-			body: config.mcpServerUrl
-				? { mcpServerUrl: config.mcpServerUrl }
-				: undefined,
-			theme: buildChatTheme(config),
-			title: config.title ?? "Assistant",
-			welcomeMessage: config.welcomeMessage,
-			placeholder: config.placeholder,
-			suggestions: config.suggestions
-				? { initial: config.suggestions }
-				: undefined,
-			width: "100%",
-			height: "100%",
-		}),
+		React.createElement(InlineChat, { config, programmatic, scriptConfig }),
 	);
 
 	return {
@@ -171,7 +159,11 @@ function createLoadingSkeleton(
 	return skeleton;
 }
 
-function mountFloating(config: EmbedConfig): EmbedInstance {
+function mountFloating(
+	config: EmbedConfig,
+	programmatic: Partial<EmbedConfig> | undefined,
+	scriptConfig: Partial<EmbedConfig> | undefined,
+): EmbedInstance {
 	hostElement = document.createElement("div");
 	hostElement.id = "waniwani-chat-embed";
 	document.body.appendChild(hostElement);
@@ -190,6 +182,8 @@ function mountFloating(config: EmbedConfig): EmbedInstance {
 	reactRoot.render(
 		React.createElement(FloatingChat, {
 			config,
+			programmatic,
+			scriptConfig,
 			onReady: () => skeleton.remove(),
 		}),
 	);
@@ -217,11 +211,19 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 		return currentInstance;
 	}
 
-	const config = resolveConfig(options);
+	// Parse `data-*` once synchronously — `document.currentScript` is only
+	// valid during script execution, so we must capture it here and thread
+	// the result through to useRemoteEmbedConfig.
+	const scriptConfig = parseConfigFromScript();
+	const config = resolveConfig(options, undefined, scriptConfig);
 
+	// Pass the raw programmatic overrides + captured script config through
+	// so the React-side useRemoteEmbedConfig hook can re-apply them on top
+	// of the server's config once it arrives. Without this the remote
+	// config could override fields the customer explicitly set.
 	currentInstance = config.container
-		? mountInline(config)
-		: mountFloating(config);
+		? mountInline(config, options, scriptConfig)
+		: mountFloating(config, options, scriptConfig);
 
 	return currentInstance;
 }

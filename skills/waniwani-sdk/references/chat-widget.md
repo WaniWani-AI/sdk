@@ -311,6 +311,16 @@ Render inside an existing container instead of floating:
 
 The embed widget sends `Authorization: Bearer wwp_...` on every request directly to the WaniWani API. The token is verified server-side against the `embed_tokens` table. No customer MCP app changes needed — generate tokens in the dashboard, paste the `<script>` tag.
 
+### Remote Config
+
+On mount the widget fetches `GET {data-api}/config` with the embed token and merges the response into its settings. Configure the agent from the WaniWani dashboard (environment → Embed Chat Config):
+
+| Server-only | Display-only |
+|---|---|
+| `systemPrompt`, `maxSteps` — applied at inference, never leak to the browser | `title`, `welcomeMessage`, `placeholder`, `suggestions` — sent to the widget |
+
+Merge order (later wins): **defaults < remote config < `data-*` attrs < programmatic `init()`**. So the dashboard value is the default and data-attrs still override per-page if you need a local tweak.
+
 ## Additional Components
 
 - **`McpAppFrame`** -- Renders MCP App widget iframes inside chat. Forwards tool result `_meta` via `ui/notifications/tool-result` for widget tracking config.

@@ -2,16 +2,22 @@
 // Embed Config — types and resolution
 // ============================================================================
 
+import type { ChatTheme } from "../@types";
+
 /**
  * Configuration for the embeddable chat widget.
  *
- * Resolution priority: programmatic (via `WaniWani.chat.init()`) > `data-*`
- * attributes on the `<script>` tag > built-in defaults.
+ * Resolution priority (later wins):
+ *   defaults < remote config (from server) < `data-*` attrs < programmatic.
+ *
+ * Remote config lives on `GET {api}/config` and is authenticated with the
+ * public token. It only carries display-facing fields (title, welcome message,
+ * placeholder, suggestions) — system prompt and step budget stay server-side.
  */
 export interface EmbedConfig {
 	/** WaniWani chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
 	api?: string;
-	/** Embed token (wwp_...) for authentication (required). */
+	/** Public token (wwp_...) for authentication (required). */
 	token: string;
 	/** Override MCP server URL (optional — resolved from environment by default). */
 	mcpServerUrl?: string;
@@ -195,13 +201,20 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 }
 
 // ---------------------------------------------------------------------------
-// Merge: defaults < script attrs < programmatic
+// Merge: defaults < remote < script attrs < programmatic
 // ---------------------------------------------------------------------------
 
 export function resolveConfig(
 	programmatic?: Partial<EmbedConfig>,
+	remote?: Partial<EmbedConfig>,
+	scriptConfig?: Partial<EmbedConfig>,
 ): EmbedConfig {
-	const fromScript = parseConfigFromScript();
+	// Caller may pass a pre-parsed script config so async re-resolution
+	// (post-fetch) doesn't re-invoke `parseConfigFromScript` — by the time a
+	// promise settles, `document.currentScript` is null and the fallback
+	// heuristic can miss renamed/CDN-hosted bundles, silently dropping
+	// `data-*` overrides.
+	const fromScript = scriptConfig ?? parseConfigFromScript();
 
 	const merged: EmbedConfig = {
 		// Required — token validated below, api has default
@@ -210,14 +223,18 @@ export function resolveConfig(
 		// Defaults
 		...DEFAULTS,
 
-		// Script attributes (overrides defaults)
+		// Server-side config (fills in gaps the customer didn't override)
+		...(remote ?? {}),
+
+		// Script attributes (override remote + defaults)
 		...fromScript,
 
 		// Programmatic (overrides everything)
 		...programmatic,
 
-		// Deep-merge theme: defaults < script < programmatic
+		// Deep-merge theme: defaults < remote < script < programmatic
 		theme: {
+			...(remote?.theme ?? {}),
 			...fromScript.theme,
 			...programmatic?.theme,
 		},
@@ -231,4 +248,21 @@ export function resolveConfig(
 	}
 
 	return merged;
+}
+
+// ---------------------------------------------------------------------------
+// Theme adapter — EmbedConfig.theme → ChatCard's ChatTheme
+// ---------------------------------------------------------------------------
+
+export function buildChatTheme(config: EmbedConfig): ChatTheme | undefined {
+	if (!config.theme) {
+		return undefined;
+	}
+	const t = config.theme;
+	return {
+		...(t.primaryColor ? { primaryColor: t.primaryColor } : {}),
+		...(t.backgroundColor ? { backgroundColor: t.backgroundColor } : {}),
+		...(t.textColor ? { textColor: t.textColor } : {}),
+		...(t.fontFamily ? { fontFamily: t.fontFamily } : {}),
+	};
 }
