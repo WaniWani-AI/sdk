@@ -13,6 +13,7 @@ import {
 import type { ChatHandle, ChatTheme } from "../@types";
 import { ChatCard } from "../layouts/chat-card";
 import type { EmbedConfig } from "./config";
+import { useRemoteEmbedConfig } from "./remote-config";
 
 export function buildChatTheme(config: EmbedConfig): ChatTheme | undefined {
 	if (!config.theme) {
@@ -33,6 +34,11 @@ export function buildChatTheme(config: EmbedConfig): ChatTheme | undefined {
 
 export interface FloatingChatProps {
 	config: EmbedConfig;
+	/**
+	 * Raw programmatic overrides from `init()`. Re-applied on top of the
+	 * remote config once it lands, so user-supplied values still win.
+	 */
+	programmatic?: Partial<EmbedConfig>;
 	/** Called once after the component mounts (post-commit). */
 	onReady?: () => void;
 }
@@ -105,7 +111,11 @@ const TRANSITION_MS = 200;
 // ---------------------------------------------------------------------------
 
 export const FloatingChat = forwardRef<FloatingChatHandle, FloatingChatProps>(
-	function FloatingChat({ config, onReady }, ref) {
+	function FloatingChat({ config: initialConfig, programmatic, onReady }, ref) {
+		// Layered merge (defaults < remote < data-attrs < programmatic) lands
+		// in `config` once the `/config` fetch resolves. Until then we render
+		// with whatever the customer / data-attrs / defaults already gave us.
+		const config = useRemoteEmbedConfig(initialConfig, programmatic);
 		const [isOpen, setIsOpen] = useState(false);
 		const [unreadCount, setUnreadCount] = useState(0);
 		const [isMobile, setIsMobile] = useState(false);

@@ -5,8 +5,12 @@
 /**
  * Configuration for the embeddable chat widget.
  *
- * Resolution priority: programmatic (via `WaniWani.chat.init()`) > `data-*`
- * attributes on the `<script>` tag > built-in defaults.
+ * Resolution priority (later wins):
+ *   defaults < remote config (from server) < `data-*` attrs < programmatic.
+ *
+ * Remote config lives on `GET {api}/config` and is authenticated with the
+ * embed token. It only carries display-facing fields (title, welcome message,
+ * placeholder, suggestions) — system prompt and step budget stay server-side.
  */
 export interface EmbedConfig {
 	/** WaniWani chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
@@ -195,11 +199,12 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 }
 
 // ---------------------------------------------------------------------------
-// Merge: defaults < script attrs < programmatic
+// Merge: defaults < remote < script attrs < programmatic
 // ---------------------------------------------------------------------------
 
 export function resolveConfig(
 	programmatic?: Partial<EmbedConfig>,
+	remote?: Partial<EmbedConfig>,
 ): EmbedConfig {
 	const fromScript = parseConfigFromScript();
 
@@ -210,14 +215,18 @@ export function resolveConfig(
 		// Defaults
 		...DEFAULTS,
 
-		// Script attributes (overrides defaults)
+		// Server-side config (fills in gaps the customer didn't override)
+		...(remote ?? {}),
+
+		// Script attributes (override remote + defaults)
 		...fromScript,
 
 		// Programmatic (overrides everything)
 		...programmatic,
 
-		// Deep-merge theme: defaults < script < programmatic
+		// Deep-merge theme: defaults < remote < script < programmatic
 		theme: {
+			...(remote?.theme ?? {}),
 			...fromScript.theme,
 			...programmatic?.theme,
 		},
