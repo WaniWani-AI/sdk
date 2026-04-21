@@ -10,23 +10,11 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type { ChatHandle, ChatTheme } from "../@types";
+import type { ChatHandle } from "../@types";
 import { ChatCard } from "../layouts/chat-card";
 import type { EmbedConfig } from "./config";
+import { buildChatTheme } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
-
-export function buildChatTheme(config: EmbedConfig): ChatTheme | undefined {
-	if (!config.theme) {
-		return undefined;
-	}
-	const t = config.theme;
-	return {
-		...(t.primaryColor ? { primaryColor: t.primaryColor } : {}),
-		...(t.backgroundColor ? { backgroundColor: t.backgroundColor } : {}),
-		...(t.textColor ? { textColor: t.textColor } : {}),
-		...(t.fontFamily ? { fontFamily: t.fontFamily } : {}),
-	};
-}
 
 // ---------------------------------------------------------------------------
 // Types

@@ -9,7 +9,7 @@
 import { useEffect } from "react";
 import { ChatCard } from "../layouts/chat-card";
 import type { EmbedConfig } from "./config";
-import { buildChatTheme } from "./floating-chat";
+import { buildChatTheme } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
 
 export interface InlineChatProps {

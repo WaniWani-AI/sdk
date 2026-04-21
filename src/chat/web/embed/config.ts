@@ -2,6 +2,8 @@
 // Embed Config — types and resolution
 // ============================================================================
 
+import type { ChatTheme } from "../@types";
+
 /**
  * Configuration for the embeddable chat widget.
  *
@@ -246,4 +248,21 @@ export function resolveConfig(
 	}
 
 	return merged;
+}
+
+// ---------------------------------------------------------------------------
+// Theme adapter — EmbedConfig.theme → ChatCard's ChatTheme
+// ---------------------------------------------------------------------------
+
+export function buildChatTheme(config: EmbedConfig): ChatTheme | undefined {
+	if (!config.theme) {
+		return undefined;
+	}
+	const t = config.theme;
+	return {
+		...(t.primaryColor ? { primaryColor: t.primaryColor } : {}),
+		...(t.backgroundColor ? { backgroundColor: t.backgroundColor } : {}),
+		...(t.textColor ? { textColor: t.textColor } : {}),
+		...(t.fontFamily ? { fontFamily: t.fontFamily } : {}),
+	};
 }
