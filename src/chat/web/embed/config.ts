@@ -9,13 +9,13 @@
  *   defaults < remote config (from server) < `data-*` attrs < programmatic.
  *
  * Remote config lives on `GET {api}/config` and is authenticated with the
- * embed token. It only carries display-facing fields (title, welcome message,
+ * public token. It only carries display-facing fields (title, welcome message,
  * placeholder, suggestions) — system prompt and step budget stay server-side.
  */
 export interface EmbedConfig {
 	/** WaniWani chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
 	api?: string;
-	/** Embed token (wwp_...) for authentication (required). */
+	/** Public token (wwp_...) for authentication (required). */
 	token: string;
 	/** Override MCP server URL (optional — resolved from environment by default). */
 	mcpServerUrl?: string;

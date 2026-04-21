@@ -17,7 +17,7 @@ interface RemoteConfigResponse {
 }
 
 /**
- * Fetch the server-side config for an embed token. Returns a sparse
+ * Fetch the server-side config for a public token. Returns a sparse
  * `Partial<EmbedConfig>` (only keys the server populated) so callers can
  * safely spread it into their config merge.
  *
