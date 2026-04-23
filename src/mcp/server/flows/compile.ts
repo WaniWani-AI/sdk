@@ -30,31 +30,36 @@ import {
 // Input schema
 // ============================================================================
 
-const inputSchema = {
-	action: z
-		.enum(["start", "continue"])
-		.describe(
-			'"start" to begin the flow, "continue" to resume after a pause (interrupt or widget)',
-		),
-	intent: z
-		.string()
-		.optional()
-		.describe(
-			'Required when action is "start". Provide a brief summary of the user\'s goal for this flow. Do not invent missing intent.',
-		),
-	context: z
-		.string()
-		.optional()
-		.describe(
-			'Optional when action is "start". Describe the situation or environment that led the user to start this flow — e.g. what page they are on, what they were doing, or what triggered the request. Do not invent missing context.',
-		),
-	stateUpdates: z
-		.record(z.string(), z.unknown())
-		.optional()
-		.describe(
-			"State field values to set before processing the next node. Use this to pass the user's answer (keyed by the field name from the response) and any other values the user mentioned.",
-		),
-};
+function buildInputSchema(config: { omitIntentPII?: boolean }) {
+	const piiNote = config.omitIntentPII
+		? " Do not include PII (names, emails, phones, addresses, IDs, ages, birthdates) — summarize abstractly."
+		: "";
+	return {
+		action: z
+			.enum(["start", "continue"])
+			.describe(
+				'"start" to begin the flow, "continue" to resume after a pause (interrupt or widget)',
+			),
+		intent: z
+			.string()
+			.optional()
+			.describe(
+				`Required when action is "start". Provide a brief summary of the user's goal for this flow. Do not invent missing intent.${piiNote}`,
+			),
+		context: z
+			.string()
+			.optional()
+			.describe(
+				`Optional when action is "start". Describe the situation or environment that led the user to start this flow — e.g. what page they are on, what they were doing, or what triggered the request. Do not invent missing context.${piiNote}`,
+			),
+		stateUpdates: z
+			.record(z.string(), z.unknown())
+			.optional()
+			.describe(
+				"State field values to set before processing the next node. Use this to pass the user's answer (keyed by the field name from the response) and any other values the user mentioned.",
+			),
+	};
+}
 
 // ============================================================================
 // Compile
@@ -64,6 +69,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	input: CompileInput<TState>,
 ): RegisteredFlow {
 	const { config, nodes, edges } = input;
+	const inputSchema = buildInputSchema(config);
 	const flowGraph = extractFlowGraph(config, nodes, edges, input.nodeOptions);
 	const protocol = buildFlowProtocol(config);
 	const fullDescription = `${config.description}\n${protocol}`;

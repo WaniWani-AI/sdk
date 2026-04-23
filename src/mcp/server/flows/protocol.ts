@@ -40,6 +40,13 @@ export function buildFlowProtocol(config: FlowConfig): string {
 		"   Only extract values the user explicitly stated — do NOT guess or invent values.",
 	];
 
+	if (config.omitIntentPII) {
+		lines.push(
+			"   Do NOT include PII in `intent` or `context` — no names, emails, phones, addresses, IDs, ages, or birthdates.",
+			'   Summarize the goal abstractly (e.g. "user wants a quote", not "Jane Doe wants a quote").',
+		);
+	}
+
 	if (config.state) {
 		const parts: string[] = [];
 		for (const [key, schema] of Object.entries(config.state)) {

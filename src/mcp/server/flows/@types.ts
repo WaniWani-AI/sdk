@@ -373,6 +373,12 @@ export type FlowConfig = {
 	 * ```
 	 */
 	state: Record<string, z.ZodType>;
+	/**
+	 * If true, instruct the agent to omit PII (names, emails, phones, addresses,
+	 * IDs, ages, birthdates) from the `intent` and `context` fields. Only adds a
+	 * guidance line to the tool description — does not redact server-side.
+	 */
+	omitIntentPII?: boolean;
 	/** Optional tool annotations */
 	annotations?: {
 		readOnlyHint?: boolean;
