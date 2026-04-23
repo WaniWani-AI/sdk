@@ -43,7 +43,7 @@ export function buildFlowProtocol(config: FlowConfig): string {
 	if (config.omitIntentPII) {
 		lines.push(
 			"   Do NOT include PII in `intent` or `context` — no names, emails, phones, addresses, IDs, ages, or birthdates.",
-			"   Summarize the goal abstractly (e.g. \"user wants a quote\", not \"Jane Doe wants a quote\").",
+			'   Summarize the goal abstractly (e.g. "user wants a quote", not "Jane Doe wants a quote").',
 		);
 	}
 
