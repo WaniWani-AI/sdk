@@ -172,11 +172,18 @@ export function McpAppFrame({
 		[autoHeight],
 	);
 
-	// Build the iframe src URL directly — avoids null-origin issues with srcdoc
-	const iframeSrc = useMemo(
-		() => `${resourceEndpoint}?uri=${encodeURIComponent(resourceUri)}`,
-		[resourceEndpoint, resourceUri],
-	);
+	// Build the iframe src URL via string concatenation so the value is
+	// stable across SSR and CSR — `new URL(..., window.location.href)`
+	// would produce an absolute URL that differs between server (falling
+	// back to a stub origin) and client, causing a hydration mismatch
+	// and a wasted iframe load against the stub origin before hydration
+	// corrects it. The browser resolves relative URLs against the
+	// document itself, so this works for both absolute and relative
+	// `resourceEndpoint` values.
+	const iframeSrc = useMemo(() => {
+		const separator = resourceEndpoint.includes("?") ? "&" : "?";
+		return `${resourceEndpoint}${separator}uri=${encodeURIComponent(resourceUri)}`;
+	}, [resourceEndpoint, resourceUri]);
 
 	const isDarkRef = useRef(isDark);
 	isDarkRef.current = isDark;

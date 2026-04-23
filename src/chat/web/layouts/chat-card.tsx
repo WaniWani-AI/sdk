@@ -30,6 +30,7 @@ import { useChatEngine } from "../hooks/use-chat-engine";
 import { useConfig } from "../hooks/use-config";
 import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
+import { buildResourceEndpoint } from "../lib/resource-endpoint";
 import { cn } from "../lib/utils";
 import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
 
@@ -52,7 +53,10 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 		} = props;
 
 		const effectiveApi = api ?? "/api/waniwani";
-		const effectiveResourceEndpoint = `${effectiveApi}/resource`;
+		const effectiveResourceEndpoint = buildResourceEndpoint(
+			effectiveApi,
+			props.headers,
+		);
 
 		const resolvedTheme = mergeTheme(userTheme);
 		const cssVars = themeToCSSProperties(resolvedTheme);
