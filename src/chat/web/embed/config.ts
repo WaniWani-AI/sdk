@@ -32,12 +32,12 @@ export interface EmbedConfig {
 	/** Position of the floating bubble. Defaults to `"bottom-right"`. */
 	position?: "bottom-right" | "bottom-left";
 	/**
-	 * Display mode.
-	 * - `"floating"` (default): SDK renders a floating bubble that toggles a popover panel.
+	 * Display mode. Defaults to `"inline"`.
+	 * - `"inline"` (default): no bubble or panel — ChatCard is rendered directly into the first
+	 *   `[data-waniwani-embed]` element found on the page.
+	 * - `"floating"`: SDK renders a floating bubble that toggles a popover panel.
 	 * - `"custom"`: popover panel only — consumer renders their own launcher and opens
 	 *   it via `WaniWani.chat.open()` / `toggle()`.
-	 * - `"inline"`: no bubble or panel — ChatCard is rendered directly into the first
-	 *   `[data-waniwani-embed]` element found on the page.
 	 */
 	mode?: "floating" | "custom" | "inline";
 	/**
@@ -271,7 +271,7 @@ export function resolveConfig(
 	}
 
 	if (!merged.mode) {
-		merged.mode = "floating";
+		merged.mode = "inline";
 	}
 
 	return merged;
