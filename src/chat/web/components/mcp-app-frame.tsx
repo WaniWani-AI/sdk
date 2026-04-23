@@ -172,11 +172,19 @@ export function McpAppFrame({
 		[autoHeight],
 	);
 
-	// Build the iframe src URL directly — avoids null-origin issues with srcdoc
-	const iframeSrc = useMemo(
-		() => `${resourceEndpoint}?uri=${encodeURIComponent(resourceUri)}`,
-		[resourceEndpoint, resourceUri],
-	);
+	// Build the iframe src URL directly — avoids null-origin issues with srcdoc.
+	// Parse through URL so callers can pre-populate query params on
+	// `resourceEndpoint` (e.g. the embed appends a `token` so the
+	// cross-origin GET carries auth without needing custom headers).
+	const iframeSrc = useMemo(() => {
+		const base =
+			typeof window !== "undefined"
+				? window.location.href
+				: "http://localhost/";
+		const u = new URL(resourceEndpoint, base);
+		u.searchParams.set("uri", resourceUri);
+		return u.toString();
+	}, [resourceEndpoint, resourceUri]);
 
 	const isDarkRef = useRef(isDark);
 	isDarkRef.current = isDark;

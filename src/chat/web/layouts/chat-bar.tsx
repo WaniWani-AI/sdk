@@ -54,7 +54,21 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			Math.round((typeof width === "number" ? width : 600) * 1.2);
 
 		const effectiveApi = api ?? "/api/waniwani";
-		const effectiveResourceEndpoint = `${effectiveApi}/resource`;
+		// Iframe GET for widget HTML can't set custom headers. When the
+		// caller passed an `Authorization: Bearer …` header (embed path),
+		// propagate that token in the URL so the cross-origin resource
+		// fetch is authenticated. Same-origin proxy setups (customer
+		// next-js adapter) won't pass headers and get a plain endpoint.
+		const authHeaderValue =
+			props.headers && (props.headers as Record<string, string>).Authorization;
+		const resourceToken =
+			typeof authHeaderValue === "string" &&
+			authHeaderValue.startsWith("Bearer ")
+				? authHeaderValue.slice(7)
+				: null;
+		const effectiveResourceEndpoint = resourceToken
+			? `${effectiveApi}/resource?token=${encodeURIComponent(resourceToken)}`
+			: `${effectiveApi}/resource`;
 
 		const resolvedTheme = mergeTheme(userTheme);
 		const cssVars = themeToCSSProperties(resolvedTheme);

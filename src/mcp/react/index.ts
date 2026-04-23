@@ -1,7 +1,7 @@
 // Client-side React hooks and components for MCP widgets
 
 // Components
-export { InitializeNextJsInChatGpt } from "./components/initialize-next-in-chat-gpt";
+export { InitializeNextJsInIframe } from "./components/initialize-next-in-iframe";
 // Dev tools
 export {
 	DevModeProvider,

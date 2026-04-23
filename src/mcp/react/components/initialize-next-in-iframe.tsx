@@ -1,25 +1,54 @@
 /**
+ * Initializes & patches Next.js functionality so an app can run as a
+ * widget inside a cross-origin iframe. Used by every MCP widget host —
+ * ChatGPT's sandbox, the embed's `/api/mcp/chat/resource` proxy, and any
+ * future host that renders the widget on a domain other than its own
+ * `baseUrl`.
  *
- * Initializes & patches Next.js functionalities
- * so it can be run inside the ChatGPT iframe:
- * - history.pushState / history.replaceState - Prevents full-origin URLs in history
- * - window.fetch - Rewrites same-origin requests to use the correct base URL
- * - html attribute observer - Prevents ChatGPT from modifying the root element
+ * What it patches:
+ * - `history.pushState` / `history.replaceState` — prevents full-origin
+ *   URLs from ending up in the iframe's history (browsers reject cross-
+ *   origin pushes in sandboxed iframes).
+ * - `window.fetch` — rewrites same-origin requests to the widget's real
+ *   `baseUrl`. Without this, relative `/api/...` calls from the widget
+ *   hit the host's origin (ChatGPT sandbox, WaniWani embed proxy, etc.)
+ *   and 404. `passthroughOrigins` opts specific origins out of the
+ *   rewrite (see prop doc).
+ * - `<html>` attribute observer — strips attributes the host injects
+ *   after hydration (ChatGPT mutates `<html>` for theming), while
+ *   preserving `class` / `style` / `lang`.
  *
- * More information about this component can be found here:
- *
+ * More background on the ChatGPT case:
  * https://vercel.com/blog/running-next-js-inside-chatgpt-a-deep-dive-into-native-app-integration
  */
-export function InitializeNextJsInChatGpt({ baseUrl }: { baseUrl: string }) {
+export function InitializeNextJsInIframe({
+	baseUrl,
+	passthroughOrigins,
+}: {
+	baseUrl: string;
+	/**
+	 * Origins whose fetches should skip the same-origin → baseUrl rewrite.
+	 * Set this to the WaniWani API origin when the widget is loaded through
+	 * a proxy that shares origin with the API (e.g. the embed's
+	 * `/api/mcp/chat/resource` route on `app.waniwani.ai`). Without this,
+	 * widget tracking calls to the WaniWani API get rewritten to the
+	 * widget's own host and 404.
+	 */
+	passthroughOrigins?: string[];
+}) {
 	return (
 		<>
 			<base href={baseUrl}></base>
 			<script>{`window.innerBaseUrl = ${JSON.stringify(baseUrl)}`}</script>
+			<script>{`window.__wwPassthroughOrigins = ${JSON.stringify(passthroughOrigins ?? [])}`}</script>
 			<script>{`window.__isChatGptApp = typeof window.openai !== "undefined";`}</script>
 			<script>
 				{"(" +
 					(() => {
 						const baseUrl = window.innerBaseUrl;
+						const passthroughOrigins: string[] =
+							(window as unknown as { __wwPassthroughOrigins: string[] })
+								.__wwPassthroughOrigins ?? [];
 						const htmlElement = document.documentElement;
 						const observer = new MutationObserver((mutations) => {
 							mutations.forEach((mutation) => {
@@ -133,6 +162,14 @@ export function InitializeNextJsInChatGpt({ baseUrl }: { baseUrl: string }) {
 										...init,
 										mode: "cors",
 									});
+								}
+
+								// Explicit passthrough list — never rewrite these.
+								// Needed when the widget shares origin with a
+								// non-Next-app host (e.g. the WaniWani app serving the
+								// embed iframe + the tracking API from the same host).
+								if (passthroughOrigins.indexOf(url.origin) !== -1) {
+									return originalFetch.call(window, input, init);
 								}
 
 								if (url.origin === window.location.origin) {
