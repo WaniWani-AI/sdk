@@ -9,7 +9,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import type { EmbedConfig } from "./config";
 import { parseConfigFromScript, resolveConfig } from "./config";
-import { FloatingChat } from "./floating-chat";
+import { FloatingChat, type FloatingChatHandle } from "./floating-chat";
 import { InlineChat } from "./inline-chat";
 
 // ---------------------------------------------------------------------------
@@ -28,6 +28,9 @@ declare global {
 			chat?: {
 				init: (options?: Partial<EmbedConfig>) => EmbedInstance;
 				destroy: () => void;
+				open: () => void;
+				close: () => void;
+				toggle: () => void;
 			};
 		};
 	}
@@ -39,6 +42,12 @@ declare global {
 
 interface EmbedInstance {
 	destroy: () => void;
+	/** Open the chat panel. No-op in inline mode. */
+	open: () => void;
+	/** Close the chat panel. No-op in inline mode. */
+	close: () => void;
+	/** Toggle the chat panel. No-op in inline mode. */
+	toggle: () => void;
 }
 
 let currentInstance: EmbedInstance | null = null;
@@ -81,16 +90,17 @@ function injectStyles(shadowRoot: ShadowRoot, config: EmbedConfig): void {
 // Mount helpers
 // ---------------------------------------------------------------------------
 
+const INLINE_MARKER_ATTR = "data-waniwani-embed";
+
 function mountInline(
 	config: EmbedConfig,
 	programmatic: Partial<EmbedConfig> | undefined,
 	scriptConfig: Partial<EmbedConfig> | undefined,
 ): EmbedInstance {
-	const selector = config.container as string;
-	const container = document.querySelector(selector);
+	const container = document.querySelector(`[${INLINE_MARKER_ATTR}]`);
 	if (!container) {
 		throw new Error(
-			`[WaniWani] Container element not found: ${config.container}`,
+			`[WaniWani] No inline mount target. Place \`<div ${INLINE_MARKER_ATTR}></div>\` in your page for \`mode: "inline"\`.`,
 		);
 	}
 
@@ -120,6 +130,9 @@ function mountInline(
 			hostElement = null;
 			currentInstance = null;
 		},
+		open: () => {},
+		close: () => {},
+		toggle: () => {},
 	};
 }
 
@@ -170,21 +183,26 @@ function mountFloating(
 
 	const shadowRoot = hostElement.attachShadow({ mode: "open" });
 
-	// Show loading skeleton immediately (CSS-only, no React needed)
-	const skeleton = createLoadingSkeleton(shadowRoot, config);
+	// Show loading skeleton immediately (CSS-only, no React needed) —
+	// skip in custom mode since there's no bubble to stand in for.
+	const skeleton =
+		config.mode === "custom" ? null : createLoadingSkeleton(shadowRoot, config);
 
 	injectStyles(shadowRoot, config);
 
 	const mountContainer = document.createElement("div");
 	shadowRoot.appendChild(mountContainer);
 
+	const chatRef = React.createRef<FloatingChatHandle>();
+
 	reactRoot = ReactDOM.createRoot(mountContainer);
 	reactRoot.render(
 		React.createElement(FloatingChat, {
+			ref: chatRef,
 			config,
 			programmatic,
 			scriptConfig,
-			onReady: () => skeleton.remove(),
+			onReady: () => skeleton?.remove(),
 		}),
 	);
 
@@ -196,6 +214,9 @@ function mountFloating(
 			hostElement = null;
 			currentInstance = null;
 		},
+		open: () => chatRef.current?.open(),
+		close: () => chatRef.current?.close(),
+		toggle: () => chatRef.current?.toggle(),
 	};
 }
 
@@ -221,9 +242,10 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 	// so the React-side useRemoteEmbedConfig hook can re-apply them on top
 	// of the server's config once it arrives. Without this the remote
 	// config could override fields the customer explicitly set.
-	currentInstance = config.container
-		? mountInline(config, options, scriptConfig)
-		: mountFloating(config, options, scriptConfig);
+	currentInstance =
+		config.mode === "inline"
+			? mountInline(config, options, scriptConfig)
+			: mountFloating(config, options, scriptConfig);
 
 	return currentInstance;
 }
@@ -240,7 +262,13 @@ function destroy(): void {
 // ---------------------------------------------------------------------------
 
 window.WaniWani = window.WaniWani || {};
-window.WaniWani.chat = { init, destroy };
+window.WaniWani.chat = {
+	init,
+	destroy,
+	open: () => currentInstance?.open(),
+	close: () => currentInstance?.close(),
+	toggle: () => currentInstance?.toggle(),
+};
 
 // ---------------------------------------------------------------------------
 // Auto-init from script tag data attributes

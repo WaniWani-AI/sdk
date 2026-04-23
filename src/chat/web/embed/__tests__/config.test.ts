@@ -56,13 +56,11 @@ describe("resolveConfig — programmatic", () => {
 			token: "tok",
 			welcomeMessage: "Hello!",
 			placeholder: "Type here...",
-			container: "#chat",
 			css: "https://example.com/custom.css",
 		});
 
 		expect(config.welcomeMessage).toBe("Hello!");
 		expect(config.placeholder).toBe("Type here...");
-		expect(config.container).toBe("#chat");
 		expect(config.css).toBe("https://example.com/custom.css");
 	});
 
