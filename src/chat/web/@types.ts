@@ -220,6 +220,8 @@ export interface ChatEmbedProps
 	className?: string;
 	/** MCP Apps configuration. Only needed if your backend serves widget resources. */
 	mcp?: ChatEmbedMcpConfig;
+	/** Hide the input bar at the bottom, making the chat read-only. */
+	readOnly?: boolean;
 }
 
 // ============================================================================

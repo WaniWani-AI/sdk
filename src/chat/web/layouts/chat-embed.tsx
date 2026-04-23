@@ -63,6 +63,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			api,
 			mcp,
 			debug = false,
+			readOnly = false,
 		} = props;
 
 		const resolvedTheme = mergeTheme(userTheme);
@@ -216,50 +217,56 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 					<ConversationScrollButton />
 				</Conversation>
 
-				{/* Suggestions — hide when fullscreen */}
-				<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
-					<Suggestions
-						suggestions={suggestionsState.suggestions}
-						isLoading={suggestionsState.isLoading}
-						onSelect={handleSuggestionSelect}
-					/>
-				</div>
+				{/* Suggestions — hide when fullscreen or readOnly */}
+				{!readOnly && (
+					<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
+						<Suggestions
+							suggestions={suggestionsState.suggestions}
+							isLoading={suggestionsState.isLoading}
+							onSelect={handleSuggestionSelect}
+						/>
+					</div>
+				)}
 
-				{/* Queue — hide when fullscreen */}
-				<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
-					<ChatQueue
-						queuedMessages={engine.queuedMessages}
-						onRemove={engine.removeQueuedMessage}
-					/>
-				</div>
+				{/* Queue — hide when fullscreen or readOnly */}
+				{!readOnly && (
+					<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
+						<ChatQueue
+							queuedMessages={engine.queuedMessages}
+							onRemove={engine.removeQueuedMessage}
+						/>
+					</div>
+				)}
 
-				{/* Input — hide when fullscreen */}
-				<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
-					<div className="ww:shrink-0 ww:px-4 ww:pb-8 ww:pt-2 ww:bg-background">
-						<div className="ww:mx-auto ww:w-full ww:max-w-3xl">
-							<PromptInput
-								onSubmit={engine.handleSubmit}
-								globalDrop={allowAttachments}
-								multiple={allowAttachments}
-								className="ww:rounded-2xl ww:border-border ww:bg-input"
-							>
-								<div className="ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-2.5">
-									{allowAttachments && <PromptInputAddAttachments />}
-									<PromptInputTextarea
-										onChange={engine.handleTextChange}
-										value={engine.text}
-										placeholder={animatedPlaceholder}
-										className="ww:min-h-0 ww:py-1 ww:px-0"
-									/>
-									<PromptInputSubmit
-										status={engine.status}
-										disabled={engine.queueFull}
-									/>
-								</div>
-							</PromptInput>
+				{/* Input — hide when fullscreen or readOnly */}
+				{!readOnly && (
+					<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
+						<div className="ww:shrink-0 ww:px-4 ww:pb-8 ww:pt-2 ww:bg-background">
+							<div className="ww:mx-auto ww:w-full ww:max-w-3xl">
+								<PromptInput
+									onSubmit={engine.handleSubmit}
+									globalDrop={allowAttachments}
+									multiple={allowAttachments}
+									className="ww:rounded-2xl ww:border-border ww:bg-input"
+								>
+									<div className="ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-2.5">
+										{allowAttachments && <PromptInputAddAttachments />}
+										<PromptInputTextarea
+											onChange={engine.handleTextChange}
+											value={engine.text}
+											placeholder={animatedPlaceholder}
+											className="ww:min-h-0 ww:py-1 ww:px-0"
+										/>
+										<PromptInputSubmit
+											status={engine.status}
+											disabled={engine.queueFull}
+										/>
+									</div>
+								</PromptInput>
+							</div>
 						</div>
 					</div>
-				</div>
+				)}
 			</div>
 		);
 	},
