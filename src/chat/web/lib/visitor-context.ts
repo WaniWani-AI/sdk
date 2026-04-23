@@ -1,3 +1,5 @@
+import { getOrCreateMemoryUserId } from "./memory-user-id";
+
 const VISITOR_ID_KEY = "waniwani-visitor-id";
 
 // ============================================================================
@@ -22,6 +24,7 @@ export interface VisitorContext {
 	connectionType: string;
 	referrer: string;
 	visitorId: string;
+	memoryUserId: string;
 }
 
 // ============================================================================
@@ -148,7 +151,10 @@ async function computeVisitorId(): Promise<string> {
 
 export async function collectVisitorContext(): Promise<VisitorContext> {
 	const ua = navigator.userAgent;
-	const visitorId = await computeVisitorId();
+	const [visitorId, memoryUserId] = await Promise.all([
+		computeVisitorId(),
+		getOrCreateMemoryUserId(),
+	]);
 
 	return {
 		userAgent: ua,
@@ -169,5 +175,6 @@ export async function collectVisitorContext(): Promise<VisitorContext> {
 		connectionType: (navigator as any).connection?.effectiveType ?? "unknown",
 		referrer: document.referrer,
 		visitorId,
+		memoryUserId,
 	};
 }

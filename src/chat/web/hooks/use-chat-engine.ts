@@ -187,6 +187,23 @@ export function useChatEngine(props: ChatBaseProps) {
 						referrer: vc.referrer,
 						visitorId: vc.visitorId,
 					};
+					const existingVisitor =
+						typeof resolvedBody.visitor === "object" &&
+						resolvedBody.visitor !== null
+							? (resolvedBody.visitor as Record<string, unknown>)
+							: {};
+					const existingClient =
+						typeof existingVisitor.client === "object" &&
+						existingVisitor.client !== null
+							? (existingVisitor.client as Record<string, unknown>)
+							: {};
+					resolvedBody.visitor = {
+						...existingVisitor,
+						client: {
+							...existingClient,
+							memoryUserId: vc.memoryUserId,
+						},
+					};
 				}
 
 				return resolvedBody;
