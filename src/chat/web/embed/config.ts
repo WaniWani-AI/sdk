@@ -21,8 +21,6 @@ export interface EmbedConfig {
 	token: string;
 	/** Override MCP server URL (optional — resolved from environment by default). */
 	mcpServerUrl?: string;
-	/** CSS selector for inline mode — renders ChatCard inside this element instead of a floating bubble. */
-	container?: string;
 	/** Title shown in the chat header. Defaults to `"Assistant"`. */
 	title?: string;
 	/** Welcome message shown before the first user message. */
@@ -33,6 +31,24 @@ export interface EmbedConfig {
 	suggestions?: string[];
 	/** Position of the floating bubble. Defaults to `"bottom-right"`. */
 	position?: "bottom-right" | "bottom-left";
+	/**
+	 * Display mode.
+	 * - `"floating"` (default): SDK renders a floating bubble that toggles a popover panel.
+	 * - `"custom"`: popover panel only — consumer renders their own launcher and opens
+	 *   it via `WaniWani.chat.open()` / `toggle()`.
+	 * - `"inline"`: no bubble or panel — ChatCard is rendered directly into the first
+	 *   `[data-waniwani-embed]` element found on the page.
+	 */
+	mode?: "floating" | "custom" | "inline";
+	/**
+	 * Layout component used in `mode: "inline"`.
+	 * - `"card"` (default): `ChatCard` — bordered card with header + messages + input.
+	 * - `"bar"`: `ChatBar` — compact bar that expands upward on focus.
+	 * - `"embed"`: `ChatEmbed` — borderless, fills parent container.
+	 *
+	 * Ignored in `floating` and `custom` modes (always renders `ChatCard` in the panel).
+	 */
+	layout?: "card" | "bar" | "embed";
 	/** Panel width in pixels. Defaults to `400`. */
 	width?: number;
 	/** Panel height in pixels. Defaults to `600`. */
@@ -119,11 +135,6 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	}
 
 	// Optional strings
-	const container = str("data-container");
-	if (container) {
-		config.container = container;
-	}
-
 	const title = str("data-title");
 	if (title) {
 		config.title = title;
@@ -162,6 +173,18 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const position = str("data-position");
 	if (position === "bottom-right" || position === "bottom-left") {
 		config.position = position;
+	}
+
+	// Display mode
+	const mode = str("data-mode");
+	if (mode === "floating" || mode === "custom" || mode === "inline") {
+		config.mode = mode;
+	}
+
+	// Inline layout
+	const layout = str("data-layout");
+	if (layout === "card" || layout === "bar" || layout === "embed") {
+		config.layout = layout;
 	}
 
 	// Dimensions
@@ -245,6 +268,10 @@ export function resolveConfig(
 			"[WaniWani] Missing required config: `token`. " +
 				"Set data-token on the script tag or pass it to WaniWani.chat.init().",
 		);
+	}
+
+	if (!merged.mode) {
+		merged.mode = "floating";
 	}
 
 	return merged;

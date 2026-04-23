@@ -266,28 +266,74 @@ No MCP app changes needed — the embed talks to WaniWani API directly.
 | `data-placeholder` | No | Input field placeholder text |
 | `data-suggestions` | No | Comma-separated suggestion chips |
 | `data-position` | No | `"bottom-right"` (default) or `"bottom-left"` |
+| `data-mode` | No | `"floating"` (default), `"custom"`, or `"inline"`. See [Display modes](#display-modes) below. |
+| `data-layout` | No | In `inline` mode: `"card"` (default), `"bar"`, or `"embed"`. Picks the layout component. Ignored in other modes. |
 | `data-width` | No | Panel width in px (default: `400`) |
 | `data-height` | No | Panel height in px (default: `600`) |
-| `data-container` | No | CSS selector for inline mode (no floating bubble) |
 | `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |
 | `data-primary-color` | No | Primary color hex |
 | `data-background-color` | No | Background color hex |
 | `data-text-color` | No | Text color hex |
 | `data-font-family` | No | Font family |
 
-### Inline Mode
+### Display Modes
 
-Render inside an existing container instead of floating:
+Pick how the widget appears with `data-mode` (or `mode` in `init()`):
+
+| Mode | Behaviour | Use when |
+|---|---|---|
+| `floating` (default) | SDK renders a floating bubble bottom-right/left; clicking it toggles a popover panel. | Standard drop-in chat bubble. |
+| `custom` | Popover panel only — no bubble. Consumer renders their own launcher and calls `WaniWani.chat.open()` / `toggle()`. | You want the bubble replaced by a branded button, nav item, etc. |
+| `inline` | Layout component renders directly into the first `[data-waniwani-embed]` element on the page. No bubble, no panel, no overlay. | You want the chat embedded as a block on a page (e.g. landing page hero). |
+
+#### Inline mode
+
+Place a marker element anywhere on the page — the SDK mounts into it:
 
 ```html
-<div id="chat" style="width: 400px; height: 600px;"></div>
+<div data-waniwani-embed style="width: 400px; height: 600px;"></div>
+
 <script
   src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
   defer
   data-token="wwp_..."
-  data-container="#chat"
+  data-mode="inline"
 ></script>
 ```
+
+Pick the layout with `data-layout` (inline only):
+
+| Value | Component | Shape |
+|---|---|---|
+| `card` (default) | `ChatCard` | Bordered card with header, messages, input. |
+| `bar` | `ChatBar` | Compact input bar that expands upward on focus. |
+| `embed` | `ChatEmbed` | Borderless, fills parent container (no header). |
+
+```html
+<div data-waniwani-embed style="width: 600px; height: 80px;"></div>
+<script src=".../embed.js" defer
+  data-token="wwp_..."
+  data-mode="inline"
+  data-layout="bar"
+></script>
+```
+
+#### Custom launcher
+
+Set `data-mode="custom"` to suppress the built-in bubble. The panel still mounts (hidden) and opens via `WaniWani.chat.open()`:
+
+```html
+<script
+  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
+  defer
+  data-token="wwp_..."
+  data-mode="custom"
+></script>
+
+<button onclick="WaniWani.chat.toggle()">Chat with us</button>
+```
+
+`open`, `close`, and `toggle` are exposed on the instance returned by `init()` and on `window.WaniWani.chat`. They're no-ops in `inline` mode (nothing to open).
 
 ### Programmatic Init
 
@@ -300,6 +346,11 @@ Render inside an existing container instead of floating:
       title: 'Support',
       theme: { primaryColor: '#6366f1' },
     });
+
+    // Imperative control (floating mode only)
+    chat.open();
+    chat.close();
+    chat.toggle();
 
     // Cleanup
     chat.destroy();

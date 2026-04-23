@@ -208,6 +208,7 @@ export const FloatingChat = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// -----------------------------------------------------------------------
 		// Position helpers
 		// -----------------------------------------------------------------------
+		const isCustomMode = config.mode === "custom";
 		const isLeft = config.position === "bottom-left";
 		const panelWidth = config.width ?? 400;
 		const panelHeight = config.height ?? 600;
@@ -263,7 +264,7 @@ export const FloatingChat = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				}
 			: {
 					position: "absolute",
-					bottom: BUBBLE_SIZE + PANEL_GAP,
+					bottom: isCustomMode ? 0 : BUBBLE_SIZE + PANEL_GAP,
 					...(isLeft ? { left: 0 } : { right: 0 }),
 					width: panelWidth,
 					height: panelHeight,
@@ -372,27 +373,30 @@ export const FloatingChat = forwardRef<FloatingChatHandle, FloatingChatProps>(
 					</div>
 				</div>
 
-				{/* Bubble */}
-				<button
-					type="button"
-					onClick={toggle}
-					style={{ ...bubbleStyle, position: "relative" }}
-					aria-label={isOpen ? "Close chat" : "Open chat"}
-					onMouseEnter={(e) => {
-						(e.currentTarget as HTMLButtonElement).style.transform =
-							"scale(1.08)";
-						(e.currentTarget as HTMLButtonElement).style.boxShadow =
-							"0 6px 20px rgba(0, 0, 0, 0.2)";
-					}}
-					onMouseLeave={(e) => {
-						(e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
-						(e.currentTarget as HTMLButtonElement).style.boxShadow =
-							"0 4px 12px rgba(0, 0, 0, 0.15)";
-					}}
-				>
-					<ChatIcon />
-					{hasUnread && <span style={unreadDotStyle} />}
-				</button>
+				{/* Bubble — hidden in custom-trigger mode (consumer renders their own) */}
+				{!isCustomMode && (
+					<button
+						type="button"
+						onClick={toggle}
+						style={{ ...bubbleStyle, position: "relative" }}
+						aria-label={isOpen ? "Close chat" : "Open chat"}
+						onMouseEnter={(e) => {
+							(e.currentTarget as HTMLButtonElement).style.transform =
+								"scale(1.08)";
+							(e.currentTarget as HTMLButtonElement).style.boxShadow =
+								"0 6px 20px rgba(0, 0, 0, 0.2)";
+						}}
+						onMouseLeave={(e) => {
+							(e.currentTarget as HTMLButtonElement).style.transform =
+								"scale(1)";
+							(e.currentTarget as HTMLButtonElement).style.boxShadow =
+								"0 4px 12px rgba(0, 0, 0, 0.15)";
+						}}
+					>
+						<ChatIcon />
+						{hasUnread && <span style={unreadDotStyle} />}
+					</button>
+				)}
 			</div>
 		);
 	},

@@ -1,13 +1,15 @@
 // ============================================================================
-// InlineChat — wraps ChatCard for the `data-container` inline mount path.
+// InlineChat — wraps ChatCard/ChatBar/ChatEmbed for the inline mount path.
 //
 // Exists so remote config fetching can happen inside React, matching the
-// floating mode. Plain rendering of ChatCard in embed.ts would leave no
+// floating mode. Plain rendering of the layout in embed.ts would leave no
 // useEffect hook to own the fetch.
 // ============================================================================
 
 import { useEffect } from "react";
+import { ChatBar } from "../layouts/chat-bar";
 import { ChatCard } from "../layouts/chat-card";
+import { ChatEmbed } from "../layouts/chat-embed";
 import type { EmbedConfig } from "./config";
 import { buildChatTheme } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
@@ -37,21 +39,37 @@ export function InlineChat({
 		onReady?.();
 	}, []);
 
+	const shared = {
+		api: config.api,
+		headers: { Authorization: `Bearer ${config.token}` },
+		skipRemoteConfig: true as const,
+		body: config.mcpServerUrl
+			? { mcpServerUrl: config.mcpServerUrl }
+			: undefined,
+		theme: buildChatTheme(config),
+		welcomeMessage: config.welcomeMessage,
+		placeholder: config.placeholder,
+		suggestions: config.suggestions
+			? { initial: config.suggestions }
+			: undefined,
+	};
+
+	const layout = config.layout ?? "card";
+
+	if (layout === "bar") {
+		return <ChatBar {...shared} title={config.title ?? "Assistant"} />;
+	}
+
+	if (layout === "embed") {
+		// ChatEmbed requires a non-optional `api`; shared.api is already resolved
+		// from defaults, so non-null assertion is safe.
+		return <ChatEmbed {...shared} api={shared.api as string} />;
+	}
+
 	return (
 		<ChatCard
-			api={config.api}
-			headers={{ Authorization: `Bearer ${config.token}` }}
-			skipRemoteConfig
-			body={
-				config.mcpServerUrl ? { mcpServerUrl: config.mcpServerUrl } : undefined
-			}
-			theme={buildChatTheme(config)}
+			{...shared}
 			title={config.title ?? "Assistant"}
-			welcomeMessage={config.welcomeMessage}
-			placeholder={config.placeholder}
-			suggestions={
-				config.suggestions ? { initial: config.suggestions } : undefined
-			}
 			width="100%"
 			height="100%"
 		/>
