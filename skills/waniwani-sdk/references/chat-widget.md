@@ -244,7 +244,11 @@ No MCP app changes needed — the embed talks to WaniWani API directly.
 
 ### Script Tag (declarative)
 
+Default mode is `inline` — the chat mounts into the first `[data-waniwani-embed]` element on the page:
+
 ```html
+<div data-waniwani-embed style="width: 400px; height: 600px;"></div>
+
 <script
   src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
   defer
@@ -254,6 +258,8 @@ No MCP app changes needed — the embed talks to WaniWani API directly.
   data-primary-color="#6366f1"
 ></script>
 ```
+
+For a floating bubble instead, add `data-mode="floating"`.
 
 ### Script Tag Options
 
@@ -266,7 +272,7 @@ No MCP app changes needed — the embed talks to WaniWani API directly.
 | `data-placeholder` | No | Input field placeholder text |
 | `data-suggestions` | No | Comma-separated suggestion chips |
 | `data-position` | No | `"bottom-right"` (default) or `"bottom-left"` |
-| `data-mode` | No | `"floating"` (default), `"custom"`, or `"inline"`. See [Display modes](#display-modes) below. |
+| `data-mode` | No | `"inline"` (default), `"floating"`, or `"custom"`. See [Display modes](#display-modes) below. |
 | `data-layout` | No | In `inline` mode: `"card"` (default), `"bar"`, or `"embed"`. Picks the layout component. Ignored in other modes. |
 | `data-width` | No | Panel width in px (default: `400`) |
 | `data-height` | No | Panel height in px (default: `600`) |
@@ -282,9 +288,9 @@ Pick how the widget appears with `data-mode` (or `mode` in `init()`):
 
 | Mode | Behaviour | Use when |
 |---|---|---|
-| `floating` (default) | SDK renders a floating bubble bottom-right/left; clicking it toggles a popover panel. | Standard drop-in chat bubble. |
+| `inline` (default) | Layout component renders directly into the first `[data-waniwani-embed]` element on the page. No bubble, no panel, no overlay. | You want the chat embedded as a block on a page (e.g. landing page hero). |
+| `floating` | SDK renders a floating bubble bottom-right/left; clicking it toggles a popover panel. | Standard drop-in chat bubble. |
 | `custom` | Popover panel only — no bubble. Consumer renders their own launcher and calls `WaniWani.chat.open()` / `toggle()`. | You want the bubble replaced by a branded button, nav item, etc. |
-| `inline` | Layout component renders directly into the first `[data-waniwani-embed]` element on the page. No bubble, no panel, no overlay. | You want the chat embedded as a block on a page (e.g. landing page hero). |
 
 #### Inline mode
 
