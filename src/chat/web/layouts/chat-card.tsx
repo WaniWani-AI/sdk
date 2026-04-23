@@ -30,6 +30,7 @@ import { useChatEngine } from "../hooks/use-chat-engine";
 import { useConfig } from "../hooks/use-config";
 import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
+import { buildResourceEndpoint } from "../lib/resource-endpoint";
 import { cn } from "../lib/utils";
 import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
 
@@ -52,21 +53,10 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 		} = props;
 
 		const effectiveApi = api ?? "/api/waniwani";
-		// Iframe GET for widget HTML can't set custom headers. When the
-		// caller passed an `Authorization: Bearer …` header (embed path),
-		// propagate that token in the URL so the cross-origin resource
-		// fetch is authenticated. Same-origin proxy setups (customer
-		// next-js adapter) won't pass headers and get a plain endpoint.
-		const authHeaderValue =
-			props.headers && (props.headers as Record<string, string>).Authorization;
-		const resourceToken =
-			typeof authHeaderValue === "string" &&
-			authHeaderValue.startsWith("Bearer ")
-				? authHeaderValue.slice(7)
-				: null;
-		const effectiveResourceEndpoint = resourceToken
-			? `${effectiveApi}/resource?token=${encodeURIComponent(resourceToken)}`
-			: `${effectiveApi}/resource`;
+		const effectiveResourceEndpoint = buildResourceEndpoint(
+			effectiveApi,
+			props.headers,
+		);
 
 		const resolvedTheme = mergeTheme(userTheme);
 		const cssVars = themeToCSSProperties(resolvedTheme);
