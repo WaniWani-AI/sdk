@@ -39,25 +39,28 @@ After installing, just describe what you want in natural language. Your agent wi
 - *"Add a knowledge base FAQ tool"*
 - *"Embed a chat widget on my landing page"*
 
-## OpenAI Submission Test Cases
+## OpenAI App Submission
 
-A separate skill is available to generate test cases for the OpenAI MCP submission process. It analyzes your project's tools and flows to produce 5 positive and 5 negative test cases in the required format.
+A separate skill is available to generate the submission documents required for the ChatGPT App Store. It analyzes your MCP server's tools, flows, and widgets to produce two Notion pages:
+
+1. **Tool Justification** -- annotations (Read Only, Open World, Destructive) with justifications for every tool
+2. **Test Cases** -- positive and negative test scenarios for OpenAI reviewers
 
 <CodeGroup>
   ```bash npx
-  npx skills add WaniWani-AI/sdk -s openai-submission
+  npx skills add WaniWani-AI/sdk -s oai-submission
   ```
 
   ```bash bunx
-  bunx skills add WaniWani-AI/sdk -s openai-submission
+  bunx skills add WaniWani-AI/sdk -s oai-submission
   ```
 </CodeGroup>
 
 Then ask your agent:
 
-- *"Generate test cases for OpenAI submission"*
+- *"Start the OpenAI submission for this MCP server"*
 
-It will read your tools, flows, and knowledge base content, then output structured test cases (scenario, user prompt, tool triggered, expected output) ready to paste into the submission form.
+It will read your codebase, determine tool annotations and CSP metadata, and create both documents in Notion ready for the submission form.
 
 ## Learn more
 
