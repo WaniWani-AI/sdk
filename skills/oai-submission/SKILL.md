@@ -16,7 +16,7 @@ Generate the two Notion documents required for the ChatGPT App Store submission:
 
 Ask the user for:
 - **Parent page URL**: The page under which both documents will be created (e.g., the customer's page under MCP Servicing)
-- **MCP server production URL**: The Vercel deployment URL (e.g., `https://v1.sidecare.mcp.waniwani.run`)
+- **MCP server production URL**: The Vercel deployment URL (e.g., `https://v1.acme.mcp.waniwani.run`)
 
 ### 2. Analyze the MCP server codebase
 
