@@ -433,7 +433,7 @@ export const PromptInputTextarea = ({
 	return (
 		<textarea
 			className={cn(
-				"ww:field-sizing-content ww:max-h-48 ww:min-h-16 ww:w-full ww:resize-none ww:border-0 ww:bg-transparent ww:px-3 ww:py-3 ww:text-sm ww:outline-none ww:placeholder:text-muted-foreground",
+				"ww:field-sizing-content ww:max-h-48 ww:min-h-0 ww:w-full ww:resize-none ww:border-0 ww:bg-transparent ww:px-3 ww:py-2 ww:text-sm ww:outline-none ww:placeholder:text-muted-foreground",
 				className,
 			)}
 			name="message"
