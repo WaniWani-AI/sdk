@@ -56,6 +56,14 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			[],
 		);
 
+		// Inline mode drops its own corner rounding - the embedder's container
+		// already provides whatever radius the page design wants. Explicit user
+		// theme overrides still win.
+		const theme = {
+			borderRadius: 0,
+			...buildChatTheme(config),
+		};
+
 		const shared = {
 			api: config.api,
 			headers: { Authorization: `Bearer ${config.token}` },
@@ -63,7 +71,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			body: config.mcpServerUrl
 				? { mcpServerUrl: config.mcpServerUrl }
 				: undefined,
-			theme: buildChatTheme(config),
+			theme,
 			welcomeMessage: config.welcomeMessage,
 			placeholder: config.placeholder,
 			suggestions: config.suggestions

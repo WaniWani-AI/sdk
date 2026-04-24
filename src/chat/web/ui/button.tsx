@@ -27,8 +27,8 @@ export const Button = ({
 				"ww:hover:bg-accent ww:hover:text-accent-foreground",
 			size === "default" && "ww:h-9 ww:px-4 ww:py-2 ww:text-sm",
 			size === "sm" && "ww:h-8 ww:px-3 ww:text-xs",
-			size === "icon" && "ww:size-9 ww:rounded-full",
-			size === "icon-sm" && "ww:size-7 ww:rounded-full",
+			size === "icon" && "ww:size-9 ww:!rounded-full",
+			size === "icon-sm" && "ww:size-7 ww:!rounded-full",
 			className,
 		)}
 		{...props}
