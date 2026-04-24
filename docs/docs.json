@@ -79,6 +79,10 @@
       "href": "https://app.waniwani.ai"
     }
   },
+  "contextual": {
+    "options": ["copy"],
+    "display": "header"
+  },
   "footer": {
     "socials": {
       "github": "https://github.com/waniwani-ai",

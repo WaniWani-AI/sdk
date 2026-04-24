@@ -5,7 +5,18 @@ description: "Install the WaniWani SDK skill for Claude Code, Cursor, and other 
 
 The WaniWani SDK is available as an [agent skill](https://agentskills.io) for Claude Code, Cursor, GitHub Copilot, and 20+ other AI coding agents. Once installed, your agent knows how to integrate the SDK without you having to explain the API.
 
-## Install
+<Columns cols={2}>
+  <Card title="WaniWani SDK" icon="code" href="#waniwani-sdk">
+    Tracking, flows, widgets, knowledge base, and chat components.
+  </Card>
+  <Card title="OpenAI Submission" icon="file-check" href="#openai-app-submission">
+    Generate Tool Justification and Test Cases for the ChatGPT App Store.
+  </Card>
+</Columns>
+
+## WaniWani SDK
+
+### Install
 
 <CodeGroup>
   ```bash npx
@@ -19,7 +30,7 @@ The WaniWani SDK is available as an [agent skill](https://agentskills.io) for Cl
 
 The skill is installed into your project's `.claude/skills/` directory (or equivalent for other agents).
 
-## What's included
+### What's included
 
 The skill teaches your agent how to:
 
@@ -30,7 +41,7 @@ The skill teaches your agent how to:
 - **Add a knowledge base** -- ingest markdown, search with embeddings, build FAQ tools
 - **Embed chat** -- React component and script-tag embed with theming
 
-## Usage
+### Usage
 
 After installing, just describe what you want in natural language. Your agent will use the skill automatically:
 
@@ -41,10 +52,7 @@ After installing, just describe what you want in natural language. Your agent wi
 
 ## OpenAI App Submission
 
-A separate skill is available to generate the submission documents required for the ChatGPT App Store. It analyzes your MCP server's tools, flows, and widgets to produce two Notion pages:
-
-1. **Tool Justification** -- annotations (Read Only, Open World, Destructive) with justifications for every tool
-2. **Test Cases** -- positive and negative test scenarios for OpenAI reviewers
+### Install
 
 <CodeGroup>
   ```bash npx
@@ -56,7 +64,14 @@ A separate skill is available to generate the submission documents required for 
   ```
 </CodeGroup>
 
-Then ask your agent:
+### What's included
+
+This skill generates the submission documents required for the ChatGPT App Store. It analyzes your MCP server's tools, flows, and widgets to produce two Notion pages:
+
+1. **Tool Justification** -- annotations (Read Only, Open World, Destructive) with justifications for every tool
+2. **Test Cases** -- positive and negative test scenarios for OpenAI reviewers
+
+### Usage
 
 - *"Start the OpenAI submission for this MCP server"*
 
