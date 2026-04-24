@@ -1,8 +1,8 @@
 # Test Cases Page
 
-Use this exact Notion markdown structure as content (replace `{POSITIVE_ROWS}` and `{NEGATIVE_ROWS}`):
+Use this exact markdown structure as page content (replace `{POSITIVE_ROWS}` and `{NEGATIVE_ROWS}`):
 
-```notionmd
+```md
 This document contains all the test cases you need to enter in the ChatGPT App submission form. These have been prepared by your WaniWani developer based on your app's tools and expected behavior.
 **How to use this document:** Review each test case below, then copy the values directly into the submission form. If anything doesn't match how your app works, reach out to your WaniWani point of contact before submitting.
 ---
@@ -35,7 +35,7 @@ These are prompts where your app should **NOT** trigger. They help OpenAI confir
 ## Row Templates
 
 Each `{POSITIVE_ROWS}` entry:
-```notionmd
+```md
 <tr>
 <td>1</td>
 <td>Short scenario description</td>
@@ -46,7 +46,7 @@ Each `{POSITIVE_ROWS}` entry:
 ```
 
 Each `{NEGATIVE_ROWS}` entry:
-```notionmd
+```md
 <tr>
 <td>1</td>
 <td>Short scenario description</td>

@@ -1,12 +1,12 @@
 ---
 name: oai-submission
-description: Generate OpenAI/ChatGPT App submission documents (Tool Justification + Test Cases) in Notion by analyzing the MCP server's tools, flows, and widgets
+description: Generate OpenAI/ChatGPT App submission documents (Tool Justification + Test Cases) by analyzing the MCP server's tools, flows, and widgets
 user-invocable: true
 ---
 
 # OpenAI App Submission Documents
 
-Generate the two Notion documents required for the ChatGPT App Store submission:
+Generate the two documents required for the ChatGPT App Store submission:
 1. **Tool Justification** — annotations (Read Only, Open World, Destructive) with justifications for every tool
 2. **Test Cases** — positive and negative test scenarios for OpenAI reviewers
 
@@ -33,19 +33,19 @@ For each tool, determine annotations and CSP metadata. See [references/tool-anno
 
 ### 3. Create the Tool Justification page
 
-Create a Notion page under the parent page using the Notion `create-pages` tool with `parent: { page_id: "<parent_page_id>" }`.
+Create a page under the parent page using the `create-pages` tool with `parent: { page_id: "<parent_page_id>" }`.
 
 **Title**: `{Company Name} - Tool Justification`
 
-See [references/tool-justification-page.md](references/tool-justification-page.md) for the exact Notion markdown structure and row templates.
+See [references/tool-justification-page.md](references/tool-justification-page.md) for the exact page structure and row templates.
 
 ### 4. Create the Test Cases page
 
-Create a second Notion page under the same parent page.
+Create a second page under the same parent page.
 
 **Title**: `{Company Name} - Test Cases`
 
-See [references/test-cases-page.md](references/test-cases-page.md) for the exact Notion markdown structure, row templates, and guidelines.
+See [references/test-cases-page.md](references/test-cases-page.md) for the exact page structure, row templates, and guidelines.
 
 ### 5. Write test prompts in the MCP's primary language
 

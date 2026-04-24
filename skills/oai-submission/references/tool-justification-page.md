@@ -1,8 +1,8 @@
 # Tool Justification Page
 
-Use this exact Notion markdown structure as content (replace `{TOOL_ROWS}`, `{CSP_ROWS}`, and `{MCP_SERVER_URL}`):
+Use this exact markdown structure as page content (replace `{TOOL_ROWS}`, `{CSP_ROWS}`, and `{MCP_SERVER_URL}`):
 
-```notionmd
+```md
 This document lists every tool exposed by your MCP server along with the annotation values and justification descriptions you need to enter in the ChatGPT App submission form.
 **How to use this document:** Copy the values from the table below directly into the submission form. Each row corresponds to one tool. The annotation columns tell you what you should see after the tools are scanned (Yes/No). The justification column gives you the exact text to paste.
 <callout icon="ℹ️">
@@ -68,7 +68,7 @@ Outlined here, providing more context than the actual specification: [Tool Annot
 ## Row Templates
 
 Each `{TOOL_ROWS}` entry is one `<tr>` block per tool:
-```notionmd
+```md
 <tr>
 <td>`tool_name`</td>
 <td>Yes or No</td>
@@ -81,7 +81,7 @@ Each `{TOOL_ROWS}` entry is one `<tr>` block per tool:
 ```
 
 Each `{CSP_ROWS}` entry:
-```notionmd
+```md
 <tr>
 <td>`tool_name`</td>
 <td>[{MCP_SERVER_URL}]({MCP_SERVER_URL}) or —</td>
