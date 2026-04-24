@@ -111,9 +111,12 @@ function mountInline(
 		);
 	}
 
-	// Create shadow DOM inside the target container
+	// Create shadow DOM inside the target container. Stretch to fill the
+	// parent so the embedder's sizing (e.g. `h-[640px]`) drives the chat.
 	hostElement = document.createElement("div");
 	hostElement.id = "waniwani-chat-embed";
+	hostElement.style.width = "100%";
+	hostElement.style.height = "100%";
 	container.appendChild(hostElement);
 
 	const shadowRoot = hostElement.attachShadow({ mode: "open" });

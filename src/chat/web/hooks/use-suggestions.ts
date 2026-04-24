@@ -38,9 +38,10 @@ function isConfigObject(
 export function useSuggestions(options: UseSuggestionsOptions) {
 	const { messages, status, config } = options;
 
-	const [suggestions, setSuggestions] = useState<string[]>(
-		(isConfigObject(config) && config.initial ? config.initial : []) ?? [],
-	);
+	const initial =
+		isConfigObject(config) && config.initial ? config.initial : undefined;
+
+	const [suggestions, setSuggestions] = useState<string[]>(initial ?? []);
 	const prevStatusRef = useRef<ChatStatus>(status);
 
 	const isDynamicEnabled =
@@ -50,6 +51,16 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		setSuggestions([]);
 	}, []);
 
+	// Sync initial suggestions when the remote config arrives post-mount.
+	// Only applied while the conversation is empty; once the user has sent
+	// a message, suggestions are driven by streaming responses (or cleared).
+	const hasMessages = messages.length > 0;
+	useEffect(() => {
+		if (!hasMessages && initial && initial.length > 0) {
+			setSuggestions(initial);
+		}
+	}, [initial, hasMessages]);
+
 	// Clear when a new user message arrives
 	const lastMessage = messages[messages.length - 1];
 	useEffect(() => {
@@ -58,7 +69,7 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		}
 	}, [lastMessage, clear]);
 
-	// Extract suggestions from message parts on streaming → ready transition
+	// Extract suggestions from message parts on streaming -> ready transition
 	useEffect(() => {
 		const prevStatus = prevStatusRef.current;
 		prevStatusRef.current = status;
