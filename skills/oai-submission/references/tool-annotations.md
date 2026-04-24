@@ -17,7 +17,7 @@ For each tool, determine:
 
 ## Common Patterns by Tool Type
 
-### Flow tools (e.g., `fast_quote_journey`, `lassie_quote`)
+### Flow tools (e.g., `get_quote`, `onboarding_flow`)
 - Usually **not read-only** (they create accounts, submit forms, save data)
 - Usually **not open world** (they call fixed, pre-configured APIs)
 - Usually **not destructive** (they create new records, don't delete existing ones)
