@@ -147,8 +147,7 @@ function mountInline(
 		open: () => {},
 		close: () => {},
 		toggle: () => {},
-		sendMessage: (text: string) =>
-			inlineRef.current?.chat?.sendMessage(text),
+		sendMessage: (text: string) => inlineRef.current?.chat?.sendMessage(text),
 	};
 }
 
@@ -233,8 +232,7 @@ function mountFloating(
 		open: () => chatRef.current?.open(),
 		close: () => chatRef.current?.close(),
 		toggle: () => chatRef.current?.toggle(),
-		sendMessage: (text: string) =>
-			chatRef.current?.chat?.sendMessage(text),
+		sendMessage: (text: string) => chatRef.current?.chat?.sendMessage(text),
 	};
 }
 

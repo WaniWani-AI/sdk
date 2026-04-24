@@ -86,13 +86,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		if (layout === "embed") {
 			// ChatEmbed requires a non-optional `api`; shared.api is already resolved
 			// from defaults, so non-null assertion is safe.
-			return (
-				<ChatEmbed
-					{...shared}
-					ref={chatRef}
-					api={shared.api as string}
-				/>
-			);
+			return <ChatEmbed {...shared} ref={chatRef} api={shared.api as string} />;
 		}
 
 		return (
