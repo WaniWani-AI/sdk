@@ -42,32 +42,33 @@ bun embed
 
 ### Ingest script for external projects
 
-If you're running your own MCP server, create a simple script to read your docs and push them to WaniWani:
+If you're running your own MCP server, create a simple script to read your docs and push them to WaniWani. This runs standalone — it doesn't need to be inside an MCP server.
 
-```ts scripts/embed.ts
+```ts scripts/kb-ingest.ts
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { waniwani } from "@waniwani/sdk";
-import fs from "node:fs";
-import path from "node:path";
 
-const wani = waniwani(); // reads WANIWANI_API_KEY from env
-const docsDir = "./knowledge-base"; // your markdown files
+const client = waniwani(); // reads WANIWANI_API_KEY from env
 
-const files = fs.readdirSync(docsDir)
-  .filter((f) => f.endsWith(".md"))
-  .map((f) => ({
-    filename: f,
-    content: fs.readFileSync(path.join(docsDir, f), "utf-8"),
-  }));
+const knowledgeDir = join(import.meta.dirname, "../knowledge");
+const files = await readdir(knowledgeDir);
+const mdFiles = files.filter((f) => f.endsWith(".md"));
 
-// Batch in groups of 10
-for (let i = 0; i < files.length; i += 10) {
-  const batch = files.slice(i, i + 10);
-  const result = await wani.kb.ingest(batch);
-  console.log(`Ingested ${result.filesProcessed} files (${result.chunksIngested} chunks)`);
-}
+console.log(`Ingesting ${mdFiles.length} files from ${knowledgeDir}`);
+
+const docs = await Promise.all(
+  mdFiles.map(async (filename) => ({
+    filename,
+    content: await readFile(join(knowledgeDir, filename), "utf-8"),
+  })),
+);
+
+const result = await client.kb.ingest(docs);
+console.log(`Done: ${result.chunksIngested} chunks from ${result.filesProcessed} files`);
 ```
 
-Run it with `npx tsx scripts/embed.ts` or `bun scripts/embed.ts`.
+Run it with `npx tsx scripts/kb-ingest.ts` or `bun scripts/kb-ingest.ts`.
 
 <Info>
   A built-in `waniwani embed` CLI command is coming soon to `@waniwani/cli`, so you won't need a custom script.

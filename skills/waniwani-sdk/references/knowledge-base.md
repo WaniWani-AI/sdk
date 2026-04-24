@@ -86,6 +86,8 @@ export const faqTool = createTool(
 
 ## Example: Ingestion Script
 
+You can push markdown files to the knowledge base from any TypeScript script — it doesn't need to run inside an MCP server.
+
 Create `scripts/kb-ingest.ts`:
 
 ```typescript
@@ -93,24 +95,26 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { waniwani } from "@waniwani/sdk";
 
+const client = waniwani(); // uses WANIWANI_API_KEY env var
+
 const knowledgeDir = join(import.meta.dirname, "../knowledge");
+const files = await readdir(knowledgeDir);
+const mdFiles = files.filter((f) => f.endsWith(".md"));
 
-const mdFiles = (await readdir(knowledgeDir)).filter((f) => f.endsWith(".md"));
-console.log(`Found ${mdFiles.length} knowledge file(s)`);
+console.log(`Ingesting ${mdFiles.length} files from ${knowledgeDir}`);
 
-const files = await Promise.all(
+const docs = await Promise.all(
   mdFiles.map(async (filename) => ({
     filename,
     content: await readFile(join(knowledgeDir, filename), "utf-8"),
   })),
 );
 
-const client = waniwani();
-const result = await client.kb.ingest(files);
+const result = await client.kb.ingest(docs);
 console.log(`Done: ${result.chunksIngested} chunks from ${result.filesProcessed} files`);
 ```
 
-Add to `package.json` scripts: `"kb:ingest": "bun run scripts/kb-ingest.ts"`
+Run it with `npx tsx scripts/kb-ingest.ts` or add to `package.json` scripts: `"kb:ingest": "npx tsx scripts/kb-ingest.ts"`
 
 ## Types
 
