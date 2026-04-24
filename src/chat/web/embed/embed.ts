@@ -10,7 +10,7 @@ import ReactDOM from "react-dom/client";
 import type { EmbedConfig } from "./config";
 import { parseConfigFromScript, resolveConfig } from "./config";
 import { FloatingChat, type FloatingChatHandle } from "./floating-chat";
-import { InlineChat } from "./inline-chat";
+import { InlineChat, type InlineChatHandle } from "./inline-chat";
 
 // ---------------------------------------------------------------------------
 // CSS placeholder — replaced at build time with the actual CSS string
@@ -31,6 +31,11 @@ declare global {
 				open: () => void;
 				close: () => void;
 				toggle: () => void;
+				/**
+				 * Programmatically submit a user message to the chat. No-op if the
+				 * embed has not mounted yet or the inner layout has not attached.
+				 */
+				sendMessage: (text: string) => void;
 			};
 		};
 	}
@@ -48,6 +53,8 @@ interface EmbedInstance {
 	close: () => void;
 	/** Toggle the chat panel. No-op in inline mode. */
 	toggle: () => void;
+	/** Submit a user message. No-op until the inner chat layout has mounted. */
+	sendMessage: (text: string) => void;
 }
 
 let currentInstance: EmbedInstance | null = null;
@@ -117,9 +124,16 @@ function mountInline(
 	mountContainer.style.height = "100%";
 	shadowRoot.appendChild(mountContainer);
 
+	const inlineRef = React.createRef<InlineChatHandle>();
+
 	reactRoot = ReactDOM.createRoot(mountContainer);
 	reactRoot.render(
-		React.createElement(InlineChat, { config, programmatic, scriptConfig }),
+		React.createElement(InlineChat, {
+			ref: inlineRef,
+			config,
+			programmatic,
+			scriptConfig,
+		}),
 	);
 
 	return {
@@ -133,6 +147,8 @@ function mountInline(
 		open: () => {},
 		close: () => {},
 		toggle: () => {},
+		sendMessage: (text: string) =>
+			inlineRef.current?.chat?.sendMessage(text),
 	};
 }
 
@@ -217,6 +233,8 @@ function mountFloating(
 		open: () => chatRef.current?.open(),
 		close: () => chatRef.current?.close(),
 		toggle: () => chatRef.current?.toggle(),
+		sendMessage: (text: string) =>
+			chatRef.current?.chat?.sendMessage(text),
 	};
 }
 
@@ -268,6 +286,7 @@ window.WaniWani.chat = {
 	open: () => currentInstance?.open(),
 	close: () => currentInstance?.close(),
 	toggle: () => currentInstance?.toggle(),
+	sendMessage: (text: string) => currentInstance?.sendMessage(text),
 };
 
 // ---------------------------------------------------------------------------
