@@ -57,11 +57,13 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		);
 
 		// Inline mode drops its own corner rounding - the embedder's container
-		// already provides whatever radius the page design wants. Explicit user
-		// theme overrides still win.
+		// already provides whatever radius the page design wants.
+		// `EmbedConfig.theme` does not currently surface `borderRadius`, so this
+		// is an unconditional override; if we ever expose it, revisit the spread
+		// order so explicit user values win.
 		const theme = {
-			borderRadius: 0,
 			...buildChatTheme(config),
+			borderRadius: 0,
 		};
 
 		const shared = {
