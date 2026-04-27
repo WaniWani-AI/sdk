@@ -75,17 +75,18 @@ export type WithWaniwaniOptions = {
 	 */
 	injectWidgetToken?: boolean;
 	/**
-	 * Strip `latitude`/`longitude` from known location `_meta` entries
+	 * List of field names to strip from known location `_meta` entries
 	 * (`openai/userLocation`, `waniwani/geoLocation`, `waniwani/userLocation`)
 	 * before events are sent to the WaniWani API. Applied to both the
 	 * request-level `_meta` and any `_meta` on the tool response.
 	 *
-	 * Enable this when precise geo coordinates should not reach the tracking
-	 * backend; city/region/country fields are preserved.
+	 * Pass e.g. `["latitude", "longitude"]` to drop coordinates only, or
+	 * `["latitude", "longitude", "city", "region"]` to keep just `country`.
+	 * Empty/omitted = no redaction.
 	 *
-	 * @default false
+	 * @default []
 	 */
-	stripGeoCoordinates?: boolean;
+	stripLocationFields?: readonly string[];
 	/**
 	 * Replace `input.stateUpdates[field]` with `"REDACTED"` for any field
 	 * marked via `redacted()` on a flow state schema. When `false` (default),

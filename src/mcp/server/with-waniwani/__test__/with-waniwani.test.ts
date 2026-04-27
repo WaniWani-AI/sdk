@@ -629,16 +629,20 @@ describe("withWaniwani", () => {
 		expect(meta.waniwani).toBe(undefined);
 	});
 
-	test("stripGeoCoordinates removes latitude/longitude from known location meta keys", async () => {
+	test("stripLocationFields removes listed fields from known location meta keys", async () => {
 		const { client, tracked } = mockClient();
 		const mock = mockServer();
 
-		withWaniwani(mock.server, { client, stripGeoCoordinates: true });
+		withWaniwani(mock.server, {
+			client,
+			stripLocationFields: ["latitude", "longitude", "city", "region"],
+		});
 
 		mock.registerTool("pricing", {}, async () => ({
 			_meta: {
 				"openai/userLocation": {
 					city: "Madrid",
+					region: "Madrid",
 					country: "ES",
 					latitude: "40.4",
 					longitude: "-3.7",
@@ -654,12 +658,14 @@ describe("withWaniwani", () => {
 				_meta: {
 					"openai/userLocation": {
 						city: "Madrid",
+						region: "Madrid",
 						country: "ES",
 						latitude: "40.4",
 						longitude: "-3.7",
 					},
 					"waniwani/geoLocation": {
 						country: "ES",
+						city: "Madrid",
 						latitude: "40.4",
 						longitude: "-3.7",
 					},
@@ -671,14 +677,42 @@ describe("withWaniwani", () => {
 			meta?: Record<string, unknown>;
 			properties: { output?: { _meta?: Record<string, unknown> } };
 		};
+		expect(event.meta?.["openai/userLocation"]).toEqual({ country: "ES" });
+		expect(event.meta?.["waniwani/geoLocation"]).toEqual({ country: "ES" });
+		expect(event.properties.output?._meta?.["openai/userLocation"]).toEqual({
+			country: "ES",
+		});
+	});
+
+	test("stripLocationFields defaults to empty — no redaction", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("pricing", {}, async () => ({ content: [] }));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{},
+			{
+				_meta: {
+					"openai/userLocation": {
+						city: "Madrid",
+						country: "ES",
+						latitude: "40.4",
+						longitude: "-3.7",
+					},
+				},
+			},
+		);
+
+		const event = tracked[0] as { meta?: Record<string, unknown> };
 		expect(event.meta?.["openai/userLocation"]).toEqual({
 			city: "Madrid",
 			country: "ES",
-		});
-		expect(event.meta?.["waniwani/geoLocation"]).toEqual({ country: "ES" });
-		expect(event.properties.output?._meta?.["openai/userLocation"]).toEqual({
-			city: "Madrid",
-			country: "ES",
+			latitude: "40.4",
+			longitude: "-3.7",
 		});
 	});
 

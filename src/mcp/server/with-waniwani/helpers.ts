@@ -24,11 +24,13 @@ const LOCATION_META_KEYS = [
 	LEGACY_USER_LOCATION_KEY,
 ] as const;
 
-const COORDINATE_KEYS = ["latitude", "longitude"] as const;
-
-export function stripGeoCoordinatesFromMeta(
+export function stripLocationFieldsFromMeta(
 	meta: UnknownRecord,
+	fields: readonly string[],
 ): UnknownRecord {
+	if (fields.length === 0) {
+		return meta;
+	}
 	let next: UnknownRecord | undefined;
 	for (const key of LOCATION_META_KEYS) {
 		const value = meta[key];
@@ -36,12 +38,12 @@ export function stripGeoCoordinatesFromMeta(
 			continue;
 		}
 		let stripped: UnknownRecord | undefined;
-		for (const coord of COORDINATE_KEYS) {
-			if (coord in value) {
+		for (const field of fields) {
+			if (field in value) {
 				if (!stripped) {
 					stripped = { ...value };
 				}
-				delete stripped[coord];
+				delete stripped[field];
 			}
 		}
 		if (stripped) {
@@ -102,7 +104,7 @@ export function buildTrackInput(
 			? T
 			: never;
 		metadata?: UnknownRecord;
-		stripGeoCoordinates?: boolean;
+		stripLocationFields?: readonly string[];
 		redactInput?: (input: unknown) => unknown;
 	},
 	timing?: { durationMs: number; status: string; errorMessage?: string },
@@ -111,10 +113,13 @@ export function buildTrackInput(
 ): TrackInput {
 	const toolType = resolveToolType(toolName, options.toolType);
 
+	const stripFields = options.stripLocationFields;
+	const shouldStrip = stripFields && stripFields.length > 0;
+
 	const rawMeta = extractMeta(extra);
 	const meta =
-		rawMeta && options.stripGeoCoordinates
-			? stripGeoCoordinatesFromMeta(rawMeta)
+		rawMeta && shouldStrip
+			? stripLocationFieldsFromMeta(rawMeta, stripFields)
 			: rawMeta;
 
 	const input =
@@ -123,12 +128,13 @@ export function buildTrackInput(
 			: io?.input;
 
 	const output =
-		options.stripGeoCoordinates &&
-		isRecord(io?.output) &&
-		isRecord(io.output._meta)
+		shouldStrip && isRecord(io?.output) && isRecord(io.output._meta)
 			? {
 					...(io.output as UnknownRecord),
-					_meta: stripGeoCoordinatesFromMeta(io.output._meta as UnknownRecord),
+					_meta: stripLocationFieldsFromMeta(
+						io.output._meta as UnknownRecord,
+						stripFields,
+					),
 				}
 			: io?.output;
 
