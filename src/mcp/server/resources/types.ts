@@ -24,6 +24,11 @@ export type ResourceConfig = {
 	baseUrl: string;
 	/** Path to the HTML file (relative to baseUrl) */
 	htmlPath: string;
+	/**
+	 * Cache key appended to widget template URIs as `?dpl=<cacheKey>`.
+	 * Defaults to `VERCEL_DEPLOYMENT_ID` when available.
+	 */
+	cacheKey?: string;
 	/** Domain for OpenAI security context */
 	widgetDomain: string;
 	/** Whether widget prefers border (defaults to true) */
@@ -38,9 +43,9 @@ export type RegisteredResource = {
 	readonly id: string;
 	readonly title: string;
 	readonly description: string | undefined;
-	/** OpenAI URI: ui://widgets/apps-sdk/{id}.html */
+	/** OpenAI URI: ui://widgets/apps-sdk/{id}.html, with ?dpl={cacheKey} when configured */
 	readonly openaiUri: string;
-	/** MCP URI: ui://widgets/ext-apps/{id}.html */
+	/** MCP URI: ui://widgets/ext-apps/{id}.html, with ?dpl={cacheKey} when configured */
 	readonly mcpUri: string;
 	readonly autoHeight: boolean | undefined;
 	/** Register this resource on an McpServer */

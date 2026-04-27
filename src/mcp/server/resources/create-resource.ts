@@ -31,6 +31,7 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 		description,
 		baseUrl,
 		htmlPath,
+		cacheKey = process.env.VERCEL_DEPLOYMENT_ID,
 		widgetDomain,
 		prefersBorder = true,
 		autoHeight = true,
@@ -66,8 +67,13 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 		}
 	}
 
-	const openaiUri = `ui://widgets/apps-sdk/${id}.html`;
-	const mcpUri = `ui://widgets/ext-apps/${id}.html`;
+	const cacheQuery =
+		typeof cacheKey === "string" && cacheKey.trim()
+			? `?dpl=${encodeURIComponent(cacheKey.trim())}`
+			: "";
+
+	const openaiUri = `ui://widgets/apps-sdk/${id}.html${cacheQuery}`;
+	const mcpUri = `ui://widgets/ext-apps/${id}.html${cacheQuery}`;
 
 	// Lazy HTML — fetched once, shared across all calls
 	let htmlPromise: Promise<string> | null = null;
