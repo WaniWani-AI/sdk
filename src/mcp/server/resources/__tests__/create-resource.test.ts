@@ -25,16 +25,16 @@ function resourceConfig(
 }
 
 describe("createResource", () => {
-	test("appends explicit cache key as dpl query parameter to template URIs", () => {
+	test("appends explicit cache key to template URI filenames", () => {
 		process.env.VERCEL_DEPLOYMENT_ID = "ignored";
 
 		const resource = createResource(resourceConfig({ cacheKey: "dpl_abc123" }));
 
 		expect(resource.openaiUri).toBe(
-			"ui://widgets/apps-sdk/insurance_comparison.html?dpl=dpl_abc123",
+			"ui://widgets/apps-sdk/insurance_comparison-dpl_abc123.html",
 		);
 		expect(resource.mcpUri).toBe(
-			"ui://widgets/ext-apps/insurance_comparison.html?dpl=dpl_abc123",
+			"ui://widgets/ext-apps/insurance_comparison-dpl_abc123.html",
 		);
 	});
 
@@ -44,10 +44,10 @@ describe("createResource", () => {
 		const resource = createResource(resourceConfig());
 
 		expect(resource.openaiUri).toBe(
-			"ui://widgets/apps-sdk/insurance_comparison.html?dpl=dpl_from_env",
+			"ui://widgets/apps-sdk/insurance_comparison-dpl_from_env.html",
 		);
 		expect(resource.mcpUri).toBe(
-			"ui://widgets/ext-apps/insurance_comparison.html?dpl=dpl_from_env",
+			"ui://widgets/ext-apps/insurance_comparison-dpl_from_env.html",
 		);
 	});
 
@@ -55,11 +55,11 @@ describe("createResource", () => {
 		const resource = createResource(resourceConfig({ cacheKey: "build 1/2" }));
 
 		expect(resource.openaiUri).toBe(
-			"ui://widgets/apps-sdk/insurance_comparison.html?dpl=build%201%2F2",
+			"ui://widgets/apps-sdk/insurance_comparison-build%201%2F2.html",
 		);
 	});
 
-	test("omits dpl query parameter when cache key is empty", () => {
+	test("omits filename suffix when cache key is empty", () => {
 		process.env.VERCEL_DEPLOYMENT_ID = "dpl_from_env";
 
 		const resource = createResource(resourceConfig({ cacheKey: "" }));
