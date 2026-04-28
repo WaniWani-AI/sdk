@@ -608,7 +608,14 @@ function writeGeneratedEntry(
 
 function writeWidgetHtml(projectRoot: string, target: WidgetBuildTarget): void {
 	const assetBase = target.assetBase;
-	const cssPath = resolve(projectRoot, "public", `${assetBase}.css`);
+	// `assetBase` is rooted at "/" (e.g. "/widgets/comparison"); strip the
+	// leading slash so `path.resolve` doesn't treat it as an absolute path
+	// and discard the `projectRoot` + "public" segments.
+	const cssPath = resolve(
+		projectRoot,
+		"public",
+		`${assetBase.replace(/^\//, "")}.css`,
+	);
 	const htmlPath = resolve(
 		projectRoot,
 		"public",
