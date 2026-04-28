@@ -6,6 +6,10 @@ import {
 	MIME_TYPE_OPENAI,
 } from "./meta";
 import type { McpServer, RegisteredResource, ResourceConfig } from "./types";
+import {
+	replaceWidgetTemplatePlaceholders,
+	resolveResourceHtmlPath,
+} from "./widget-manifest";
 
 /**
  * Creates a reusable UI resource (HTML template) that can be attached
@@ -30,12 +34,11 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 		title,
 		description,
 		baseUrl,
-		htmlPath,
-		cacheKey = process.env.VERCEL_DEPLOYMENT_ID,
 		widgetDomain,
 		prefersBorder = true,
 		autoHeight = true,
 	} = config;
+	const htmlPath = resolveResourceHtmlPath(id, config.htmlPath);
 
 	// Auto-generate CSP from baseUrl if not explicitly provided
 	let widgetCSP = config.widgetCSP ?? {
@@ -67,19 +70,16 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 		}
 	}
 
-	const cacheSuffix =
-		typeof cacheKey === "string" && cacheKey.trim()
-			? `-${encodeURIComponent(cacheKey.trim())}`
-			: "";
-
-	const openaiUri = `ui://widgets/apps-sdk/${id}${cacheSuffix}.html`;
-	const mcpUri = `ui://widgets/ext-apps/${id}${cacheSuffix}.html`;
+	const openaiUri = `ui://widgets/apps-sdk/${id}.html`;
+	const mcpUri = `ui://widgets/ext-apps/${id}.html`;
 
 	// Lazy HTML — fetched once, shared across all calls
 	let htmlPromise: Promise<string> | null = null;
 	const getHtml = () => {
 		if (!htmlPromise) {
-			htmlPromise = fetchHtml(baseUrl, htmlPath);
+			htmlPromise = fetchHtml(baseUrl, htmlPath).then((html) =>
+				replaceWidgetTemplatePlaceholders(html, baseUrl),
+			);
 		}
 		return htmlPromise;
 	};

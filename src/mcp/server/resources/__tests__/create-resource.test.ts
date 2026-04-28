@@ -1,74 +1,62 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createResource } from "../create-resource";
+import { WANIWANI_WIDGETS_MANIFEST_ENV } from "../widget-manifest";
 
-const ORIGINAL_VERCEL_DEPLOYMENT_ID = process.env.VERCEL_DEPLOYMENT_ID;
+const ORIGINAL_FETCH = globalThis.fetch;
+const ORIGINAL_MANIFEST = process.env[WANIWANI_WIDGETS_MANIFEST_ENV];
 
 afterEach(() => {
-	if (ORIGINAL_VERCEL_DEPLOYMENT_ID === undefined) {
-		delete process.env.VERCEL_DEPLOYMENT_ID;
+	globalThis.fetch = ORIGINAL_FETCH;
+	if (ORIGINAL_MANIFEST === undefined) {
+		delete process.env[WANIWANI_WIDGETS_MANIFEST_ENV];
 	} else {
-		process.env.VERCEL_DEPLOYMENT_ID = ORIGINAL_VERCEL_DEPLOYMENT_ID;
+		process.env[WANIWANI_WIDGETS_MANIFEST_ENV] = ORIGINAL_MANIFEST;
 	}
 });
 
-function resourceConfig(
-	overrides: Partial<Parameters<typeof createResource>[0]> = {},
-) {
-	return {
-		id: "insurance_comparison",
-		title: "Insurance comparison",
-		baseUrl: "https://example.com",
-		htmlPath: "/widgets/comparison.html",
-		widgetDomain: "https://example.com",
-		...overrides,
-	};
-}
-
 describe("createResource", () => {
-	test("appends explicit cache key to template URI filenames", () => {
-		process.env.VERCEL_DEPLOYMENT_ID = "ignored";
+	test("fetches generated stable widget HTML when a widget manifest maps the route", async () => {
+		const requests: string[] = [];
+		process.env[WANIWANI_WIDGETS_MANIFEST_ENV] = JSON.stringify({
+			version: 1,
+			byId: {
+				tariff_comparison: "/widgets/tariff-comparison.html",
+			},
+			byHtmlPath: {
+				"/tariff-comparison": "/widgets/tariff-comparison.html",
+			},
+		});
+		globalThis.fetch = (async (input: RequestInfo | URL) => {
+			requests.push(String(input));
+			return new Response(
+				'<script src="__WANIWANI_WIDGET_BASE_URL__/widgets/tariff-comparison.js"></script>',
+			);
+		}) as typeof fetch;
 
-		const resource = createResource(resourceConfig({ cacheKey: "dpl_abc123" }));
+		const resource = createResource({
+			id: "tariff_comparison",
+			title: "Tariff comparison",
+			baseUrl: "https://example.com",
+			htmlPath: "/tariff-comparison",
+			widgetDomain: "https://example.com",
+		});
+		let handler:
+			| ((uri: URL) => Promise<{ contents: Array<{ text: string }> }>)
+			| undefined;
 
-		expect(resource.openaiUri).toBe(
-			"ui://widgets/apps-sdk/insurance_comparison-dpl_abc123.html",
+		await resource.register({
+			registerResource: (_name, _uri, _meta, callback) => {
+				handler = callback as unknown as typeof handler;
+			},
+		} as Parameters<typeof resource.register>[0]);
+
+		const response = await handler?.(new URL(resource.openaiUri));
+
+		expect(requests[0]).toBe(
+			"https://example.com/widgets/tariff-comparison.html",
 		);
-		expect(resource.mcpUri).toBe(
-			"ui://widgets/ext-apps/insurance_comparison-dpl_abc123.html",
-		);
-	});
-
-	test("defaults cache key to VERCEL_DEPLOYMENT_ID", () => {
-		process.env.VERCEL_DEPLOYMENT_ID = "dpl_from_env";
-
-		const resource = createResource(resourceConfig());
-
-		expect(resource.openaiUri).toBe(
-			"ui://widgets/apps-sdk/insurance_comparison-dpl_from_env.html",
-		);
-		expect(resource.mcpUri).toBe(
-			"ui://widgets/ext-apps/insurance_comparison-dpl_from_env.html",
-		);
-	});
-
-	test("encodes cache key values", () => {
-		const resource = createResource(resourceConfig({ cacheKey: "build 1/2" }));
-
-		expect(resource.openaiUri).toBe(
-			"ui://widgets/apps-sdk/insurance_comparison-build%201%2F2.html",
-		);
-	});
-
-	test("omits filename suffix when cache key is empty", () => {
-		process.env.VERCEL_DEPLOYMENT_ID = "dpl_from_env";
-
-		const resource = createResource(resourceConfig({ cacheKey: "" }));
-
-		expect(resource.openaiUri).toBe(
-			"ui://widgets/apps-sdk/insurance_comparison.html",
-		);
-		expect(resource.mcpUri).toBe(
-			"ui://widgets/ext-apps/insurance_comparison.html",
+		expect(response?.contents[0].text).toContain(
+			"https://example.com/widgets/tariff-comparison.js",
 		);
 	});
 });
