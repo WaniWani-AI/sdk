@@ -1,6 +1,6 @@
 {
   "name": "@waniwani/sdk",
-  "version": "0.10.10-beta.1",
+  "version": "0.10.10",
   "description": "WaniWani SDK - MCP event tracking, widget framework, and tools",
   "type": "module",
   "exports": {
@@ -160,5 +160,5 @@
     "widgets"
   ],
   "author": "WaniWani",
-  "license": "AGPL-3.0-or-later"
+  "license": "MIT"
 }
