@@ -1,6 +1,18 @@
-export const WANIWANI_WIDGETS_MANIFEST_ENV = "WANIWANI_WIDGETS_MANIFEST";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 export const WANIWANI_WIDGET_BASE_URL_PLACEHOLDER =
 	"__WANIWANI_WIDGET_BASE_URL__";
+
+/**
+ * Path to the manifest file shipped inside the SDK's `dist/` directory.
+ * `withWaniwaniWidgets()` overwrites this file at build time with the
+ * resources discovered for the consuming app. The runtime reads it via
+ * `fs.readFileSync` so that Next.js / Vercel file tracing bundles it into
+ * the serverless function output.
+ */
+export const WANIWANI_WIDGETS_MANIFEST_FILENAME = "widgets-manifest.json";
 
 export type WaniwaniWidgetsManifest = {
 	version: 1;
@@ -8,32 +20,48 @@ export type WaniwaniWidgetsManifest = {
 	byHtmlPath: Record<string, string>;
 };
 
-let parsedManifest:
-	| {
-			raw: string | undefined;
-			value: WaniwaniWidgetsManifest | null;
-	  }
-	| undefined;
+const manifestPath = resolve(
+	dirname(fileURLToPath(import.meta.url)),
+	"..",
+	WANIWANI_WIDGETS_MANIFEST_FILENAME,
+);
+
+/**
+ * Absolute path to the manifest JSON file. Both the runtime reader (here)
+ * and the build-time writer (`withWaniwaniWidgets`) resolve to the same
+ * location so the bridge works in tests (uncompiled TS) and in published
+ * builds (compiled `dist/`).
+ */
+export function getManifestFilePath(): string {
+	return manifestPath;
+}
+
+let cachedManifest: WaniwaniWidgetsManifest | null | undefined;
+let testOverrideManifest: WaniwaniWidgetsManifest | null | undefined;
 
 function getManifest(): WaniwaniWidgetsManifest | null {
-	const raw = process.env[WANIWANI_WIDGETS_MANIFEST_ENV];
-	if (parsedManifest && parsedManifest.raw === raw) {
-		return parsedManifest.value;
+	if (testOverrideManifest !== undefined) {
+		return testOverrideManifest;
 	}
-
-	if (!raw) {
-		parsedManifest = { raw, value: null };
-		return null;
+	if (cachedManifest !== undefined) {
+		return cachedManifest;
 	}
 
 	try {
-		const value = JSON.parse(raw) as WaniwaniWidgetsManifest;
-		parsedManifest = { raw, value };
-		return value;
+		const raw = readFileSync(manifestPath, "utf8");
+		cachedManifest = JSON.parse(raw) as WaniwaniWidgetsManifest;
 	} catch {
-		parsedManifest = { raw, value: null };
-		return null;
+		cachedManifest = null;
 	}
+	return cachedManifest;
+}
+
+/** Test-only: override the manifest used by `resolveResourceHtmlPath`. */
+export function __setManifestForTesting(
+	manifest: WaniwaniWidgetsManifest | null | undefined,
+): void {
+	testOverrideManifest = manifest;
+	cachedManifest = undefined;
 }
 
 export function getDefaultResourceHtmlPath(id: string): string {

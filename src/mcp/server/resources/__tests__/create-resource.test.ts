@@ -1,23 +1,18 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createResource } from "../create-resource";
-import { WANIWANI_WIDGETS_MANIFEST_ENV } from "../widget-manifest";
+import { __setManifestForTesting } from "../widget-manifest";
 
 const ORIGINAL_FETCH = globalThis.fetch;
-const ORIGINAL_MANIFEST = process.env[WANIWANI_WIDGETS_MANIFEST_ENV];
 
 afterEach(() => {
 	globalThis.fetch = ORIGINAL_FETCH;
-	if (ORIGINAL_MANIFEST === undefined) {
-		delete process.env[WANIWANI_WIDGETS_MANIFEST_ENV];
-	} else {
-		process.env[WANIWANI_WIDGETS_MANIFEST_ENV] = ORIGINAL_MANIFEST;
-	}
+	__setManifestForTesting(undefined);
 });
 
 describe("createResource", () => {
 	test("fetches generated stable widget HTML when a widget manifest maps the route", async () => {
 		const requests: string[] = [];
-		process.env[WANIWANI_WIDGETS_MANIFEST_ENV] = JSON.stringify({
+		__setManifestForTesting({
 			version: 1,
 			byId: {
 				tariff_comparison: "/widgets/tariff-comparison.html",

@@ -14,8 +14,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { InitializeNextJsInIframe } from "../mcp/react/components/initialize-next-in-iframe";
 import {
+	getManifestFilePath,
 	WANIWANI_WIDGET_BASE_URL_PLACEHOLDER,
-	WANIWANI_WIDGETS_MANIFEST_ENV,
+	WANIWANI_WIDGETS_MANIFEST_FILENAME,
 	type WaniwaniWidgetsManifest,
 } from "../mcp/server/resources/widget-manifest";
 
@@ -38,6 +39,7 @@ type NextConfigObject = {
 	env?: Record<string, string | undefined>;
 	headers?: () => HeaderRoute[] | Promise<HeaderRoute[]>;
 	webpack?: (config: unknown, context: WebpackContext) => unknown;
+	outputFileTracingIncludes?: Record<string, string[]>;
 	[key: string]: unknown;
 };
 
@@ -100,14 +102,20 @@ function enhanceNextConfig(
 	const projectRoot = resolve(options.projectRoot ?? process.cwd());
 	const resources = discoverResources(projectRoot, options.resources);
 	const manifest = createManifest(resources);
+	writeManifestFile(manifest);
 	const originalHeaders = nextConfig.headers;
 	const originalWebpack = nextConfig.webpack;
+	const manifestTraceTarget = `./node_modules/@waniwani/sdk/dist/${WANIWANI_WIDGETS_MANIFEST_FILENAME}`;
+	const existingTracingIncludes = nextConfig.outputFileTracingIncludes ?? {};
 
 	return {
 		...nextConfig,
-		env: {
-			...nextConfig.env,
-			[WANIWANI_WIDGETS_MANIFEST_ENV]: JSON.stringify(manifest),
+		outputFileTracingIncludes: {
+			...existingTracingIncludes,
+			"/**/*": [
+				...(existingTracingIncludes["/**/*"] ?? []),
+				manifestTraceTarget,
+			],
 		},
 		async headers() {
 			buildWidgetsSync(projectRoot, options);
@@ -136,6 +144,12 @@ function enhanceNextConfig(
 			return originalWebpack ? originalWebpack(config, context) : config;
 		},
 	};
+}
+
+function writeManifestFile(manifest: WaniwaniWidgetsManifest): void {
+	const manifestPath = getManifestFilePath();
+	mkdirSync(dirname(manifestPath), { recursive: true });
+	writeFileSync(manifestPath, JSON.stringify(manifest));
 }
 
 function buildWidgetsSync(

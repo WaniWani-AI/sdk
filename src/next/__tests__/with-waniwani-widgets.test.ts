@@ -1,7 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+	getManifestFilePath,
+	WANIWANI_WIDGETS_MANIFEST_FILENAME,
+} from "../../mcp/server/resources/widget-manifest";
 import { withWaniwaniWidgets } from "../index";
 
 const roots: string[] = [];
@@ -40,7 +50,7 @@ export const tariffComparisonResource = createResource({
 }
 
 describe("withWaniwaniWidgets", () => {
-	test("adds a stable widget manifest and cache headers", async () => {
+	test("writes the widget manifest file and adds cache + tracing config", async () => {
 		process.env.WANIWANI_WIDGETS_SKIP_BUILD = "1";
 		const root = createProject();
 		const config = withWaniwaniWidgets(
@@ -56,10 +66,17 @@ describe("withWaniwaniWidgets", () => {
 		);
 
 		const manifest = JSON.parse(
-			(config as { env?: Record<string, string> }).env
-				?.WANIWANI_WIDGETS_MANIFEST ?? "{}",
-		);
+			readFileSync(getManifestFilePath(), "utf8"),
+		) as {
+			byId: Record<string, string>;
+			byHtmlPath: Record<string, string>;
+		};
 		const headers = await config.headers?.();
+		const tracing = (
+			config as {
+				outputFileTracingIncludes?: Record<string, string[]>;
+			}
+		).outputFileTracingIncludes;
 
 		expect(manifest.byId.tariff_comparison).toBe(
 			"/widgets/tariff-comparison.html",
@@ -69,6 +86,9 @@ describe("withWaniwaniWidgets", () => {
 		);
 		expect(headers?.some((route) => route.source === "/widgets/:path*")).toBe(
 			true,
+		);
+		expect(tracing?.["/**/*"]).toContain(
+			`./node_modules/@waniwani/sdk/dist/${WANIWANI_WIDGETS_MANIFEST_FILENAME}`,
 		);
 	});
 });
