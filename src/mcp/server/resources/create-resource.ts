@@ -6,6 +6,10 @@ import {
 	MIME_TYPE_OPENAI,
 } from "./meta";
 import type { McpServer, RegisteredResource, ResourceConfig } from "./types";
+import {
+	replaceWidgetTemplatePlaceholders,
+	resolveResourceHtmlPath,
+} from "./widget-manifest";
 
 /**
  * Creates a reusable UI resource (HTML template) that can be attached
@@ -30,11 +34,11 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 		title,
 		description,
 		baseUrl,
-		htmlPath,
 		widgetDomain,
 		prefersBorder = true,
 		autoHeight = true,
 	} = config;
+	const htmlPath = resolveResourceHtmlPath(id, config.htmlPath);
 
 	// Auto-generate CSP from baseUrl if not explicitly provided
 	let widgetCSP = config.widgetCSP ?? {
@@ -73,7 +77,9 @@ export function createResource(config: ResourceConfig): RegisteredResource {
 	let htmlPromise: Promise<string> | null = null;
 	const getHtml = () => {
 		if (!htmlPromise) {
-			htmlPromise = fetchHtml(baseUrl, htmlPath);
+			htmlPromise = fetchHtml(baseUrl, htmlPath).then((html) =>
+				replaceWidgetTemplatePlaceholders(html, baseUrl),
+			);
 		}
 		return htmlPromise;
 	};

@@ -1,6 +1,6 @@
 {
   "name": "@waniwani/sdk",
-  "version": "0.10.10",
+  "version": "0.10.11-beta.4",
   "description": "WaniWani SDK - MCP event tracking, widget framework, and tools",
   "type": "module",
   "exports": {
@@ -35,6 +35,11 @@
       "types": "./dist/chat/next-js/index.d.ts",
       "import": "./dist/chat/next-js/index.js",
       "default": "./dist/chat/next-js/index.js"
+    },
+    "./next": {
+      "types": "./dist/next/index.d.ts",
+      "import": "./dist/next/index.js",
+      "default": "./dist/next/index.js"
     },
     "./kb": {
       "types": "./dist/kb/index.d.ts",
@@ -82,6 +87,11 @@
     "@ai-sdk/mcp": ">=1.0.0",
     "braintrust": ">=3.0.0",
     "autoevals": ">=0.0.100"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.4",
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.10"
   },
   "peerDependenciesMeta": {
     "@modelcontextprotocol/sdk": {

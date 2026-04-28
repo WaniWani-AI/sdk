@@ -22,8 +22,8 @@ export type ResourceConfig = {
 	description?: string;
 	/** Base URL for fetching the HTML */
 	baseUrl: string;
-	/** Path to the HTML file (relative to baseUrl) */
-	htmlPath: string;
+	/** Path to the HTML file or Next.js widget route (relative to baseUrl). Defaults to /{id}. */
+	htmlPath?: string;
 	/** Domain for OpenAI security context */
 	widgetDomain: string;
 	/** Whether widget prefers border (defaults to true) */
