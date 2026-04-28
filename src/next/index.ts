@@ -39,6 +39,7 @@ type NextConfigObject = {
 	env?: Record<string, string | undefined>;
 	headers?: () => HeaderRoute[] | Promise<HeaderRoute[]>;
 	webpack?: (config: unknown, context: WebpackContext) => unknown;
+	turbopack?: Record<string, unknown>;
 	outputFileTracingIncludes?: Record<string, string[]>;
 	[key: string]: unknown;
 };
@@ -110,6 +111,10 @@ function enhanceNextConfig(
 
 	return {
 		...nextConfig,
+		// Empty `turbopack` key signals to Next.js 16 that the consumer is
+		// aware their config touches both bundlers; without it Next errors out
+		// when the user runs Turbopack with a custom `webpack()` hook.
+		turbopack: { ...(nextConfig.turbopack ?? {}) },
 		outputFileTracingIncludes: {
 			...existingTracingIncludes,
 			"/**/*": [
