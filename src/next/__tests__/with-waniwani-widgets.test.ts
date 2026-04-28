@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	getManifestFilePath,
-	WANIWANI_WIDGETS_MANIFEST_FILENAME,
+	WANIWANI_WIDGETS_MANIFEST_RELATIVE_PATH,
 } from "../../mcp/server/resources/widget-manifest";
 import { withWaniwaniWidgets } from "../index";
 
@@ -66,7 +66,7 @@ describe("withWaniwaniWidgets", () => {
 		);
 
 		const manifest = JSON.parse(
-			readFileSync(getManifestFilePath(), "utf8"),
+			readFileSync(getManifestFilePath(root), "utf8"),
 		) as {
 			byId: Record<string, string>;
 			byHtmlPath: Record<string, string>;
@@ -88,7 +88,7 @@ describe("withWaniwaniWidgets", () => {
 			true,
 		);
 		expect(tracing?.["/**/*"]).toContain(
-			`./node_modules/@waniwani/sdk/dist/${WANIWANI_WIDGETS_MANIFEST_FILENAME}`,
+			`./${WANIWANI_WIDGETS_MANIFEST_RELATIVE_PATH}`,
 		);
 	});
 });

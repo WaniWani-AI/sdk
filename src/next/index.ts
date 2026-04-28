@@ -16,7 +16,7 @@ import { InitializeNextJsInIframe } from "../mcp/react/components/initialize-nex
 import {
 	getManifestFilePath,
 	WANIWANI_WIDGET_BASE_URL_PLACEHOLDER,
-	WANIWANI_WIDGETS_MANIFEST_FILENAME,
+	WANIWANI_WIDGETS_MANIFEST_RELATIVE_PATH,
 	type WaniwaniWidgetsManifest,
 } from "../mcp/server/resources/widget-manifest";
 
@@ -102,10 +102,10 @@ function enhanceNextConfig(
 	const projectRoot = resolve(options.projectRoot ?? process.cwd());
 	const resources = discoverResources(projectRoot, options.resources);
 	const manifest = createManifest(resources);
-	writeManifestFile(manifest);
+	writeManifestFile(projectRoot, manifest);
 	const originalHeaders = nextConfig.headers;
 	const originalWebpack = nextConfig.webpack;
-	const manifestTraceTarget = `./node_modules/@waniwani/sdk/dist/${WANIWANI_WIDGETS_MANIFEST_FILENAME}`;
+	const manifestTraceTarget = `./${WANIWANI_WIDGETS_MANIFEST_RELATIVE_PATH}`;
 	const existingTracingIncludes = nextConfig.outputFileTracingIncludes ?? {};
 
 	return {
@@ -146,8 +146,11 @@ function enhanceNextConfig(
 	};
 }
 
-function writeManifestFile(manifest: WaniwaniWidgetsManifest): void {
-	const manifestPath = getManifestFilePath();
+function writeManifestFile(
+	projectRoot: string,
+	manifest: WaniwaniWidgetsManifest,
+): void {
+	const manifestPath = getManifestFilePath(projectRoot);
 	mkdirSync(dirname(manifestPath), { recursive: true });
 	writeFileSync(manifestPath, JSON.stringify(manifest));
 }
