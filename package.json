@@ -129,6 +129,7 @@
     "ai": "^6.0.141",
     "autoevals": "^0.0.132",
     "clsx": "^2.1.1",
+    "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.7.0",
     "lucide-react": "^0.563.0",
     "postcss": "^8.5.6",

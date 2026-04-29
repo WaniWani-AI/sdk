@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import type { FileUIPart } from "ai";
+import type { FileUIPart, UIMessage } from "ai";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
@@ -9,10 +9,34 @@ import { hasModelContext } from "../../../shared/model-context";
 import type { ChatBaseProps } from "../@types";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
 import { LenientChatTransport } from "../lib/lenient-chat-transport";
+import {
+	deleteThread as deleteThreadFromStore,
+	deriveThreadTitle,
+	getActiveThreadId,
+	listThreads,
+	loadThread,
+	type StoredThread,
+	upsertThread,
+} from "../lib/thread-store";
 import type { VisitorContext } from "../lib/visitor-context";
 import { collectVisitorContext } from "../lib/visitor-context";
 
 const SESSION_HEADER_NAME = "x-session-id";
+const THREAD_PERSIST_DEBOUNCE_MS = 250;
+
+function generateThreadId(): string {
+	if (
+		typeof crypto !== "undefined" &&
+		typeof crypto.randomUUID === "function"
+	) {
+		return crypto.randomUUID();
+	}
+	return nanoid();
+}
+
+function nowIso(): string {
+	return new Date().toISOString();
+}
 
 function normalizeSessionId(value: unknown): string | undefined {
 	if (typeof value !== "string") {
@@ -94,6 +118,9 @@ export function useChatEngine(props: ChatBaseProps) {
 		body,
 		onMessageSent,
 		onResponseReceived,
+		enableThreadHistory = true,
+		activeThreadId: controlledThreadId,
+		onThreadChange,
 	} = props;
 
 	const headersRef = useRef(userHeaders);
@@ -106,6 +133,44 @@ export function useChatEngine(props: ChatBaseProps) {
 		undefined,
 	);
 	const sessionIdRef = useRef<string | undefined>(sessionId);
+
+	const [activeThreadId, setActiveThreadIdState] = useState<string | undefined>(
+		controlledThreadId,
+	);
+	const activeThreadIdRef = useRef<string | undefined>(activeThreadId);
+	const [threads, setThreads] = useState<StoredThread[]>([]);
+	const [isThreadHistoryReady, setIsThreadHistoryReady] = useState(
+		!enableThreadHistory,
+	);
+	const threadCreatedAtRef = useRef<string | undefined>(undefined);
+	const threadTitleRef = useRef<string | undefined>(undefined);
+	const persistTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
+	const onThreadChangeRef = useRef(onThreadChange);
+	useEffect(() => {
+		onThreadChangeRef.current = onThreadChange;
+	}, [onThreadChange]);
+
+	const setActiveThreadId = useCallback((next: string | undefined) => {
+		activeThreadIdRef.current = next;
+		setActiveThreadIdState(next);
+		if (next) {
+			onThreadChangeRef.current?.(next);
+		}
+	}, []);
+
+	const refreshThreads = useCallback(async () => {
+		if (!enableThreadHistory) {
+			return;
+		}
+		const memoryUserId = visitorContextRef.current?.memoryUserId;
+		if (!memoryUserId) {
+			return;
+		}
+		const list = await listThreads(memoryUserId);
+		setThreads(list);
+	}, [enableThreadHistory]);
 
 	const getSessionId = useCallback((): string | undefined => {
 		return sessionIdRef.current;
@@ -137,14 +202,62 @@ export function useChatEngine(props: ChatBaseProps) {
 		bodyRef.current = body;
 	}, [body]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: load once on mount
 	useEffect(() => {
-		collectVisitorContext()
-			.then((ctx) => {
+		let cancelled = false;
+		(async () => {
+			try {
+				const ctx = await collectVisitorContext();
+				if (cancelled) {
+					return;
+				}
 				visitorContextRef.current = ctx;
-			})
-			.catch(() => {
+			} catch {
 				// Best-effort — silently ignore failures
-			});
+			}
+
+			if (!enableThreadHistory) {
+				return;
+			}
+			const memoryUserId = visitorContextRef.current?.memoryUserId;
+			if (!memoryUserId) {
+				setIsThreadHistoryReady(true);
+				return;
+			}
+
+			try {
+				const targetId =
+					controlledThreadId ?? (await getActiveThreadId(memoryUserId));
+				if (cancelled) {
+					return;
+				}
+				if (targetId) {
+					const stored = await loadThread(targetId);
+					if (cancelled) {
+						return;
+					}
+					if (stored && stored.memoryUserId === memoryUserId) {
+						activeThreadIdRef.current = stored.threadId;
+						setActiveThreadIdState(stored.threadId);
+						threadCreatedAtRef.current = stored.createdAt;
+						threadTitleRef.current = stored.title;
+						if (stored.sessionId) {
+							sessionIdRef.current = stored.sessionId;
+							setSessionIdState(stored.sessionId);
+						}
+						setMessages(stored.messages);
+					}
+				}
+				await refreshThreads();
+			} finally {
+				if (!cancelled) {
+					setIsThreadHistoryReady(true);
+				}
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
 	const transportRef = useRef(
@@ -204,6 +317,22 @@ export function useChatEngine(props: ChatBaseProps) {
 							memoryUserId: vc.memoryUserId,
 						},
 					};
+				}
+
+				if (enableThreadHistory) {
+					const hasExplicitThreadId = Object.hasOwn(resolvedBody, "threadId");
+					if (!hasExplicitThreadId) {
+						let tid = activeThreadIdRef.current;
+						if (!tid) {
+							tid = generateThreadId();
+							threadCreatedAtRef.current = nowIso();
+							threadTitleRef.current = undefined;
+							setActiveThreadId(tid);
+						}
+						resolvedBody.threadId = tid;
+					} else if (typeof resolvedBody.threadId === "string") {
+						activeThreadIdRef.current = resolvedBody.threadId;
+					}
 				}
 
 				return resolvedBody;
@@ -272,6 +401,11 @@ export function useChatEngine(props: ChatBaseProps) {
 			}
 		},
 	});
+
+	const messagesRef = useRef<UIMessage[]>(messages);
+	useEffect(() => {
+		messagesRef.current = messages;
+	}, [messages]);
 
 	// Resolve sendMessageAndWait only after React has committed the messages
 	// state update. `onFinish` fires before the re-render, so resolving there
@@ -381,6 +515,139 @@ export function useChatEngine(props: ChatBaseProps) {
 		void refreshToolDefinitions();
 	}, [setMessages, clearSessionId, refreshToolDefinitions]);
 
+	const persistActiveThread = useCallback(async () => {
+		if (!enableThreadHistory) {
+			return;
+		}
+		const memoryUserId = visitorContextRef.current?.memoryUserId;
+		const threadId = activeThreadIdRef.current;
+		const msgs = messagesRef.current;
+		if (!memoryUserId || !threadId || msgs.length === 0) {
+			return;
+		}
+		if (!threadCreatedAtRef.current) {
+			threadCreatedAtRef.current = nowIso();
+		}
+		if (!threadTitleRef.current) {
+			const firstUser = msgs.find((m) => m.role === "user");
+			const firstUserText = firstUser
+				? firstUser.parts
+						.map((p) =>
+							"text" in p && typeof p.text === "string" ? p.text : "",
+						)
+						.join(" ")
+				: "";
+			threadTitleRef.current = deriveThreadTitle(firstUserText);
+		}
+		const stored: StoredThread = {
+			threadId,
+			memoryUserId,
+			title: threadTitleRef.current,
+			messages: msgs,
+			sessionId: sessionIdRef.current,
+			createdAt: threadCreatedAtRef.current,
+			updatedAt: nowIso(),
+		};
+		await upsertThread(stored);
+		await refreshThreads();
+	}, [enableThreadHistory, refreshThreads]);
+
+	useEffect(() => {
+		if (!enableThreadHistory) {
+			return;
+		}
+		if (!isThreadHistoryReady) {
+			return;
+		}
+		if (status === "submitted" || status === "streaming") {
+			return;
+		}
+		if (messages.length === 0) {
+			return;
+		}
+		if (persistTimerRef.current) {
+			clearTimeout(persistTimerRef.current);
+		}
+		persistTimerRef.current = setTimeout(() => {
+			void persistActiveThread();
+		}, THREAD_PERSIST_DEBOUNCE_MS);
+		return () => {
+			if (persistTimerRef.current) {
+				clearTimeout(persistTimerRef.current);
+			}
+		};
+	}, [
+		enableThreadHistory,
+		isThreadHistoryReady,
+		messages,
+		status,
+		persistActiveThread,
+	]);
+
+	const startNewThread = useCallback(() => {
+		if (persistTimerRef.current) {
+			clearTimeout(persistTimerRef.current);
+			persistTimerRef.current = undefined;
+		}
+		setMessages([]);
+		setQueuedMessages([]);
+		clearSessionId();
+		setText("");
+		const nextId = generateThreadId();
+		threadCreatedAtRef.current = nowIso();
+		threadTitleRef.current = undefined;
+		setActiveThreadId(nextId);
+		void refreshThreads();
+		return nextId;
+	}, [setMessages, clearSessionId, setActiveThreadId, refreshThreads]);
+
+	const switchThread = useCallback(
+		async (threadId: string) => {
+			if (persistTimerRef.current) {
+				clearTimeout(persistTimerRef.current);
+				persistTimerRef.current = undefined;
+			}
+			const stored = await loadThread(threadId);
+			if (!stored) {
+				return;
+			}
+			setActiveThreadId(stored.threadId);
+			threadCreatedAtRef.current = stored.createdAt;
+			threadTitleRef.current = stored.title;
+			if (stored.sessionId) {
+				sessionIdRef.current = stored.sessionId;
+				setSessionIdState(stored.sessionId);
+			} else {
+				clearSessionId();
+			}
+			setMessages(stored.messages);
+			setQueuedMessages([]);
+			setText("");
+		},
+		[setMessages, clearSessionId, setActiveThreadId],
+	);
+
+	const deleteThread = useCallback(
+		async (threadId: string) => {
+			await deleteThreadFromStore(threadId);
+			await refreshThreads();
+			if (activeThreadIdRef.current === threadId) {
+				if (persistTimerRef.current) {
+					clearTimeout(persistTimerRef.current);
+					persistTimerRef.current = undefined;
+				}
+				setMessages([]);
+				clearSessionId();
+				setText("");
+				activeThreadIdRef.current = undefined;
+				setActiveThreadIdState(undefined);
+				threadCreatedAtRef.current = undefined;
+				threadTitleRef.current = undefined;
+			}
+		},
+		[setMessages, clearSessionId, refreshThreads],
+	);
+
 	const handleTextChange = useCallback(
 		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
 			setText(e.target.value);
@@ -419,5 +686,11 @@ export function useChatEngine(props: ChatBaseProps) {
 		sessionId,
 		toolDefinitions,
 		refreshToolDefinitions,
+		threads,
+		activeThreadId,
+		isThreadHistoryReady,
+		startNewThread,
+		switchThread,
+		deleteThread,
 	};
 }

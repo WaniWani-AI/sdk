@@ -1,5 +1,11 @@
-const DB_NAME = "waniwani-memory";
-const STORE_NAME = "ids";
+export const DB_NAME = "waniwani-memory";
+export const DB_VERSION = 2;
+export const IDS_STORE = "ids";
+export const THREADS_STORE = "threads";
+export const THREADS_BY_USER_INDEX = "by_memoryUserId";
+export const THREADS_BY_UPDATED_INDEX = "by_updatedAt";
+
+const STORE_NAME = IDS_STORE;
 const KEY = "memoryUserId";
 const LOCAL_STORAGE_KEY = "waniwani-memory-user-id";
 
@@ -20,18 +26,43 @@ function generateUuid(): string {
 	});
 }
 
-async function openDb(): Promise<IDBDatabase> {
+export function applyMemoryDbUpgrade(
+	db: IDBDatabase,
+	oldVersion: number,
+): void {
+	if (oldVersion < 1) {
+		if (!db.objectStoreNames.contains(IDS_STORE)) {
+			db.createObjectStore(IDS_STORE);
+		}
+	}
+	if (oldVersion < 2) {
+		if (!db.objectStoreNames.contains(THREADS_STORE)) {
+			const threads = db.createObjectStore(THREADS_STORE, {
+				keyPath: "threadId",
+			});
+			threads.createIndex(THREADS_BY_USER_INDEX, "memoryUserId", {
+				unique: false,
+			});
+			threads.createIndex(THREADS_BY_UPDATED_INDEX, "updatedAt", {
+				unique: false,
+			});
+		}
+	}
+}
+
+export async function openMemoryDb(): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
-		const req = indexedDB.open(DB_NAME, 1);
-		req.onupgradeneeded = () => {
-			const db = req.result;
-			if (!db.objectStoreNames.contains(STORE_NAME)) {
-				db.createObjectStore(STORE_NAME);
-			}
+		const req = indexedDB.open(DB_NAME, DB_VERSION);
+		req.onupgradeneeded = (event) => {
+			applyMemoryDbUpgrade(req.result, event.oldVersion);
 		};
 		req.onsuccess = () => resolve(req.result);
 		req.onerror = () => reject(req.error);
 	});
+}
+
+async function openDb(): Promise<IDBDatabase> {
+	return openMemoryDb();
 }
 
 async function idbGet(db: IDBDatabase): Promise<string | null> {

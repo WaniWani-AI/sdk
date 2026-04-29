@@ -25,6 +25,7 @@ import { ChatQueue } from "../components/chat-queue";
 import { ExportSessionButton } from "../components/export-session";
 import { MessageList } from "../components/message-list";
 import { Suggestions } from "../components/suggestions";
+import { ThreadMenu } from "../components/thread-menu";
 import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useConfig } from "../hooks/use-config";
@@ -49,6 +50,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			triggerEvent = "triggerDemoRequest",
 			api,
 			debug,
+			enableThreadHistory = true,
 		} = props;
 
 		const effectiveApi = api ?? "/api/waniwani";
@@ -205,18 +207,33 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			>
 				{/* Header */}
 				<div
-					className="ww:shrink-0 ww:flex ww:items-center ww:px-6 ww:py-3"
+					className="ww:shrink-0 ww:flex ww:items-center ww:gap-2 ww:px-6 ww:py-3"
 					style={{
 						backgroundColor: resolvedTheme.headerBackgroundColor,
 						color: resolvedTheme.headerTextColor,
 					}}
 				>
-					<div className="ww:text-sm ww:font-semibold ww:truncate">{title}</div>
+					<div className="ww:text-sm ww:font-semibold ww:truncate ww:flex-1 ww:min-w-0">
+						{title}
+					</div>
 					<ExportSessionButton
 						messages={engine.messages}
 						evalEnabled={config.eval}
 						api={effectiveApi}
 					/>
+					{enableThreadHistory && (
+						<ThreadMenu
+							threads={engine.threads}
+							activeThreadId={engine.activeThreadId}
+							onNewThread={engine.startNewThread}
+							onSelectThread={(id) => {
+								void engine.switchThread(id);
+							}}
+							onDeleteThread={(id) => {
+								void engine.deleteThread(id);
+							}}
+						/>
+					)}
 				</div>
 
 				{/* Messages */}

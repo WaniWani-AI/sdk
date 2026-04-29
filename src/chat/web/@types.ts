@@ -135,6 +135,18 @@ export interface ChatBaseProps {
 	 * @internal
 	 */
 	skipRemoteConfig?: boolean;
+	/**
+	 * Persist the conversation across page reloads using IndexedDB so the user
+	 * can resume previous threads. Defaults to `true`.
+	 */
+	enableThreadHistory?: boolean;
+	/**
+	 * Force a specific thread to be active. When provided, the embed renders
+	 * that thread's messages and ignores the most-recently-updated default.
+	 */
+	activeThreadId?: string;
+	/** Fired whenever the active thread changes (new chat, switch, delete). */
+	onThreadChange?: (threadId: string) => void;
 }
 
 // ============================================================================
