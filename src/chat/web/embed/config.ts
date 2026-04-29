@@ -39,6 +39,11 @@ export interface EmbedConfig {
 	height?: number;
 	/** URL to a custom stylesheet injected into the shadow root. */
 	css?: string;
+	/**
+	 * Persist conversations across page reloads using IndexedDB so users can
+	 * resume previous threads. Defaults to `true`.
+	 */
+	enableThreadHistory?: boolean;
 	/** Theme overrides applied to the ChatCard. */
 	theme?: {
 		primaryColor?: string;
@@ -103,6 +108,21 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		}
 		const n = Number(raw);
 		return Number.isFinite(n) ? n : undefined;
+	};
+
+	const bool = (attr: string): boolean | undefined => {
+		const raw = el.getAttribute(attr);
+		if (raw == null) {
+			return undefined;
+		}
+		const lowered = raw.trim().toLowerCase();
+		if (lowered === "true" || lowered === "1" || lowered === "") {
+			return true;
+		}
+		if (lowered === "false" || lowered === "0") {
+			return false;
+		}
+		return undefined;
 	};
 
 	const config: Partial<EmbedConfig> = {};
@@ -173,6 +193,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const height = num("data-height");
 	if (height) {
 		config.height = height;
+	}
+
+	const enableThreadHistory = bool("data-enable-thread-history");
+	if (enableThreadHistory !== undefined) {
+		config.enableThreadHistory = enableThreadHistory;
 	}
 
 	// Theme from individual data attributes

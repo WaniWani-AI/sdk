@@ -365,6 +365,7 @@ export const FloatingChat = forwardRef<FloatingChatHandle, FloatingChatProps>(
 							suggestions={
 								config.suggestions ? { initial: config.suggestions } : undefined
 							}
+							enableThreadHistory={config.enableThreadHistory}
 							onResponseReceived={handleResponseReceived}
 							width="100%"
 							height="100%"
