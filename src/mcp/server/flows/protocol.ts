@@ -104,6 +104,13 @@ export function buildFlowProtocol(config: FlowConfig): string {
 		"   If the user did not answer all pending questions, the engine will re-prompt for the remaining ones.",
 		"   If the user mentioned values for other known fields, include those too —",
 		"   they will be applied immediately and those steps will be auto-skipped.",
+		"5. CORRECTION: If the user wants to CHANGE a previously-answered field",
+		'   (e.g. "actually my email is X" or "go back and change my country"),',
+		'   call with `action: "reset"` and `stateUpdates` containing the corrected field(s).',
+		"   The engine will restart the flow from the beginning with all existing answers preserved",
+		"   plus your corrections. Steps with filled answers will be auto-skipped.",
+		"   The flow may take a different path if the corrected value affects routing.",
+		'   Do NOT use "reset" for the CURRENT question — use "continue" for that.',
 	);
 
 	return lines.join("\n");

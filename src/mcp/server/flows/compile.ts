@@ -36,9 +36,9 @@ function buildInputSchema(config: { omitIntentPII?: boolean }) {
 		: "";
 	return {
 		action: z
-			.enum(["start", "continue"])
+			.enum(["start", "continue", "reset"])
 			.describe(
-				'"start" to begin the flow, "continue" to resume after a pause (interrupt or widget)',
+				'"start" to begin the flow, "continue" to resume after a pause (interrupt or widget), "reset" to restart from the beginning with a correction to a previously-collected field',
 			),
 		intent: z
 			.string()
@@ -208,6 +208,75 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			return executeFrom(
 				step,
 				updatedState,
+				nodes,
+				edges,
+				validators,
+				meta,
+				waniwani,
+				input.nodeOptions,
+				config.id,
+			);
+		}
+
+		if (args.action === "reset") {
+			if (!sessionId) {
+				return {
+					content: {
+						status: "error" as const,
+						error: "No session ID available for reset action.",
+					},
+				};
+			}
+
+			let flowState: Awaited<ReturnType<typeof store.get>>;
+			try {
+				flowState = await store.get(sessionId);
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				return {
+					content: {
+						status: "error" as const,
+						error: `Failed to load flow state (session "${sessionId}"): ${msg}`,
+					},
+				};
+			}
+
+			if (!flowState) {
+				return {
+					content: {
+						status: "error" as const,
+						error: `Flow state not found for session "${sessionId}". The flow may have completed or expired. Use action "start" to begin a new flow.`,
+					},
+				};
+			}
+
+			if (!args.stateUpdates || Object.keys(args.stateUpdates).length === 0) {
+				return {
+					content: {
+						status: "error" as const,
+						error:
+							'Missing "stateUpdates" for action "reset". Include the corrected field(s).',
+					},
+				};
+			}
+
+			const startEdge = edges.get(START);
+			if (!startEdge) {
+				return {
+					content: { status: "error" as const, error: "No start edge" },
+				};
+			}
+
+			const existingState = flowState.state as TState;
+			const mergedState = deepMerge(
+				existingState as Record<string, unknown>,
+				expandDotPaths(args.stateUpdates),
+			) as TState;
+
+			const firstNode = await resolveNextNode(startEdge, mergedState);
+			return executeFrom(
+				firstNode,
+				mergedState,
 				nodes,
 				edges,
 				validators,

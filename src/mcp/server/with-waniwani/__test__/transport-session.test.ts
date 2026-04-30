@@ -29,6 +29,29 @@ describe("extractTransportSessionId", () => {
 		).toBe("sid-from-transport");
 	});
 
+	test("returns x-waniwani-session-id from requestInfo headers", () => {
+		expect(
+			extractTransportSessionId({
+				requestInfo: {
+					headers: { "x-waniwani-session-id": "wani-sid" },
+				},
+			}),
+		).toBe("wani-sid");
+	});
+
+	test("prefers mcp-session-id over x-waniwani-session-id", () => {
+		expect(
+			extractTransportSessionId({
+				requestInfo: {
+					headers: {
+						"mcp-session-id": "mcp-sid",
+						"x-waniwani-session-id": "wani-sid",
+					},
+				},
+			}),
+		).toBe("mcp-sid");
+	});
+
 	test("returns undefined when neither is present", () => {
 		expect(extractTransportSessionId({})).toBe(undefined);
 	});

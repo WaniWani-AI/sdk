@@ -1288,3 +1288,357 @@ describe("nested object state", () => {
 		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
 	});
 });
+
+// ============================================================================
+// Reset action
+// ============================================================================
+
+describe("reset action", () => {
+	test("reset corrects a previously-answered field and re-executes from start", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "reset_basic",
+			title: "Reset Basic",
+			description: "Test basic reset.",
+			state: {
+				email: z.string().describe("Email"),
+				name: z.string().describe("Name"),
+				phone: z.string().describe("Phone"),
+			},
+		})
+			.addNode("ask_email", ({ interrupt }) =>
+				interrupt({ email: { question: "Email?" } }),
+			)
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addNode("ask_phone", ({ interrupt }) =>
+				interrupt({ phone: { question: "Phone?" } }),
+			)
+			.addEdge(START, "ask_email")
+			.addEdge("ask_email", "ask_name")
+			.addEdge("ask_name", "ask_phone")
+			.addEdge("ask_phone", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Start → ask email
+		await handler?.(startInput(), TEST_EXTRA);
+		// Answer email → ask name
+		await handler?.(
+			{ action: "continue", stateUpdates: { email: "old@test.com" } },
+			TEST_EXTRA,
+		);
+		// Answer name → ask phone
+		await handler?.(
+			{ action: "continue", stateUpdates: { name: "Alice" } },
+			TEST_EXTRA,
+		);
+
+		// Now paused at ask_phone. Reset email.
+		const result = (await handler?.(
+			{ action: "reset", stateUpdates: { email: "new@test.com" } },
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		// Should skip email (filled with new value) and name (still filled),
+		// and land on ask_phone again
+		expect(parsed.status).toBe("interrupt");
+		expect(parsed.question).toBe("Phone?");
+		expect(parsed.field).toBe("phone");
+
+		// Verify state has the corrected email
+		const state = await store.get(TEST_SESSION_ID);
+		expect(state?.state.email).toBe("new@test.com");
+		expect(state?.state.name).toBe("Alice");
+	});
+
+	test("reset changes conditional edge path", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "reset_conditional",
+			title: "Reset Conditional",
+			description: "Test reset with conditional edges.",
+			state: {
+				country: z.string().describe("Country"),
+				usState: z.string().describe("US State"),
+				euRegion: z.string().describe("EU Region"),
+			},
+		})
+			.addNode("ask_country", ({ interrupt }) =>
+				interrupt({ country: { question: "Country?" } }),
+			)
+			.addNode("ask_us_state", ({ interrupt }) =>
+				interrupt({ usState: { question: "US State?" } }),
+			)
+			.addNode("ask_eu_region", ({ interrupt }) =>
+				interrupt({ euRegion: { question: "EU Region?" } }),
+			)
+			.addEdge(START, "ask_country")
+			.addConditionalEdge("ask_country", (state) =>
+				state.country === "US" ? "ask_us_state" : "ask_eu_region",
+			)
+			.addEdge("ask_us_state", END)
+			.addEdge("ask_eu_region", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Start → ask country
+		await handler?.(startInput(), TEST_EXTRA);
+		// Answer "US" → ask US state
+		await handler?.(
+			{ action: "continue", stateUpdates: { country: "US" } },
+			TEST_EXTRA,
+		);
+
+		// Now paused at ask_us_state. Reset country to "FR".
+		const result = (await handler?.(
+			{ action: "reset", stateUpdates: { country: "FR" } },
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		// Should now take EU path
+		expect(parsed.status).toBe("interrupt");
+		expect(parsed.question).toBe("EU Region?");
+		expect(parsed.field).toBe("euRegion");
+	});
+
+	test("reset recomputes action node derived values", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "reset_action_recompute",
+			title: "Reset Action Recompute",
+			description: "Test reset recomputes action nodes.",
+			state: {
+				email: z.string().describe("Email"),
+				domain: z.string().describe("Extracted domain"),
+				confirmed: z.string().describe("Confirmation"),
+			},
+		})
+			.addNode("ask_email", ({ interrupt }) =>
+				interrupt({ email: { question: "Email?" } }),
+			)
+			.addNode("extract_domain", ({ state }) => ({
+				domain: state.email?.split("@")[1] ?? "",
+			}))
+			.addNode("confirm", ({ interrupt }) =>
+				interrupt({ confirmed: { question: "Confirm?" } }),
+			)
+			.addEdge(START, "ask_email")
+			.addEdge("ask_email", "extract_domain")
+			.addEdge("extract_domain", "confirm")
+			.addEdge("confirm", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Start → ask email
+		await handler?.(startInput(), TEST_EXTRA);
+		// Answer email → extract_domain runs → ask confirm
+		await handler?.(
+			{ action: "continue", stateUpdates: { email: "alice@old.com" } },
+			TEST_EXTRA,
+		);
+
+		// Verify domain was computed
+		let state = await store.get(TEST_SESSION_ID);
+		expect(state?.state.domain).toBe("old.com");
+
+		// Reset email → domain should be recomputed
+		const result = (await handler?.(
+			{ action: "reset", stateUpdates: { email: "alice@new.com" } },
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("interrupt");
+		expect(parsed.field).toBe("confirmed");
+
+		state = await store.get(TEST_SESSION_ID);
+		expect(state?.state.domain).toBe("new.com");
+		expect(state?.state.email).toBe("alice@new.com");
+	});
+
+	test("reset without session ID returns error", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "reset_no_session",
+			title: "Reset No Session",
+			description: "Test reset without session.",
+			state: { name: z.string().describe("Name") },
+		})
+			.addNode("ask", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addEdge(START, "ask")
+			.addEdge("ask", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(
+			{ action: "reset", stateUpdates: { name: "Alice" } },
+			{ _meta: {} },
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("error");
+		expect(parsed.error).toContain("No session ID");
+	});
+
+	test("reset without stateUpdates returns error", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "reset_no_updates",
+			title: "Reset No Updates",
+			description: "Test reset without updates.",
+			state: {
+				name: z.string().describe("Name"),
+				email: z.string().describe("Email"),
+			},
+		})
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addNode("ask_email", ({ interrupt }) =>
+				interrupt({ email: { question: "Email?" } }),
+			)
+			.addEdge(START, "ask_name")
+			.addEdge("ask_name", "ask_email")
+			.addEdge("ask_email", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Start and answer first question (flow still in progress)
+		await handler?.(startInput(), TEST_EXTRA);
+		await handler?.(
+			{ action: "continue", stateUpdates: { name: "Alice" } },
+			TEST_EXTRA,
+		);
+
+		const result = (await handler?.({ action: "reset" }, TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("error");
+		expect(parsed.error).toContain("stateUpdates");
+	});
+
+	test("reset on completed/expired flow returns error", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "reset_completed",
+			title: "Reset Completed",
+			description: "Test reset on completed flow.",
+			state: { name: z.string().describe("Name") },
+		})
+			.addNode("ask", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addEdge(START, "ask")
+			.addEdge("ask", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Complete the flow
+		await handler?.(startInput(), TEST_EXTRA);
+		await handler?.(
+			{ action: "continue", stateUpdates: { name: "Alice" } },
+			TEST_EXTRA,
+		);
+
+		// Store should be cleaned up
+		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
+
+		// Reset should fail
+		const result = (await handler?.(
+			{ action: "reset", stateUpdates: { name: "Bob" } },
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("error");
+		expect(parsed.error).toContain("not found");
+	});
+
+	test("reset preserves partial progress on current multi-question interrupt", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "reset_partial_progress",
+			title: "Reset Partial Progress",
+			description: "Test reset preserves partial answers on current node.",
+			state: {
+				email: z.string().describe("Email"),
+				phone: z.string().describe("Phone"),
+				address: z.string().describe("Address"),
+			},
+		})
+			.addNode("ask_email", ({ interrupt }) =>
+				interrupt({ email: { question: "Email?" } }),
+			)
+			.addNode("ask_contact", ({ interrupt }) =>
+				interrupt({
+					phone: { question: "Phone?" },
+					address: { question: "Address?" },
+				}),
+			)
+			.addEdge(START, "ask_email")
+			.addEdge("ask_email", "ask_contact")
+			.addEdge("ask_contact", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Start → ask email
+		await handler?.(startInput(), TEST_EXTRA);
+		// Answer email → ask contact (phone + address)
+		await handler?.(
+			{ action: "continue", stateUpdates: { email: "old@test.com" } },
+			TEST_EXTRA,
+		);
+		// Partial answer: only phone
+		await handler?.(
+			{ action: "continue", stateUpdates: { phone: "123" } },
+			TEST_EXTRA,
+		);
+
+		// Now paused on ask_contact with only address remaining.
+		// Reset email — phone should be preserved.
+		const result = (await handler?.(
+			{ action: "reset", stateUpdates: { email: "new@test.com" } },
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		// Should land on ask_contact, asking only for address (phone already filled)
+		expect(parsed.status).toBe("interrupt");
+		expect(parsed.question).toBe("Address?");
+		expect(parsed.field).toBe("address");
+
+		const state = await store.get(TEST_SESSION_ID);
+		expect(state?.state.email).toBe("new@test.com");
+		expect(state?.state.phone).toBe("123");
+	});
+});

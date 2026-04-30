@@ -5,8 +5,9 @@ function isRecord(v: unknown): v is UnknownRecord {
 }
 
 /**
- * Extract session ID from MCP transport metadata (`extra.sessionId`) or
- * the raw `Mcp-Session-Id` HTTP header (`extra.requestInfo.headers`).
+ * Extract session ID from MCP transport metadata (`extra.sessionId`),
+ * the raw `Mcp-Session-Id` HTTP header, or the `X-Waniwani-Session-Id`
+ * header (set by stateless serverless deployments).
  */
 export function extractTransportSessionId(
 	extra: UnknownRecord,
@@ -27,6 +28,10 @@ export function extractTransportSessionId(
 			const sid = headers["mcp-session-id"];
 			if (typeof sid === "string" && sid) {
 				return sid;
+			}
+			const waniSid = headers["x-waniwani-session-id"];
+			if (typeof waniSid === "string" && waniSid) {
+				return waniSid;
 			}
 		}
 	}
