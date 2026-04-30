@@ -91,6 +91,19 @@ export async function createFlowTestHarness(
 			return toResult(parsePayload(result));
 		},
 
+		async resetWith(
+			stateUpdates: Record<string, unknown>,
+		): Promise<FlowTestResult> {
+			const result = (await handler(
+				{
+					action: "reset",
+					stateUpdates,
+				},
+				extra,
+			)) as Record<string, unknown>;
+			return toResult(parsePayload(result));
+		},
+
 		async lastState(): Promise<FlowTokenContent | null> {
 			return store ? store.get(sessionId) : null;
 		},
