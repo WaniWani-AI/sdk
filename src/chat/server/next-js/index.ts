@@ -6,6 +6,8 @@ import type { NextJsHandlerOptions, NextJsHandlerResult } from "./@types.js";
 
 export type { NextJsHandlerOptions, NextJsHandlerResult } from "./@types.js";
 
+let deprecationWarned = false;
+
 /**
  * Create Next.js route handlers from a WaniWani client.
  *
@@ -14,6 +16,10 @@ export type { NextJsHandlerOptions, NextJsHandlerResult } from "./@types.js";
  *
  * - `POST /api/waniwani`              → chat (proxied to WaniWani API)
  * - `GET  /api/waniwani/resource?uri=…` → MCP resource content
+ *
+ * @deprecated Use `toExpressJsHandler` from `@waniwani/sdk/express-js` instead.
+ *   The Next.js-specific wrapper will be removed in a follow-up release. Both
+ *   adapters share the same underlying `createApiHandler`, so behavior is identical.
  *
  * @example
  * ```typescript
@@ -35,6 +41,13 @@ export function toNextJsHandler(
 	client: WaniWaniClient,
 	options: NextJsHandlerOptions,
 ): NextJsHandlerResult {
+	if (!deprecationWarned && process.env.NODE_ENV !== "test") {
+		console.warn(
+			"[waniwani-sdk] toNextJsHandler is deprecated; switch to toExpressJsHandler from @waniwani/sdk/express-js. It will be removed in a follow-up release.",
+		);
+		deprecationWarned = true;
+	}
+
 	const { apiKey, apiUrl } = client._config;
 
 	const debugEnabled = options?.debug ?? process.env.WANIWANI_DEBUG === "1";
