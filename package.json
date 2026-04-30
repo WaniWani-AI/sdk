@@ -36,6 +36,11 @@
       "import": "./dist/chat/next-js/index.js",
       "default": "./dist/chat/next-js/index.js"
     },
+    "./express-js": {
+      "types": "./dist/chat/express-js/index.d.ts",
+      "import": "./dist/chat/express-js/index.js",
+      "default": "./dist/chat/express-js/index.js"
+    },
     "./kb": {
       "types": "./dist/kb/index.d.ts",
       "import": "./dist/kb/index.js",

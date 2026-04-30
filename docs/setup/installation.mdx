@@ -122,6 +122,6 @@ const result = await wani.shutdown({ timeoutMs: 5000 });
 ## Also supported
 
 - **Project config file.** Create a `waniwani.config.ts` with `defineConfig({ ... })` from `@waniwani/sdk`, then import it once at startup. Subsequent calls to `waniwani()` pick up the registered config.
-- **Framework adapters.** Pass the client to `toNextJsHandler(wani, { ... })` from `@waniwani/sdk/next-js` for Next.js route handlers.
+- **Framework adapters.** Pass the client to `toExpressJsHandler(wani, { ... })` from `@waniwani/sdk/express-js` for Express middleware. The legacy `toNextJsHandler` from `@waniwani/sdk/next-js` is deprecated and will be removed in a follow-up release.
 
 Next: [get your API key](/setup/api-key), then [wrap your MCP server](/setup/wrap-server).
