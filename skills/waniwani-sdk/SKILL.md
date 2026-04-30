@@ -243,6 +243,7 @@ Step-by-step scripts for common tasks. Follow these when the user wants to build
 |------------------|----------|
 | Initialize a new MCP distribution from the template | [scripts/initialize.md](scripts/initialize.md) |
 | Create their first flow | [scripts/create-flow.md](scripts/create-flow.md) |
+| Tunnel the dev server for remote testing | [scripts/tunnel.md](scripts/tunnel.md) |
 
 When a playbook exists for the user's task, **follow the playbook step by step** instead of writing code directly. The playbooks include prerequisite checks, interactive design steps, and testing instructions.
 

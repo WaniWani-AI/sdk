@@ -33,7 +33,8 @@
               "setup/installation",
               "setup/api-key",
               "setup/security",
-              "setup/wrap-server"
+              "setup/wrap-server",
+              "setup/tunnel"
             ]
           },
           {

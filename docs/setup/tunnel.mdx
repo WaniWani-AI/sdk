@@ -1,0 +1,101 @@
+---
+title: Tunnel
+description: "Expose your local MCP server to ChatGPT, Claude, and other remote clients."
+---
+
+MCP clients like ChatGPT and Claude need a public URL to reach your server. A tunnel forwards traffic from a public URL to your local dev server -- no deployment required.
+
+<Note>
+  **Managed projects** handle this automatically. `bun dev` starts a Cloudflare tunnel and prints the public URL. This guide is for **external projects** or custom setups.
+</Note>
+
+## 1. Start your dev server
+
+```bash
+bun run dev
+# or: npm run dev, node dist/index.js, etc.
+```
+
+Note the port your server is listening on (usually `3000`, `8080`, or `8787`). Check your server logs or `package.json` for the exact port.
+
+## 2. Start a tunnel
+
+<Tabs>
+  <Tab title="cloudflared (recommended)">
+    [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) requires no account for quick tunnels.
+
+    **Install:**
+
+    <CodeGroup>
+      ```bash macOS
+      brew install cloudflared
+      ```
+
+      ```bash Linux
+      curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg > /dev/null
+      echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+      sudo apt update && sudo apt install cloudflared
+      ```
+    </CodeGroup>
+
+    **Run:**
+
+    ```bash
+    cloudflared tunnel --url http://localhost:3000
+    ```
+
+    Cloudflared prints a public URL like `https://<random>.trycloudflare.com`. Use that as your MCP server endpoint.
+  </Tab>
+
+  <Tab title="ngrok">
+    [ngrok](https://ngrok.com) requires a free account and auth token.
+
+    **Install:**
+
+    <CodeGroup>
+      ```bash macOS
+      brew install ngrok
+      ```
+
+      ```bash Linux
+      snap install ngrok
+      ```
+    </CodeGroup>
+
+    **Authenticate (once):**
+
+    ```bash
+    ngrok config add-authtoken <your-token>
+    ```
+
+    **Run:**
+
+    ```bash
+    ngrok http 3000
+    ```
+
+    ngrok prints a public URL like `https://<random>.ngrok-free.app`.
+  </Tab>
+</Tabs>
+
+## 3. Use the tunnel URL
+
+Replace `localhost` with the tunnel URL in your MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "url": "https://<tunnel-url>/mcp"
+    }
+  }
+}
+```
+
+Both the dev server and the tunnel must stay running. If either stops, the public URL stops working.
+
+## Good to know
+
+- **Quick tunnels generate a new URL each time.** For a stable URL, set up a [named Cloudflare tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/create-remote-tunnel/) or use an ngrok paid plan.
+- **stdio transport does not need a tunnel.** Tunnels are only needed for HTTP-based transports (Streamable HTTP, SSE).
+- **ngrok free tier** has rate limits and session expiry (typically 2 hours).
