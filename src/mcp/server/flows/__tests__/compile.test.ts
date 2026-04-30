@@ -1642,3 +1642,240 @@ describe("reset action", () => {
 		expect(state?.state.phone).toBe("123");
 	});
 });
+
+// ============================================================================
+// Auto-generated sessionId for sessionless clients (e.g. Claude Code)
+// ============================================================================
+
+describe("auto-generated sessionId for sessionless clients", () => {
+	/** Fresh extra with no session — avoids mutation leaking between calls */
+	const noSessionExtra = () => ({ _meta: {} });
+
+	function buildSimpleFlow(store: TestFlowStateStore) {
+		return createFlow({
+			id: "sessionless_flow",
+			title: "Sessionless Flow",
+			description: "Test auto-generated sessionId.",
+			state: {
+				name: z.string().describe("User name"),
+			},
+		})
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ name: { question: "What's your name?" } }),
+			)
+			.addEdge(START, "ask_name")
+			.addEdge("ask_name", END)
+			.compile({ store });
+	}
+
+	test("start without session auto-generates sessionId and includes it in response", async () => {
+		const store = new TestFlowStateStore();
+		const flow = buildSimpleFlow(store);
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(
+			startInput(),
+			noSessionExtra(),
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("interrupt");
+		expect(parsed.sessionId).toBeString();
+		expect((parsed.sessionId as string).length).toBeGreaterThan(0);
+	});
+
+	test("start with _meta sessionId does NOT echo sessionId in response", async () => {
+		const store = new TestFlowStateStore();
+		const flow = buildSimpleFlow(store);
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("interrupt");
+		expect(parsed.sessionId).toBeUndefined();
+	});
+
+	test("continue with sessionId from input retrieves persisted state", async () => {
+		const store = new TestFlowStateStore();
+		const flow = buildSimpleFlow(store);
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Start without session — get auto-generated sessionId
+		const startResult = (await handler?.(
+			startInput(),
+			noSessionExtra(),
+		)) as Record<string, unknown>;
+		const startParsed = parsePayload(startResult);
+		const sessionId = startParsed.sessionId as string;
+		expect(sessionId).toBeString();
+
+		// Continue passing sessionId in input (as Claude Code would)
+		const continueResult = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { name: "Alice" },
+				sessionId,
+			},
+			noSessionExtra(),
+		)) as Record<string, unknown>;
+		const continueParsed = parsePayload(continueResult);
+
+		expect(continueParsed.status).toBe("complete");
+		// sessionId still echoed (no _meta session)
+		expect(continueParsed.sessionId).toBe(sessionId);
+	});
+
+	test("reset with sessionId from input works end-to-end", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "sessionless_reset_flow",
+			title: "Sessionless Reset Flow",
+			description: "Test reset with auto-generated sessionId.",
+			state: {
+				name: z.string().describe("User name"),
+				email: z.string().describe("User email"),
+			},
+		})
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addNode("ask_email", ({ interrupt }) =>
+				interrupt({ email: { question: "Email?" } }),
+			)
+			.addEdge(START, "ask_name")
+			.addEdge("ask_name", "ask_email")
+			.addEdge("ask_email", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Start — get sessionId
+		const r1 = (await handler?.(startInput(), noSessionExtra())) as Record<
+			string,
+			unknown
+		>;
+		const sessionId = parsePayload(r1).sessionId as string;
+
+		// Continue with name
+		await handler?.(
+			{ action: "continue", stateUpdates: { name: "Alice" }, sessionId },
+			noSessionExtra(),
+		);
+
+		// Reset name
+		const r3 = (await handler?.(
+			{ action: "reset", stateUpdates: { name: "Bob" }, sessionId },
+			noSessionExtra(),
+		)) as Record<string, unknown>;
+		const p3 = parsePayload(r3);
+
+		// Should skip ask_name (already filled with "Bob") and land on ask_email
+		expect(p3.status).toBe("interrupt");
+		expect(p3.field).toBe("email");
+		expect(p3.sessionId).toBe(sessionId);
+	});
+
+	test("continue without session and without sessionId input returns error", async () => {
+		const store = new TestFlowStateStore();
+		const flow = buildSimpleFlow(store);
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(
+			{ action: "continue", stateUpdates: { name: "Alice" } },
+			noSessionExtra(),
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("error");
+		expect(parsed.error).toContain("No session ID");
+	});
+
+	test("auto-generated sessionId persists state to KV store", async () => {
+		const store = new TestFlowStateStore();
+		const flow = buildSimpleFlow(store);
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(
+			startInput(),
+			noSessionExtra(),
+		)) as Record<string, unknown>;
+		const sessionId = parsePayload(result).sessionId as string;
+
+		// Verify state was stored under the auto-generated sessionId
+		const stored = await store.get(sessionId);
+		expect(stored).toMatchObject({
+			step: "ask_name",
+			state: {},
+			field: "name",
+		});
+	});
+
+	test("completed flow cleans up state with auto-generated sessionId", async () => {
+		const store = new TestFlowStateStore();
+		const flow = buildSimpleFlow(store);
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Start
+		const r1 = (await handler?.(startInput(), noSessionExtra())) as Record<
+			string,
+			unknown
+		>;
+		const sessionId = parsePayload(r1).sessionId as string;
+
+		// Complete
+		await handler?.(
+			{ action: "continue", stateUpdates: { name: "Alice" }, sessionId },
+			noSessionExtra(),
+		);
+
+		// State should be cleaned up
+		expect(await store.get(sessionId)).toEqual(null);
+	});
+
+	test("each start generates a unique sessionId", async () => {
+		const store = new TestFlowStateStore();
+		const flow = buildSimpleFlow(store);
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const r1 = (await handler?.(startInput(), noSessionExtra())) as Record<
+			string,
+			unknown
+		>;
+		const r2 = (await handler?.(startInput(), noSessionExtra())) as Record<
+			string,
+			unknown
+		>;
+
+		const id1 = parsePayload(r1).sessionId as string;
+		const id2 = parsePayload(r2).sessionId as string;
+
+		expect(id1).not.toBe(id2);
+	});
+});

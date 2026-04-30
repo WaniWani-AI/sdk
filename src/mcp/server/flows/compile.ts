@@ -58,6 +58,12 @@ function buildInputSchema(config: { omitIntentPII?: boolean }) {
 			.describe(
 				"State field values to set before processing the next node. Use this to pass the user's answer (keyed by the field name from the response) and any other values the user mentioned.",
 			),
+		sessionId: z
+			.string()
+			.optional()
+			.describe(
+				'Session identifier. If the response includes a `sessionId`, pass it back on every subsequent "continue" and "reset" call for this flow.',
+			),
 	};
 }
 
@@ -316,7 +322,16 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			ServerNotification
 		>;
 		const _meta: Record<string, unknown> = requestExtra._meta ?? {};
-		const sessionId = extractSessionId(_meta);
+		const metaSessionId = extractSessionId(_meta);
+		let sessionId = metaSessionId ?? args.sessionId;
+
+		// Auto-generate session ID for clients that don't provide one (e.g. Claude Code)
+		if (!sessionId && args.action === "start") {
+			sessionId = crypto.randomUUID();
+			// Set in _meta so tracking/scoped-client picks it up
+			_meta["waniwani/sessionId"] = sessionId;
+		}
+
 		const waniwani = extractScopedClient(requestExtra);
 
 		const result = await handleToolCall(args, sessionId, _meta, waniwani);
@@ -354,10 +369,16 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			}
 		}
 
+		// Echo sessionId in response when not sourced from _meta (client must pass it back)
+		const contentObj =
+			!metaSessionId && sessionId
+				? { ...result.content, sessionId }
+				: result.content;
+
 		const content = [
 			{
 				type: "text" as const,
-				text: JSON.stringify(result.content, null, 2),
+				text: JSON.stringify(contentObj, null, 2),
 			},
 		];
 

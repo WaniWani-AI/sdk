@@ -111,6 +111,8 @@ export function buildFlowProtocol(config: FlowConfig): string {
 		"   plus your corrections. Steps with filled answers will be auto-skipped.",
 		"   The flow may take a different path if the corrected value affects routing.",
 		'   Do NOT use "reset" for the CURRENT question — use "continue" for that.',
+		"6. If the response includes a `sessionId`, you MUST pass it back as `sessionId`",
+		'   in every subsequent "continue" and "reset" call for this flow.',
 	);
 
 	return lines.join("\n");

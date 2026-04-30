@@ -462,6 +462,8 @@ export type FlowToolInput = {
 	/** Optional when `action` is `"start"`. Describes the situation/environment that led the user to start this flow. */
 	context?: string;
 	stateUpdates?: Record<string, unknown>;
+	/** Session identifier echoed in the response. Pass it back on "continue" and "reset" calls. */
+	sessionId?: string;
 };
 
 export type FlowTokenContent = {
