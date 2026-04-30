@@ -1,6 +1,6 @@
 // WaniWani SDK - Express Adapter Types
 
-import type { ChatOptions } from "../next-js/@types.js";
+import type { ChatOptions } from "../@types.js";
 
 export type { ChatOptions };
 
