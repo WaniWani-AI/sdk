@@ -10,14 +10,23 @@ import { WidgetProvider, useToolOutput, useTheme } from "@waniwani/sdk/mcp/react
 
 Peer dependencies: `react`, optionally `@modelcontextprotocol/ext-apps`
 
-## `WidgetProvider`
+## `WidgetProvider` (REQUIRED)
 
-Required wrapper for all widget components. Without it, hooks will fail silently.
+**Every widget page MUST wrap its content in `WidgetProvider`.** Without it, all hooks (`useToolOutput`, `useTheme`, etc.) will throw:
+
+```
+Uncaught Error: useWidgetClient must be used within a WidgetProvider
+```
+
+The page component itself must NOT call any hooks. It is only a thin shell that renders `WidgetProvider` around a child component. All hook usage goes in the child component.
 
 ```tsx
+// CORRECT: page.tsx is a thin wrapper, hooks are in the child component
+"use client";
 import { WidgetProvider } from "@waniwani/sdk/mcp/react";
+import { MyWidget } from "@/lib/widgets/my-widget";
 
-export default function App() {
+export default function MyWidgetPage() {
   return (
     <WidgetProvider loading={<div>Loading...</div>}>
       <MyWidget />
@@ -25,6 +34,52 @@ export default function App() {
   );
 }
 ```
+
+```tsx
+// WRONG: calling hooks directly in the page without WidgetProvider
+"use client";
+import { useToolOutput } from "@waniwani/sdk/mcp/react";
+
+export default function MyWidgetPage() {
+  const data = useToolOutput(); // THROWS: useWidgetClient must be used within a WidgetProvider
+  return <div>{JSON.stringify(data)}</div>;
+}
+```
+
+## `InitializeNextJsInIframe`
+
+Patches Next.js so the app works correctly inside a cross-origin iframe (ChatGPT sandbox, Claude MCP Apps, embed proxy). Must be rendered in the root layout's `<head>`.
+
+**What it patches:**
+- `history.pushState` / `replaceState` -- prevents cross-origin URL errors in sandboxed iframes
+- `window.fetch` -- rewrites same-origin requests to the widget's real `baseUrl` so relative `/api/...` calls don't 404
+- `<html>` attribute observer -- strips host-injected attributes while preserving `class`/`style`/`lang`
+
+```tsx
+// app/layout.tsx (or app/widgets/layout.tsx)
+import { InitializeNextJsInIframe } from "@waniwani/sdk/mcp/react";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <InitializeNextJsInIframe
+          baseUrl={process.env.NEXT_PUBLIC_BASE_URL!}
+          passthroughOrigins={[process.env.NEXT_PUBLIC_WANIWANI_API_URL ?? "https://app.waniwani.ai"]}
+        />
+      </head>
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+**Props:**
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `baseUrl` | `string` | Yes | The widget app's canonical URL (e.g. `https://my-app.com`) |
+| `passthroughOrigins` | `string[]` | No | Origins whose fetches skip the rewrite (e.g. WaniWani API origin when widget shares origin with a proxy) |
 
 ## Hooks Reference
 
@@ -144,10 +199,10 @@ First token is the event name, remaining `key:value` pairs become metadata. Nume
 
 ## Widget Page Pattern
 
-Keep the page component as a thin wrapper. All widget logic belongs in a separate component file.
+**CRITICAL: The page component MUST wrap children in `WidgetProvider`. Never call hooks directly in the page -- they will throw.** Keep the page as a thin wrapper. All widget logic belongs in a separate component file rendered inside `WidgetProvider`.
 
 ```tsx
-// app/widgets/pricing/page.tsx -- thin wrapper
+// app/widgets/pricing/page.tsx -- thin wrapper with WidgetProvider
 "use client";
 import { WidgetProvider } from "@waniwani/sdk/mcp/react";
 import { PricingWidget } from "@/lib/widgets/pricing";
@@ -162,7 +217,7 @@ export default function PricingPage() {
 ```
 
 ```tsx
-// lib/widgets/pricing.tsx -- all logic here
+// lib/widgets/pricing.tsx -- all hook usage here, inside WidgetProvider
 "use client";
 import { useToolOutput, useTheme } from "@waniwani/sdk/mcp/react";
 
@@ -197,7 +252,7 @@ Programmatic mock updates are available via `initializeMockOpenAI()`, `updateMoc
 
 ## Common Mistakes
 
+- **Calling hooks in the page component without `WidgetProvider`** -- This is the #1 error. The page component must ONLY render `<WidgetProvider>` around a child component. All `useToolOutput`, `useTheme`, etc. calls go in the child. Without this, you get: `Uncaught Error: useWidgetClient must be used within a WidgetProvider`.
 - **Wrong import path** -- Hooks come from `@waniwani/sdk/mcp/react`, not `@waniwani/sdk`.
-- **Missing `WidgetProvider`** -- All hooks require the `WidgetProvider` wrapper. Without it, hooks fail silently.
-- **Business logic in page files** -- Keep `page.tsx` as a thin wrapper. All widget logic belongs in a separate component.
+- **Missing `InitializeNextJsInIframe` in layout** -- Without it, fetch calls 404 and navigation breaks inside cross-origin iframes (ChatGPT, Claude, embed proxy).
 - **Assuming all hooks work everywhere** -- `useSafeArea`, `useMaxHeight`, and `useWidgetState` return `null`/no-op on MCP Apps (Claude).

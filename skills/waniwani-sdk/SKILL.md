@@ -241,6 +241,7 @@ Step-by-step scripts for common tasks. Follow these when the user wants to build
 
 | User wants to... | Playbook |
 |------------------|----------|
+| Initialize a new MCP distribution from the template | [scripts/initialize.md](scripts/initialize.md) |
 | Create their first flow | [scripts/create-flow.md](scripts/create-flow.md) |
 
 When a playbook exists for the user's task, **follow the playbook step by step** instead of writing code directly. The playbooks include prerequisite checks, interactive design steps, and testing instructions.
@@ -260,6 +261,7 @@ When a playbook exists for the user's task, **follow the playbook step by step**
 - **Missing `WANIWANI_API_KEY` env var** -- Flow state and tracking will throw. Set it in all environments (dev, Vercel, production).
 - **Creating multiple clients** -- Create one in `lib/waniwani.ts` and import everywhere.
 - **Wrong import paths** -- Hooks: `@waniwani/sdk/mcp/react`. Chat: `@waniwani/sdk/chat`. Tools: `@waniwani/sdk/mcp`.
-- **Missing `WidgetProvider`** -- All React widget hooks require the `WidgetProvider` wrapper.
+- **Missing `WidgetProvider` in page component** -- The page MUST wrap children in `<WidgetProvider>`. Never call hooks (`useToolOutput`, `useTheme`, etc.) directly in the page -- they throw `useWidgetClient must be used within a WidgetProvider`. Put all hook usage in a child component rendered inside `WidgetProvider`.
+- **Missing `InitializeNextJsInIframe` in layout** -- Add `<InitializeNextJsInIframe baseUrl={...} />` in the root layout's `<head>` so fetch/navigation work inside cross-origin iframes.
 - **Forgetting `START`/`END` edges in flows** -- Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`.
 - **Importing `interrupt`/`showWidget` directly** -- These come from the handler context: `({ interrupt }) => interrupt(...)`.
