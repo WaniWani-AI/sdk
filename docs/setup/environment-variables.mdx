@@ -1,0 +1,39 @@
+---
+title: Environment Variables
+description: "All environment variables recognized by the WaniWani SDK."
+---
+
+The SDK reads the following environment variables at runtime. None are required at import time; they are checked when the relevant feature is used.
+
+## Authentication
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `WANIWANI_API_KEY` | Yes | API key for your MCP environment. See [API Keys](/setup/api-key). |
+| `WANIWANI_API_URL` | No | Override the API base URL. Defaults to `https://app.waniwani.ai`. Use `https://eu.app.waniwani.ai` for the EU region. |
+
+## Logging
+
+By default the SDK is silent. Set one of these to enable internal logs (prefixed `[waniwani:*]`):
+
+| Variable | Values | Description |
+| --- | --- | --- |
+| `WANIWANI_LOG_LEVEL` | `debug` &#124; `warn` &#124; `error` &#124; `none` | Controls SDK log verbosity. Defaults to `none`. |
+| `WANIWANI_DEBUG` | Any truthy value | Legacy shorthand. Equivalent to `WANIWANI_LOG_LEVEL=debug`. |
+
+If both are set, `WANIWANI_LOG_LEVEL` takes precedence.
+
+```bash .env
+# Enable debug logs
+WANIWANI_LOG_LEVEL=debug
+```
+
+<Tip>
+  The chat server adapters (`toNextJsHandler`, `toExpressJsHandler`) also accept a `debug` option that overrides the env var for that handler only.
+</Tip>
+
+## Encryption
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `WANIWANI_ENCRYPTION_KEY` | No | Base64-encoded 32-byte key for AES-256-GCM encryption of KV store values. When set, all values written through the KV store are encrypted at rest. |

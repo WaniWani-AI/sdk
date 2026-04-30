@@ -100,7 +100,7 @@ export type WithWaniwaniOptions = {
 	applyFieldRedactions?: boolean;
 };
 
-const log = createLogger("mcp", !!process.env.WANIWANI_DEBUG);
+const log = createLogger("mcp");
 
 const DEFAULT_BASE_URL = "https://app.waniwani.ai";
 

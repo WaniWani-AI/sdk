@@ -5,7 +5,7 @@
 
 import { createLogger } from "../../utils/logger.js";
 
-const log = createLogger("widget-token", !!process.env.WANIWANI_DEBUG);
+const log = createLogger("widget-token");
 
 interface WidgetTokenConfig {
 	apiUrl: string;

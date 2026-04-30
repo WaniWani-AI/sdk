@@ -1676,10 +1676,10 @@ describe("auto-generated sessionId for sessionless clients", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		const result = (await handler?.(
-			startInput(),
-			noSessionExtra(),
-		)) as Record<string, unknown>;
+		const result = (await handler?.(startInput(), noSessionExtra())) as Record<
+			string,
+			unknown
+		>;
 		const parsed = parsePayload(result);
 
 		expect(parsed.status).toBe("interrupt");
@@ -1816,10 +1816,10 @@ describe("auto-generated sessionId for sessionless clients", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		const result = (await handler?.(
-			startInput(),
-			noSessionExtra(),
-		)) as Record<string, unknown>;
+		const result = (await handler?.(startInput(), noSessionExtra())) as Record<
+			string,
+			unknown
+		>;
 		const sessionId = parsePayload(result).sessionId as string;
 
 		// Verify state was stored under the auto-generated sessionId

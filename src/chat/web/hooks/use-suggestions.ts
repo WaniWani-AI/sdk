@@ -82,10 +82,7 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 				return;
 			}
 
-			console.log("[WaniWani] Assistant parts:", lastAssistant.parts);
-
 			const extracted = extractSuggestions(lastAssistant);
-			console.log("[WaniWani] Extracted suggestions:", extracted);
 			if (extracted) {
 				setSuggestions(extracted);
 			}

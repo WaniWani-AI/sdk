@@ -10,6 +10,7 @@
  * - `WANIWANI_ENCRYPTION_KEY` (optional, base64-encoded 32-byte key for AES-256-GCM encryption)
  */
 
+import { createLogger } from "../../../utils/logger.js";
 import { decryptValue, encryptValue, isEncryptedEnvelope } from "./crypto";
 
 // ============================================================================
@@ -29,11 +30,7 @@ export interface KvStore<T = Record<string, unknown>> {
 const SDK_NAME = "@waniwani/sdk";
 const DEFAULT_BASE_URL = "https://app.waniwani.ai";
 
-function kvDebug(...args: unknown[]): void {
-	if (process.env.WANIWANI_DEBUG) {
-		console.log("[waniwani:kv]", ...args);
-	}
-}
+const kvDebug = createLogger("kv");
 
 export class WaniwaniKvStore<T = Record<string, unknown>>
 	implements KvStore<T>
