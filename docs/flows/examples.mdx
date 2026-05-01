@@ -3,7 +3,7 @@ title: "Example: Pet Insurance Quote"
 description: "A production-grade flow showcasing open-ended questions, validation, conditional branching, widgets, and correction loops."
 ---
 
-This example is a simplified version of a production pet insurance quoting flow. It demonstrates how flows handle complex, multi-step conversations that feel natural — not like filling out a form.
+This example is a simplified version of a production pet insurance quoting flow. It demonstrates how flows handle complex, multi-step conversations that feel natural, not like filling out a form.
 
 <Note>
 API calls use a fictional `petApi` for clarity. The patterns and architecture are real.
@@ -68,17 +68,17 @@ export const quoteFlow = createFlow({
   title: "Pet Insurance Quote",
   description: `Get a pet insurance quote. Use when a user wants to insure their dog or cat, get a price quote, or learn about available insurance packages.
 
-NO-RECOMMENDATION RULE (CRITICAL — applies to the ENTIRE conversation):
-- NEVER recommend, suggest, or steer the user toward any specific plan — not even implicitly.
+NO-RECOMMENDATION RULE (CRITICAL - applies to the ENTIRE conversation):
+- NEVER recommend, suggest, or steer the user toward any specific plan, not even implicitly.
 - NEVER use social proof ("most people choose…") or comparative framing ("best protection…").
 - When asked "what do you recommend?", warmly decline: explain you can only provide factual information, and invite them to ask about coverage details so they can decide themselves.
 - When comparing plans, present ONLY factual differences (price, limits, what's included).
 
-TONE — conversational, not a form:
-- You are a warm, knowledgeable assistant — like a friend who happens to know everything about pet insurance.
+TONE - conversational, not a form:
+- You are a warm, knowledgeable assistant, like a friend who happens to know everything about pet insurance.
 - React to what the user shares with genuine interest (e.g., "Goldens are such great dogs!")
 - Use the pet's name once you know it.
-- Keep text short — use widgets for structured information.
+- Keep text short. Use widgets for structured information.
 - Explain difficult concepts simply, avoid insurance jargon.
 
 DO: Talk like a friend. React genuinely. Be frank and truthful.
@@ -164,7 +164,7 @@ DON'T: Sound sales-y. Be judgmental. Use walls of text. Be robotic.`,
       petName: {
         question: "Tell me about your pet!",
         context: `Warmly greet the user and ask an OPEN-ENDED question. Something like:
-"I'd love to help you explore insurance options! Tell me a bit about your pet — what kind of animal, their name, breed, age… anything you'd like to share :)"
+"I'd love to help you explore insurance options! Tell me a bit about your pet - what kind of animal, their name, breed, age… anything you'd like to share :)"
 
 Do NOT list specific questions. Let the user share naturally.
 
@@ -174,7 +174,7 @@ From their response, extract as many fields as possible into stateUpdates:
 - isCurrentlyInsured, municipality
 - isMixedBreed + mixedBreed if they mention a mix
 
-Only extract what is clearly stated — do NOT guess missing fields.`,
+Only extract what is clearly stated. Do NOT guess missing fields.`,
       },
     });
   })
@@ -184,11 +184,11 @@ Only extract what is clearly stated — do NOT guess missing fields.`,
   .addNode("ask_remaining_details", async ({ state, interrupt }) => {
     const breedList = await petApi.getBreedList(state.animalType);
 
-    const sharedContext = `You're having a natural conversation — NOT filling out a form. Ask remaining questions ONE OR TWO at a time, weaving them in naturally. React to what the user shared previously with genuine interest before asking the next thing.
+    const sharedContext = `You're having a natural conversation, NOT filling out a form. Ask remaining questions ONE OR TWO at a time, weaving them in naturally. React to what the user shared previously with genuine interest before asking the next thing.
 
 Good follow-ups:
 - "Love that name! And what breed is ${state.petName}?"
-- "A Golden Retriever — great choice! Is ${state.petName} a boy or a girl?"
+- "A Golden Retriever, great choice! Is ${state.petName} a boy or a girl?"
 - "Got it! And roughly how old is ${state.petName}?"
 
 ${breedList ? `Valid breed names: ${breedList}. Match the user's input to the closest name from this list.` : ""}
@@ -240,7 +240,7 @@ FORMATTING: Write in flowing prose, not bullet points.`;
     );
   })
 
-  // ─── Node 3: Mixed breed — collect breed names ───────────────────────
+  // ─── Node 3: Mixed breed - collect breed names ───────────────────────
   .addNode("ask_mixed_breed_breeds", async ({ state, interrupt }) => {
     if (!state.isMixedBreed || state.mixedBreed?.breed1) return {};
 
@@ -249,7 +249,7 @@ FORMATTING: Write in flowing prose, not bullet points.`;
     return interrupt({
       "mixedBreed.breed1": {
         question: "Which breeds is your dog a mix of?",
-        context: `Ask naturally: "Which breeds is ${state.petName} a mix of?" They must provide at least one — the second is optional.${breedList ? `\n\nValid breeds: ${breedList}. Match each to the closest official name.` : ""}`,
+        context: `Ask naturally: "Which breeds is ${state.petName} a mix of?" They must provide at least one, the second is optional.${breedList ? `\n\nValid breeds: ${breedList}. Match each to the closest official name.` : ""}`,
         validate: async (breed1) => {
           if (!breed1) return;
           return petApi.validateMixedBreed(state.animalType!, {
@@ -285,7 +285,7 @@ FORMATTING: Write in flowing prose, not bullet points.`;
     return showWidget(showPetSummaryTool, {
       field: "confirmed",
       description:
-        "Call show_pet_summary to display the summary card. Build excitement — 'Here's what I've got for [petName]!' The widget shows the details, so do NOT repeat them in text. If the user corrects anything, set confirmed to false. Only set confirmed to true when they explicitly confirm.",
+        "Call show_pet_summary to display the summary card. Build excitement: 'Here's what I've got for [petName]!' The widget shows the details, so do NOT repeat them in text. If the user corrects anything, set confirmed to false. Only set confirmed to true when they explicitly confirm.",
       data: {
         animalType: state.animalType,
         petName: state.petName,
@@ -422,7 +422,7 @@ await showPricingTool.register(server);
 
 <AccordionGroup>
   <Accordion title="Why the system prompt lives in description">
-    The `description` field of a flow becomes the MCP tool's description — it's the first thing the model reads when deciding how to use the tool. By embedding compliance rules and tone guidance here, you ensure **every single interaction** follows your guidelines without relying on external system prompts you don't control.
+    The `description` field of a flow becomes the MCP tool's description. It's the first thing the model reads when deciding how to use the tool. By embedding compliance rules and tone guidance here, you ensure **every single interaction** follows your guidelines without relying on external system prompts you don't control.
 
     This is especially powerful for regulated industries (insurance, finance, healthcare) where the AI must never give recommendations or advice.
   </Accordion>
@@ -442,7 +442,7 @@ await showPricingTool.register(server);
   </Accordion>
 
   <Accordion title="The pricing adjustment loop">
-    After showing pricing plans, the user might say "can I see prices with a lower deductible?" The model sets the new deductible value and `pricingAction: "adjust"`. The `recalculate_pricing` node resets `pricingAction` to `undefined`, which loops back to `show_pricing` — which calls the API with the new parameters and re-renders the widget.
+    After showing pricing plans, the user might say "can I see prices with a lower deductible?" The model sets the new deductible value and `pricingAction: "adjust"`. The `recalculate_pricing` node resets `pricingAction` to `undefined`, which loops back to `show_pricing`, which calls the API with the new parameters and re-renders the widget.
 
     This pattern works for any "configure → preview → adjust" cycle.
   </Accordion>
@@ -456,6 +456,6 @@ await showPricingTool.register(server);
     }
     ```
 
-    This runs server-side when the model provides a breed name. If the breed doesn't exist in the database, the validation throws an error with suggestions — the flow automatically re-asks the user. If it succeeds, it can return state updates (like `breedId`) that enrich the state without an extra round-trip.
+    This runs server-side when the model provides a breed name. If the breed doesn't exist in the database, the validation throws an error with suggestions and the flow automatically re-asks the user. If it succeeds, it can return state updates (like `breedId`) that enrich the state without an extra round-trip.
   </Accordion>
 </AccordionGroup>

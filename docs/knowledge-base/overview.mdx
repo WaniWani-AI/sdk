@@ -17,7 +17,7 @@ const wani = waniwani(); // reads WANIWANI_API_KEY from env
 
 ## Ingest files
 
-Load markdown content into your knowledge base. Ingestion is **destructive** — it replaces all existing chunks.
+Load markdown content into your knowledge base. Ingestion is **destructive** and replaces all existing chunks.
 
 ```ts
 await wani.kb.ingest([
@@ -42,7 +42,7 @@ bun embed
 
 ### Ingest script for external projects
 
-If you're running your own MCP server, create a simple script to read your docs and push them to WaniWani. This runs standalone — it doesn't need to be inside an MCP server.
+If you're running your own MCP server, create a simple script to read your docs and push them to WaniWani. This runs standalone and doesn't need to be inside an MCP server.
 
 ```ts scripts/kb-ingest.ts
 import { readdir, readFile } from "node:fs/promises";

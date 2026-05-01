@@ -5,12 +5,15 @@ description: "Get a working MCP server with analytics in under 5 minutes."
 
 ## Choose your setup
 
-<CardGroup cols={2}>
+<CardGroup cols={3}>
   <Card title="Managed project" icon="cloud" href="#option-a-managed-project">
-    WaniWani provisions a repo, deploys to Vercel, and auto-tunnels local dev. Best for **new MCP servers** — zero infrastructure to manage.
+    WaniWani provisions a repo, deploys to Vercel, and auto-tunnels local dev. Best for **new MCP servers** with zero infrastructure to manage.
   </Card>
-  <Card title="External project" icon="server" href="#option-b-external-project">
-    You host your own MCP server and add the SDK to it. Best for **existing MCP servers** where you want to add tracking, flows, or knowledge base.
+  <Card title="Template" icon="rocket" href="#option-b-start-from-template">
+    Clone a ready-to-go repo with the SDK pre-configured. Best for **new projects** you want to host yourself.
+  </Card>
+  <Card title="Existing project" icon="server" href="#option-c-existing-project">
+    Add the SDK to your own MCP server. Best for **existing MCP servers** where you want to add tracking, flows, or knowledge base.
   </Card>
 </CardGroup>
 
@@ -36,7 +39,7 @@ WaniWani provisions a GitHub repo, deploys to Vercel, and auto-tunnels local dev
     bun dev
     ```
 
-    `bun dev` starts a Cloudflare tunnel automatically. Your local server is now reachable from ChatGPT and Claude — no ngrok, no port forwarding.
+    `bun dev` starts a Cloudflare tunnel automatically. Your local server is now reachable from ChatGPT and Claude. No ngrok, no port forwarding.
   </Step>
 
   <Step title="Open the playground">
@@ -46,7 +49,47 @@ WaniWani provisions a GitHub repo, deploys to Vercel, and auto-tunnels local dev
 
 ---
 
-## Option B: External project
+## Option B: Start from template
+
+The [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-template) gives you a production-ready MCP server with the SDK, event tracking, flows, and widgets already wired up.
+
+<Steps>
+  <Step title="Create your repo">
+    Click **"Use this template"** on [GitHub](https://github.com/WaniWani-AI/mcp-distribution-template) to create a new repository from the template, or clone it directly:
+
+    ```bash
+    git clone https://github.com/WaniWani-AI/mcp-distribution-template.git my-mcp-server
+    cd my-mcp-server
+    ```
+  </Step>
+
+  <Step title="Install and configure">
+    ```bash
+    bun install
+    cp .env.example .env
+    ```
+
+    Add your API key to `.env`:
+
+    ```bash .env
+    WANIWANI_API_KEY=wwk_...
+    ```
+
+    Get a key from [app.waniwani.ai](https://app.waniwani.ai). Create an **External** project and copy the `wwk_...` key.
+  </Step>
+
+  <Step title="Run">
+    ```bash
+    bun dev
+    ```
+
+    The template includes a reference flow you can try immediately. If you have the [agent skill](/guides/skills) installed, run `/waniwani-sdk initialize` to scaffold a flow tailored to your business.
+  </Step>
+</Steps>
+
+---
+
+## Option C: Existing project
 
 You already have an MCP server and want to add WaniWani to it.
 
@@ -71,7 +114,7 @@ You already have an MCP server and want to add WaniWani to it.
     1. Open [app.waniwani.ai/mcp](https://app.waniwani.ai/mcp) and sign in.
     2. Click **Create project** and choose **External** ("You host your MCP").
     3. Set your server URL for the production environment.
-    4. Copy the API key (`wwk_...`) — it is shown only once.
+    4. Copy the API key (`wwk_...`). It is shown only once.
 
     ```bash .env
     WANIWANI_API_KEY=wwk_...
