@@ -67,7 +67,8 @@
               "flows/nodes",
               "flows/interrupts",
               "flows/edges",
-              "flows/register"
+              "flows/register",
+              "flows/examples"
             ]
           }
         ]
