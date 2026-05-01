@@ -285,7 +285,7 @@ FORMATTING: Write in flowing prose, not bullet points.`;
     return showWidget(showPetSummaryTool, {
       field: "confirmed",
       description:
-        "Call show_pet_summary to display the summary card. Build excitement: 'Here's what I've got for [petName]!' The widget shows the details, so do NOT repeat them in text. If the user corrects anything, set confirmed to false. Only set confirmed to true when they explicitly confirm.",
+        "You MUST now call the show_pet_summary tool with the pet data to display the summary card. Write a short, excited message first — something like 'Here's what I've got for [petName] — take a look!' Then immediately call show_pet_summary. The widget displays all the details, so do NOT repeat them in your text. After the widget renders, ask the user to confirm or let you know if anything needs fixing. If the user corrects anything, set confirmed to false and extract the correction. Only set confirmed to true when they explicitly say everything is correct.",
       data: {
         animalType: state.animalType,
         petName: state.petName,
@@ -323,7 +323,7 @@ FORMATTING: Write in flowing prose, not bullet points.`;
     return {
       quoteId: quote.id,
       ...showWidget(showPricingTool, {
-        description: `Present the pricing plans to the user. COMPLIANCE: Do NOT recommend any plan. Only present factual differences. If the user wants to adjust their deductible (options: 0, 250, 500, 750) or copay (options: 15%, 20%, 25%), set the new values and set pricingAction to "adjust". If they're happy, set pricingAction to "done".`,
+        description: `You MUST now call the show_pricing tool with the plans data to display the pricing cards. Write a brief intro — something like "Here are the plans available for [petName]!" Then immediately call show_pricing. COMPLIANCE: Do NOT recommend any plan. Only present factual differences. After the widget renders, let the user browse. If they want to adjust their deductible (options: 0, 250, 500, 750) or copay (options: 15%, 20%, 25%), set the new values and set pricingAction to "adjust". If they're happy, set pricingAction to "done".`,
         data: {
           petName: state.petName,
           quoteId: quote.id,
@@ -445,6 +445,32 @@ await showPricingTool.register(server);
     After showing pricing plans, the user might say "can I see prices with a lower deductible?" The model sets the new deductible value and `pricingAction: "adjust"`. The `recalculate_pricing` node resets `pricingAction` to `undefined`, which loops back to `show_pricing`, which calls the API with the new parameters and re-renders the widget.
 
     This pattern works for any "configure → preview → adjust" cycle.
+  </Accordion>
+
+  <Accordion title="How flows call widgets (the showWidget handoff)">
+    Flows don't render widgets directly. Instead, `showWidget` creates a special interrupt that **instructs the LLM to call a separate display tool**. Here's the sequence:
+
+    1. The flow node calls `showWidget(showPricingTool, { description, data })` and pauses.
+    2. The flow engine returns an interrupt to the LLM with the `description` you provided.
+    3. The LLM reads that description — which says "You MUST now call the `show_pricing` tool" — writes a short intro message, then calls the display tool.
+    4. The display tool renders the widget in the chat UI.
+    5. After the user interacts with the widget, the LLM continues the flow with updated state.
+
+    The `description` is the key bridge — it's your instruction to the LLM about **what tool to call and how to frame it conversationally**. This is why it says things like "Write a brief intro, then immediately call show_pet_summary" rather than just describing what the widget does.
+
+    The `field` parameter tells the flow which state field the widget interaction resolves (e.g., `confirmed`). The `data` is passed directly to the widget component for rendering.
+
+    ```ts
+    // The flow pauses here and tells the LLM:
+    // "Call show_pet_summary with this data"
+    return showWidget(showPetSummaryTool, {
+      field: "confirmed",  // Which state field this resolves
+      description: "You MUST now call the show_pet_summary tool...",
+      data: { petName, breed, ... },  // Passed to the widget
+    });
+    ```
+
+    This separation means the flow controls **when** and **with what data** a widget appears, while the LLM controls the **conversational framing** around it.
   </Accordion>
 
   <Accordion title="Validate callbacks for real-time enrichment">
