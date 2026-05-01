@@ -23,20 +23,25 @@
             "group": "Get Started",
             "pages": [
               "introduction",
-              "quickstart",
-              "skills",
-              "commands"
+              "quickstart"
             ]
           },
           {
-            "group": "Setup",
+            "group": "Guides",
             "pages": [
-              "setup/installation",
-              "setup/api-key",
-              "setup/environment-variables",
-              "setup/security",
-              "setup/wrap-server",
-              "setup/tunnel"
+              "guides/skills",
+              "guides/commands",
+              "guides/tunnel"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/installation",
+              "configuration/api-key",
+              "configuration/environment-variables",
+              "configuration/wrap-server",
+              "configuration/security"
             ]
           },
           {

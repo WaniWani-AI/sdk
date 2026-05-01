@@ -3,7 +3,54 @@ title: Installation
 description: "Install @waniwani/sdk and create a client."
 ---
 
-## Requirements
+## Choose your approach
+
+<CardGroup cols={2}>
+  <Card title="Start from template" icon="rocket" href="#option-a-start-from-template">
+    Clone a ready-to-go MCP server with the SDK pre-configured. Best for **new projects**.
+  </Card>
+  <Card title="Add to existing project" icon="plus" href="#option-b-add-to-existing-project">
+    Install the SDK package into your existing MCP server. Best for **existing projects**.
+  </Card>
+</CardGroup>
+
+---
+
+## Option A: Start from template
+
+The [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-template) gives you a production-ready MCP server with the SDK, event tracking, flows, and widgets already wired up.
+
+<Steps>
+  <Step title="Create your repo">
+    Click **"Use this template"** on [GitHub](https://github.com/WaniWani-AI/mcp-distribution-template) to create a new repository from the template, or clone it directly:
+
+    ```bash
+    git clone https://github.com/WaniWani-AI/mcp-distribution-template.git my-mcp-server
+    cd my-mcp-server
+    ```
+  </Step>
+
+  <Step title="Install and run">
+    ```bash
+    bun install
+    cp .env.example .env
+    # Add your WANIWANI_API_KEY to .env
+    bun dev
+    ```
+  </Step>
+
+  <Step title="Customize">
+    The template includes a reference flow (Alpine ski lessons) you can replace with your own. If you have the [agent skill](/guides/skills) installed, run `/waniwani-sdk initialize` to interactively scaffold a flow tailored to your business.
+  </Step>
+</Steps>
+
+Skip to [Create a client](#create-a-client) once your project is set up.
+
+---
+
+## Option B: Add to existing project
+
+### Requirements
 
 - Node.js 18.17 or newer (Node 20+ recommended)
 - An MCP server runtime. The SDK is tested against:
@@ -14,7 +61,7 @@ description: "Install @waniwani/sdk and create a client."
 
 `@modelcontextprotocol/sdk` and `zod` are peer dependencies. Install them in your project if you do not already have them.
 
-## Install
+### Install
 
 <CodeGroup>
   ```bash bun
@@ -38,7 +85,35 @@ description: "Install @waniwani/sdk and create a client."
   The SDK has zero runtime dependencies and targets a sub-5KB core bundle. It runs in long-lived Node processes, serverless functions, and edge runtimes.
 </Note>
 
+### Minimal setup
+
+This is the minimum code needed to get the SDK working. Wrap your MCP server with `withWaniwani` -- this enables automatic event tracking, session management, and flow support.
+
+```ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { withWaniwani } from "@waniwani/sdk/mcp";
+import "dotenv/config";
+
+const server = new McpServer({ name: "my-mcp", version: "0.1.0" });
+
+// Your tools
+server.registerTool("hello", { /* ... */ });
+
+// This single line enables tracking, flows, and sessions
+withWaniwani(server);
+```
+
+Set your API key in `.env`:
+
+```bash .env
+WANIWANI_API_KEY=wwk_...
+```
+
+That's it. Every tool call now emits events to your [WaniWani dashboard](https://app.waniwani.ai). See [Wrap your server](/configuration/wrap-server) for all `withWaniwani` options.
+
 ## Create a client
+
+For manual event tracking beyond what `withWaniwani` provides automatically, create a client:
 
 ```ts
 import { waniwani } from "@waniwani/sdk";
@@ -48,7 +123,7 @@ const wani = waniwani();
 
 With no arguments, the client reads `WANIWANI_API_KEY` from the environment and uses `https://app.waniwani.ai` as the base URL. This is the recommended setup.
 
-See [API keys](/setup/api-key) for how to obtain and configure the key.
+See [API keys](/configuration/api-key) for how to obtain and configure the key.
 
 ## Configuration reference
 
@@ -124,4 +199,4 @@ const result = await wani.shutdown({ timeoutMs: 5000 });
 - **Project config file.** Create a `waniwani.config.ts` with `defineConfig({ ... })` from `@waniwani/sdk`, then import it once at startup. Subsequent calls to `waniwani()` pick up the registered config.
 - **Framework adapters.** Pass the client to `toExpressJsHandler(wani, { ... })` from `@waniwani/sdk/express-js` for Express middleware. The legacy `toNextJsHandler` from `@waniwani/sdk/next-js` is deprecated and will be removed in a follow-up release.
 
-Next: [get your API key](/setup/api-key), then [wrap your MCP server](/setup/wrap-server).
+Next: [get your API key](/configuration/api-key), then [wrap your MCP server](/configuration/wrap-server).

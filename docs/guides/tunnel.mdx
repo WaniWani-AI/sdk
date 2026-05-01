@@ -94,6 +94,10 @@ Replace `localhost` with the tunnel URL in your MCP client config:
 
 Both the dev server and the tunnel must stay running. If either stops, the public URL stops working.
 
+## Using the agent skill
+
+If you have the [WaniWani SDK agent skill](/guides/skills) installed, you can run the `/waniwani-sdk tunnel` command and your AI agent will handle the entire setup for you -- detecting the dev server port, picking an available tunnel provider, and printing the public URL. See [Commands](/guides/commands#tunnel) for details.
+
 ## Good to know
 
 - **Quick tunnels generate a new URL each time.** For a stable URL, set up a [named Cloudflare tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/create-remote-tunnel/) or use an ngrok paid plan.
