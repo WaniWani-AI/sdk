@@ -52,7 +52,7 @@ Patches Next.js so the app works correctly inside a cross-origin iframe (ChatGPT
 
 **What it patches:**
 - `history.pushState` / `replaceState` -- prevents cross-origin URL errors in sandboxed iframes
-- `window.fetch` -- rewrites same-origin requests to the widget's real `baseUrl` so relative `/api/...` calls don't 404
+- `window.fetch` -- rewrites *relative* same-origin requests to the widget's real `baseUrl` so relative `/api/...` calls don't 404. Absolute URLs (string with scheme, `URL`, `Request`) are left alone, so SDK transports can hit the WaniWani API even when it shares an origin with the iframe.
 - `<html>` attribute observer -- strips host-injected attributes while preserving `class`/`style`/`lang`
 
 ```tsx
@@ -63,10 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <InitializeNextJsInIframe
-          baseUrl={process.env.NEXT_PUBLIC_BASE_URL!}
-          passthroughOrigins={[process.env.NEXT_PUBLIC_WANIWANI_API_URL ?? "https://app.waniwani.ai"]}
-        />
+        <InitializeNextJsInIframe baseUrl={process.env.NEXT_PUBLIC_BASE_URL!} />
       </head>
       <body>{children}</body>
     </html>
@@ -79,7 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 | Prop | Type | Required | Description |
 |------|------|----------|-------------|
 | `baseUrl` | `string` | Yes | The widget app's canonical URL (e.g. `https://my-app.com`) |
-| `passthroughOrigins` | `string[]` | No | Origins whose fetches skip the rewrite (e.g. WaniWani API origin when widget shares origin with a proxy) |
+| `passthroughOrigins` | `string[]` | No | Origins whose *relative-URL* fetches skip the rewrite. Absolute URLs are never rewritten, so most callers don't need this. |
 
 ## Hooks Reference
 
