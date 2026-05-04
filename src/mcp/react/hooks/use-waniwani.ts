@@ -87,6 +87,7 @@ interface WidgetState {
 	widget: WaniwaniWidget;
 	cleanup: () => void;
 	config: WaniwaniConfig | null;
+	captureKey: string;
 }
 
 /** Module-level singleton — shared across all hook consumers. */
@@ -106,7 +107,24 @@ function normalizeString(value: unknown): string | undefined {
 }
 
 function createNoopState(): WidgetState {
-	return { widget: NOOP_WIDGET, cleanup: () => {}, config: null };
+	return {
+		widget: NOOP_WIDGET,
+		cleanup: () => {},
+		config: null,
+		captureKey: "",
+	};
+}
+
+function captureKeyOf(capture?: AutoCaptureToggles): string {
+	if (!capture) {
+		return "";
+	}
+	return [
+		capture.click ? "1" : "0",
+		capture.scroll ? "1" : "0",
+		capture.formField ? "1" : "0",
+		capture.formSubmit ? "1" : "0",
+	].join("");
 }
 
 /**
@@ -229,6 +247,7 @@ function createState(
 	}
 
 	return {
+		captureKey: captureKeyOf(capture),
 		widget: {
 			identify(id: string, traits?: Record<string, unknown>) {
 				userId = id;
@@ -325,6 +344,7 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 	metadataRef.current = options.metadata;
 	const captureRef = useRef(options.capture);
 	captureRef.current = options.capture;
+	const captureKey = captureKeyOf(options.capture);
 
 	// Track consumer mount/unmount for singleton lifecycle
 	useEffect(() => {
@@ -355,12 +375,15 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 			return;
 		}
 
-		if (!isSameConfig(state?.config, config)) {
+		if (
+			!isSameConfig(state?.config, config) ||
+			state?.captureKey !== captureKey
+		) {
 			state?.cleanup();
 			state = createState(config, metadataRef.current, captureRef.current);
 			setWidget(state.widget);
 		}
-	}, [config]);
+	}, [config, captureKey]);
 
 	return widget;
 }

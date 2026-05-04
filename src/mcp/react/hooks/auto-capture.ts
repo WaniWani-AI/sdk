@@ -146,13 +146,23 @@ export function initAutoCapture(
 
 	// ── widget_click ───────────────────────────────────────────────────
 	// Opt-in. Even when enabled, skip when target sits inside a labelled
-	// element since the matching data-ww-step / data-ww-conversion handler
-	// already records a typed event.
+	// element with a non-empty parsed name, mirroring the typed handlers
+	// below. An empty `data-ww-conversion=""` falls through here so the
+	// click is not silently dropped.
 	if (config.capture?.click) {
 		const onClick = (ev: MouseEvent) => {
 			const target = ev.target as HTMLElement | null;
-			if (target?.closest?.("[data-ww-conversion],[data-ww-step]")) {
-				return;
+			const labelled = target?.closest?.(
+				"[data-ww-conversion],[data-ww-step]",
+			) as HTMLElement | null;
+			if (labelled) {
+				const raw =
+					labelled.getAttribute("data-ww-conversion") ??
+					labelled.getAttribute("data-ww-step") ??
+					"";
+				if (parseAttr(raw).name) {
+					return;
+				}
 			}
 			enqueue([
 				baseFields(config, "widget_click", {
