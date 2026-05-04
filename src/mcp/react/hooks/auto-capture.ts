@@ -4,11 +4,26 @@ import type { WidgetEvent } from "./widget-transport";
 
 type Enqueue = (events: WidgetEvent[]) => void;
 
+/**
+ * Opt-in toggles for the noisy auto-capture event types. Each defaults to
+ * `false` so widget owners declare intent before the SDK starts emitting
+ * coarse, high-volume events. Always-on capture covers widget_render,
+ * widget_error, widget_link_click, and the labelled `data-ww-step` /
+ * `data-ww-conversion` clicks.
+ */
+export interface AutoCaptureToggles {
+	click?: boolean;
+	scroll?: boolean;
+	formField?: boolean;
+	formSubmit?: boolean;
+}
+
 interface AutoCaptureConfig {
 	sessionId?: string;
 	traceId?: string;
 	metadata?: Record<string, unknown>;
 	source?: string;
+	capture?: AutoCaptureToggles;
 }
 
 function eventId(): string {
@@ -130,24 +145,32 @@ export function initAutoCapture(
 	);
 
 	// ── widget_click ───────────────────────────────────────────────────
-	const onClick = (ev: MouseEvent) => {
-		const target = ev.target as HTMLElement | null;
-		enqueue([
-			baseFields(config, "widget_click", {
-				metadata: {
-					target_tag: target?.tagName?.toLowerCase() ?? "unknown",
-					target_id: target?.id || undefined,
-					target_class: target?.className || undefined,
-					click_x: ev.clientX,
-					click_y: ev.clientY,
-				},
-			}),
-		]);
-	};
-	document.addEventListener("click", onClick, { capture: true });
-	cleanups.push(() =>
-		document.removeEventListener("click", onClick, { capture: true }),
-	);
+	// Opt-in. Even when enabled, skip when target sits inside a labelled
+	// element since the matching data-ww-step / data-ww-conversion handler
+	// already records a typed event.
+	if (config.capture?.click) {
+		const onClick = (ev: MouseEvent) => {
+			const target = ev.target as HTMLElement | null;
+			if (target?.closest?.("[data-ww-conversion],[data-ww-step]")) {
+				return;
+			}
+			enqueue([
+				baseFields(config, "widget_click", {
+					metadata: {
+						target_tag: target?.tagName?.toLowerCase() ?? "unknown",
+						target_id: target?.id || undefined,
+						target_class: target?.className || undefined,
+						click_x: ev.clientX,
+						click_y: ev.clientY,
+					},
+				}),
+			]);
+		};
+		document.addEventListener("click", onClick, { capture: true });
+		cleanups.push(() =>
+			document.removeEventListener("click", onClick, { capture: true }),
+		);
+	}
 
 	// ── data-ww-conversion ────────────────────────────────────────────
 	// Format: "name key:value key:value ..."
@@ -235,124 +258,133 @@ export function initAutoCapture(
 	);
 
 	// ── widget_scroll ──────────────────────────────────────────────────
-	let scrollTimer: ReturnType<typeof setTimeout> | null = null;
-	let lastScrollY = window.scrollY || 0;
-	const onScroll = () => {
-		if (scrollTimer) {
-			return;
-		}
-		scrollTimer = setTimeout(() => {
-			scrollTimer = null;
-			const scrollTop = window.scrollY || document.documentElement.scrollTop;
-			const docHeight =
-				document.documentElement.scrollHeight -
-				document.documentElement.clientHeight;
-			const depthPct =
-				docHeight > 0 ? Math.round((scrollTop / docHeight) * 100) : 0;
-			const direction = scrollTop >= lastScrollY ? "down" : "up";
-			lastScrollY = scrollTop;
+	// Opt-in.
+	if (config.capture?.scroll) {
+		let scrollTimer: ReturnType<typeof setTimeout> | null = null;
+		let lastScrollY = window.scrollY || 0;
+		const onScroll = () => {
+			if (scrollTimer) {
+				return;
+			}
+			scrollTimer = setTimeout(() => {
+				scrollTimer = null;
+				const scrollTop = window.scrollY || document.documentElement.scrollTop;
+				const docHeight =
+					document.documentElement.scrollHeight -
+					document.documentElement.clientHeight;
+				const depthPct =
+					docHeight > 0 ? Math.round((scrollTop / docHeight) * 100) : 0;
+				const direction = scrollTop >= lastScrollY ? "down" : "up";
+				lastScrollY = scrollTop;
+				enqueue([
+					baseFields(config, "widget_scroll", {
+						metadata: {
+							scroll_depth_pct: depthPct,
+							scroll_direction: direction,
+							viewport_height: window.innerHeight,
+						},
+					}),
+				]);
+			}, 250);
+		};
+		window.addEventListener("scroll", onScroll, { passive: true });
+		cleanups.push(() => {
+			window.removeEventListener("scroll", onScroll);
+			if (scrollTimer) {
+				clearTimeout(scrollTimer);
+			}
+		});
+	}
+
+	// ── widget_form_field ──────────────────────────────────────────────
+	// Opt-in.
+	if (config.capture?.formField) {
+		const fieldTimers = new WeakMap<EventTarget, number>();
+
+		const onFocusIn = (ev: FocusEvent) => {
+			const target = ev.target as HTMLElement | null;
+			if (!target || !isFormField(target)) {
+				return;
+			}
+			fieldTimers.set(target, Date.now());
+		};
+		const onFocusOut = (ev: FocusEvent) => {
+			const target = ev.target as HTMLElement | null;
+			if (!target || !isFormField(target)) {
+				return;
+			}
+			const start = fieldTimers.get(target);
+			const timeInField = start ? Date.now() - start : 0;
+			const input = target as HTMLInputElement;
 			enqueue([
-				baseFields(config, "widget_scroll", {
+				baseFields(config, "widget_form_field", {
 					metadata: {
-						scroll_depth_pct: depthPct,
-						scroll_direction: direction,
-						viewport_height: window.innerHeight,
+						field_name: input.name || input.id || undefined,
+						field_type: input.type || target.tagName.toLowerCase(),
+						time_in_field_ms: timeInField,
+						filled: !!input.value,
 					},
 				}),
 			]);
-		}, 250);
-	};
-	window.addEventListener("scroll", onScroll, { passive: true });
-	cleanups.push(() => {
-		window.removeEventListener("scroll", onScroll);
-		if (scrollTimer) {
-			clearTimeout(scrollTimer);
-		}
-	});
-
-	// ── widget_form_field ──────────────────────────────────────────────
-	const fieldTimers = new WeakMap<EventTarget, number>();
-
-	const onFocusIn = (ev: FocusEvent) => {
-		const target = ev.target as HTMLElement | null;
-		if (!target || !isFormField(target)) {
-			return;
-		}
-		fieldTimers.set(target, Date.now());
-	};
-	const onFocusOut = (ev: FocusEvent) => {
-		const target = ev.target as HTMLElement | null;
-		if (!target || !isFormField(target)) {
-			return;
-		}
-		const start = fieldTimers.get(target);
-		const timeInField = start ? Date.now() - start : 0;
-		const input = target as HTMLInputElement;
-		enqueue([
-			baseFields(config, "widget_form_field", {
-				metadata: {
-					field_name: input.name || input.id || undefined,
-					field_type: input.type || target.tagName.toLowerCase(),
-					time_in_field_ms: timeInField,
-					filled: !!input.value,
-				},
-			}),
-		]);
-	};
-	document.addEventListener("focusin", onFocusIn, { capture: true });
-	document.addEventListener("focusout", onFocusOut, { capture: true });
-	cleanups.push(() => {
-		document.removeEventListener("focusin", onFocusIn, { capture: true });
-		document.removeEventListener("focusout", onFocusOut, { capture: true });
-	});
+		};
+		document.addEventListener("focusin", onFocusIn, { capture: true });
+		document.addEventListener("focusout", onFocusOut, { capture: true });
+		cleanups.push(() => {
+			document.removeEventListener("focusin", onFocusIn, { capture: true });
+			document.removeEventListener("focusout", onFocusOut, { capture: true });
+		});
+	}
 
 	// ── widget_form_submit ─────────────────────────────────────────────
-	const formStartTimes = new WeakMap<HTMLFormElement, number>();
-	const trackFormStart = (ev: FocusEvent) => {
-		const target = ev.target as HTMLElement | null;
-		const form = target?.closest?.("form");
-		if (form && !formStartTimes.has(form)) {
-			formStartTimes.set(form, Date.now());
-		}
-	};
-	document.addEventListener("focusin", trackFormStart, { capture: true });
-	cleanups.push(() =>
-		document.removeEventListener("focusin", trackFormStart, {
-			capture: true,
-		}),
-	);
+	// Opt-in.
+	if (config.capture?.formSubmit) {
+		const formStartTimes = new WeakMap<HTMLFormElement, number>();
+		const trackFormStart = (ev: FocusEvent) => {
+			const target = ev.target as HTMLElement | null;
+			const form = target?.closest?.("form");
+			if (form && !formStartTimes.has(form)) {
+				formStartTimes.set(form, Date.now());
+			}
+		};
+		document.addEventListener("focusin", trackFormStart, { capture: true });
+		cleanups.push(() =>
+			document.removeEventListener("focusin", trackFormStart, {
+				capture: true,
+			}),
+		);
 
-	const onSubmit = (ev: SubmitEvent) => {
-		const form = ev.target as HTMLFormElement | null;
-		const startTime = form ? formStartTimes.get(form) : undefined;
+		const onSubmit = (ev: SubmitEvent) => {
+			const form = ev.target as HTMLFormElement | null;
+			const startTime = form ? formStartTimes.get(form) : undefined;
 
-		let validationErrors = 0;
-		if (form) {
-			const fields = form.querySelectorAll("input, textarea, select");
-			for (const field of fields) {
-				const el = field as HTMLInputElement;
-				if (el.validity && !el.validity.valid) {
-					validationErrors++;
-				} else if (el.getAttribute("aria-invalid") === "true") {
-					validationErrors++;
+			let validationErrors = 0;
+			if (form) {
+				const fields = form.querySelectorAll("input, textarea, select");
+				for (const field of fields) {
+					const el = field as HTMLInputElement;
+					if (el.validity && !el.validity.valid) {
+						validationErrors++;
+					} else if (el.getAttribute("aria-invalid") === "true") {
+						validationErrors++;
+					}
 				}
 			}
-		}
 
-		enqueue([
-			baseFields(config, "widget_form_submit", {
-				metadata: {
-					form_id: form?.id || undefined,
-					time_to_submit_ms: startTime ? Date.now() - startTime : undefined,
-					validation_errors: validationErrors,
-				},
-			}),
-		]);
-	};
-	document.addEventListener("submit", onSubmit, { capture: true });
-	cleanups.push(() =>
-		document.removeEventListener("submit", onSubmit, { capture: true }),
-	);
+			enqueue([
+				baseFields(config, "widget_form_submit", {
+					metadata: {
+						form_id: form?.id || undefined,
+						time_to_submit_ms: startTime ? Date.now() - startTime : undefined,
+						validation_errors: validationErrors,
+					},
+				}),
+			]);
+		};
+		document.addEventListener("submit", onSubmit, { capture: true });
+		cleanups.push(() =>
+			document.removeEventListener("submit", onSubmit, { capture: true }),
+		);
+	}
 
 	return () => {
 		for (const cleanup of cleanups) {

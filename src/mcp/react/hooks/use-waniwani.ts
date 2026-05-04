@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { initAutoCapture } from "./auto-capture";
+import { type AutoCaptureToggles, initAutoCapture } from "./auto-capture";
 import { WidgetClientContext } from "./use-widget";
 import type { WidgetEvent } from "./widget-transport";
 import { WidgetTransport } from "./widget-transport";
@@ -50,6 +50,15 @@ export interface UseWaniwaniOptions {
 	 * Additional metadata to include with every tracked event.
 	 */
 	metadata?: Record<string, unknown>;
+	/**
+	 * Opt-in toggles for noisy auto-capture event types. Default: all off.
+	 * Always-on capture: widget_render, widget_error, widget_link_click,
+	 * `data-ww-step` / `data-ww-conversion` clicks.
+	 *
+	 * @example
+	 * useWaniwani({ capture: { click: true, scroll: true } });
+	 */
+	capture?: AutoCaptureToggles;
 }
 
 /**
@@ -179,6 +188,7 @@ function useContextConfig(
 function createState(
 	config: WaniwaniConfig,
 	metadata?: Record<string, unknown>,
+	capture?: AutoCaptureToggles,
 ): WidgetState {
 	const sessionId = config.sessionId ?? crypto.randomUUID();
 	const traceId = crypto.randomUUID();
@@ -198,7 +208,7 @@ function createState(
 	const source = config.source ?? "widget";
 
 	const cleanupCapture = initAutoCapture(
-		{ sessionId, traceId, metadata, source },
+		{ sessionId, traceId, metadata, source, capture },
 		enqueue,
 	);
 
@@ -313,6 +323,8 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 	const [widget, setWidget] = useState<WaniwaniWidget>(NOOP_WIDGET);
 	const metadataRef = useRef(options.metadata);
 	metadataRef.current = options.metadata;
+	const captureRef = useRef(options.capture);
+	captureRef.current = options.capture;
 
 	// Track consumer mount/unmount for singleton lifecycle
 	useEffect(() => {
@@ -345,7 +357,7 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 
 		if (!isSameConfig(state?.config, config)) {
 			state?.cleanup();
-			state = createState(config, metadataRef.current);
+			state = createState(config, metadataRef.current, captureRef.current);
 			setWidget(state.widget);
 		}
 	}, [config]);
