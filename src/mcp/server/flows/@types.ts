@@ -323,13 +323,13 @@ export type Edge<TState> =
 	| { type: "conditional"; condition: ConditionFn<TState> };
 
 export type NodeOptions = {
-	trackFunnel?: true | string;
+	trackFunnel?: string;
 };
 
 export type FlowGraphNode = {
 	id: string;
 	type: "widget" | "interrupt" | "action";
-	trackFunnel: false | true | string;
+	trackFunnel: false | string;
 };
 
 export type FlowGraphEdge =

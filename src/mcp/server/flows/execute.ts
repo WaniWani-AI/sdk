@@ -138,8 +138,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 			};
 		}
 
-		const opts = nodeOptions?.get(currentNode);
-		if (opts?.trackFunnel && waniwani) {
+		if (waniwani) {
 			waniwani
 				.track({
 					event: "flow.node_reached",
