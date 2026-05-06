@@ -323,7 +323,7 @@ export type Edge<TState> =
 	| { type: "conditional"; condition: ConditionFn<TState> };
 
 export type NodeOptions = {
-	/** Human-readable label for this node (used in funnel visualization). */
+	/** Human-readable label for this node (used in funnel visualization and Graphs). */
 	label: string;
 	/** When true, this node is excluded from funnel analytics. */
 	hideFromFunnel?: boolean;
