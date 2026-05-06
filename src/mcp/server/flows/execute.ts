@@ -5,6 +5,7 @@ import type {
 	InterruptQuestionData,
 	MaybePromise,
 	NodeHandler,
+	NodeOptions,
 } from "./@types";
 import { END, interrupt, isInterrupt, isWidget, showWidget } from "./@types";
 import { deepMerge, deleteNestedValue, getNestedValue } from "./nested";
@@ -108,6 +109,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 	validators: Map<string, ValidateFn>,
 	meta?: Record<string, unknown>,
 	waniwani?: ScopedWaniWaniClient,
+	nodeOptions?: Map<string, NodeOptions>,
 	flowId?: string,
 ): Promise<ExecutionResult> {
 	let currentNode = startNodeName;
@@ -136,7 +138,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 			};
 		}
 
-		if (waniwani) {
+		if (waniwani && !nodeOptions?.get(currentNode)?.hideFromFunnel) {
 			waniwani
 				.track({
 					event: "flow.node_reached",

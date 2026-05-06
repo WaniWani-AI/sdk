@@ -129,6 +129,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				validators,
 				meta,
 				waniwani,
+				input.nodeOptions,
 				config.id,
 			);
 		}
@@ -202,6 +203,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					validators,
 					meta,
 					waniwani,
+					input.nodeOptions,
 					config.id,
 				);
 			}
@@ -217,6 +219,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				validators,
 				meta,
 				waniwani,
+				input.nodeOptions,
 				config.id,
 			);
 		}
@@ -285,6 +288,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				validators,
 				meta,
 				waniwani,
+				input.nodeOptions,
 				config.id,
 			);
 		}
