@@ -323,13 +323,17 @@ export type Edge<TState> =
 	| { type: "conditional"; condition: ConditionFn<TState> };
 
 export type NodeOptions = {
-	trackLabel?: string;
+	/** Human-readable label for this node (used in funnel visualization). */
+	label: string;
+	/** When true, this node is excluded from funnel analytics. */
+	hideFromFunnel?: boolean;
 };
 
 export type FlowGraphNode = {
 	id: string;
 	type: "widget" | "interrupt" | "action";
-	trackLabel?: string;
+	label: string;
+	hideFromFunnel?: boolean;
 };
 
 export type FlowGraphEdge =
