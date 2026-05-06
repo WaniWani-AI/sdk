@@ -57,7 +57,8 @@ export function extractFlowGraph<TState extends Record<string, unknown>>(
 		graphNodes.push({
 			id,
 			type: classifyNode(handler),
-			trackFunnel: opts?.trackFunnel ?? false,
+			label: opts?.label ?? id,
+			...(opts?.hideFromFunnel ? { hideFromFunnel: true } : {}),
 		});
 	}
 
