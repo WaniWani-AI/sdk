@@ -79,6 +79,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			suggestions: config.suggestions
 				? { initial: config.suggestions }
 				: undefined,
+			enableThreadHistory: config.enableThreadHistory,
 		};
 
 		const layout = config.layout ?? "card";

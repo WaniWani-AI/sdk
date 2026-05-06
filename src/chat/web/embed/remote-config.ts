@@ -14,6 +14,7 @@ interface RemoteConfigResponse {
 	title: string | null;
 	placeholder: string | null;
 	suggestions: string[] | null;
+	enableThreadHistory?: boolean | null;
 }
 
 /**
@@ -72,6 +73,9 @@ function remoteToConfigPartial(
 	}
 	if (data.suggestions != null && data.suggestions.length > 0) {
 		out.suggestions = data.suggestions;
+	}
+	if (typeof data.enableThreadHistory === "boolean") {
+		out.enableThreadHistory = data.enableThreadHistory;
 	}
 	return out;
 }
