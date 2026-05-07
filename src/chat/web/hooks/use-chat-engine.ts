@@ -155,6 +155,11 @@ export function useChatEngine(props: ChatBaseProps) {
 	// can await an already-fired persist and avoid resurrect-after-delete
 	// races, which `clearTimeout` alone cannot.
 	const persistInflightRef = useRef<Promise<void> | undefined>(undefined);
+	// Monotonic epoch invalidator for `switchThread`. Any concurrent
+	// `startNewThread` / `switchThread` / `deleteThread` (on the active
+	// thread) bumps this so a slower in-flight `loadThread` can't clobber
+	// a newer thread's state when it eventually resolves.
+	const switchEpochRef = useRef(0);
 	const onThreadChangeRef = useRef(onThreadChange);
 	useEffect(() => {
 		onThreadChangeRef.current = onThreadChange;
@@ -213,6 +218,10 @@ export function useChatEngine(props: ChatBaseProps) {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: load once on mount
 	useEffect(() => {
 		let cancelled = false;
+		// Snapshot epoch at mount. Any user action (startNewThread,
+		// switchThread, deleteThread on active) bumps it; we then skip
+		// applying the stale mount-load result.
+		const mountEpoch = switchEpochRef.current;
 		(async () => {
 			try {
 				const ctx = await collectVisitorContext();
@@ -236,12 +245,12 @@ export function useChatEngine(props: ChatBaseProps) {
 			try {
 				const targetId =
 					controlledThreadId ?? (await getActiveThreadId(memoryUserId));
-				if (cancelled) {
+				if (cancelled || mountEpoch !== switchEpochRef.current) {
 					return;
 				}
 				if (targetId) {
 					const stored = await loadThread(targetId);
-					if (cancelled) {
+					if (cancelled || mountEpoch !== switchEpochRef.current) {
 						return;
 					}
 					if (stored && stored.memoryUserId === memoryUserId) {
@@ -523,15 +532,20 @@ export function useChatEngine(props: ChatBaseProps) {
 		void refreshToolDefinitions();
 	}, [setMessages, clearSessionId, refreshToolDefinitions]);
 
-	const persistActiveThread = useCallback(async () => {
-		if (!enableThreadHistory) {
-			return;
+	// Build a `StoredThread` from current refs synchronously. Callers that
+	// need to flush before mutating thread state (startNewThread,
+	// switchThread, deleteThread) must snapshot here *before* any `await`
+	// or ref mutation, so the write describes the outgoing thread, not a
+	// half-mutated mix of old + new.
+	const buildPersistSnapshot = useCallback((): StoredThread | undefined => {
+		if (!enableThreadHistoryRef.current) {
+			return undefined;
 		}
 		const memoryUserId = visitorContextRef.current?.memoryUserId;
 		const threadId = activeThreadIdRef.current;
 		const msgs = messagesRef.current;
 		if (!memoryUserId || !threadId || msgs.length === 0) {
-			return;
+			return undefined;
 		}
 		if (!threadCreatedAtRef.current) {
 			threadCreatedAtRef.current = nowIso();
@@ -547,7 +561,7 @@ export function useChatEngine(props: ChatBaseProps) {
 				: "";
 			threadTitleRef.current = deriveThreadTitle(firstUserText);
 		}
-		const stored: StoredThread = {
+		return {
 			threadId,
 			memoryUserId,
 			title: threadTitleRef.current,
@@ -556,9 +570,16 @@ export function useChatEngine(props: ChatBaseProps) {
 			createdAt: threadCreatedAtRef.current,
 			updatedAt: nowIso(),
 		};
-		await upsertThread(stored);
+	}, []);
+
+	const persistActiveThread = useCallback(async () => {
+		const snap = buildPersistSnapshot();
+		if (!snap) {
+			return;
+		}
+		await upsertThread(snap);
 		await refreshThreads();
-	}, [enableThreadHistory, refreshThreads]);
+	}, [buildPersistSnapshot, refreshThreads]);
 
 	useEffect(() => {
 		if (!enableThreadHistory) {
@@ -598,24 +619,36 @@ export function useChatEngine(props: ChatBaseProps) {
 		persistActiveThread,
 	]);
 
-	const flushPendingPersist = useCallback(async () => {
-		// Drain an already-fired persist first so writes settle in order.
+	// Flush in-flight + pending persist. The snapshot is captured *now*
+	// (synchronously) so callers can mutate thread refs immediately after
+	// invoking this without tainting the outgoing write — even when an
+	// in-flight persist forces the async tail to yield first.
+	const flushPendingPersist = useCallback((): Promise<void> => {
 		const inflight = persistInflightRef.current;
-		if (inflight) {
-			await inflight;
+		const timer = persistTimerRef.current;
+		const snap = timer ? buildPersistSnapshot() : undefined;
+		if (timer) {
+			clearTimeout(timer);
+			persistTimerRef.current = undefined;
 		}
-		if (!persistTimerRef.current) {
-			return;
-		}
-		clearTimeout(persistTimerRef.current);
-		persistTimerRef.current = undefined;
-		await persistActiveThread();
-	}, [persistActiveThread]);
+		return (async () => {
+			if (inflight) {
+				await inflight;
+			}
+			if (snap) {
+				await upsertThread(snap);
+				await refreshThreads();
+			}
+		})();
+	}, [buildPersistSnapshot, refreshThreads]);
 
 	const startNewThread = useCallback(() => {
-		// Fire-and-forget: persistActiveThread snapshots refs synchronously
-		// before any await, so subsequent mutations below don't corrupt the
-		// write of the outgoing thread.
+		// Bump epoch first so any in-flight `switchThread` load knows it's
+		// been invalidated and skips its setters when it eventually resolves.
+		switchEpochRef.current += 1;
+		// Fire-and-forget: `flushPendingPersist` snapshots synchronously
+		// before any await, so subsequent ref mutations below don't taint
+		// the outgoing write.
 		void flushPendingPersist();
 		setMessages([]);
 		setQueuedMessages([]);
@@ -637,8 +670,16 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	const switchThread = useCallback(
 		async (threadId: string) => {
+			switchEpochRef.current += 1;
+			const epoch = switchEpochRef.current;
 			await flushPendingPersist();
+			if (epoch !== switchEpochRef.current) {
+				return;
+			}
 			const stored = await loadThread(threadId);
+			if (epoch !== switchEpochRef.current) {
+				return;
+			}
 			if (!stored) {
 				return;
 			}
@@ -664,6 +705,8 @@ export function useChatEngine(props: ChatBaseProps) {
 			// deleting — otherwise an already-fired `upsertThread` can settle
 			// after `deleteThreadFromStore` and resurrect the row.
 			if (activeThreadIdRef.current === threadId) {
+				// Invalidate any in-flight `switchThread` targeting this thread.
+				switchEpochRef.current += 1;
 				if (persistTimerRef.current) {
 					clearTimeout(persistTimerRef.current);
 					persistTimerRef.current = undefined;
