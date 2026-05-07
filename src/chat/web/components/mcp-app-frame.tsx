@@ -173,8 +173,17 @@ export function McpAppFrame({
 
 	const clampHeight = useCallback(
 		(h: number) => {
-			if (autoHeight || promotedAutoHeightRef.current) {
+			// Opt-in autoHeight: widget is authored knowing the +16 padding contract.
+			if (autoHeight) {
 				return Math.max(h + AUTOHEIGHT_PADDING, 0);
+			}
+			// Auto-promoted: widget overflowed MAX_HEIGHT but wasn't written with
+			// the padding contract. Adding +16 here causes a feedback loop with
+			// widgets whose body fills its viewport (min-height: 100% / 100vh):
+			// each tick we grow by 16, the widget reports the new height, repeat.
+			// Pass the reported height through verbatim instead.
+			if (promotedAutoHeightRef.current) {
+				return Math.max(h, 0);
 			}
 			return Math.min(Math.max(h, 50), MAX_HEIGHT);
 		},
