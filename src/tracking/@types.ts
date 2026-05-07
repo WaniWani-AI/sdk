@@ -20,8 +20,7 @@ export type EventType =
 	| "widget_scroll"
 	| "widget_form_field"
 	| "widget_form_submit"
-	| "user.identified"
-	| "flow.node_reached";
+	| "user.identified";
 
 // ============================================
 // Event Properties
@@ -101,11 +100,7 @@ export type TrackEvent =
 			event: "purchase.completed";
 			properties?: PurchaseCompletedProperties;
 	  } & BaseTrackEvent)
-	| ({ event: "user.identified" } & BaseTrackEvent)
-	| ({
-			event: "flow.node_reached";
-			properties?: { flowId?: string; nodeId?: string };
-	  } & BaseTrackEvent);
+	| ({ event: "user.identified" } & BaseTrackEvent);
 
 /**
  * Legacy tracking shape supported for existing integrations.

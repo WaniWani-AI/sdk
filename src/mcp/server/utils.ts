@@ -53,6 +53,9 @@ const EXTERNAL_USER_ID_KEYS = [
 
 const CORRELATION_ID_KEYS = ["correlationId", "openai/requestId"] as const;
 
+/** Meta key for flow execution path (nodesVisited, flowId). */
+export const FLOW_META_KEY = "waniwani/flow" as const;
+
 // --- Extractors ---
 
 export function extractSessionId(

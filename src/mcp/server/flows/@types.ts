@@ -525,4 +525,6 @@ export type FlowContent =
 export type ExecutionResult = {
 	content: FlowContent;
 	flowTokenContent?: FlowTokenContent;
+	/** Nodes visited during this execution (excludes nodes with hideFromFunnel). */
+	nodesVisited?: string[];
 };
