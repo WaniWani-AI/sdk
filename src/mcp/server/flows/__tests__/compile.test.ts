@@ -2020,11 +2020,10 @@ describe("nodesVisited flow path tracking", () => {
 				name: z.string().describe("Name"),
 			},
 		})
-			.addNode(
-				"hidden_compute",
-				() => ({ computed: "done" }),
-				{ label: "Hidden Compute", hideFromFunnel: true },
-			)
+			.addNode("hidden_compute", () => ({ computed: "done" }), {
+				label: "Hidden Compute",
+				hideFromFunnel: true,
+			})
 			.addNode("ask_name", ({ interrupt }) =>
 				interrupt({ name: { question: "Name?" } }),
 			)
