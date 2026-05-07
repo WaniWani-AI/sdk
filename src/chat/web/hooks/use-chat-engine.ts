@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import type { FileUIPart } from "ai";
+import type { FileUIPart, UIMessage } from "ai";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
@@ -9,10 +9,34 @@ import { hasModelContext } from "../../../shared/model-context";
 import type { ChatBaseProps } from "../@types";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
 import { LenientChatTransport } from "../lib/lenient-chat-transport";
+import {
+	deleteThread as deleteThreadFromStore,
+	deriveThreadTitle,
+	getActiveThreadId,
+	listThreads,
+	loadThread,
+	type StoredThread,
+	upsertThread,
+} from "../lib/thread-store";
 import type { VisitorContext } from "../lib/visitor-context";
 import { collectVisitorContext } from "../lib/visitor-context";
 
 const SESSION_HEADER_NAME = "x-session-id";
+const THREAD_PERSIST_DEBOUNCE_MS = 250;
+
+function generateThreadId(): string {
+	if (
+		typeof crypto !== "undefined" &&
+		typeof crypto.randomUUID === "function"
+	) {
+		return crypto.randomUUID();
+	}
+	return nanoid();
+}
+
+function nowIso(): string {
+	return new Date().toISOString();
+}
 
 function normalizeSessionId(value: unknown): string | undefined {
 	if (typeof value !== "string") {
@@ -94,10 +118,17 @@ export function useChatEngine(props: ChatBaseProps) {
 		body,
 		onMessageSent,
 		onResponseReceived,
+		enableThreadHistory = false,
+		activeThreadId: controlledThreadId,
+		onThreadChange,
 	} = props;
 
 	const headersRef = useRef(userHeaders);
 	const bodyRef = useRef(body);
+	const enableThreadHistoryRef = useRef(enableThreadHistory);
+	useEffect(() => {
+		enableThreadHistoryRef.current = enableThreadHistory;
+	}, [enableThreadHistory]);
 	const pendingModelContextRef = useRef<ModelContextUpdate | undefined>(
 		undefined,
 	);
@@ -106,6 +137,53 @@ export function useChatEngine(props: ChatBaseProps) {
 		undefined,
 	);
 	const sessionIdRef = useRef<string | undefined>(sessionId);
+
+	const [activeThreadId, setActiveThreadIdState] = useState<string | undefined>(
+		controlledThreadId,
+	);
+	const activeThreadIdRef = useRef<string | undefined>(activeThreadId);
+	const [threads, setThreads] = useState<StoredThread[]>([]);
+	const [isThreadHistoryReady, setIsThreadHistoryReady] = useState(
+		!enableThreadHistory,
+	);
+	const threadCreatedAtRef = useRef<string | undefined>(undefined);
+	const threadTitleRef = useRef<string | undefined>(undefined);
+	const persistTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
+	// In-flight `upsertThread` promise. Tracked so callers (delete, flush)
+	// can await an already-fired persist and avoid resurrect-after-delete
+	// races, which `clearTimeout` alone cannot.
+	const persistInflightRef = useRef<Promise<void> | undefined>(undefined);
+	// Monotonic epoch invalidator for `switchThread`. Any concurrent
+	// `startNewThread` / `switchThread` / `deleteThread` (on the active
+	// thread) bumps this so a slower in-flight `loadThread` can't clobber
+	// a newer thread's state when it eventually resolves.
+	const switchEpochRef = useRef(0);
+	const onThreadChangeRef = useRef(onThreadChange);
+	useEffect(() => {
+		onThreadChangeRef.current = onThreadChange;
+	}, [onThreadChange]);
+
+	const setActiveThreadId = useCallback((next: string | undefined) => {
+		activeThreadIdRef.current = next;
+		setActiveThreadIdState(next);
+		if (next) {
+			onThreadChangeRef.current?.(next);
+		}
+	}, []);
+
+	const refreshThreads = useCallback(async () => {
+		if (!enableThreadHistory) {
+			return;
+		}
+		const memoryUserId = visitorContextRef.current?.memoryUserId;
+		if (!memoryUserId) {
+			return;
+		}
+		const list = await listThreads(memoryUserId);
+		setThreads(list);
+	}, [enableThreadHistory]);
 
 	const getSessionId = useCallback((): string | undefined => {
 		return sessionIdRef.current;
@@ -137,14 +215,66 @@ export function useChatEngine(props: ChatBaseProps) {
 		bodyRef.current = body;
 	}, [body]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: load once on mount
 	useEffect(() => {
-		collectVisitorContext()
-			.then((ctx) => {
+		let cancelled = false;
+		// Snapshot epoch at mount. Any user action (startNewThread,
+		// switchThread, deleteThread on active) bumps it; we then skip
+		// applying the stale mount-load result.
+		const mountEpoch = switchEpochRef.current;
+		(async () => {
+			try {
+				const ctx = await collectVisitorContext();
+				if (cancelled) {
+					return;
+				}
 				visitorContextRef.current = ctx;
-			})
-			.catch(() => {
+			} catch {
 				// Best-effort — silently ignore failures
-			});
+			}
+
+			if (!enableThreadHistory) {
+				return;
+			}
+			const memoryUserId = visitorContextRef.current?.memoryUserId;
+			if (!memoryUserId) {
+				setIsThreadHistoryReady(true);
+				return;
+			}
+
+			try {
+				const targetId =
+					controlledThreadId ?? (await getActiveThreadId(memoryUserId));
+				if (cancelled || mountEpoch !== switchEpochRef.current) {
+					return;
+				}
+				if (targetId) {
+					const stored = await loadThread(targetId);
+					if (cancelled || mountEpoch !== switchEpochRef.current) {
+						return;
+					}
+					if (stored && stored.memoryUserId === memoryUserId) {
+						activeThreadIdRef.current = stored.threadId;
+						setActiveThreadIdState(stored.threadId);
+						threadCreatedAtRef.current = stored.createdAt;
+						threadTitleRef.current = stored.title;
+						if (stored.sessionId) {
+							sessionIdRef.current = stored.sessionId;
+							setSessionIdState(stored.sessionId);
+						}
+						setMessages(stored.messages);
+					}
+				}
+				await refreshThreads();
+			} finally {
+				if (!cancelled) {
+					setIsThreadHistoryReady(true);
+				}
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
 	const transportRef = useRef(
@@ -187,6 +317,39 @@ export function useChatEngine(props: ChatBaseProps) {
 						referrer: vc.referrer,
 						visitorId: vc.visitorId,
 					};
+					const existingVisitor =
+						typeof resolvedBody.visitor === "object" &&
+						resolvedBody.visitor !== null
+							? (resolvedBody.visitor as Record<string, unknown>)
+							: {};
+					const existingClient =
+						typeof existingVisitor.client === "object" &&
+						existingVisitor.client !== null
+							? (existingVisitor.client as Record<string, unknown>)
+							: {};
+					resolvedBody.visitor = {
+						...existingVisitor,
+						client: {
+							...existingClient,
+							memoryUserId: vc.memoryUserId,
+						},
+					};
+				}
+
+				if (enableThreadHistoryRef.current) {
+					const hasExplicitThreadId = Object.hasOwn(resolvedBody, "threadId");
+					if (!hasExplicitThreadId) {
+						let tid = activeThreadIdRef.current;
+						if (!tid) {
+							tid = generateThreadId();
+							threadCreatedAtRef.current = nowIso();
+							threadTitleRef.current = undefined;
+							setActiveThreadId(tid);
+						}
+						resolvedBody.threadId = tid;
+					} else if (typeof resolvedBody.threadId === "string") {
+						activeThreadIdRef.current = resolvedBody.threadId;
+					}
 				}
 
 				return resolvedBody;
@@ -255,6 +418,11 @@ export function useChatEngine(props: ChatBaseProps) {
 			}
 		},
 	});
+
+	const messagesRef = useRef<UIMessage[]>(messages);
+	useEffect(() => {
+		messagesRef.current = messages;
+	}, [messages]);
 
 	// Resolve sendMessageAndWait only after React has committed the messages
 	// state update. `onFinish` fires before the re-render, so resolving there
@@ -364,6 +532,231 @@ export function useChatEngine(props: ChatBaseProps) {
 		void refreshToolDefinitions();
 	}, [setMessages, clearSessionId, refreshToolDefinitions]);
 
+	// Build a `StoredThread` from current refs synchronously. Callers that
+	// need to flush before mutating thread state (startNewThread,
+	// switchThread, deleteThread) must snapshot here *before* any `await`
+	// or ref mutation, so the write describes the outgoing thread, not a
+	// half-mutated mix of old + new.
+	const buildPersistSnapshot = useCallback((): StoredThread | undefined => {
+		if (!enableThreadHistoryRef.current) {
+			return undefined;
+		}
+		const memoryUserId = visitorContextRef.current?.memoryUserId;
+		const threadId = activeThreadIdRef.current;
+		const msgs = messagesRef.current;
+		if (!memoryUserId || !threadId || msgs.length === 0) {
+			return undefined;
+		}
+		if (!threadCreatedAtRef.current) {
+			threadCreatedAtRef.current = nowIso();
+		}
+		if (!threadTitleRef.current) {
+			const firstUser = msgs.find((m) => m.role === "user");
+			const firstUserText = firstUser
+				? firstUser.parts
+						.map((p) =>
+							"text" in p && typeof p.text === "string" ? p.text : "",
+						)
+						.join(" ")
+				: "";
+			threadTitleRef.current = deriveThreadTitle(firstUserText);
+		}
+		return {
+			threadId,
+			memoryUserId,
+			title: threadTitleRef.current,
+			messages: msgs,
+			sessionId: sessionIdRef.current,
+			createdAt: threadCreatedAtRef.current,
+			updatedAt: nowIso(),
+		};
+	}, []);
+
+	const persistActiveThread = useCallback(async () => {
+		const snap = buildPersistSnapshot();
+		if (!snap) {
+			return;
+		}
+		await upsertThread(snap);
+		await refreshThreads();
+	}, [buildPersistSnapshot, refreshThreads]);
+
+	useEffect(() => {
+		if (!enableThreadHistory) {
+			return;
+		}
+		if (!isThreadHistoryReady) {
+			return;
+		}
+		if (status === "submitted" || status === "streaming") {
+			return;
+		}
+		if (messages.length === 0) {
+			return;
+		}
+		if (persistTimerRef.current) {
+			clearTimeout(persistTimerRef.current);
+		}
+		persistTimerRef.current = setTimeout(() => {
+			persistTimerRef.current = undefined;
+			const p = persistActiveThread().finally(() => {
+				if (persistInflightRef.current === p) {
+					persistInflightRef.current = undefined;
+				}
+			});
+			persistInflightRef.current = p;
+		}, THREAD_PERSIST_DEBOUNCE_MS);
+		return () => {
+			if (persistTimerRef.current) {
+				clearTimeout(persistTimerRef.current);
+			}
+		};
+	}, [
+		enableThreadHistory,
+		isThreadHistoryReady,
+		messages,
+		status,
+		persistActiveThread,
+	]);
+
+	// Flush in-flight + pending persist. The snapshot is captured *now*
+	// (synchronously) so callers can mutate thread refs immediately after
+	// invoking this without tainting the outgoing write — even when an
+	// in-flight persist forces the async tail to yield first.
+	const flushPendingPersist = useCallback((): Promise<void> => {
+		const inflight = persistInflightRef.current;
+		const timer = persistTimerRef.current;
+		const snap = timer ? buildPersistSnapshot() : undefined;
+		if (timer) {
+			clearTimeout(timer);
+			persistTimerRef.current = undefined;
+		}
+		return (async () => {
+			if (inflight) {
+				await inflight;
+			}
+			if (snap) {
+				await upsertThread(snap);
+				await refreshThreads();
+			}
+		})();
+	}, [buildPersistSnapshot, refreshThreads]);
+
+	const startNewThread = useCallback(() => {
+		// Bump epoch first so any in-flight `switchThread` load knows it's
+		// been invalidated and skips its setters when it eventually resolves.
+		switchEpochRef.current += 1;
+		// Fire-and-forget: `flushPendingPersist` snapshots synchronously
+		// before any await, so subsequent ref mutations below don't taint
+		// the outgoing write.
+		void flushPendingPersist();
+		setMessages([]);
+		setQueuedMessages([]);
+		clearSessionId();
+		setText("");
+		const nextId = generateThreadId();
+		threadCreatedAtRef.current = nowIso();
+		threadTitleRef.current = undefined;
+		setActiveThreadId(nextId);
+		void refreshThreads();
+		return nextId;
+	}, [
+		setMessages,
+		clearSessionId,
+		setActiveThreadId,
+		refreshThreads,
+		flushPendingPersist,
+	]);
+
+	const switchThread = useCallback(
+		async (threadId: string) => {
+			switchEpochRef.current += 1;
+			const epoch = switchEpochRef.current;
+			await flushPendingPersist();
+			if (epoch !== switchEpochRef.current) {
+				return;
+			}
+			const stored = await loadThread(threadId);
+			if (epoch !== switchEpochRef.current) {
+				return;
+			}
+			if (!stored) {
+				return;
+			}
+			setActiveThreadId(stored.threadId);
+			threadCreatedAtRef.current = stored.createdAt;
+			threadTitleRef.current = stored.title;
+			if (stored.sessionId) {
+				sessionIdRef.current = stored.sessionId;
+				setSessionIdState(stored.sessionId);
+			} else {
+				clearSessionId();
+			}
+			setMessages(stored.messages);
+			setQueuedMessages([]);
+			setText("");
+		},
+		[setMessages, clearSessionId, setActiveThreadId, flushPendingPersist],
+	);
+
+	const deleteThread = useCallback(
+		async (threadId: string) => {
+			// Drop pending + await in-flight persist for the thread we're
+			// deleting — otherwise an already-fired `upsertThread` can settle
+			// after `deleteThreadFromStore` and resurrect the row.
+			if (activeThreadIdRef.current === threadId) {
+				// Invalidate any in-flight `switchThread` targeting this thread.
+				switchEpochRef.current += 1;
+				if (persistTimerRef.current) {
+					clearTimeout(persistTimerRef.current);
+					persistTimerRef.current = undefined;
+				}
+				const inflight = persistInflightRef.current;
+				if (inflight) {
+					await inflight;
+				}
+			}
+			await deleteThreadFromStore(threadId);
+			await refreshThreads();
+			if (activeThreadIdRef.current === threadId) {
+				setMessages([]);
+				setQueuedMessages([]);
+				clearSessionId();
+				setText("");
+				activeThreadIdRef.current = undefined;
+				setActiveThreadIdState(undefined);
+				threadCreatedAtRef.current = undefined;
+				threadTitleRef.current = undefined;
+			}
+		},
+		[setMessages, clearSessionId, refreshThreads],
+	);
+
+	// Sync controlled `activeThreadId` after mount. The mount effect seeds
+	// the initial value; this effect handles parent-driven changes
+	// afterwards by switching threads. Gated on `isThreadHistoryReady` so it
+	// runs only once the mount load has settled.
+	useEffect(() => {
+		if (!enableThreadHistory) {
+			return;
+		}
+		if (!isThreadHistoryReady) {
+			return;
+		}
+		if (controlledThreadId === undefined) {
+			return;
+		}
+		if (controlledThreadId === activeThreadIdRef.current) {
+			return;
+		}
+		void switchThread(controlledThreadId);
+	}, [
+		controlledThreadId,
+		enableThreadHistory,
+		isThreadHistoryReady,
+		switchThread,
+	]);
+
 	const handleTextChange = useCallback(
 		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
 			setText(e.target.value);
@@ -402,5 +795,11 @@ export function useChatEngine(props: ChatBaseProps) {
 		sessionId,
 		toolDefinitions,
 		refreshToolDefinitions,
+		threads,
+		activeThreadId,
+		isThreadHistoryReady,
+		startNewThread,
+		switchThread,
+		deleteThread,
 	};
 }

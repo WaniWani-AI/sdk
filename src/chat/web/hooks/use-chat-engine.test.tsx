@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { Window } from "happy-dom";
+
+// biome-ignore lint/suspicious/noExplicitAny: test setup
+(globalThis as any).indexedDB = new IDBFactory();
+// biome-ignore lint/suspicious/noExplicitAny: test setup
+(globalThis as any).IDBKeyRange = IDBKeyRange;
 
 // ---------------------------------------------------------------------------
 // Set up DOM globals before importing React
@@ -70,6 +76,18 @@ mock.module("@ai-sdk/react", () => ({
 			setMessages: mockSetMessages,
 			status: useChatStatus,
 		};
+	},
+}));
+
+// Capture transport body callback so we can inspect resolvedBody without
+// actually firing a network request through the real DefaultChatTransport.
+let capturedTransportBody: (() => Record<string, unknown>) | undefined;
+// @ts-expect-error -- bun:test `mock.module` exists at runtime but has no TS type
+mock.module("../lib/lenient-chat-transport", () => ({
+	LenientChatTransport: class {
+		constructor(opts: { body?: () => Record<string, unknown> }) {
+			capturedTransportBody = opts.body;
+		}
 	},
 }));
 
@@ -229,5 +247,57 @@ describe("useChatEngine – sendMessageAndWait deferred resolution", () => {
 		});
 
 		expect(true).toBe(true);
+	});
+});
+
+async function flushAsync() {
+	await act(async () => {
+		await new Promise((r) => setTimeout(r, 30));
+	});
+}
+
+describe("useChatEngine – thread history", () => {
+	test("resolvedBody.threadId is set after the first send", async () => {
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+		// Wait for visitor context + thread history load to settle
+		await flushAsync();
+		act(() => {
+			root.render(createElement(Harness, { resultRef: hookRef }));
+		});
+
+		expect(capturedTransportBody).toBeDefined();
+		const body = capturedTransportBody?.();
+		expect(typeof body?.threadId).toBe("string");
+		expect((body?.threadId as string).length).toBeGreaterThan(5);
+	});
+
+	test("startNewThread clears messages and creates a new threadId", async () => {
+		await flushAsync();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		// Force-create the first thread by invoking the body builder.
+		const firstBody = capturedTransportBody?.();
+		const firstThreadId = firstBody?.threadId as string;
+		expect(typeof firstThreadId).toBe("string");
+
+		mockSetMessages.mockClear();
+		let nextId: string | undefined;
+		act(() => {
+			nextId = engine.startNewThread();
+		});
+
+		expect(typeof nextId).toBe("string");
+		expect(nextId).not.toBe(firstThreadId);
+		expect(mockSetMessages).toHaveBeenCalled();
+
+		// Body builder now uses the new threadId
+		const secondBody = capturedTransportBody?.();
+		expect(secondBody?.threadId).toBe(nextId);
 	});
 });
