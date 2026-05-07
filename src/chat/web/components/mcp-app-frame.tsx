@@ -18,7 +18,6 @@ const MAX_HEIGHT = 500;
 // (Claude, ChatGPT) is that the widget owns its loading state; the host
 // just gives the iframe a sane default size so that skeleton is visible.
 const DEFAULT_HEIGHT = 120;
-const AUTOHEIGHT_PADDING = 16;
 const PROTOCOL_VERSION = "2026-01-26";
 const RESIZE_ANIMATION_MS = 300;
 const HANDSHAKE_TIMEOUT_MS = 3000;
@@ -173,16 +172,13 @@ export function McpAppFrame({
 
 	const clampHeight = useCallback(
 		(h: number) => {
-			// Opt-in autoHeight: widget is authored knowing the +16 padding contract.
-			if (autoHeight) {
-				return Math.max(h + AUTOHEIGHT_PADDING, 0);
-			}
-			// Auto-promoted: widget overflowed MAX_HEIGHT but wasn't written with
-			// the padding contract. Adding +16 here causes a feedback loop with
+			// Pass the reported height through verbatim for autoHeight (opt-in or
+			// auto-promoted). Adding any padding here causes a feedback loop with
 			// widgets whose body fills its viewport (min-height: 100% / 100vh):
-			// each tick we grow by 16, the widget reports the new height, repeat.
-			// Pass the reported height through verbatim instead.
-			if (promotedAutoHeightRef.current) {
+			// each tick we'd grow by N, the widget reports the new height, repeat.
+			// Widgets that need breathing room should render it inside (margin-
+			// bottom on the root element), not via the host inflating the iframe.
+			if (autoHeight || promotedAutoHeightRef.current) {
 				return Math.max(h, 0);
 			}
 			return Math.min(Math.max(h, 50), MAX_HEIGHT);
