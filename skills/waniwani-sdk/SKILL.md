@@ -1,7 +1,7 @@
 ---
 name: waniwani-sdk
 description: "Integrate the @waniwani/sdk package into MCP servers for event tracking, multi-step conversational flows, widget creation, knowledge base search, and chat components. Use when building or integrating WaniWani analytics, creating MCP tools with UI widgets, building multi-turn flows, or adding chat to a website."
-license: AGPL-3.0-or-later
+license: MIT
 metadata:
   author: WaniWani
 ---
