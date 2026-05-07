@@ -118,7 +118,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		body,
 		onMessageSent,
 		onResponseReceived,
-		enableThreadHistory = true,
+		enableThreadHistory = false,
 		activeThreadId: controlledThreadId,
 		onThreadChange,
 	} = props;

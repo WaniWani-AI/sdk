@@ -137,7 +137,7 @@ export interface ChatBaseProps {
 	skipRemoteConfig?: boolean;
 	/**
 	 * Persist the conversation across page reloads using IndexedDB so the user
-	 * can resume previous threads. Defaults to `true`.
+	 * can resume previous threads. Defaults to `false` — opt in explicitly.
 	 */
 	enableThreadHistory?: boolean;
 	/**

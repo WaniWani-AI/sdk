@@ -51,7 +51,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			triggerEvent = "triggerDemoRequest",
 			api,
 			debug,
-			enableThreadHistory = true,
+			enableThreadHistory = false,
 		} = props;
 
 		const effectiveApi = api ?? "/api/waniwani";

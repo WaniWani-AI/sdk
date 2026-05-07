@@ -57,7 +57,7 @@ export interface EmbedConfig {
 	css?: string;
 	/**
 	 * Persist conversations across page reloads using IndexedDB so users can
-	 * resume previous threads. Defaults to `true`.
+	 * resume previous threads. Defaults to `false` — opt in explicitly.
 	 */
 	enableThreadHistory?: boolean;
 	/** Theme overrides applied to the ChatCard. */
