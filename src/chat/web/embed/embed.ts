@@ -113,18 +113,24 @@ function mountInline(
 
 	// Create shadow DOM inside the target container. Stretch to fill the
 	// parent so the embedder's sizing (e.g. `h-[640px]`) drives the chat.
+	// Grid + `min-height: inherit` so containers sized via `min-height`
+	// (not `height`) still propagate a definite size — `height: 100%`
+	// alone collapses against `min-height` parents.
 	hostElement = document.createElement("div");
 	hostElement.id = "waniwani-chat-embed";
 	hostElement.style.width = "100%";
 	hostElement.style.height = "100%";
+	hostElement.style.minHeight = "inherit";
+	hostElement.style.display = "grid";
+	hostElement.style.gridTemplateRows = "1fr";
 	container.appendChild(hostElement);
 
 	const shadowRoot = hostElement.attachShadow({ mode: "open" });
 	injectStyles(shadowRoot, config);
 
 	const mountContainer = document.createElement("div");
-	mountContainer.style.width = "100%";
-	mountContainer.style.height = "100%";
+	mountContainer.style.minHeight = "0";
+	mountContainer.style.minWidth = "0";
 	shadowRoot.appendChild(mountContainer);
 
 	const inlineRef = React.createRef<InlineChatHandle>();
