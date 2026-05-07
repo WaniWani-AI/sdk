@@ -151,6 +151,10 @@ export function useChatEngine(props: ChatBaseProps) {
 	const persistTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
 		undefined,
 	);
+	// In-flight `upsertThread` promise. Tracked so callers (delete, flush)
+	// can await an already-fired persist and avoid resurrect-after-delete
+	// races, which `clearTimeout` alone cannot.
+	const persistInflightRef = useRef<Promise<void> | undefined>(undefined);
 	const onThreadChangeRef = useRef(onThreadChange);
 	useEffect(() => {
 		onThreadChangeRef.current = onThreadChange;
@@ -573,7 +577,13 @@ export function useChatEngine(props: ChatBaseProps) {
 			clearTimeout(persistTimerRef.current);
 		}
 		persistTimerRef.current = setTimeout(() => {
-			void persistActiveThread();
+			persistTimerRef.current = undefined;
+			const p = persistActiveThread().finally(() => {
+				if (persistInflightRef.current === p) {
+					persistInflightRef.current = undefined;
+				}
+			});
+			persistInflightRef.current = p;
 		}, THREAD_PERSIST_DEBOUNCE_MS);
 		return () => {
 			if (persistTimerRef.current) {
@@ -588,13 +598,18 @@ export function useChatEngine(props: ChatBaseProps) {
 		persistActiveThread,
 	]);
 
-	const flushPendingPersist = useCallback(() => {
+	const flushPendingPersist = useCallback(async () => {
+		// Drain an already-fired persist first so writes settle in order.
+		const inflight = persistInflightRef.current;
+		if (inflight) {
+			await inflight;
+		}
 		if (!persistTimerRef.current) {
-			return undefined;
+			return;
 		}
 		clearTimeout(persistTimerRef.current);
 		persistTimerRef.current = undefined;
-		return persistActiveThread();
+		await persistActiveThread();
 	}, [persistActiveThread]);
 
 	const startNewThread = useCallback(() => {
@@ -645,11 +660,18 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	const deleteThread = useCallback(
 		async (threadId: string) => {
-			// Drop any pending persist for the thread we're deleting — flushing
-			// would resurrect the row right after `deleteThreadFromStore`.
-			if (activeThreadIdRef.current === threadId && persistTimerRef.current) {
-				clearTimeout(persistTimerRef.current);
-				persistTimerRef.current = undefined;
+			// Drop pending + await in-flight persist for the thread we're
+			// deleting — otherwise an already-fired `upsertThread` can settle
+			// after `deleteThreadFromStore` and resurrect the row.
+			if (activeThreadIdRef.current === threadId) {
+				if (persistTimerRef.current) {
+					clearTimeout(persistTimerRef.current);
+					persistTimerRef.current = undefined;
+				}
+				const inflight = persistInflightRef.current;
+				if (inflight) {
+					await inflight;
+				}
 			}
 			await deleteThreadFromStore(threadId);
 			await refreshThreads();
