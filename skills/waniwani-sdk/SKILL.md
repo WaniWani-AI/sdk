@@ -266,3 +266,4 @@ When a playbook exists for the user's task, **follow the playbook step by step**
 - **Missing `InitializeNextJsInIframe` in layout** -- Add `<InitializeNextJsInIframe baseUrl={...} />` in the root layout's `<head>` so fetch/navigation work inside cross-origin iframes.
 - **Forgetting `START`/`END` edges in flows** -- Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`.
 - **Importing `interrupt`/`showWidget` directly** -- These come from the handler context: `({ interrupt }) => interrupt(...)`.
+- **Skybridge widget filename ≠ registered name** -- The file at `web/src/widgets/<name>.tsx` MUST match the name passed to `registerWidget(<name>, ...)` and `showWidget(<name>, ...)`. A mismatch surfaces as `[vite] Failed to fetch dynamically imported module: .../src/widgets/<name>` in the dev-server log and the widget never renders. When debugging "widget not rendering," check the dev-server log first -- it names the exact path Vite is looking for.
