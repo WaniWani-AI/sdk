@@ -720,6 +720,7 @@ export function useChatEngine(props: ChatBaseProps) {
 			await refreshThreads();
 			if (activeThreadIdRef.current === threadId) {
 				setMessages([]);
+				setQueuedMessages([]);
 				clearSessionId();
 				setText("");
 				activeThreadIdRef.current = undefined;
