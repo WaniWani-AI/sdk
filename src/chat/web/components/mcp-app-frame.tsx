@@ -13,7 +13,11 @@ import { cn } from "../lib/utils";
 
 const DEFAULT_RESOURCE_ENDPOINT = "/api/mcp/resource";
 const MAX_HEIGHT = 500;
-const DEFAULT_HEIGHT = 0;
+// Initial height giving widgets room to render their own loading skeleton
+// before `ui/notifications/size-changed` arrives. The MCP Apps convention
+// (Claude, ChatGPT) is that the widget owns its loading state; the host
+// just gives the iframe a sane default size so that skeleton is visible.
+const DEFAULT_HEIGHT = 120;
 const AUTOHEIGHT_PADDING = 16;
 const PROTOCOL_VERSION = "2026-01-26";
 const RESIZE_ANIMATION_MS = 300;
@@ -144,6 +148,11 @@ export function McpAppFrame({
 	const initializedRef = useRef(false);
 	const retryCountRef = useRef(0);
 	const displayModeRef = useRef<McpAppDisplayMode>("inline");
+	// Once a widget reports a size larger than MAX_HEIGHT, treat it as
+	// auto-height for the rest of its lifetime: a widget that actively
+	// reports a tall size knows what it's doing, so respecting the
+	// reported height is better than trapping it behind a scrollbar.
+	const promotedAutoHeightRef = useRef(false);
 	const [height, setHeight] = useState(DEFAULT_HEIGHT);
 	const [width, setWidth] = useState<number | undefined>(undefined);
 	const onOpenLinkRef = useRef(onOpenLink);
@@ -164,7 +173,7 @@ export function McpAppFrame({
 
 	const clampHeight = useCallback(
 		(h: number) => {
-			if (autoHeight) {
+			if (autoHeight || promotedAutoHeightRef.current) {
 				return Math.max(h + AUTOHEIGHT_PADDING, 0);
 			}
 			return Math.min(Math.max(h, 50), MAX_HEIGHT);
@@ -374,6 +383,13 @@ export function McpAppFrame({
 
 				if (heightChanged && newHeight !== undefined) {
 					last.height = newHeight;
+					if (
+						!autoHeight &&
+						!promotedAutoHeightRef.current &&
+						newHeight > MAX_HEIGHT
+					) {
+						promotedAutoHeightRef.current = true;
+					}
 					const clamped = clampHeight(newHeight);
 
 					// Get current visual height before canceling the old animation
