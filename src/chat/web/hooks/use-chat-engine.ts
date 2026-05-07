@@ -125,6 +125,10 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	const headersRef = useRef(userHeaders);
 	const bodyRef = useRef(body);
+	const enableThreadHistoryRef = useRef(enableThreadHistory);
+	useEffect(() => {
+		enableThreadHistoryRef.current = enableThreadHistory;
+	}, [enableThreadHistory]);
 	const pendingModelContextRef = useRef<ModelContextUpdate | undefined>(
 		undefined,
 	);
@@ -319,7 +323,7 @@ export function useChatEngine(props: ChatBaseProps) {
 					};
 				}
 
-				if (enableThreadHistory) {
+				if (enableThreadHistoryRef.current) {
 					const hasExplicitThreadId = Object.hasOwn(resolvedBody, "threadId");
 					if (!hasExplicitThreadId) {
 						let tid = activeThreadIdRef.current;
@@ -584,11 +588,20 @@ export function useChatEngine(props: ChatBaseProps) {
 		persistActiveThread,
 	]);
 
-	const startNewThread = useCallback(() => {
-		if (persistTimerRef.current) {
-			clearTimeout(persistTimerRef.current);
-			persistTimerRef.current = undefined;
+	const flushPendingPersist = useCallback(() => {
+		if (!persistTimerRef.current) {
+			return undefined;
 		}
+		clearTimeout(persistTimerRef.current);
+		persistTimerRef.current = undefined;
+		return persistActiveThread();
+	}, [persistActiveThread]);
+
+	const startNewThread = useCallback(() => {
+		// Fire-and-forget: persistActiveThread snapshots refs synchronously
+		// before any await, so subsequent mutations below don't corrupt the
+		// write of the outgoing thread.
+		void flushPendingPersist();
 		setMessages([]);
 		setQueuedMessages([]);
 		clearSessionId();
@@ -599,14 +612,17 @@ export function useChatEngine(props: ChatBaseProps) {
 		setActiveThreadId(nextId);
 		void refreshThreads();
 		return nextId;
-	}, [setMessages, clearSessionId, setActiveThreadId, refreshThreads]);
+	}, [
+		setMessages,
+		clearSessionId,
+		setActiveThreadId,
+		refreshThreads,
+		flushPendingPersist,
+	]);
 
 	const switchThread = useCallback(
 		async (threadId: string) => {
-			if (persistTimerRef.current) {
-				clearTimeout(persistTimerRef.current);
-				persistTimerRef.current = undefined;
-			}
+			await flushPendingPersist();
 			const stored = await loadThread(threadId);
 			if (!stored) {
 				return;
@@ -624,18 +640,20 @@ export function useChatEngine(props: ChatBaseProps) {
 			setQueuedMessages([]);
 			setText("");
 		},
-		[setMessages, clearSessionId, setActiveThreadId],
+		[setMessages, clearSessionId, setActiveThreadId, flushPendingPersist],
 	);
 
 	const deleteThread = useCallback(
 		async (threadId: string) => {
+			// Drop any pending persist for the thread we're deleting — flushing
+			// would resurrect the row right after `deleteThreadFromStore`.
+			if (activeThreadIdRef.current === threadId && persistTimerRef.current) {
+				clearTimeout(persistTimerRef.current);
+				persistTimerRef.current = undefined;
+			}
 			await deleteThreadFromStore(threadId);
 			await refreshThreads();
 			if (activeThreadIdRef.current === threadId) {
-				if (persistTimerRef.current) {
-					clearTimeout(persistTimerRef.current);
-					persistTimerRef.current = undefined;
-				}
 				setMessages([]);
 				clearSessionId();
 				setText("");
@@ -647,6 +665,31 @@ export function useChatEngine(props: ChatBaseProps) {
 		},
 		[setMessages, clearSessionId, refreshThreads],
 	);
+
+	// Sync controlled `activeThreadId` after mount. The mount effect seeds
+	// the initial value; this effect handles parent-driven changes
+	// afterwards by switching threads. Gated on `isThreadHistoryReady` so it
+	// runs only once the mount load has settled.
+	useEffect(() => {
+		if (!enableThreadHistory) {
+			return;
+		}
+		if (!isThreadHistoryReady) {
+			return;
+		}
+		if (controlledThreadId === undefined) {
+			return;
+		}
+		if (controlledThreadId === activeThreadIdRef.current) {
+			return;
+		}
+		void switchThread(controlledThreadId);
+	}, [
+		controlledThreadId,
+		enableThreadHistory,
+		isThreadHistoryReady,
+		switchThread,
+	]);
 
 	const handleTextChange = useCallback(
 		(e: React.ChangeEvent<HTMLTextAreaElement>) => {
