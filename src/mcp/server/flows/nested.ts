@@ -100,14 +100,24 @@ export function deleteNestedValue(
 /**
  * Expand dot-path keys into nested objects.
  * `{ "driver.name": "John", "email": "a@b.com" }` → `{ driver: { name: "John" }, email: "a@b.com" }`
+ *
+ * Mixed input where a dot-key and its nested sibling share a parent
+ * (e.g. `{ "driver.name": "John", driver: { license: "ABC" } }`) is deep-merged
+ * regardless of key order, so neither side clobbers the other.
  */
 export function expandDotPaths(
 	flat: Record<string, unknown>,
 ): Record<string, unknown> {
-	const result: Record<string, unknown> = {};
+	let result: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(flat)) {
 		if (key.includes(".")) {
 			setNestedValue(result, key, value);
+		} else if (
+			value !== null &&
+			typeof value === "object" &&
+			!Array.isArray(value)
+		) {
+			result = deepMerge(result, { [key]: value as Record<string, unknown> });
 		} else {
 			result[key] = value;
 		}
