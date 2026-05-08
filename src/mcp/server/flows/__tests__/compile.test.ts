@@ -1288,6 +1288,98 @@ describe("nested object state", () => {
 		expect(p3.status).toBe("complete");
 		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
 	});
+
+	test("mixed dot-key and nested sibling in continue (dot first)", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nested_mixed_continue_dot_first",
+			title: "Nested Mixed Continue",
+			description: "Mixed-shape stateUpdates on continue.",
+			state: {
+				mortgagor: z
+					.object({
+						age: z.number().describe("Age"),
+						name: z.string().describe("Full name"),
+					})
+					.describe("Mortgagor details"),
+			},
+		})
+			.addNode("ask_mortgagor", ({ interrupt }) =>
+				interrupt({
+					"mortgagor.age": { question: "Age?" },
+					"mortgagor.name": { question: "Name?" },
+				}),
+			)
+			.addEdge(START, "ask_mortgagor")
+			.addEdge("ask_mortgagor", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		await handler?.(startInput(), TEST_EXTRA);
+
+		const result = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: {
+					"mortgagor.age": 32,
+					mortgagor: { name: "Alice" },
+				},
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("complete");
+	});
+
+	test("mixed dot-key and nested sibling in continue (nested first)", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nested_mixed_continue_nested_first",
+			title: "Nested Mixed Continue",
+			description: "Mixed-shape stateUpdates on continue.",
+			state: {
+				mortgagor: z
+					.object({
+						age: z.number().describe("Age"),
+						name: z.string().describe("Full name"),
+					})
+					.describe("Mortgagor details"),
+			},
+		})
+			.addNode("ask_mortgagor", ({ interrupt }) =>
+				interrupt({
+					"mortgagor.age": { question: "Age?" },
+					"mortgagor.name": { question: "Name?" },
+				}),
+			)
+			.addEdge(START, "ask_mortgagor")
+			.addEdge("ask_mortgagor", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		await handler?.(startInput(), TEST_EXTRA);
+
+		const result = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: {
+					mortgagor: { name: "Alice" },
+					"mortgagor.age": 32,
+				},
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("complete");
+	});
 });
 
 // ============================================================================
