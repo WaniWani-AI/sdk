@@ -99,13 +99,12 @@ function mountInline(
 		);
 	}
 
-	// Plain block host with no forced sizing — the chat flows naturally
-	// in its parent. Sticky header/input inside the chat resolve against
-	// the nearest scroll ancestor (page, scrollable wrapper, or a
-	// `max-height; overflow: auto` container — all work without a
-	// definite parent height).
+	// ChatEmbed self-sizes against the customer's container (walking up
+	// across the shadow boundary), so the host needs no special sizing —
+	// it auto-fits the chat root's chosen height.
 	hostElement = document.createElement("div");
 	hostElement.id = "waniwani-chat-embed";
+	hostElement.style.width = "100%";
 	container.appendChild(hostElement);
 
 	const shadowRoot = hostElement.attachShadow({ mode: "open" });

@@ -70,17 +70,17 @@ Always-visible card with a header, status dot, and optional subtitle. Best for d
 
 ### `ChatEmbed`
 
-Bring-your-own-backend chat that flows in the host page's scroll context. The header (if set) and input footer are `position: sticky` — drop `ChatEmbed` inside any container (a plain `<div>`, a flex column, a `max-height; overflow: auto` box) and it just works, no definite parent height needed.
+Bring-your-own-backend chat with an internal flex column (pinned header, scrolling messages, pinned input). It self-sizes to the customer's bounded container — works for `height`, `max-height`, and flex/grid bounded ancestors — by measuring the outer container with a `ResizeObserver` (a temporary tall sentinel forces `max-height` to engage during the read). Falls back to `min(80svh, 700px)` if no bounding ancestor is found.
 
 ```tsx
-// Headerless — flows in page, sticky input at viewport bottom
+// Headerless — fills parent's bounded height
 <ChatEmbed
   api="/api/my-chat-endpoint"
   body={{ environmentId, sessionId }}
   theme={{ backgroundColor: "#fff" }}
 />
 
-// With sticky header + thread history
+// With header + thread history
 <ChatEmbed
   api="/api/my-chat-endpoint"
   title="Support"
@@ -101,19 +101,29 @@ Bring-your-own-backend chat that flows in the host page's scroll context. The he
 | `api` | `string` | Yes | Chat API endpoint (no default) |
 | `className` | `string` | No | Additional CSS class names |
 | `mcp` | `ChatEmbedMcpConfig` | No | MCP Apps config for widget iframes |
-| `title` | `string` | No | When set, renders a sticky header with this title |
-| `headerActions` | `ReactNode` | No | Extra React node rendered on the right of the sticky header |
+| `title` | `string` | No | When set, renders the header with this title |
+| `headerActions` | `ReactNode` | No | Extra React node rendered on the right of the header |
 | `readOnly` | `boolean` | No | Hide the input bar |
 
-**Sizing:** `ChatEmbed` no longer fills its parent — it flows naturally and grows with content. To bound it, wrap in a scrollable container:
+**Sizing:** any of these work — the chat fits within whichever bound the customer's container provides.
 
 ```tsx
-<div style={{ maxHeight: 600, overflow: "auto" }}>
+// max-height bound
+<div style={{ maxHeight: 600 }}>
   <ChatEmbed api="/api/chat" title="Support" />
 </div>
-```
 
-The sticky header/input then stick within that scroll container.
+// definite height
+<div style={{ height: 600 }}>
+  <ChatEmbed api="/api/chat" />
+</div>
+
+// flex-column item with bounded flex sizing
+<div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+  <header />
+  <ChatEmbed api="/api/chat" />  {/* flex: 1 fills remaining height */}
+</div>
+```
 
 **`ChatEmbedMcpConfig`:**
 
@@ -257,7 +267,7 @@ Tracking is fire-and-forget -- failures never break the chat.
 
 Self-contained IIFE bundle with React bundled. Drop a `<script>` tag on any website to inline a chat into an element on your page. Uses Shadow DOM for CSS isolation.
 
-The embed mounts inline only — there is no floating bubble or popover panel. The chat flows in its parent's scroll context with a sticky header and sticky input footer, so it works inside containers of any size (or no size at all).
+The embed mounts inline only — there is no floating bubble or popover panel. The chat self-sizes to the bounded height of `[data-waniwani-embed]` (or any ancestor that bounds it via `height`, `max-height`, or flex/grid). Inside, header and input are pinned while only the messages list scrolls. If no bounding ancestor is found, the chat falls back to `min(80svh, 700px)`.
 
 ### Prerequisites
 
@@ -282,15 +292,21 @@ Place a marker element where the chat should mount; the script auto-mounts into 
 ></script>
 ```
 
-The chat fills the width of its parent and grows with its content; the page (or nearest scroll ancestor) scrolls naturally. To bound it, wrap in a scrollable container:
+Bound the chat by sizing `[data-waniwani-embed]` (or an ancestor) with `height`, `max-height`, or flex/grid sizing. The chat fits within that bound and scrolls internally — no need to add `overflow: auto` yourself.
 
 ```html
-<div style="max-height: 600px; overflow: auto;">
-  <div data-waniwani-embed></div>
+<!-- max-height bound -->
+<div data-waniwani-embed style="max-height: 600px;"></div>
+
+<!-- definite height -->
+<div data-waniwani-embed style="height: 600px;"></div>
+
+<!-- flex-column item -->
+<div style="display: flex; flex-direction: column; height: 100vh;">
+  <header>…</header>
+  <div data-waniwani-embed style="flex: 1; min-height: 0;"></div>
 </div>
 ```
-
-The sticky header/input then stick within that scroll box instead of the page.
 
 ### Script Tag Options
 

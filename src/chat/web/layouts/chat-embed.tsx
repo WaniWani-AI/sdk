@@ -30,15 +30,13 @@ import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
 import { Button } from "../ui/button";
 
 /**
- * Standalone chat that flows in the host page's scroll context.
+ * Bring-your-own-backend chat with internal scroll.
  *
- * Header and input are `position: sticky`; the message list grows with its
- * content and the host page (or nearest scroll ancestor) scrolls. This avoids
- * the need for a definite parent height — drop it inside a `max-height`,
- * a flex column, or a plain `<div>` and it just works.
- *
- * Pass `title` or `enableThreadHistory` to render a sticky header.
- * Point `api` at any AI-SDK-compatible streaming endpoint.
+ * Self-sizes to its parent's bounded height (works for `height`,
+ * `max-height`, and flex/grid bounded items) using a hide-then-measure
+ * loop on a `ResizeObserver`. Falls back to `min(80svh, 700px)` when the
+ * parent is truly unbounded. Internally a flex column: header and input
+ * stay pinned while the message list scrolls between them.
  */
 export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 	function ChatEmbed(props, ref) {
@@ -77,10 +75,74 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			string | null
 		>(null);
 		const rootRef = useRef<HTMLDivElement>(null);
+		const scrollRef = useRef<HTMLDivElement>(null);
 		const bottomRef = useRef<HTMLDivElement>(null);
 		const [atBottom, setAtBottom] = useState(true);
 		const atBottomRef = useRef(atBottom);
 		atBottomRef.current = atBottom;
+
+		// Self-size to the customer's bounded container so the chat scrolls
+		// internally instead of overflowing the page. We find that
+		// container (the parent above the shadow boundary, if any) and
+		// measure its `clientHeight` while a tall sentinel forces any
+		// `max-height` constraint to engage. The chat root itself is
+		// hidden during the measurement so its content doesn't muddy the
+		// reading. Sentinel-cap of 90000px lets us also detect "truly
+		// unbounded" containers and fall back to a viewport-based default.
+		useEffect(() => {
+			const root = rootRef.current;
+			if (!root) {
+				return;
+			}
+
+			const rootNode = root.getRootNode();
+			const outer =
+				rootNode instanceof ShadowRoot
+					? rootNode.host.parentElement
+					: root.parentElement;
+			if (!outer) {
+				return;
+			}
+
+			let applying = false;
+			const apply = () => {
+				if (applying) {
+					return;
+				}
+				applying = true;
+
+				const sentinel = document.createElement("div");
+				sentinel.style.cssText =
+					"height:100000px;width:0;flex:none;visibility:hidden;";
+				outer.appendChild(sentinel);
+
+				const prevDisplay = root.style.display;
+				root.style.display = "none";
+				const avail = outer.clientHeight;
+				root.style.display = prevDisplay;
+
+				outer.removeChild(sentinel);
+
+				if (avail >= 100 && avail < 90000) {
+					root.style.height = `${avail}px`;
+					root.style.maxHeight = "";
+				} else {
+					// Outer is truly unbounded — viewport-derived fallback,
+					// still capped by any inherited ancestor `max-height`.
+					root.style.height = "min(80svh, 700px)";
+					root.style.maxHeight = "inherit";
+				}
+
+				queueMicrotask(() => {
+					applying = false;
+				});
+			};
+
+			apply();
+			const ro = new ResizeObserver(apply);
+			ro.observe(outer);
+			return () => ro.disconnect();
+		}, []);
 
 		const focusInput = useCallback(() => {
 			const container = rootRef.current;
@@ -100,18 +162,18 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			[],
 		);
 
-		// Track whether the bottom sentinel is visible. Acts as "user near
-		// bottom" — we only auto-stick when true so reading older messages
-		// isn't yanked away by a streaming response.
+		// Track whether the bottom sentinel is visible inside the scroll
+		// container. Only auto-stick when true so reading older messages
+		// isn't yanked away by streaming.
 		useEffect(() => {
 			const el = bottomRef.current;
-			if (!el) {
+			const scroller = scrollRef.current;
+			if (!el || !scroller) {
 				return;
 			}
 			const observer = new IntersectionObserver(
 				([entry]) => setAtBottom(entry.isIntersecting),
-				// Generous bottom margin so "near bottom" still counts.
-				{ rootMargin: "0px 0px 200px 0px", threshold: 0 },
+				{ root: scroller, rootMargin: "0px 0px 200px 0px", threshold: 0 },
 			);
 			observer.observe(el);
 			return () => observer.disconnect();
@@ -125,7 +187,6 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			}
 		}, [engine.messages.length, engine.messages[engine.messages.length - 1]]);
 
-		// Initial scroll-to-bottom on mount (no smooth so it lands instantly).
 		useEffect(() => {
 			scrollToBottom("auto");
 		}, [scrollToBottom]);
@@ -215,13 +276,13 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 				data-waniwani-layout="embed"
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className={cn(
-					"ww:relative ww:w-full ww:bg-background ww:text-foreground ww:font-[family-name:var(--ww-font)]",
+					"ww:relative ww:w-full ww:flex ww:flex-col ww:bg-background ww:text-foreground ww:font-[family-name:var(--ww-font)] ww:overflow-hidden",
 					className,
 				)}
 			>
 				{showHeader && (
 					<div
-						className="ww:sticky ww:top-0 ww:z-10 ww:flex ww:items-center ww:gap-2 ww:px-6 ww:py-3 ww:bg-background ww:border-b ww:border-border"
+						className="ww:shrink-0 ww:flex ww:items-center ww:gap-2 ww:px-6 ww:py-3 ww:bg-background ww:border-b ww:border-border"
 						style={{
 							backgroundColor: resolvedTheme.headerBackgroundColor,
 							color: resolvedTheme.headerTextColor,
@@ -251,57 +312,61 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 				)}
 
 				<div
+					ref={scrollRef}
 					className={cn(
-						"ww:mx-auto ww:w-full ww:max-w-3xl ww:px-4 ww:py-6 ww:flex ww:flex-col ww:gap-6",
-						fullscreenToolCallId && "ww:!py-0",
+						"ww:relative ww:flex-1 ww:min-h-0",
+						fullscreenToolCallId ? "ww:overflow-hidden" : "ww:overflow-y-auto",
 					)}
 				>
-					<MessageList
-						messages={engine.messages}
-						status={engine.status}
-						welcomeMessage={welcomeMessage}
-						welcome={welcome}
-						onSuggestionSelect={handleSuggestionSelect}
-						resourceEndpoint={mcp?.resourceEndpoint}
-						chatSessionId={engine.sessionId}
-						isDark={isDark}
-						onFollowUp={handleWidgetMessage}
-						onCallTool={handleCallTool}
-						fullscreenToolCallId={fullscreenToolCallId}
-						debug={debug}
-						toolDefinitions={engine.toolDefinitions}
-						onWidgetDisplayModeChange={(mode, widget) => {
-							setFullscreenToolCallId(
-								mode === "fullscreen" ? widget.toolCallId : null,
-							);
-						}}
-					/>
+					<div
+						className={cn(
+							"ww:mx-auto ww:w-full ww:max-w-3xl ww:px-4 ww:py-6 ww:flex ww:flex-col ww:gap-6",
+							fullscreenToolCallId && "ww:!py-0",
+						)}
+					>
+						<MessageList
+							messages={engine.messages}
+							status={engine.status}
+							welcomeMessage={welcomeMessage}
+							welcome={welcome}
+							onSuggestionSelect={handleSuggestionSelect}
+							resourceEndpoint={mcp?.resourceEndpoint}
+							chatSessionId={engine.sessionId}
+							isDark={isDark}
+							onFollowUp={handleWidgetMessage}
+							onCallTool={handleCallTool}
+							fullscreenToolCallId={fullscreenToolCallId}
+							debug={debug}
+							toolDefinitions={engine.toolDefinitions}
+							onWidgetDisplayModeChange={(mode, widget) => {
+								setFullscreenToolCallId(
+									mode === "fullscreen" ? widget.toolCallId : null,
+								);
+							}}
+						/>
+						<div ref={bottomRef} aria-hidden style={{ height: 1 }} />
+					</div>
+					{!atBottom && !fullscreenToolCallId && (
+						<div className="ww:sticky ww:bottom-2 ww:flex ww:justify-center ww:pointer-events-none">
+							<Button
+								type="button"
+								onClick={() => scrollToBottom("smooth")}
+								size="icon"
+								variant="outline"
+								className="ww:rounded-full ww:shadow ww:pointer-events-auto"
+								aria-label="Scroll to latest"
+							>
+								<ArrowDownIcon className="ww:size-4" />
+							</Button>
+						</div>
+					)}
 				</div>
-
-				{/* Bottom sentinel for IntersectionObserver — placed before the
-				    sticky footer so "at bottom" means messages are caught up,
-				    not that the input chrome is visible. */}
-				<div ref={bottomRef} aria-hidden style={{ height: 1 }} />
 
 				{!readOnly && (
 					<div
-						className="ww:sticky ww:bottom-0 ww:bg-background"
+						className="ww:shrink-0 ww:bg-background"
 						style={fullscreenToolCallId ? { display: "none" } : undefined}
 					>
-						{!atBottom && (
-							<div className="ww:flex ww:justify-center ww:pt-1 ww:pb-2">
-								<Button
-									type="button"
-									onClick={() => scrollToBottom("smooth")}
-									size="icon"
-									variant="outline"
-									className="ww:rounded-full ww:shadow"
-									aria-label="Scroll to latest"
-								>
-									<ArrowDownIcon className="ww:size-4" />
-								</Button>
-							</div>
-						)}
 						<Suggestions
 							suggestions={suggestionsState.suggestions}
 							isLoading={suggestionsState.isLoading}
