@@ -110,10 +110,10 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 	meta?: Record<string, unknown>,
 	waniwani?: ScopedWaniWaniClient,
 	nodeOptions?: Map<string, NodeOptions>,
-	flowId?: string,
 ): Promise<ExecutionResult> {
 	let currentNode = startNodeName;
 	let state = { ...startState };
+	const nodesVisited: string[] = [];
 
 	// Safety limit to prevent infinite loops
 	const MAX_ITERATIONS = 50;
@@ -125,6 +125,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 			return {
 				content: { status: "complete" },
 				flowTokenContent: { state },
+				nodesVisited,
 			};
 		}
 
@@ -135,16 +136,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 					status: "error",
 					error: `Unknown node: "${currentNode}"`,
 				},
+				nodesVisited,
 			};
 		}
 
-		if (waniwani && !nodeOptions?.get(currentNode)?.hideFromFunnel) {
-			waniwani
-				.track({
-					event: "flow.node_reached",
-					properties: { flowId: flowId ?? "unknown", nodeId: currentNode },
-				})
-				.catch(() => {});
+		if (!nodeOptions?.get(currentNode)?.hideFromFunnel) {
+			nodesVisited.push(currentNode);
 		}
 
 		try {
@@ -179,7 +176,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				);
 
 				if (interruptResult) {
-					return interruptResult;
+					return { ...interruptResult, nodesVisited };
 				}
 
 				// All questions filled — run validators before advancing
@@ -218,7 +215,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 								state,
 							);
 							if (errResult) {
-								return errResult;
+								return { ...errResult, nodesVisited };
 							}
 							break;
 						}
@@ -233,6 +230,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 							status: "error",
 							error: `No outgoing edge from node "${currentNode}"`,
 						},
+						nodesVisited,
 					};
 				}
 				currentNode = await resolveNextNode(edge, state);
@@ -255,6 +253,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 									status: "error",
 									error: `No outgoing edge from node "${currentNode}"`,
 								},
+								nodesVisited,
 							};
 						}
 						currentNode = await resolveNextNode(edge, state);
@@ -276,6 +275,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 						field: widgetField,
 						widgetId: result.tool,
 					},
+					nodesVisited,
 				};
 			}
 
@@ -292,6 +292,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 						status: "error",
 						error: `No outgoing edge from node "${currentNode}"`,
 					},
+					nodesVisited,
 				};
 			}
 			currentNode = await resolveNextNode(edge, state);
@@ -300,6 +301,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 			return {
 				content: { status: "error", error: message },
 				flowTokenContent: { step: currentNode, state },
+				nodesVisited,
 			};
 		}
 	}
@@ -309,5 +311,6 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 			status: "error",
 			error: "Flow exceeded maximum iterations (possible infinite loop)",
 		},
+		nodesVisited,
 	};
 }

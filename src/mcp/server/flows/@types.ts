@@ -525,4 +525,5 @@ export type FlowContent =
 export type ExecutionResult = {
 	content: FlowContent;
 	flowTokenContent?: FlowTokenContent;
+	nodesVisited?: string[];
 };

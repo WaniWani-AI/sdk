@@ -7,7 +7,7 @@ import type {
 import { z } from "zod";
 import type { ScopedWaniWaniClient } from "../scoped-client";
 import { extractScopedClient } from "../scoped-client";
-import { extractSessionId } from "../utils";
+import { extractSessionId, FLOW_META_KEY } from "../utils";
 import type {
 	CompileInput,
 	FlowToolHandler,
@@ -130,7 +130,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				meta,
 				waniwani,
 				input.nodeOptions,
-				config.id,
 			);
 		}
 
@@ -204,7 +203,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					meta,
 					waniwani,
 					input.nodeOptions,
-					config.id,
 				);
 			}
 
@@ -220,7 +218,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				meta,
 				waniwani,
 				input.nodeOptions,
-				config.id,
 			);
 		}
 
@@ -289,7 +286,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				meta,
 				waniwani,
 				input.nodeOptions,
-				config.id,
 			);
 		}
 
@@ -381,6 +377,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				text: JSON.stringify(contentObj, null, 2),
 			},
 		];
+
+		if (result.nodesVisited?.length) {
+			_meta[FLOW_META_KEY] = {
+				flowId: config.id,
+				nodesVisited: result.nodesVisited,
+			};
+		}
 
 		return {
 			content,
