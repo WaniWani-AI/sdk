@@ -67,7 +67,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 						: undefined
 				}
 				theme={theme}
-				title={config.title ?? "Assistant"}
+				title={config.title}
 				welcomeMessage={config.welcomeMessage}
 				placeholder={config.placeholder}
 				suggestions={

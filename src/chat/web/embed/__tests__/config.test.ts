@@ -27,13 +27,13 @@ describe("resolveConfig — programmatic", () => {
 		expect(config.api).toBe("https://custom.app/api/chat");
 	});
 
-	test("applies defaults for optional fields", () => {
+	test("title undefined by default — chat renders headerless", () => {
 		const config = resolveConfig({ token: "tok" });
 
-		expect(config.title).toBe("Assistant");
+		expect(config.title).toBeUndefined();
 	});
 
-	test("programmatic overrides defaults", () => {
+	test("programmatic title is applied", () => {
 		const config = resolveConfig({
 			token: "tok",
 			title: "Support",

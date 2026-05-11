@@ -53,7 +53,6 @@ const DEFAULT_API_URL = "https://app.waniwani.ai/api/mcp/chat";
 
 const DEFAULTS = {
 	api: DEFAULT_API_URL,
-	title: "Assistant",
 };
 
 // ---------------------------------------------------------------------------
