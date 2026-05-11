@@ -32,11 +32,13 @@ import { Button } from "../ui/button";
 /**
  * Bring-your-own-backend chat with internal scroll.
  *
- * Self-sizes to its parent's bounded height (works for `height`,
- * `max-height`, and flex/grid bounded items) using a hide-then-measure
- * loop on a `ResizeObserver`. Falls back to `min(80svh, 700px)` when the
- * parent is truly unbounded. Internally a flex column: header and input
- * stay pinned while the message list scrolls between them.
+ * Sizes via a pure-CSS `height: 100%; max-height: inherit` chain that
+ * works for `height`, `max-height`, and flex/grid-bounded ancestors —
+ * including across the embed's shadow boundary (CSS inherits through
+ * the composed tree). When the parent is truly unbounded the chat grows
+ * with content; bound it by setting `height` or `max-height` on the
+ * parent. Internally a flex column: header and input pinned, messages
+ * scrolling between them.
  */
 export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 	function ChatEmbed(props, ref) {
@@ -80,69 +82,6 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 		const [atBottom, setAtBottom] = useState(true);
 		const atBottomRef = useRef(atBottom);
 		atBottomRef.current = atBottom;
-
-		// Self-size to the customer's bounded container so the chat scrolls
-		// internally instead of overflowing the page. We find that
-		// container (the parent above the shadow boundary, if any) and
-		// measure its `clientHeight` while a tall sentinel forces any
-		// `max-height` constraint to engage. The chat root itself is
-		// hidden during the measurement so its content doesn't muddy the
-		// reading. Sentinel-cap of 90000px lets us also detect "truly
-		// unbounded" containers and fall back to a viewport-based default.
-		useEffect(() => {
-			const root = rootRef.current;
-			if (!root) {
-				return;
-			}
-
-			const rootNode = root.getRootNode();
-			const outer =
-				rootNode instanceof ShadowRoot
-					? rootNode.host.parentElement
-					: root.parentElement;
-			if (!outer) {
-				return;
-			}
-
-			let applying = false;
-			const apply = () => {
-				if (applying) {
-					return;
-				}
-				applying = true;
-
-				const sentinel = document.createElement("div");
-				sentinel.style.cssText =
-					"height:100000px;width:0;flex:none;visibility:hidden;";
-				outer.appendChild(sentinel);
-
-				const prevDisplay = root.style.display;
-				root.style.display = "none";
-				const avail = outer.clientHeight;
-				root.style.display = prevDisplay;
-
-				outer.removeChild(sentinel);
-
-				if (avail >= 100 && avail < 90000) {
-					root.style.height = `${avail}px`;
-					root.style.maxHeight = "";
-				} else {
-					// Outer is truly unbounded — viewport-derived fallback,
-					// still capped by any inherited ancestor `max-height`.
-					root.style.height = "min(80svh, 700px)";
-					root.style.maxHeight = "inherit";
-				}
-
-				queueMicrotask(() => {
-					applying = false;
-				});
-			};
-
-			apply();
-			const ro = new ResizeObserver(apply);
-			ro.observe(outer);
-			return () => ro.disconnect();
-		}, []);
 
 		const focusInput = useCallback(() => {
 			const container = rootRef.current;
@@ -271,12 +210,12 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 		return (
 			<div
 				ref={rootRef}
-				style={cssVars}
+				style={{ ...cssVars, maxHeight: "inherit" }}
 				data-waniwani-chat=""
 				data-waniwani-layout="embed"
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className={cn(
-					"ww:relative ww:w-full ww:flex ww:flex-col ww:bg-background ww:text-foreground ww:font-[family-name:var(--ww-font)] ww:overflow-hidden",
+					"ww:relative ww:w-full ww:h-full ww:flex ww:flex-col ww:bg-background ww:text-foreground ww:font-[family-name:var(--ww-font)] ww:overflow-hidden",
 					className,
 				)}
 			>

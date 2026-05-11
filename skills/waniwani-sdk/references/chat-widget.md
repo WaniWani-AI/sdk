@@ -70,7 +70,7 @@ Always-visible card with a header, status dot, and optional subtitle. Best for d
 
 ### `ChatEmbed`
 
-Bring-your-own-backend chat with an internal flex column (pinned header, scrolling messages, pinned input). It self-sizes to the customer's bounded container — works for `height`, `max-height`, and flex/grid bounded ancestors — by measuring the outer container with a `ResizeObserver` (a temporary tall sentinel forces `max-height` to engage during the read). Falls back to `min(80svh, 700px)` if no bounding ancestor is found.
+Bring-your-own-backend chat with an internal flex column (pinned header, scrolling messages, pinned input). Sized via a pure-CSS `height: 100%; max-height: inherit` chain that propagates the customer's `height` or `max-height` down to the chat root — including across the embed's shadow boundary, via composed-tree inheritance. Works for `height`, `max-height`, and flex/grid-bounded ancestors. If the parent is truly unbounded, the chat grows with content; bound it by setting `height` or `max-height` on the parent.
 
 ```tsx
 // Headerless — fills parent's bounded height
@@ -267,7 +267,7 @@ Tracking is fire-and-forget -- failures never break the chat.
 
 Self-contained IIFE bundle with React bundled. Drop a `<script>` tag on any website to inline a chat into an element on your page. Uses Shadow DOM for CSS isolation.
 
-The embed mounts inline only — there is no floating bubble or popover panel. The chat self-sizes to the bounded height of `[data-waniwani-embed]` (or any ancestor that bounds it via `height`, `max-height`, or flex/grid). Inside, header and input are pinned while only the messages list scrolls. If no bounding ancestor is found, the chat falls back to `min(80svh, 700px)`.
+The embed mounts inline only — there is no floating bubble or popover panel. The chat sizes itself via a `height: 100%; max-height: inherit` CSS chain that crosses the shadow boundary, so setting `height` or `max-height` on `[data-waniwani-embed]` (or any ancestor in the chain) bounds the chat. Inside, header and input are pinned while only the messages list scrolls.
 
 ### Prerequisites
 

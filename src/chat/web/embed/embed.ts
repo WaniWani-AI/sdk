@@ -99,18 +99,22 @@ function mountInline(
 		);
 	}
 
-	// ChatEmbed self-sizes against the customer's container (walking up
-	// across the shadow boundary), so the host needs no special sizing —
-	// it auto-fits the chat root's chosen height.
+	// Propagate the customer's height / max-height down to the chat root
+	// via a `height: 100%; max-height: inherit` chain that crosses the
+	// shadow boundary (CSS inherits through the composed tree, so
+	// `max-height: inherit` on a shadow-tree element copies the value
+	// from its shadow host). Both host and mountContainer are links in
+	// the chain.
 	hostElement = document.createElement("div");
 	hostElement.id = "waniwani-chat-embed";
-	hostElement.style.width = "100%";
+	hostElement.style.cssText = "width:100%;height:100%;max-height:inherit;";
 	container.appendChild(hostElement);
 
 	const shadowRoot = hostElement.attachShadow({ mode: "open" });
 	injectStyles(shadowRoot, config);
 
 	const mountContainer = document.createElement("div");
+	mountContainer.style.cssText = "width:100%;height:100%;max-height:inherit;";
 	shadowRoot.appendChild(mountContainer);
 
 	const inlineRef = React.createRef<InlineChatHandle>();
