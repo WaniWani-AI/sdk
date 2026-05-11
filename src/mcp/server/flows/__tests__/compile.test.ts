@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import type { RegisteredTool } from "../../tools/types";
+import { FLOW_META_KEY } from "../../utils";
 import type { FlowTokenContent, McpServer } from "../@types";
 import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
@@ -1287,6 +1288,98 @@ describe("nested object state", () => {
 		expect(p3.status).toBe("complete");
 		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
 	});
+
+	test("mixed dot-key and nested sibling in continue (dot first)", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nested_mixed_continue_dot_first",
+			title: "Nested Mixed Continue",
+			description: "Mixed-shape stateUpdates on continue.",
+			state: {
+				mortgagor: z
+					.object({
+						age: z.number().describe("Age"),
+						name: z.string().describe("Full name"),
+					})
+					.describe("Mortgagor details"),
+			},
+		})
+			.addNode("ask_mortgagor", ({ interrupt }) =>
+				interrupt({
+					"mortgagor.age": { question: "Age?" },
+					"mortgagor.name": { question: "Name?" },
+				}),
+			)
+			.addEdge(START, "ask_mortgagor")
+			.addEdge("ask_mortgagor", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		await handler?.(startInput(), TEST_EXTRA);
+
+		const result = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: {
+					"mortgagor.age": 32,
+					mortgagor: { name: "Alice" },
+				},
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("complete");
+	});
+
+	test("mixed dot-key and nested sibling in continue (nested first)", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nested_mixed_continue_nested_first",
+			title: "Nested Mixed Continue",
+			description: "Mixed-shape stateUpdates on continue.",
+			state: {
+				mortgagor: z
+					.object({
+						age: z.number().describe("Age"),
+						name: z.string().describe("Full name"),
+					})
+					.describe("Mortgagor details"),
+			},
+		})
+			.addNode("ask_mortgagor", ({ interrupt }) =>
+				interrupt({
+					"mortgagor.age": { question: "Age?" },
+					"mortgagor.name": { question: "Name?" },
+				}),
+			)
+			.addEdge(START, "ask_mortgagor")
+			.addEdge("ask_mortgagor", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		await handler?.(startInput(), TEST_EXTRA);
+
+		const result = (await handler?.(
+			{
+				action: "continue",
+				stateUpdates: {
+					mortgagor: { name: "Alice" },
+					"mortgagor.age": 32,
+				},
+			},
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("complete");
+	});
 });
 
 // ============================================================================
@@ -1877,5 +1970,173 @@ describe("auto-generated sessionId for sessionless clients", () => {
 		const id2 = parsePayload(r2).sessionId as string;
 
 		expect(id1).not.toBe(id2);
+	});
+});
+
+// ============================================================================
+// nodesVisited in _meta
+// ============================================================================
+
+describe("nodesVisited flow path tracking", () => {
+	test("interrupt result includes nodesVisited in _meta", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "nodes_visited_flow",
+			title: "Nodes Visited",
+			description: "Test nodesVisited tracking.",
+			state: {
+				name: z.string().describe("Name"),
+			},
+		})
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addEdge(START, "ask_name")
+			.addEdge("ask_name", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const meta = result._meta as Record<string, unknown>;
+
+		expect(meta[FLOW_META_KEY]).toEqual({
+			flowId: "nodes_visited_flow",
+			nodesVisited: ["ask_name"],
+		});
+	});
+
+	test("action nodes traversed before interrupt are included in nodesVisited", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "action_then_interrupt",
+			title: "Action Then Interrupt",
+			description: "Test action nodes appear in nodesVisited.",
+			state: {
+				computed: z.string().describe("Computed value"),
+				name: z.string().describe("Name"),
+			},
+		})
+			.addNode("compute", () => ({ computed: "done" }))
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addEdge(START, "compute")
+			.addEdge("compute", "ask_name")
+			.addEdge("ask_name", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const meta = result._meta as Record<string, unknown>;
+
+		expect(meta[FLOW_META_KEY]).toEqual({
+			flowId: "action_then_interrupt",
+			nodesVisited: ["compute", "ask_name"],
+		});
+	});
+
+	test("completed flow includes all traversed nodes in nodesVisited", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "full_path_flow",
+			title: "Full Path",
+			description: "Test complete flow path.",
+			state: {
+				name: z.string().describe("Name"),
+				email: z.string().describe("Email"),
+			},
+		})
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addNode("ask_email", ({ interrupt }) =>
+				interrupt({ email: { question: "Email?" } }),
+			)
+			.addEdge(START, "ask_name")
+			.addEdge("ask_name", "ask_email")
+			.addEdge("ask_email", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		// Start → interrupt at ask_name
+		await handler?.(startInput(), TEST_EXTRA);
+		// Answer name → interrupt at ask_email
+		const r2 = (await handler?.(
+			{ action: "continue", stateUpdates: { name: "Alice" } },
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const meta2 = r2._meta as Record<string, unknown>;
+
+		// Continue traverses ask_name (re-executes) then advances to ask_email
+		expect(meta2[FLOW_META_KEY]).toEqual({
+			flowId: "full_path_flow",
+			nodesVisited: ["ask_name", "ask_email"],
+		});
+
+		// Answer email → complete
+		const r3 = (await handler?.(
+			{ action: "continue", stateUpdates: { email: "a@b.com" } },
+			TEST_EXTRA,
+		)) as Record<string, unknown>;
+		const meta3 = r3._meta as Record<string, unknown>;
+
+		expect(meta3[FLOW_META_KEY]).toEqual({
+			flowId: "full_path_flow",
+			nodesVisited: ["ask_email"],
+		});
+	});
+
+	test("hideFromFunnel nodes are excluded from nodesVisited", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "hidden_node_flow",
+			title: "Hidden Node",
+			description: "Test hideFromFunnel exclusion.",
+			state: {
+				computed: z.string().describe("Computed"),
+				name: z.string().describe("Name"),
+			},
+		})
+			.addNode("hidden_compute", () => ({ computed: "done" }), {
+				label: "Hidden Compute",
+				hideFromFunnel: true,
+			})
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addEdge(START, "hidden_compute")
+			.addEdge("hidden_compute", "ask_name")
+			.addEdge("ask_name", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const meta = result._meta as Record<string, unknown>;
+
+		expect(meta[FLOW_META_KEY]).toEqual({
+			flowId: "hidden_node_flow",
+			nodesVisited: ["ask_name"],
+		});
 	});
 });

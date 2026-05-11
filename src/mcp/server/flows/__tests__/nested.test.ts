@@ -123,6 +123,32 @@ describe("expandDotPaths", () => {
 			{ driver: { name: "John" }, email: "a@b.com" },
 		);
 	});
+
+	test("merges dot-key with nested sibling (dot first)", () => {
+		expect(
+			expandDotPaths({
+				"driver.name": "John",
+				driver: { license: "ABC" },
+			}),
+		).toEqual({ driver: { name: "John", license: "ABC" } });
+	});
+
+	test("merges dot-key with nested sibling (nested first)", () => {
+		expect(
+			expandDotPaths({
+				driver: { license: "ABC" },
+				"driver.name": "John",
+			}),
+		).toEqual({ driver: { name: "John", license: "ABC" } });
+	});
+
+	test("preserves arrays as values, not deep-merged", () => {
+		expect(expandDotPaths({ tags: [1, 2, 3] })).toEqual({ tags: [1, 2, 3] });
+	});
+
+	test("preserves null values", () => {
+		expect(expandDotPaths({ optional: null })).toEqual({ optional: null });
+	});
 });
 
 describe("deepMerge", () => {

@@ -150,10 +150,10 @@ export function applyIframePatches(): void {
 
 		const wsAppOrigin = appOrigin.replace(/^http/, "ws");
 		const OriginalWebSocket = window.WebSocket;
-		const PatchedWebSocket = function (
+		const PatchedWebSocket = ((
 			url: string | URL,
 			protocols?: string | string[],
-		) {
+		) => {
 			const parsed = new URL(String(url), window.location.href);
 			if (
 				parsed.origin === window.location.origin ||
@@ -166,7 +166,7 @@ export function applyIframePatches(): void {
 				return new OriginalWebSocket(rewritten.toString(), protocols);
 			}
 			return new OriginalWebSocket(url, protocols);
-		} as unknown as typeof WebSocket;
+		}) as unknown as typeof WebSocket;
 		PatchedWebSocket.prototype = OriginalWebSocket.prototype;
 		Object.assign(PatchedWebSocket, {
 			CONNECTING: OriginalWebSocket.CONNECTING,

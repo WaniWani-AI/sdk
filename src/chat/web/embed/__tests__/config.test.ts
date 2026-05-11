@@ -80,6 +80,55 @@ describe("resolveConfig — programmatic", () => {
 	});
 });
 
+describe("resolveConfig — enableThreadHistory", () => {
+	test("programmatic false disables thread history", () => {
+		const config = resolveConfig({ token: "tok", enableThreadHistory: false });
+		expect(config.enableThreadHistory).toBe(false);
+	});
+
+	test("programmatic true enables thread history", () => {
+		const config = resolveConfig({ token: "tok", enableThreadHistory: true });
+		expect(config.enableThreadHistory).toBe(true);
+	});
+
+	test("undefined when unspecified — consumers default to enabled", () => {
+		const config = resolveConfig({ token: "tok" });
+		expect(config.enableThreadHistory).toBeUndefined();
+	});
+
+	test("data-enable-thread-history attribute parses 'false' as false", async () => {
+		const { parseConfigFromScript } = await import(
+			`../config?t=${Date.now()}-${Math.random()}`
+		);
+		const fakeScript = {
+			getAttribute(name: string) {
+				if (name === "data-token") {
+					return "tok";
+				}
+				if (name === "data-enable-thread-history") {
+					return "false";
+				}
+				return null;
+			},
+		};
+		const prevDocument = g.document;
+		const prevHtmlScriptElement = g.HTMLScriptElement;
+		g.HTMLScriptElement = class {};
+		Object.setPrototypeOf(fakeScript, g.HTMLScriptElement.prototype);
+		g.document = {
+			currentScript: fakeScript,
+			querySelectorAll: () => [],
+		};
+		try {
+			const cfg = parseConfigFromScript();
+			expect(cfg.enableThreadHistory).toBe(false);
+		} finally {
+			g.document = prevDocument;
+			g.HTMLScriptElement = prevHtmlScriptElement;
+		}
+	});
+});
+
 describe("resolveConfig — validation", () => {
 	test("throws when token missing", () => {
 		expect(() => resolveConfig({})).toThrow("Missing required config: `token`");

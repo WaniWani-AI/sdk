@@ -179,7 +179,9 @@ export function McpAppFrame({
 	// and a wasted iframe load against the stub origin before hydration
 	// corrects it. The browser resolves relative URLs against the
 	// document itself, so this works for both absolute and relative
-	// `resourceEndpoint` values.
+	// `resourceEndpoint` values. Callers may pre-populate query params on
+	// `resourceEndpoint` (e.g. the embed appends a `token` so the
+	// cross-origin GET carries auth) — the separator check handles that.
 	const iframeSrc = useMemo(() => {
 		const separator = resourceEndpoint.includes("?") ? "&" : "?";
 		return `${resourceEndpoint}${separator}uri=${encodeURIComponent(resourceUri)}`;
