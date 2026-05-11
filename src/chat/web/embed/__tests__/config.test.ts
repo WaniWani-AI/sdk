@@ -31,24 +31,15 @@ describe("resolveConfig — programmatic", () => {
 		const config = resolveConfig({ token: "tok" });
 
 		expect(config.title).toBe("Assistant");
-		expect(config.position).toBe("bottom-right");
-		expect(config.width).toBe(400);
-		expect(config.height).toBe(600);
 	});
 
 	test("programmatic overrides defaults", () => {
 		const config = resolveConfig({
 			token: "tok",
 			title: "Support",
-			position: "bottom-left",
-			width: 500,
-			height: 700,
 		});
 
 		expect(config.title).toBe("Support");
-		expect(config.position).toBe("bottom-left");
-		expect(config.width).toBe(500);
-		expect(config.height).toBe(700);
 	});
 
 	test("preserves optional string fields", () => {

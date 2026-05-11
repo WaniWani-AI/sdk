@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowDownIcon } from "lucide-react";
 import {
 	forwardRef,
 	useCallback,
@@ -11,11 +12,6 @@ import {
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import type { ChatEmbedProps, ChatHandle } from "../@types";
 import {
-	Conversation,
-	ConversationContent,
-	ConversationScrollButton,
-} from "../ai-elements/conversation";
-import {
 	PromptInput,
 	PromptInputAddAttachments,
 	PromptInputSubmit,
@@ -24,31 +20,25 @@ import {
 import { ChatQueue } from "../components/chat-queue";
 import { MessageList } from "../components/message-list";
 import { Suggestions } from "../components/suggestions";
+import { ThreadMenu } from "../components/thread-menu";
 import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { cn } from "../lib/utils";
 import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
+import { Button } from "../ui/button";
 
 /**
- * Standalone, borderless chat component — bring your own backend.
+ * Standalone chat that flows in the host page's scroll context.
  *
- * Fills its parent container with no header, border, or shadow.
- * Does **not** call any WaniWani-specific endpoints (`/config`, `/tool`, `/sessions`).
- * Point `api` at your own AI-SDK-compatible streaming endpoint and pass extra
- * request fields via `body`.
+ * Header and input are `position: sticky`; the message list grows with its
+ * content and the host page (or nearest scroll ancestor) scrolls. This avoids
+ * the need for a definite parent height — drop it inside a `max-height`,
+ * a flex column, or a plain `<div>` and it just works.
  *
- * Supports the same ref API as ChatCard (`sendMessage`, `sendMessageAndWait`, `focus`).
- *
- * @example
- * ```tsx
- * <ChatEmbed
- *   api={`/api/mcp/projects/${projectId}/chat`}
- *   body={{ environmentId, chatSessionId }}
- *   suggestions={{ initial: ["What can you do?"] }}
- * />
- * ```
+ * Pass `title` or `enableThreadHistory` to render a sticky header.
+ * Point `api` at any AI-SDK-compatible streaming endpoint.
  */
 export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 	function ChatEmbed(props, ref) {
@@ -64,6 +54,9 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			mcp,
 			debug = false,
 			readOnly = false,
+			title,
+			headerActions,
+			enableThreadHistory = false,
 		} = props;
 
 		const resolvedTheme = mergeTheme(userTheme);
@@ -83,10 +76,14 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 		const [fullscreenToolCallId, setFullscreenToolCallId] = useState<
 			string | null
 		>(null);
-		const panelRef = useRef<HTMLDivElement>(null);
+		const rootRef = useRef<HTMLDivElement>(null);
+		const bottomRef = useRef<HTMLDivElement>(null);
+		const [atBottom, setAtBottom] = useState(true);
+		const atBottomRef = useRef(atBottom);
+		atBottomRef.current = atBottom;
 
 		const focusInput = useCallback(() => {
-			const container = panelRef.current;
+			const container = rootRef.current;
 			if (!container) {
 				return;
 			}
@@ -95,6 +92,43 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 				textarea.focus();
 			}
 		}, []);
+
+		const scrollToBottom = useCallback(
+			(behavior: ScrollBehavior = "smooth") => {
+				bottomRef.current?.scrollIntoView({ behavior, block: "end" });
+			},
+			[],
+		);
+
+		// Track whether the bottom sentinel is visible. Acts as "user near
+		// bottom" — we only auto-stick when true so reading older messages
+		// isn't yanked away by a streaming response.
+		useEffect(() => {
+			const el = bottomRef.current;
+			if (!el) {
+				return;
+			}
+			const observer = new IntersectionObserver(
+				([entry]) => setAtBottom(entry.isIntersecting),
+				// Generous bottom margin so "near bottom" still counts.
+				{ rootMargin: "0px 0px 200px 0px", threshold: 0 },
+			);
+			observer.observe(el);
+			return () => observer.disconnect();
+		}, []);
+
+		// Auto-scroll on new messages / streaming tokens when user is at bottom.
+		// biome-ignore lint/correctness/useExhaustiveDependencies: scroll on length + last-message identity changes
+		useEffect(() => {
+			if (atBottomRef.current) {
+				scrollToBottom("smooth");
+			}
+		}, [engine.messages.length, engine.messages[engine.messages.length - 1]]);
+
+		// Initial scroll-to-bottom on mount (no smooth so it lands instantly).
+		useEffect(() => {
+			scrollToBottom("auto");
+		}, [scrollToBottom]);
 
 		const suggestionsState = useSuggestions({
 			messages: engine.messages,
@@ -154,7 +188,6 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			],
 		);
 
-		// Listen for custom trigger event
 		useEffect(() => {
 			if (!triggerEvent) {
 				return;
@@ -172,76 +205,113 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			return () => window.removeEventListener(triggerEvent, handler);
 		}, [triggerEvent, engine.handleSubmit, focusInput]);
 
+		const showHeader = Boolean(title || enableThreadHistory || headerActions);
+
 		return (
 			<div
-				ref={panelRef}
+				ref={rootRef}
 				style={cssVars}
 				data-waniwani-chat=""
 				data-waniwani-layout="embed"
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className={cn(
-					"ww:flex ww:flex-col ww:w-full ww:h-full ww:font-[family-name:var(--ww-font)] ww:text-foreground ww:bg-background ww:overflow-hidden",
+					"ww:relative ww:w-full ww:bg-background ww:text-foreground ww:font-[family-name:var(--ww-font)]",
 					className,
 				)}
 			>
-				{/* Messages */}
-				<Conversation className="ww:flex-1 ww:min-h-0 ww:bg-background">
-					<ConversationContent
-						scrollClassName={
-							fullscreenToolCallId
-								? "ww:!relative ww:!overflow-hidden"
-								: undefined
-						}
+				{showHeader && (
+					<div
+						className="ww:sticky ww:top-0 ww:z-10 ww:flex ww:items-center ww:gap-2 ww:px-6 ww:py-3 ww:bg-background ww:border-b ww:border-border"
+						style={{
+							backgroundColor: resolvedTheme.headerBackgroundColor,
+							color: resolvedTheme.headerTextColor,
+						}}
 					>
-						<MessageList
-							messages={engine.messages}
-							status={engine.status}
-							welcomeMessage={welcomeMessage}
-							welcome={welcome}
-							onSuggestionSelect={handleSuggestionSelect}
-							resourceEndpoint={mcp?.resourceEndpoint}
-							chatSessionId={engine.sessionId}
-							isDark={isDark}
-							onFollowUp={handleWidgetMessage}
-							onCallTool={handleCallTool}
-							fullscreenToolCallId={fullscreenToolCallId}
-							debug={debug}
-							toolDefinitions={engine.toolDefinitions}
-							onWidgetDisplayModeChange={(mode, widget) => {
-								setFullscreenToolCallId(
-									mode === "fullscreen" ? widget.toolCallId : null,
-								);
-							}}
-						/>
-					</ConversationContent>
-					<ConversationScrollButton />
-				</Conversation>
+						{title && (
+							<div className="ww:text-sm ww:font-semibold ww:truncate ww:flex-1 ww:min-w-0">
+								{title}
+							</div>
+						)}
+						{!title && <div className="ww:flex-1" />}
+						{headerActions}
+						{enableThreadHistory && (
+							<ThreadMenu
+								threads={engine.threads}
+								activeThreadId={engine.activeThreadId}
+								onNewThread={engine.startNewThread}
+								onSelectThread={(id) => {
+									void engine.switchThread(id);
+								}}
+								onDeleteThread={(id) => {
+									void engine.deleteThread(id);
+								}}
+							/>
+						)}
+					</div>
+				)}
 
-				{/* Suggestions — hide when fullscreen or readOnly */}
+				<div
+					className={cn(
+						"ww:mx-auto ww:w-full ww:max-w-3xl ww:px-4 ww:py-6 ww:flex ww:flex-col ww:gap-6",
+						fullscreenToolCallId && "ww:!py-0",
+					)}
+				>
+					<MessageList
+						messages={engine.messages}
+						status={engine.status}
+						welcomeMessage={welcomeMessage}
+						welcome={welcome}
+						onSuggestionSelect={handleSuggestionSelect}
+						resourceEndpoint={mcp?.resourceEndpoint}
+						chatSessionId={engine.sessionId}
+						isDark={isDark}
+						onFollowUp={handleWidgetMessage}
+						onCallTool={handleCallTool}
+						fullscreenToolCallId={fullscreenToolCallId}
+						debug={debug}
+						toolDefinitions={engine.toolDefinitions}
+						onWidgetDisplayModeChange={(mode, widget) => {
+							setFullscreenToolCallId(
+								mode === "fullscreen" ? widget.toolCallId : null,
+							);
+						}}
+					/>
+				</div>
+
+				{/* Bottom sentinel for IntersectionObserver — placed before the
+				    sticky footer so "at bottom" means messages are caught up,
+				    not that the input chrome is visible. */}
+				<div ref={bottomRef} aria-hidden style={{ height: 1 }} />
+
 				{!readOnly && (
-					<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
+					<div
+						className="ww:sticky ww:bottom-0 ww:bg-background"
+						style={fullscreenToolCallId ? { display: "none" } : undefined}
+					>
+						{!atBottom && (
+							<div className="ww:flex ww:justify-center ww:pt-1 ww:pb-2">
+								<Button
+									type="button"
+									onClick={() => scrollToBottom("smooth")}
+									size="icon"
+									variant="outline"
+									className="ww:rounded-full ww:shadow"
+									aria-label="Scroll to latest"
+								>
+									<ArrowDownIcon className="ww:size-4" />
+								</Button>
+							</div>
+						)}
 						<Suggestions
 							suggestions={suggestionsState.suggestions}
 							isLoading={suggestionsState.isLoading}
 							onSelect={handleSuggestionSelect}
 						/>
-					</div>
-				)}
-
-				{/* Queue — hide when fullscreen or readOnly */}
-				{!readOnly && (
-					<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
 						<ChatQueue
 							queuedMessages={engine.queuedMessages}
 							onRemove={engine.removeQueuedMessage}
 						/>
-					</div>
-				)}
-
-				{/* Input — hide when fullscreen or readOnly */}
-				{!readOnly && (
-					<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
-						<div className="ww:shrink-0 ww:px-4 ww:pb-8 ww:pt-2 ww:bg-background">
+						<div className="ww:px-4 ww:pb-4 ww:pt-2">
 							<div className="ww:mx-auto ww:w-full ww:max-w-3xl">
 								<PromptInput
 									onSubmit={engine.handleSubmit}
