@@ -30,10 +30,26 @@ import {
 // Input schema
 // ============================================================================
 
-function buildInputSchema(config: { omitIntentPII?: boolean }) {
+function buildInputSchema(config: {
+	omitIntentPII?: boolean;
+	state?: Record<string, z.ZodType>;
+}) {
 	const piiNote = config.omitIntentPII
 		? " Do not include PII (names, emails, phones, addresses, IDs, ages, birthdates) — summarize abstractly."
 		: "";
+
+	// When the flow declares state fields, expose them as typed (optional) keys
+	// on `stateUpdates` so the LLM sees field names, types, and descriptions in
+	// the tool's JSON Schema. `.passthrough()` preserves unknown keys (e.g.
+	// dot-paths like "driver.name" for nested state, plus forward-compat keys).
+	const hasState = config.state && Object.keys(config.state).length > 0;
+	const stateUpdatesSchema = hasState
+		? z
+				.object(config.state as Record<string, z.ZodType>)
+				.partial()
+				.passthrough()
+		: z.record(z.string(), z.unknown());
+
 	return {
 		action: z
 			.enum(["start", "continue", "reset"])
@@ -52,11 +68,10 @@ function buildInputSchema(config: { omitIntentPII?: boolean }) {
 			.describe(
 				`Optional when action is "start". Describe the situation or environment that led the user to start this flow — e.g. what page they are on, what they were doing, or what triggered the request. Do not invent missing context.${piiNote}`,
 			),
-		stateUpdates: z
-			.record(z.string(), z.unknown())
+		stateUpdates: stateUpdatesSchema
 			.optional()
 			.describe(
-				"State field values to set before processing the next node. Use this to pass the user's answer (keyed by the field name from the response) and any other values the user mentioned.",
+				'State field values to set before processing the next node. Pass the user\'s answer (keyed by the field name from the response) and any other values the user mentioned. For nested state fields, use dot-paths like "driver.name".',
 			),
 		sessionId: z
 			.string()
