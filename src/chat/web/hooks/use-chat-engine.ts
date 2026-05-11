@@ -346,8 +346,12 @@ export function useChatEngine(props: ChatBaseProps) {
 				const memoryUserId = visitorContextRef.current?.memoryUserId;
 				const locale = visitorContextRef.current?.language;
 				const autoExtra: Record<string, unknown> = {};
-				if (memoryUserId) autoExtra.memoryUserId = memoryUserId;
-				if (locale) autoExtra.locale = locale;
+				if (memoryUserId) {
+					autoExtra.memoryUserId = memoryUserId;
+				}
+				if (locale) {
+					autoExtra.locale = locale;
+				}
 				if (Object.keys(autoExtra).length > 0 || callerExtra) {
 					resolvedBody.extra = {
 						...autoExtra,
