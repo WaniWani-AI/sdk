@@ -336,6 +336,21 @@ export function useChatEngine(props: ChatBaseProps) {
 					};
 				}
 
+				// Auto-inject SDK-managed memoryUserId into `extra` so the upstream
+				// API forwards it to MCP `_meta["waniwani/extra"].memoryUserId`.
+				// Caller-supplied `body.extra` keys win on collision.
+				const callerExtra =
+					typeof resolvedBody.extra === "object" && resolvedBody.extra !== null
+						? (resolvedBody.extra as Record<string, unknown>)
+						: undefined;
+				const memoryUserId = visitorContextRef.current?.memoryUserId;
+				if (memoryUserId || callerExtra) {
+					resolvedBody.extra = {
+						...(memoryUserId ? { memoryUserId } : {}),
+						...(callerExtra ?? {}),
+					};
+				}
+
 				if (enableThreadHistoryRef.current) {
 					const hasExplicitThreadId = Object.hasOwn(resolvedBody, "threadId");
 					if (!hasExplicitThreadId) {
