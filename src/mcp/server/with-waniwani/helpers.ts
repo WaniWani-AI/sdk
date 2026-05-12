@@ -5,6 +5,7 @@ import type {
 import type { WaniWaniClient } from "../../../types.js";
 import { extractSessionId, extractSource } from "../utils.js";
 import type { WidgetTokenCache } from "../widget-token.js";
+import type { FunnelSyncPayload } from "./funnel-sync.js";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -106,6 +107,7 @@ export function buildTrackInput(
 		metadata?: UnknownRecord;
 		stripLocationFields?: readonly string[];
 		redactInput?: (input: unknown) => unknown;
+		funnelSync?: FunnelSyncPayload | null;
 	},
 	timing?: { durationMs: number; status: string; errorMessage?: string },
 	clientInfo?: { name: string; version: string },
@@ -152,6 +154,7 @@ export function buildTrackInput(
 		metadata: {
 			...(options.metadata ?? {}),
 			...(clientInfo && { clientInfo }),
+			...(options.funnelSync && { funnelSync: options.funnelSync }),
 		},
 	};
 }

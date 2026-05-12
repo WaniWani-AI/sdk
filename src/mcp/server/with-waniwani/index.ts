@@ -7,7 +7,8 @@ import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../tools/types";
 import { extractSessionId } from "../utils.js";
 import { WidgetTokenCache } from "../widget-token.js";
-import { syncFlowGraphs } from "./funnel-sync.js";
+import type { FunnelSyncPayload } from "./funnel-sync.js";
+import { prepareFunnelSyncPayload } from "./funnel-sync.js";
 import {
 	buildTrackInput,
 	extractErrorText,
@@ -152,6 +153,7 @@ type WrapContext = {
 	opts: WithWaniwaniOptions;
 	tokenCache: WidgetTokenCache | null;
 	injectToken: boolean;
+	funnelSync: FunnelSyncPayload | null;
 };
 
 type UnknownRecordOrUndefined = UnknownRecord | undefined;
@@ -231,7 +233,7 @@ function createWrappedHandler(
 				buildTrackInput(
 					toolName,
 					extra,
-					effectiveOpts,
+					{ ...effectiveOpts, funnelSync: ctx.funnelSync },
 					{
 						durationMs,
 						status: isErrorResult ? "error" : "ok",
@@ -276,7 +278,7 @@ function createWrappedHandler(
 				buildTrackInput(
 					toolName,
 					extra,
-					effectiveOpts,
+					{ ...effectiveOpts, funnelSync: ctx.funnelSync },
 					{
 						durationMs,
 						status: "error",
@@ -321,10 +323,10 @@ function createWrappedHandler(
  * result's `_meta`, so chat UIs that only see tool results (and not
  * `tools/list`) can still render widgets. Handler-set keys take precedence.
  */
-export function withWaniwani(
+export async function withWaniwani(
 	server: McpServer,
 	options?: WithWaniwaniOptions,
-): McpServer {
+): Promise<McpServer> {
 	const wrappedServer = server as WrappedServer;
 	if (wrappedServer.__waniwaniWrapped) {
 		return wrappedServer;
@@ -349,6 +351,7 @@ export function withWaniwani(
 		opts,
 		tokenCache,
 		injectToken,
+		funnelSync: null,
 	};
 
 	const originalRegisterTool = server.registerTool.bind(server) as (
@@ -446,11 +449,7 @@ export function withWaniwani(
 		}
 
 		if (flowGraphs.length > 0) {
-			syncFlowGraphs(
-				flowGraphs,
-				tracker._config.apiUrl ?? DEFAULT_BASE_URL,
-				tracker._config.apiKey,
-			);
+			ctx.funnelSync = await prepareFunnelSyncPayload(flowGraphs);
 		}
 	}
 
