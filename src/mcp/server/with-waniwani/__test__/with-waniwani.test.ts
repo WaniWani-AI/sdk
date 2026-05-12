@@ -53,6 +53,20 @@ function mockClient() {
 	};
 }
 
+function mockClientWithApiKey() {
+	const base = mockClient();
+	return {
+		...base,
+		client: {
+			...base.client,
+			_config: {
+				...base.client._config,
+				apiKey: "wwk_test",
+			},
+		},
+	};
+}
+
 type Handler = (input: unknown, extra: unknown) => Promise<unknown>;
 type RegisterToolArgs = [string, Record<string, unknown>, Handler];
 type RegisteredToolEntry = {
@@ -158,13 +172,13 @@ describe("withWaniwani", () => {
 		});
 	});
 
-	test("prevents double wrapping", () => {
+	test("prevents double wrapping", async () => {
 		const { server } = mockServer();
 
-		const wrapped1 = withWaniwani(server, {
+		const wrapped1 = await withWaniwani(server, {
 			client: mockClient().client,
 		});
-		const wrapped2 = withWaniwani(wrapped1, {
+		const wrapped2 = await withWaniwani(wrapped1, {
 			client: mockClient().client,
 		});
 
@@ -714,6 +728,67 @@ describe("withWaniwani", () => {
 			latitude: "40.4",
 			longitude: "-3.7",
 		});
+	});
+
+	test("attaches funnelSync metadata when flow graphs are registered", async () => {
+		const { client, tracked } = mockClientWithApiKey();
+		const mock = mockServer();
+
+		mock.registerTool(
+			"flow-tool",
+			{
+				description: "A flow tool",
+				_meta: {
+					_flowGraph: {
+						flowId: "onboarding",
+						title: "Onboarding Flow",
+						nodes: [
+							{ id: "n1", type: "widget", label: "Welcome" },
+							{ id: "n2", type: "action", label: "Complete" },
+						],
+						edges: [{ from: "n1", to: "n2", type: "direct" }],
+					},
+				},
+			},
+			async () => ({ content: [] }),
+		);
+
+		await withWaniwani(mock.server, { client });
+
+		const handler = mock._registeredTools["flow-tool"]?.handler;
+		await handler?.({}, {});
+
+		expect(tracked).toHaveLength(1);
+		const metadata = tracked[0]?.metadata as Record<string, unknown>;
+		expect(metadata.funnelSync).toBeDefined();
+
+		const funnelSync = metadata.funnelSync as {
+			compositeHash: string;
+			flows: Array<{ flowId: string; configHash: string }>;
+		};
+		expect(funnelSync.compositeHash).toBeTypeOf("string");
+		expect(funnelSync.compositeHash.length).toBeGreaterThan(0);
+		expect(funnelSync.flows).toHaveLength(1);
+		expect(funnelSync.flows[0].flowId).toBe("onboarding");
+		expect(funnelSync.flows[0].configHash).toBeTypeOf("string");
+	});
+
+	test("does not attach funnelSync metadata when no flow graphs are registered", async () => {
+		const { client, tracked } = mockClientWithApiKey();
+		const mock = mockServer();
+
+		mock.registerTool("plain-tool", { description: "No flows" }, async () => ({
+			content: [],
+		}));
+
+		await withWaniwani(mock.server, { client });
+
+		const handler = mock._registeredTools["plain-tool"]?.handler;
+		await handler?.({}, {});
+
+		expect(tracked).toHaveLength(1);
+		const metadata = tracked[0]?.metadata as Record<string, unknown>;
+		expect(metadata.funnelSync).toBeUndefined();
 	});
 
 	test("auto-redacts stateUpdates fields listed in tool definition _meta", async () => {

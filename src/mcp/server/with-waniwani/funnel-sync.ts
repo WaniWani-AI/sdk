@@ -21,34 +21,30 @@ function hashGraph(graph: FlowGraph): Promise<string> {
 	return hashData(JSON.stringify({ nodes: graph.nodes, edges: graph.edges }));
 }
 
-// ---------------------------------------------------------------------------
-// globalThis-based cache so the sync HTTP call is made at most once per
-// cold start per Lambda/serverless instance. Same pattern as project-config.ts.
-// ---------------------------------------------------------------------------
+export type FunnelSyncFlow = {
+	flowId: string;
+	title: string;
+	configHash: string;
+	nodes: FlowGraph["nodes"];
+	edges: FlowGraph["edges"];
+};
 
-const SYNC_CACHE_KEY = "__waniwani_funnel_sync_cache__" as const;
+export type FunnelSyncPayload = {
+	compositeHash: string;
+	flows: FunnelSyncFlow[];
+};
 
-function getSyncCache(): Map<string, string> {
-	const g = globalThis as Record<string, unknown>;
-	if (!g[SYNC_CACHE_KEY]) {
-		g[SYNC_CACHE_KEY] = new Map<string, string>();
-	}
-	return g[SYNC_CACHE_KEY] as Map<string, string>;
-}
-
-export async function syncFlowGraphs(
+export async function prepareFunnelSyncPayload(
 	flowGraphs: FlowGraph[],
-	apiUrl: string,
-	apiKey: string,
-): Promise<void> {
+): Promise<FunnelSyncPayload | null> {
 	if (flowGraphs.length === 0) {
-		return;
+		return null;
 	}
 
-	// Composite hash of all graphs sorted by flowId for determinism.
 	const sorted = [...flowGraphs].sort((a, b) =>
 		a.flowId.localeCompare(b.flowId),
 	);
+
 	const compositeHash = await hashData(
 		JSON.stringify(
 			sorted.map((fg) => ({
@@ -59,33 +55,15 @@ export async function syncFlowGraphs(
 		),
 	);
 
-	const cache = getSyncCache();
-	if (cache.get(apiKey) === compositeHash) {
-		return;
-	}
-
 	const flows = await Promise.all(
 		flowGraphs.map(async (fg) => ({
-			...fg,
+			flowId: fg.flowId,
+			title: fg.title,
 			configHash: await hashGraph(fg),
+			nodes: fg.nodes,
+			edges: fg.edges,
 		})),
 	);
 
-	const payload = JSON.stringify({ flows });
-
-	try {
-		const url = `${apiUrl}/api/mcp/funnel/sync`;
-		fetch(url, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${apiKey}`,
-			},
-			body: payload,
-		})
-			.then(() => {
-				cache.set(apiKey, compositeHash);
-			})
-			.catch(() => {});
-	} catch {}
+	return { compositeHash, flows };
 }

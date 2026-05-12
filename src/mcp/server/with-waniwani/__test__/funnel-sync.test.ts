@@ -1,10 +1,6 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { FlowGraph } from "../../flows/@types.js";
-import { syncFlowGraphs } from "../funnel-sync.js";
-
-const SYNC_CACHE_KEY = "__waniwani_funnel_sync_cache__";
-
-const mockFetch = mock(async () => new Response(null, { status: 200 }));
+import { prepareFunnelSyncPayload } from "../funnel-sync.js";
 
 const GRAPH_A: FlowGraph = {
 	flowId: "flow-a",
@@ -23,95 +19,31 @@ const GRAPH_B: FlowGraph = {
 	edges: [],
 };
 
-beforeEach(() => {
-	mockFetch.mockClear();
-	globalThis.fetch = mockFetch as unknown as typeof fetch;
-	// Clear the sync cache between tests
-	delete (globalThis as Record<string, unknown>)[SYNC_CACHE_KEY];
-});
-
-afterEach(() => {
-	delete (globalThis as Record<string, unknown>)[SYNC_CACHE_KEY];
-});
-
-describe("syncFlowGraphs", () => {
-	test("skips sync when composite hash matches cached value", async () => {
-		await syncFlowGraphs([GRAPH_A], "https://api.test", "key-1");
-		// Allow the fire-and-forget fetch + .then() to settle
-		await new Promise((r) => setTimeout(r, 10));
-
-		expect(mockFetch).toHaveBeenCalledTimes(1);
-
-		// Second call with identical graphs should be skipped
-		await syncFlowGraphs([GRAPH_A], "https://api.test", "key-1");
-		await new Promise((r) => setTimeout(r, 10));
-
-		expect(mockFetch).toHaveBeenCalledTimes(1);
+describe("prepareFunnelSyncPayload", () => {
+	test("returns null for empty flow graphs", async () => {
+		const result = await prepareFunnelSyncPayload([]);
+		expect(result).toBeNull();
 	});
 
-	test("syncs again when graphs change", async () => {
-		await syncFlowGraphs([GRAPH_A], "https://api.test", "key-1");
-		await new Promise((r) => setTimeout(r, 10));
-
-		expect(mockFetch).toHaveBeenCalledTimes(1);
-
-		// Different graph should trigger a new sync
-		await syncFlowGraphs([GRAPH_B], "https://api.test", "key-1");
-		await new Promise((r) => setTimeout(r, 10));
-
-		expect(mockFetch).toHaveBeenCalledTimes(2);
-	});
-
-	test("does not cache on fetch failure — retries on next call", async () => {
-		mockFetch.mockImplementationOnce(async () => {
-			throw new Error("network error");
-		});
-
-		await syncFlowGraphs([GRAPH_A], "https://api.test", "key-1");
-		await new Promise((r) => setTimeout(r, 10));
-
-		expect(mockFetch).toHaveBeenCalledTimes(1);
-
-		// Same graphs, but previous call failed so should retry
-		mockFetch.mockImplementationOnce(
-			async () => new Response(null, { status: 200 }),
-		);
-		await syncFlowGraphs([GRAPH_A], "https://api.test", "key-1");
-		await new Promise((r) => setTimeout(r, 10));
-
-		expect(mockFetch).toHaveBeenCalledTimes(2);
-	});
-
-	test("uses separate cache slots for different API keys", async () => {
-		await syncFlowGraphs([GRAPH_A], "https://api.test", "key-1");
-		await new Promise((r) => setTimeout(r, 10));
-
-		expect(mockFetch).toHaveBeenCalledTimes(1);
-
-		// Same graph but different API key should still sync
-		await syncFlowGraphs([GRAPH_A], "https://api.test", "key-2");
-		await new Promise((r) => setTimeout(r, 10));
-
-		expect(mockFetch).toHaveBeenCalledTimes(2);
-	});
-
-	test("skips sync for empty flow graphs", async () => {
-		await syncFlowGraphs([], "https://api.test", "key-1");
-		await new Promise((r) => setTimeout(r, 10));
-
-		expect(mockFetch).toHaveBeenCalledTimes(0);
+	test("returns composite hash and per-flow hashes", async () => {
+		const result = await prepareFunnelSyncPayload([GRAPH_A]);
+		expect(result).not.toBeNull();
+		expect(result?.compositeHash).toBeTypeOf("string");
+		expect(result?.compositeHash.length).toBeGreaterThan(0);
+		expect(result?.flows).toHaveLength(1);
+		expect(result?.flows[0].flowId).toBe("flow-a");
+		expect(result?.flows[0].configHash).toBeTypeOf("string");
 	});
 
 	test("produces deterministic hash regardless of graph order", async () => {
-		await syncFlowGraphs([GRAPH_A, GRAPH_B], "https://api.test", "key-1");
-		await new Promise((r) => setTimeout(r, 10));
+		const resultAB = await prepareFunnelSyncPayload([GRAPH_A, GRAPH_B]);
+		const resultBA = await prepareFunnelSyncPayload([GRAPH_B, GRAPH_A]);
+		expect(resultAB?.compositeHash).toBe(resultBA?.compositeHash);
+	});
 
-		expect(mockFetch).toHaveBeenCalledTimes(1);
-
-		// Same graphs in reverse order should hit the cache
-		await syncFlowGraphs([GRAPH_B, GRAPH_A], "https://api.test", "key-1");
-		await new Promise((r) => setTimeout(r, 10));
-
-		expect(mockFetch).toHaveBeenCalledTimes(1);
+	test("produces different hash for different graphs", async () => {
+		const resultA = await prepareFunnelSyncPayload([GRAPH_A]);
+		const resultB = await prepareFunnelSyncPayload([GRAPH_B]);
+		expect(resultA?.compositeHash).not.toBe(resultB?.compositeHash);
 	});
 });
