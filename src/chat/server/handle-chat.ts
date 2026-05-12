@@ -35,6 +35,12 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 			let sessionId: string | undefined = body.sessionId;
 			let modelContext = body.modelContext;
 			let effectiveSystemPrompt = systemPrompt;
+			const extra: Record<string, unknown> | undefined =
+				typeof body.extra === "object" &&
+				body.extra !== null &&
+				!Array.isArray(body.extra)
+					? body.extra
+					: undefined;
 
 			// Extract visitor context (client-side + server-side geo)
 			const clientVisitorContext: ClientVisitorContext | null =
@@ -127,6 +133,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 					maxSteps,
 					visitor,
 					webSearch,
+					...(extra && { extra }),
 				}),
 				signal: request.signal,
 			});

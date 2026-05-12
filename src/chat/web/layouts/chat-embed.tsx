@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowDownIcon } from "lucide-react";
 import {
 	forwardRef,
 	useCallback,
@@ -11,11 +12,6 @@ import {
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import type { ChatEmbedProps, ChatHandle } from "../@types";
 import {
-	Conversation,
-	ConversationContent,
-	ConversationScrollButton,
-} from "../ai-elements/conversation";
-import {
 	PromptInput,
 	PromptInputAddAttachments,
 	PromptInputSubmit,
@@ -24,31 +20,25 @@ import {
 import { ChatQueue } from "../components/chat-queue";
 import { MessageList } from "../components/message-list";
 import { Suggestions } from "../components/suggestions";
+import { ThreadMenu } from "../components/thread-menu";
 import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { cn } from "../lib/utils";
 import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
+import { Button } from "../ui/button";
 
 /**
- * Standalone, borderless chat component — bring your own backend.
+ * Bring-your-own-backend chat with internal scroll.
  *
- * Fills its parent container with no header, border, or shadow.
- * Does **not** call any WaniWani-specific endpoints (`/config`, `/tool`, `/sessions`).
- * Point `api` at your own AI-SDK-compatible streaming endpoint and pass extra
- * request fields via `body`.
- *
- * Supports the same ref API as ChatCard (`sendMessage`, `sendMessageAndWait`, `focus`).
- *
- * @example
- * ```tsx
- * <ChatEmbed
- *   api={`/api/mcp/projects/${projectId}/chat`}
- *   body={{ environmentId, chatSessionId }}
- *   suggestions={{ initial: ["What can you do?"] }}
- * />
- * ```
+ * Sizes via a pure-CSS `height: 100%; max-height: inherit` chain that
+ * works for `height`, `max-height`, and flex/grid-bounded ancestors —
+ * including across the embed's shadow boundary (CSS inherits through
+ * the composed tree). When the parent is truly unbounded the chat grows
+ * with content; bound it by setting `height` or `max-height` on the
+ * parent. Internally a flex column: header and input pinned, messages
+ * scrolling between them.
  */
 export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 	function ChatEmbed(props, ref) {
@@ -64,6 +54,9 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			mcp,
 			debug = false,
 			readOnly = false,
+			title,
+			headerActions,
+			enableThreadHistory = false,
 		} = props;
 
 		const resolvedTheme = mergeTheme(userTheme);
@@ -83,10 +76,15 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 		const [fullscreenToolCallId, setFullscreenToolCallId] = useState<
 			string | null
 		>(null);
-		const panelRef = useRef<HTMLDivElement>(null);
+		const rootRef = useRef<HTMLDivElement>(null);
+		const scrollRef = useRef<HTMLDivElement>(null);
+		const bottomRef = useRef<HTMLDivElement>(null);
+		const [atBottom, setAtBottom] = useState(true);
+		const atBottomRef = useRef(atBottom);
+		atBottomRef.current = atBottom;
 
 		const focusInput = useCallback(() => {
-			const container = panelRef.current;
+			const container = rootRef.current;
 			if (!container) {
 				return;
 			}
@@ -95,6 +93,49 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 				textarea.focus();
 			}
 		}, []);
+
+		// Confine to the messages scroll container — `scrollIntoView` would
+		// also scroll ancestor scroll boxes (page, customer wrappers),
+		// jerking the layout every time a streamed token arrives.
+		const scrollToBottom = useCallback(
+			(behavior: ScrollBehavior = "smooth") => {
+				const scroller = scrollRef.current;
+				if (!scroller) {
+					return;
+				}
+				scroller.scrollTo({ top: scroller.scrollHeight, behavior });
+			},
+			[],
+		);
+
+		// Track whether the bottom sentinel is visible inside the scroll
+		// container. Only auto-stick when true so reading older messages
+		// isn't yanked away by streaming.
+		useEffect(() => {
+			const el = bottomRef.current;
+			const scroller = scrollRef.current;
+			if (!el || !scroller) {
+				return;
+			}
+			const observer = new IntersectionObserver(
+				([entry]) => setAtBottom(entry.isIntersecting),
+				{ root: scroller, rootMargin: "0px 0px 200px 0px", threshold: 0 },
+			);
+			observer.observe(el);
+			return () => observer.disconnect();
+		}, []);
+
+		// Auto-scroll on new messages / streaming tokens when user is at bottom.
+		// biome-ignore lint/correctness/useExhaustiveDependencies: scroll on length + last-message identity changes
+		useEffect(() => {
+			if (atBottomRef.current) {
+				scrollToBottom("smooth");
+			}
+		}, [engine.messages.length, engine.messages[engine.messages.length - 1]]);
+
+		useEffect(() => {
+			scrollToBottom("auto");
+		}, [scrollToBottom]);
 
 		const suggestionsState = useSuggestions({
 			messages: engine.messages,
@@ -154,7 +195,6 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			],
 		);
 
-		// Listen for custom trigger event
 		useEffect(() => {
 			if (!triggerEvent) {
 				return;
@@ -172,26 +212,63 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			return () => window.removeEventListener(triggerEvent, handler);
 		}, [triggerEvent, engine.handleSubmit, focusInput]);
 
+		const showHeader = Boolean(title || enableThreadHistory || headerActions);
+
 		return (
 			<div
-				ref={panelRef}
-				style={cssVars}
+				ref={rootRef}
+				style={{ ...cssVars, maxHeight: "inherit" }}
 				data-waniwani-chat=""
 				data-waniwani-layout="embed"
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className={cn(
-					"ww:flex ww:flex-col ww:w-full ww:h-full ww:font-[family-name:var(--ww-font)] ww:text-foreground ww:bg-background ww:overflow-hidden",
+					"ww:relative ww:w-full ww:h-full ww:flex ww:flex-col ww:bg-background ww:text-foreground ww:font-[family-name:var(--ww-font)] ww:overflow-hidden",
 					className,
 				)}
 			>
-				{/* Messages */}
-				<Conversation className="ww:flex-1 ww:min-h-0 ww:bg-background">
-					<ConversationContent
-						scrollClassName={
-							fullscreenToolCallId
-								? "ww:!relative ww:!overflow-hidden"
-								: undefined
-						}
+				{showHeader && (
+					<div
+						className="ww:shrink-0 ww:flex ww:items-center ww:gap-2 ww:px-6 ww:py-3 ww:bg-background ww:border-b ww:border-border"
+						style={{
+							backgroundColor: resolvedTheme.headerBackgroundColor,
+							color: resolvedTheme.headerTextColor,
+						}}
+					>
+						{title && (
+							<div className="ww:text-sm ww:font-semibold ww:truncate ww:flex-1 ww:min-w-0">
+								{title}
+							</div>
+						)}
+						{!title && <div className="ww:flex-1" />}
+						{headerActions}
+						{enableThreadHistory && (
+							<ThreadMenu
+								threads={engine.threads}
+								activeThreadId={engine.activeThreadId}
+								onNewThread={engine.startNewThread}
+								onSelectThread={(id) => {
+									void engine.switchThread(id);
+								}}
+								onDeleteThread={(id) => {
+									void engine.deleteThread(id);
+								}}
+							/>
+						)}
+					</div>
+				)}
+
+				<div
+					ref={scrollRef}
+					className={cn(
+						"ww:relative ww:flex-1 ww:min-h-0",
+						fullscreenToolCallId ? "ww:overflow-hidden" : "ww:overflow-y-auto",
+					)}
+				>
+					<div
+						className={cn(
+							"ww:mx-auto ww:w-full ww:max-w-3xl ww:px-4 ww:py-6 ww:flex ww:flex-col ww:gap-6",
+							fullscreenToolCallId && "ww:!py-0",
+						)}
 					>
 						<MessageList
 							messages={engine.messages}
@@ -213,35 +290,39 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 								);
 							}}
 						/>
-					</ConversationContent>
-					<ConversationScrollButton />
-				</Conversation>
+						<div ref={bottomRef} aria-hidden style={{ height: 1 }} />
+					</div>
+					{!atBottom && !fullscreenToolCallId && (
+						<div className="ww:sticky ww:bottom-2 ww:flex ww:justify-center ww:pointer-events-none">
+							<Button
+								type="button"
+								onClick={() => scrollToBottom("smooth")}
+								size="icon"
+								variant="outline"
+								className="ww:rounded-full ww:shadow ww:pointer-events-auto"
+								aria-label="Scroll to latest"
+							>
+								<ArrowDownIcon className="ww:size-4" />
+							</Button>
+						</div>
+					)}
+				</div>
 
-				{/* Suggestions — hide when fullscreen or readOnly */}
 				{!readOnly && (
-					<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
+					<div
+						className="ww:shrink-0 ww:bg-background"
+						style={fullscreenToolCallId ? { display: "none" } : undefined}
+					>
 						<Suggestions
 							suggestions={suggestionsState.suggestions}
 							isLoading={suggestionsState.isLoading}
 							onSelect={handleSuggestionSelect}
 						/>
-					</div>
-				)}
-
-				{/* Queue — hide when fullscreen or readOnly */}
-				{!readOnly && (
-					<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
 						<ChatQueue
 							queuedMessages={engine.queuedMessages}
 							onRemove={engine.removeQueuedMessage}
 						/>
-					</div>
-				)}
-
-				{/* Input — hide when fullscreen or readOnly */}
-				{!readOnly && (
-					<div style={fullscreenToolCallId ? { display: "none" } : undefined}>
-						<div className="ww:shrink-0 ww:px-4 ww:pb-8 ww:pt-2 ww:bg-background">
+						<div className="ww:px-4 ww:pb-4 ww:pt-2">
 							<div className="ww:mx-auto ww:w-full ww:max-w-3xl">
 								<PromptInput
 									onSubmit={engine.handleSubmit}
