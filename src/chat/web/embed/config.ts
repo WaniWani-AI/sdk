@@ -29,30 +29,6 @@ export interface EmbedConfig {
 	placeholder?: string;
 	/** Initial suggestion chips displayed before the first message. */
 	suggestions?: string[];
-	/** Position of the floating bubble. Defaults to `"bottom-right"`. */
-	position?: "bottom-right" | "bottom-left";
-	/**
-	 * Display mode. Defaults to `"inline"`.
-	 * - `"inline"` (default): no bubble or panel — ChatCard is rendered directly into the first
-	 *   `[data-waniwani-embed]` element found on the page.
-	 * - `"floating"`: SDK renders a floating bubble that toggles a popover panel.
-	 * - `"custom"`: popover panel only — consumer renders their own launcher and opens
-	 *   it via `WaniWani.chat.open()` / `toggle()`.
-	 */
-	mode?: "floating" | "custom" | "inline";
-	/**
-	 * Layout component used in `mode: "inline"`.
-	 * - `"card"` (default): `ChatCard` — bordered card with header + messages + input.
-	 * - `"bar"`: `ChatBar` — compact bar that expands upward on focus.
-	 * - `"embed"`: `ChatEmbed` — borderless, fills parent container.
-	 *
-	 * Ignored in `floating` and `custom` modes (always renders `ChatCard` in the panel).
-	 */
-	layout?: "card" | "bar" | "embed";
-	/** Panel width in pixels. Defaults to `400`. */
-	width?: number;
-	/** Panel height in pixels. Defaults to `600`. */
-	height?: number;
 	/** URL to a custom stylesheet injected into the shadow root. */
 	css?: string;
 	/**
@@ -60,7 +36,7 @@ export interface EmbedConfig {
 	 * resume previous threads. Defaults to `false` — opt in explicitly.
 	 */
 	enableThreadHistory?: boolean;
-	/** Theme overrides applied to the ChatCard. */
+	/** Theme overrides applied to the chat. */
 	theme?: {
 		primaryColor?: string;
 		backgroundColor?: string;
@@ -77,10 +53,6 @@ const DEFAULT_API_URL = "https://app.waniwani.ai/api/mcp/chat";
 
 const DEFAULTS = {
 	api: DEFAULT_API_URL,
-	title: "Assistant",
-	position: "bottom-right" as const,
-	width: 400,
-	height: 600,
 };
 
 // ---------------------------------------------------------------------------
@@ -117,15 +89,6 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const str = (attr: string): string | undefined =>
 		el.getAttribute(attr) ?? undefined;
 
-	const num = (attr: string): number | undefined => {
-		const raw = el.getAttribute(attr);
-		if (raw == null) {
-			return undefined;
-		}
-		const n = Number(raw);
-		return Number.isFinite(n) ? n : undefined;
-	};
-
 	const bool = (attr: string): boolean | undefined => {
 		const raw = el.getAttribute(attr);
 		if (raw == null) {
@@ -143,7 +106,6 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 
 	const config: Partial<EmbedConfig> = {};
 
-	// Required fields
 	const api = str("data-api");
 	if (api) {
 		config.api = api;
@@ -154,7 +116,6 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.token = token;
 	}
 
-	// Optional strings
 	const title = str("data-title");
 	if (title) {
 		config.title = title;
@@ -180,7 +141,6 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.css = css;
 	}
 
-	// Suggestions (comma-separated)
 	const suggestionsRaw = str("data-suggestions");
 	if (suggestionsRaw) {
 		config.suggestions = suggestionsRaw
@@ -189,41 +149,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 			.filter(Boolean);
 	}
 
-	// Position
-	const position = str("data-position");
-	if (position === "bottom-right" || position === "bottom-left") {
-		config.position = position;
-	}
-
-	// Display mode
-	const mode = str("data-mode");
-	if (mode === "floating" || mode === "custom" || mode === "inline") {
-		config.mode = mode;
-	}
-
-	// Inline layout
-	const layout = str("data-layout");
-	if (layout === "card" || layout === "bar" || layout === "embed") {
-		config.layout = layout;
-	}
-
-	// Dimensions
-	const width = num("data-width");
-	if (width) {
-		config.width = width;
-	}
-
-	const height = num("data-height");
-	if (height) {
-		config.height = height;
-	}
-
 	const enableThreadHistory = bool("data-enable-thread-history");
 	if (enableThreadHistory !== undefined) {
 		config.enableThreadHistory = enableThreadHistory;
 	}
 
-	// Theme from individual data attributes
 	const primaryColor = str("data-primary-color");
 	const backgroundColor = str("data-background-color");
 	const textColor = str("data-text-color");
@@ -265,22 +195,11 @@ export function resolveConfig(
 	const fromScript = scriptConfig ?? parseConfigFromScript();
 
 	const merged: EmbedConfig = {
-		// Required — token validated below, api has default
 		token: "",
-
-		// Defaults
 		...DEFAULTS,
-
-		// Server-side config (fills in gaps the customer didn't override)
 		...(remote ?? {}),
-
-		// Script attributes (override remote + defaults)
 		...fromScript,
-
-		// Programmatic (overrides everything)
 		...programmatic,
-
-		// Deep-merge theme: defaults < remote < script < programmatic
 		theme: {
 			...(remote?.theme ?? {}),
 			...fromScript.theme,
@@ -295,15 +214,11 @@ export function resolveConfig(
 		);
 	}
 
-	if (!merged.mode) {
-		merged.mode = "inline";
-	}
-
 	return merged;
 }
 
 // ---------------------------------------------------------------------------
-// Theme adapter — EmbedConfig.theme → ChatCard's ChatTheme
+// Theme adapter — EmbedConfig.theme → chat ChatTheme
 // ---------------------------------------------------------------------------
 
 export function buildChatTheme(config: EmbedConfig): ChatTheme | undefined {

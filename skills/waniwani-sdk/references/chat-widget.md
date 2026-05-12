@@ -70,13 +70,21 @@ Always-visible card with a header, status dot, and optional subtitle. Best for d
 
 ### `ChatEmbed`
 
-Borderless, bring-your-own-backend chat. Fills its parent container. No header, border, or shadow. Does not call the WaniWani hosted backend -- you provide the `api` endpoint.
+Bring-your-own-backend chat with an internal flex column (pinned header, scrolling messages, pinned input). Sized via a pure-CSS `height: 100%; max-height: inherit` chain that propagates the customer's `height` or `max-height` down to the chat root — including across the embed's shadow boundary, via composed-tree inheritance. Works for `height`, `max-height`, and flex/grid-bounded ancestors. If the parent is truly unbounded, the chat grows with content; bound it by setting `height` or `max-height` on the parent.
 
 ```tsx
+// Headerless — fills parent's bounded height
 <ChatEmbed
   api="/api/my-chat-endpoint"
   body={{ environmentId, sessionId }}
   theme={{ backgroundColor: "#fff" }}
+/>
+
+// With header + thread history
+<ChatEmbed
+  api="/api/my-chat-endpoint"
+  title="Support"
+  enableThreadHistory
 />
 
 // With MCP Apps widget support
@@ -93,6 +101,29 @@ Borderless, bring-your-own-backend chat. Fills its parent container. No header, 
 | `api` | `string` | Yes | Chat API endpoint (no default) |
 | `className` | `string` | No | Additional CSS class names |
 | `mcp` | `ChatEmbedMcpConfig` | No | MCP Apps config for widget iframes |
+| `title` | `string` | No | When set, renders the header with this title |
+| `headerActions` | `ReactNode` | No | Extra React node rendered on the right of the header |
+| `readOnly` | `boolean` | No | Hide the input bar |
+
+**Sizing:** any of these work — the chat fits within whichever bound the customer's container provides.
+
+```tsx
+// max-height bound
+<div style={{ maxHeight: 600 }}>
+  <ChatEmbed api="/api/chat" title="Support" />
+</div>
+
+// definite height
+<div style={{ height: 600 }}>
+  <ChatEmbed api="/api/chat" />
+</div>
+
+// flex-column item with bounded flex sizing
+<div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+  <header />
+  <ChatEmbed api="/api/chat" />  {/* flex: 1 fills remaining height */}
+</div>
+```
 
 **`ChatEmbedMcpConfig`:**
 
@@ -234,7 +265,9 @@ Tracking is fire-and-forget -- failures never break the chat.
 
 ## Embed Script (Non-React)
 
-Self-contained IIFE bundle (~186KB gzipped) with React bundled. Drop a `<script>` tag on any website to get a floating chat bubble. Uses Shadow DOM for CSS isolation.
+Self-contained IIFE bundle with React bundled. Drop a `<script>` tag on any website to inline a chat into an element on your page. Uses Shadow DOM for CSS isolation.
+
+The embed mounts inline only — there is no floating bubble or popover panel. The chat sizes itself via a `height: 100%; max-height: inherit` CSS chain that crosses the shadow boundary, so setting `height` or `max-height` on `[data-waniwani-embed]` (or any ancestor in the chain) bounds the chat. Inside, header and input are pinned while only the messages list scrolls.
 
 ### Prerequisites
 
@@ -244,10 +277,10 @@ No MCP app changes needed — the embed talks to WaniWani API directly.
 
 ### Script Tag (declarative)
 
-Default mode is `inline` — the chat mounts into the first `[data-waniwani-embed]` element on the page:
+Place a marker element where the chat should mount; the script auto-mounts into the first `[data-waniwani-embed]` on the page:
 
 ```html
-<div data-waniwani-embed style="width: 400px; height: 600px;"></div>
+<div data-waniwani-embed></div>
 
 <script
   src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
@@ -259,7 +292,21 @@ Default mode is `inline` — the chat mounts into the first `[data-waniwani-embe
 ></script>
 ```
 
-For a floating bubble instead, add `data-mode="floating"`.
+Bound the chat by sizing `[data-waniwani-embed]` (or an ancestor) with `height`, `max-height`, or flex/grid sizing. The chat fits within that bound and scrolls internally — no need to add `overflow: auto` yourself.
+
+```html
+<!-- max-height bound -->
+<div data-waniwani-embed style="max-height: 600px;"></div>
+
+<!-- definite height -->
+<div data-waniwani-embed style="height: 600px;"></div>
+
+<!-- flex-column item -->
+<div style="display: flex; flex-direction: column; height: 100vh;">
+  <header>…</header>
+  <div data-waniwani-embed style="flex: 1; min-height: 0;"></div>
+</div>
+```
 
 ### Script Tag Options
 
@@ -271,75 +318,12 @@ For a floating bubble instead, add `data-mode="floating"`.
 | `data-welcome-message` | No | Greeting shown before first message |
 | `data-placeholder` | No | Input field placeholder text |
 | `data-suggestions` | No | Comma-separated suggestion chips |
-| `data-position` | No | `"bottom-right"` (default) or `"bottom-left"` |
-| `data-mode` | No | `"inline"` (default), `"floating"`, or `"custom"`. See [Display modes](#display-modes) below. |
-| `data-layout` | No | In `inline` mode: `"card"` (default), `"bar"`, or `"embed"`. Picks the layout component. Ignored in other modes. |
-| `data-width` | No | Panel width in px (default: `400`) |
-| `data-height` | No | Panel height in px (default: `600`) |
+| `data-enable-thread-history` | No | `"true"`/`"false"` — persist threads in IndexedDB, show thread menu in header |
 | `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |
 | `data-primary-color` | No | Primary color hex |
 | `data-background-color` | No | Background color hex |
 | `data-text-color` | No | Text color hex |
 | `data-font-family` | No | Font family |
-
-### Display Modes
-
-Pick how the widget appears with `data-mode` (or `mode` in `init()`):
-
-| Mode | Behaviour | Use when |
-|---|---|---|
-| `inline` (default) | Layout component renders directly into the first `[data-waniwani-embed]` element on the page. No bubble, no panel, no overlay. | You want the chat embedded as a block on a page (e.g. landing page hero). |
-| `floating` | SDK renders a floating bubble bottom-right/left; clicking it toggles a popover panel. | Standard drop-in chat bubble. |
-| `custom` | Popover panel only — no bubble. Consumer renders their own launcher and calls `WaniWani.chat.open()` / `toggle()`. | You want the bubble replaced by a branded button, nav item, etc. |
-
-#### Inline mode
-
-Place a marker element anywhere on the page — the SDK mounts into it:
-
-```html
-<div data-waniwani-embed style="width: 400px; height: 600px;"></div>
-
-<script
-  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
-  defer
-  data-token="wwp_..."
-  data-mode="inline"
-></script>
-```
-
-Pick the layout with `data-layout` (inline only):
-
-| Value | Component | Shape |
-|---|---|---|
-| `card` (default) | `ChatCard` | Bordered card with header, messages, input. |
-| `bar` | `ChatBar` | Compact input bar that expands upward on focus. |
-| `embed` | `ChatEmbed` | Borderless, fills parent container (no header). |
-
-```html
-<div data-waniwani-embed style="width: 600px; height: 80px;"></div>
-<script src=".../embed.js" defer
-  data-token="wwp_..."
-  data-mode="inline"
-  data-layout="bar"
-></script>
-```
-
-#### Custom launcher
-
-Set `data-mode="custom"` to suppress the built-in bubble. The panel still mounts (hidden) and opens via `WaniWani.chat.open()`:
-
-```html
-<script
-  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
-  defer
-  data-token="wwp_..."
-  data-mode="custom"
-></script>
-
-<button onclick="WaniWani.chat.toggle()">Chat with us</button>
-```
-
-`open`, `close`, and `toggle` are exposed on the instance returned by `init()` and on `window.WaniWani.chat`. They're no-ops in `inline` mode (nothing to open).
 
 ### Programmatic Init
 
@@ -353,16 +337,16 @@ Set `data-mode="custom"` to suppress the built-in bubble. The panel still mounts
       theme: { primaryColor: '#6366f1' },
     });
 
-    // Imperative control (floating mode only)
-    chat.open();
-    chat.close();
-    chat.toggle();
+    // Send a message programmatically
+    window.WaniWani.chat.sendMessage('Show me pricing');
 
     // Cleanup
     chat.destroy();
   });
 </script>
 ```
+
+`window.WaniWani.chat` exposes: `init(options?)`, `destroy()`, `sendMessage(text)`.
 
 ### How Auth Works
 

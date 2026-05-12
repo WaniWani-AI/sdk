@@ -7,7 +7,8 @@ import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../types";
 import { extractSessionId } from "../utils.js";
 import { WidgetTokenCache } from "../widget-token.js";
-import { syncFlowGraphs } from "./funnel-sync.js";
+import type { FunnelSyncPayload } from "./funnel-sync.js";
+import { prepareFunnelSyncPayload } from "./funnel-sync.js";
 import {
 	buildTrackInput,
 	extractErrorText,
@@ -152,6 +153,7 @@ type WrapContext = {
 	opts: WithWaniwaniOptions;
 	tokenCache: WidgetTokenCache | null;
 	injectToken: boolean;
+	funnelSync: FunnelSyncPayload | null;
 };
 
 type UnknownRecordOrUndefined = UnknownRecord | undefined;
@@ -168,14 +170,17 @@ function createWrappedHandler(
 		opts.applyFieldRedactions === true
 			? buildStateUpdateRedactor(definitionMeta)
 			: undefined;
-	const effectiveOpts = stateUpdateRedactor
-		? { ...opts, redactInput: stateUpdateRedactor }
-		: opts;
-
 	const wrappedHandler: MaybeWrappedHandler = async (
 		input: unknown,
 		extra: unknown,
 	) => {
+		const effectiveOpts = stateUpdateRedactor
+			? {
+					...opts,
+					redactInput: stateUpdateRedactor,
+					funnelSync: ctx.funnelSync,
+				}
+			: { ...opts, funnelSync: ctx.funnelSync };
 		// Inject scoped client into extra so createTool/flows can surface it
 		const meta = extractMeta(extra) ?? {};
 
@@ -321,10 +326,10 @@ function createWrappedHandler(
  * result's `_meta`, so chat UIs that only see tool results (and not
  * `tools/list`) can still render widgets. Handler-set keys take precedence.
  */
-export function withWaniwani(
+export async function withWaniwani(
 	server: McpServer,
 	options?: WithWaniwaniOptions,
-): McpServer {
+): Promise<McpServer> {
 	const wrappedServer = server as WrappedServer;
 	if (wrappedServer.__waniwaniWrapped) {
 		return wrappedServer;
@@ -349,6 +354,7 @@ export function withWaniwani(
 		opts,
 		tokenCache,
 		injectToken,
+		funnelSync: null,
 	};
 
 	const originalRegisterTool = server.registerTool.bind(server) as (
@@ -446,11 +452,7 @@ export function withWaniwani(
 		}
 
 		if (flowGraphs.length > 0) {
-			syncFlowGraphs(
-				flowGraphs,
-				tracker._config.apiUrl ?? DEFAULT_BASE_URL,
-				tracker._config.apiKey,
-			);
+			ctx.funnelSync = await prepareFunnelSyncPayload(flowGraphs);
 		}
 	}
 

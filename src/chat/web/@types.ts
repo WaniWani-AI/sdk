@@ -234,6 +234,14 @@ export interface ChatEmbedProps
 	mcp?: ChatEmbedMcpConfig;
 	/** Hide the input bar at the bottom, making the chat read-only. */
 	readOnly?: boolean;
+	/**
+	 * Sticky header title. When set (or when `enableThreadHistory` is true, or
+	 * `headerActions` is provided), a sticky header is rendered at the top of
+	 * the chat. Without any of these, the chat is headerless.
+	 */
+	title?: string;
+	/** Extra React node rendered in the sticky header, right of the title. */
+	headerActions?: React.ReactNode;
 }
 
 // ============================================================================
