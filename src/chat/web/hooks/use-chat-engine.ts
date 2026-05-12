@@ -340,7 +340,9 @@ export function useChatEngine(props: ChatBaseProps) {
 				// API forwards them to MCP `_meta["waniwani/extra"]`.
 				// Caller-supplied `body.extra` keys win on collision.
 				const callerExtra =
-					typeof resolvedBody.extra === "object" && resolvedBody.extra !== null
+					typeof resolvedBody.extra === "object" &&
+					resolvedBody.extra !== null &&
+					!Array.isArray(resolvedBody.extra)
 						? (resolvedBody.extra as Record<string, unknown>)
 						: undefined;
 				const memoryUserId = visitorContextRef.current?.memoryUserId;

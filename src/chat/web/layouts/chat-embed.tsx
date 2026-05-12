@@ -94,9 +94,16 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			}
 		}, []);
 
+		// Confine to the messages scroll container — `scrollIntoView` would
+		// also scroll ancestor scroll boxes (page, customer wrappers),
+		// jerking the layout every time a streamed token arrives.
 		const scrollToBottom = useCallback(
 			(behavior: ScrollBehavior = "smooth") => {
-				bottomRef.current?.scrollIntoView({ behavior, block: "end" });
+				const scroller = scrollRef.current;
+				if (!scroller) {
+					return;
+				}
+				scroller.scrollTo({ top: scroller.scrollHeight, behavior });
 			},
 			[],
 		);

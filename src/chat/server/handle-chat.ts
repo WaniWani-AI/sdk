@@ -36,7 +36,9 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 			let modelContext = body.modelContext;
 			let effectiveSystemPrompt = systemPrompt;
 			const extra: Record<string, unknown> | undefined =
-				typeof body.extra === "object" && body.extra !== null
+				typeof body.extra === "object" &&
+				body.extra !== null &&
+				!Array.isArray(body.extra)
 					? body.extra
 					: undefined;
 
