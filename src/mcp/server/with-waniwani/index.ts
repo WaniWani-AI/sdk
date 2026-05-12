@@ -175,7 +175,11 @@ function createWrappedHandler(
 		extra: unknown,
 	) => {
 		const effectiveOpts = stateUpdateRedactor
-			? { ...opts, redactInput: stateUpdateRedactor, funnelSync: ctx.funnelSync }
+			? {
+					...opts,
+					redactInput: stateUpdateRedactor,
+					funnelSync: ctx.funnelSync,
+				}
 			: { ...opts, funnelSync: ctx.funnelSync };
 		// Inject scoped client into extra so createTool/flows can surface it
 		const meta = extractMeta(extra) ?? {};
