@@ -170,14 +170,13 @@ function createWrappedHandler(
 		opts.applyFieldRedactions === true
 			? buildStateUpdateRedactor(definitionMeta)
 			: undefined;
-	const effectiveOpts = stateUpdateRedactor
-		? { ...opts, redactInput: stateUpdateRedactor }
-		: opts;
-
 	const wrappedHandler: MaybeWrappedHandler = async (
 		input: unknown,
 		extra: unknown,
 	) => {
+		const effectiveOpts = stateUpdateRedactor
+			? { ...opts, redactInput: stateUpdateRedactor, funnelSync: ctx.funnelSync }
+			: { ...opts, funnelSync: ctx.funnelSync };
 		// Inject scoped client into extra so createTool/flows can surface it
 		const meta = extractMeta(extra) ?? {};
 
@@ -233,7 +232,7 @@ function createWrappedHandler(
 				buildTrackInput(
 					toolName,
 					extra,
-					{ ...effectiveOpts, funnelSync: ctx.funnelSync },
+					effectiveOpts,
 					{
 						durationMs,
 						status: isErrorResult ? "error" : "ok",
@@ -278,7 +277,7 @@ function createWrappedHandler(
 				buildTrackInput(
 					toolName,
 					extra,
-					{ ...effectiveOpts, funnelSync: ctx.funnelSync },
+					effectiveOpts,
 					{
 						durationMs,
 						status: "error",
