@@ -1,31 +1,62 @@
 ---
 title: Introduction
-description: "Event tracking, flows, and knowledge base for MCP servers."
+description: "Open-source flow engine for MCP servers. Free hosted tier for analytics, knowledge base, and chat."
 ---
 
-`@waniwani/sdk` plugs into an MCP server and gives you three things:
+`@waniwani/sdk` is split into two tiers so you only pay for what you use.
 
-- **Event tracking.** Automatic `tool.called` events (name, duration, status, input, output, client info) plus custom events, batched and forwarded to the WaniWani dashboard.
-- **Flows.** A typed state machine compiled into a single MCP tool. Pause on interrupts, branch on conditions, persist state across turns, all keyed by the MCP session.
-- **Knowledge base.** Ingest markdown files, search with embeddings. One function call from any tool handler.
+## Open source — no API key
 
-## Two ways to start
+The flow engine is fully open source. `createFlow` compiles a typed state graph into a single MCP tool that drives multi-turn conversations: pause on interrupts, branch on conditions, persist state across calls.
 
-| Path | When to use |
-| --- | --- |
-| **Managed project** | WaniWani provisions a repo, deploys to Vercel, and auto-tunnels local dev to ChatGPT/Claude. Start from the template. |
-| **External project** | You already have an MCP server and want to add tracking, flows, or knowledge base to it. |
+State persistence is pluggable through the `KvStore` interface — start with `MemoryKvStore` for development, swap to Redis, Upstash, Cloudflare KV, or DynamoDB for production. **Nothing leaves your infrastructure unless you set an API key.**
 
-Both paths use the same SDK. The difference is infrastructure.
+```ts
+import { createFlow, MemoryKvStore, START, END } from "@waniwani/sdk/mcp";
+
+const flow = createFlow({ /* … */ })
+  .addEdge(START, "ask_email")
+  // …
+  .compile({ store: new MemoryKvStore() });
+```
+
+See [Flows → Overview](/flows/overview) to learn the engine.
+
+## Free tier — one env var, hosted features
+
+Set `WANIWANI_API_KEY` and the same code unlocks hosted features against `app.waniwani.ai`:
+
+- **Hosted flow state** — drop the `store` argument, state persists automatically
+- **Event tracking** — auto-tracked `tool.called` events with duration, status, input, output, session correlation
+- **Funnel analytics** — flow node visits surface in the dashboard funnel view
+- **Knowledge base** — ingest markdown files, search with embeddings
+- **Playground** — test your MCP server with a hosted chat agent
+
+Get a free key at [app.waniwani.ai](https://app.waniwani.ai). See [Free Tier → Get an API key](/configuration/api-key) for setup.
+
+## Picking your path
+
+| Goal | Use |
+|---|---|
+| Run flows locally with no telemetry, no third party | OSS only — pass a `KvStore` to `.compile()` |
+| Run flows in production with no telemetry | OSS only — implement a `KvStore` adapter (Redis, Upstash, CF KV) |
+| Run flows with hosted state and dashboards | Free tier — set `WANIWANI_API_KEY` |
+| Same code with mode-by-env-var | Pass nothing — without a key, in-memory; with a key, hosted (or self-host both modes) |
 
 ## SDK entry points
 
-```
-@waniwani/sdk       # Core client (tracking, config, KB)
-@waniwani/sdk/mcp   # Server framework (createFlow, withWaniwani, registerTools)
-@waniwani/sdk/kb    # Knowledge base client (ingest, search)
-```
+| Entry point | What you get | Tier |
+|---|---|---|
+| `@waniwani/sdk` | `waniwani()` client, `defineConfig`, `WaniWaniError` | Free tier |
+| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier |
+| `@waniwani/sdk/mcp/react` | `useWaniwani` standalone tracking hook (rest of this entry point is legacy) | OSS + Free tier |
+| `@waniwani/sdk/chat` | `ChatWidget`, layouts, themes, `embed.js`, `styles.css` | Free tier |
+| `@waniwani/sdk/kb` | Knowledge-base client | Free tier |
+
+## Legacy
+
+The SDK still ships `createTool`, `createResource`, `registerTools`, the Next.js/Express chat-server adapters, and the MCP-widget React hooks for back-compat with existing customer projects. They are marked `@deprecated` and not documented for new code. See [Legacy](/legacy/tools-resources) for migration notes.
 
 ## Next step
 
-Head to the [Quickstart](/quickstart) to get a working MCP server in under 5 minutes.
+Head to the [Quickstart](/quickstart) to get a flow running in under 5 minutes.

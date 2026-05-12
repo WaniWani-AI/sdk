@@ -27,6 +27,47 @@
             ]
           },
           {
+            "group": "Open Source — Flows",
+            "pages": [
+              "flows/overview",
+              "flows/nodes",
+              "flows/interrupts",
+              "flows/edges",
+              "flows/state",
+              "flows/kv-store",
+              "flows/register",
+              "flows/self-hosting",
+              "flows/examples"
+            ]
+          },
+          {
+            "group": "Free Tier",
+            "pages": [
+              "configuration/api-key",
+              "tracking/overview",
+              "tracking/events",
+              "tracking/sessions",
+              "tracking/identify",
+              "knowledge-base/overview"
+            ]
+          },
+          {
+            "group": "Chat Widget",
+            "pages": [
+              "chat/embed",
+              "chat/react"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/installation",
+              "configuration/environment-variables",
+              "configuration/wrap-server",
+              "configuration/security"
+            ]
+          },
+          {
             "group": "Guides",
             "pages": [
               "guides/skills",
@@ -35,40 +76,12 @@
             ]
           },
           {
-            "group": "Configuration",
+            "group": "Legacy",
             "pages": [
-              "configuration/installation",
-              "configuration/api-key",
-              "configuration/environment-variables",
-              "configuration/wrap-server",
-              "configuration/security"
-            ]
-          },
-          {
-            "group": "Event Tracking",
-            "pages": [
-              "tracking/overview",
-              "tracking/events",
-              "tracking/sessions",
-              "tracking/identify"
-            ]
-          },
-          {
-            "group": "Knowledge Base",
-            "pages": [
-              "knowledge-base/overview"
-            ]
-          },
-          {
-            "group": "Flows",
-            "pages": [
-              "flows/overview",
-              "flows/state",
-              "flows/nodes",
-              "flows/interrupts",
-              "flows/edges",
-              "flows/register",
-              "flows/examples"
+              "legacy/tools-resources",
+              "legacy/widget-hooks",
+              "legacy/chat-adapters",
+              "legacy/evals"
             ]
           }
         ]

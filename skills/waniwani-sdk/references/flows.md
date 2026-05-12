@@ -2,6 +2,8 @@
 
 LangGraph-inspired multi-step conversational flows for MCP tools. Define a state graph, compile it into an MCP tool, and let the AI drive the flow step by step.
 
+**`createFlow` is the open-source core of the SDK.** It runs with no API key as long as you pass a `KvStore` to `.compile()`. The free tier swaps the store for hosted state on `app.waniwani.ai`.
+
 ## How It Works
 
 1. Define a graph of nodes connected by edges
@@ -10,17 +12,19 @@ LangGraph-inspired multi-step conversational flows for MCP tools. Define a state
 4. **Interrupt nodes** pause the flow and ask the user one or more questions
 5. **Widget nodes** pause the flow and render a widget UI
 
-Flow state is stored **server-side** via the WaniWani API, keyed by the session ID from `_meta`. The AI does not need to round-trip any token -- state is recovered automatically on every call.
+Flow state is stored via the `KvStore` interface, keyed by session ID from `_meta`. The AI never round-trips state — it's recovered automatically on every call. You provide the backing store, or use the hosted one.
 
-Flow state can be **encrypted at rest** by setting the `WANIWANI_ENCRYPTION_KEY` env var (base64-encoded 32-byte key, generate with `openssl rand -base64 32`). When set, values are encrypted with AES-256-GCM before leaving the MCP server process. See [setup.md](setup.md) for details.
+State can be **encrypted at rest** when using `WaniwaniKvStore` by setting `WANIWANI_ENCRYPTION_KEY` (base64-encoded 32-byte key, `openssl rand -base64 32`). For custom adapters, wrap your `KvStore` with the same envelope encryption pattern.
 
 ## Import
 
 ```ts
-import { createFlow, registerTools, START, END } from "@waniwani/sdk/mcp";
+import { createFlow, MemoryKvStore, START, END } from "@waniwani/sdk/mcp";
 ```
 
-`interrupt` and `showWidget` are **not** imported directly. They are provided on the handler's context object (see [Node Handlers](#node-handlers)).
+`interrupt` and `showWidget` come from the handler's context object — never imported directly (see [Node Handlers](#node-handlers)).
+
+For production self-hosting, swap `MemoryKvStore` for a Redis/Upstash/CF KV adapter — see [kv-store.md](kv-store.md).
 
 ## Quick Start
 
@@ -48,9 +52,11 @@ const flow = createFlow({
   .addEdge("ask_email", "ask_role")
   .addEdge("ask_role", "done")
   .addEdge("done", END)
-  .compile();
+  .compile({ store: new MemoryKvStore() });
+  // ↑ For dev. Drop `{ store }` if WANIWANI_API_KEY is set to use hosted state.
+  // For self-hosted prod, swap for a Redis/Upstash/CF-KV adapter — see kv-store.md.
 
-await registerTools(server, [flow]);
+await flow.register(server);
 ```
 
 ## State Definition

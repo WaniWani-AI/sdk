@@ -1,8 +1,8 @@
 "use client";
 
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { WidgetClientContext } from "../context";
 import { type AutoCaptureToggles, initAutoCapture } from "./auto-capture";
-import { WidgetClientContext } from "./use-widget";
 import type { WidgetEvent } from "./widget-transport";
 import { WidgetTransport } from "./widget-transport";
 

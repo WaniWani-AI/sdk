@@ -68,6 +68,22 @@ function buildInputSchema(config: { omitIntentPII?: boolean }) {
 }
 
 // ============================================================================
+// Default store resolution
+// ============================================================================
+
+function resolveDefaultStore(flowId: string): FlowStore {
+	if (process.env.WANIWANI_API_KEY) {
+		return new WaniwaniFlowStore();
+	}
+	throw new Error(
+		`[waniwani] createFlow "${flowId}": no flow store configured. ` +
+			`Pass { store } to .compile() — use MemoryKvStore from "@waniwani/sdk/mcp" for ` +
+			`local development, or plug in a Redis/Upstash/Cloudflare KV adapter for production. ` +
+			`Alternatively, set WANIWANI_API_KEY to use hosted flow state on app.waniwani.ai.`,
+	);
+}
+
+// ============================================================================
 // Compile
 // ============================================================================
 
@@ -80,7 +96,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	const protocol = buildFlowProtocol(config);
 	const fullDescription = `${config.description}\n${protocol}`;
 
-	const store: FlowStore = input.store ?? new WaniwaniFlowStore();
+	const store: FlowStore = input.store ?? resolveDefaultStore(config.id);
 
 	// Validator storage — populated when handlers return interrupts with validate functions.
 	// Keyed by "nodeName:fieldName", persists across tool calls within the same server.

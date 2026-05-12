@@ -1,169 +1,170 @@
 ---
 title: Quickstart
-description: "Get a working MCP server with analytics in under 5 minutes."
+description: "Run a flow in under 5 minutes. Open source by default, hosted features one env var away."
 ---
 
-## Choose your setup
+The same `createFlow` code runs in three modes. Start with mode 1 (OSS, no API key) and upgrade later — nothing changes except where state lives.
 
 <CardGroup cols={3}>
-  <Card title="Managed project" icon="cloud" href="#option-a-managed-project">
-    WaniWani provisions a repo, deploys to Vercel, and auto-tunnels local dev. Best for **new MCP servers** with zero infrastructure to manage.
+  <Card title="Open source" icon="code" href="#mode-1-open-source-no-api-key">
+    Pure OSS, no telemetry, no third party. State in memory or your own KV.
   </Card>
-  <Card title="Template" icon="rocket" href="#option-b-start-from-template">
-    Clone a ready-to-go repo with the SDK pre-configured. Best for **new projects** you want to host yourself.
+  <Card title="Free tier" icon="rocket" href="#mode-2-free-tier-with-api-key">
+    Drop the `store` argument, set `WANIWANI_API_KEY`, get hosted state + tracking + funnel.
   </Card>
-  <Card title="Existing project" icon="server" href="#option-c-existing-project">
-    Add the SDK to your own MCP server. Best for **existing MCP servers** where you want to add tracking, flows, or knowledge base.
+  <Card title="Self-hosted production" icon="server" href="#mode-3-self-hosted-production">
+    OSS code, swap `MemoryKvStore` for a Redis/Upstash/CF KV adapter.
   </Card>
 </CardGroup>
 
 ---
 
-## Option A: Managed project
-
-WaniWani provisions a GitHub repo, deploys to Vercel, and auto-tunnels local dev so ChatGPT and Claude can reach your server instantly.
-
-<Steps>
-  <Step title="Create a managed project">
-    1. Open [app.waniwani.ai/mcp](https://app.waniwani.ai/mcp) and sign in.
-    2. Click **Create project** and choose **Managed** ("We host your MCP").
-    3. WaniWani creates a GitHub repo and Vercel project for you. Two environments are provisioned automatically: **Staging** and **Production**.
-    4. Clone the repo locally.
-  </Step>
-
-  <Step title="Install and run">
-    <Note>Managed projects use **Bun** as the package manager.</Note>
-
-    ```bash
-    bun install
-    bun dev
-    ```
-
-    `bun dev` starts a Cloudflare tunnel automatically. Your local server is now reachable from ChatGPT and Claude. No ngrok, no port forwarding.
-  </Step>
-
-  <Step title="Open the playground">
-    The dev server prints a tunnel URL. Open it in your browser to access the built-in chat playground, or connect from ChatGPT/Claude using the tunnel URL + `/mcp`.
-  </Step>
-</Steps>
-
----
-
-## Option B: Start from template
-
-The [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-template) gives you a production-ready MCP server with the SDK, event tracking, flows, and widgets already wired up.
-
-<Steps>
-  <Step title="Create your repo">
-    Click **"Use this template"** on [GitHub](https://github.com/WaniWani-AI/mcp-distribution-template) to create a new repository from the template, or clone it directly:
-
-    ```bash
-    git clone https://github.com/WaniWani-AI/mcp-distribution-template.git my-mcp-server
-    cd my-mcp-server
-    ```
-  </Step>
-
-  <Step title="Install and configure">
-    ```bash
-    bun install
-    cp .env.example .env
-    ```
-
-    Add your API key to `.env`:
-
-    ```bash .env
-    WANIWANI_API_KEY=wwk_...
-    ```
-
-    Get a key from [app.waniwani.ai](https://app.waniwani.ai). Create an **External** project and copy the `wwk_...` key.
-  </Step>
-
-  <Step title="Run">
-    ```bash
-    bun dev
-    ```
-
-    The template includes a reference flow you can try immediately. If you have the [agent skill](/guides/skills) installed, run `/waniwani-sdk initialize` to scaffold a flow tailored to your business.
-  </Step>
-</Steps>
-
----
-
-## Option C: Existing project
-
-You already have an MCP server and want to add WaniWani to it.
+## Mode 1: Open source (no API key)
 
 <Steps>
   <Step title="Install the SDK">
-    <CodeGroup>
-      ```bash bun
-      bun add @waniwani/sdk
-      ```
-
-      ```bash pnpm
-      pnpm add @waniwani/sdk
-      ```
-
-      ```bash npm
-      npm install @waniwani/sdk
-      ```
-    </CodeGroup>
+    ```bash
+    bun add @waniwani/sdk
+    ```
   </Step>
 
-  <Step title="Create an external project and get an API key">
+  <Step title="Write a flow">
+    ```ts flow.ts
+    import { createFlow, END, MemoryKvStore, START } from "@waniwani/sdk/mcp";
+    import { z } from "zod";
+
+    export const onboardingFlow = createFlow({
+      id: "onboarding",
+      title: "User Onboarding",
+      description: "Use when a new user wants to get started.",
+      state: {
+        email: z.string().describe("Work email"),
+        useCase: z.string().describe("What they want to build"),
+      },
+    })
+      .addNode("ask_email", () =>
+        interrupt({ email: { question: "What's your work email?" } }),
+      )
+      .addNode("ask_use_case", () =>
+        interrupt({
+          useCase: {
+            question: "What do you want to build?",
+            suggestions: ["Analytics", "Support", "Lead capture"],
+          },
+        }),
+      )
+      .addEdge(START, "ask_email")
+      .addEdge("ask_email", "ask_use_case")
+      .addEdge("ask_use_case", END)
+      .compile({ store: new MemoryKvStore() });
+    ```
+  </Step>
+
+  <Step title="Register with your MCP server">
+    ```ts
+    import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+    import { onboardingFlow } from "./flow";
+
+    const server = new McpServer({ name: "my-mcp", version: "0.0.1" });
+    await onboardingFlow.register(server);
+    ```
+  </Step>
+</Steps>
+
+State lives in memory and resets on restart. Fine for development and tests. For production self-hosting, see [Mode 3](#mode-3-self-hosted-production). For hosted state with zero infrastructure, see [Mode 2](#mode-2-free-tier-with-api-key).
+
+---
+
+## Mode 2: Free tier (with API key)
+
+<Steps>
+  <Step title="Get a free API key">
     1. Open [app.waniwani.ai/mcp](https://app.waniwani.ai/mcp) and sign in.
-    2. Click **Create project** and choose **External** ("You host your MCP").
-    3. Set your server URL for the production environment.
-    4. Copy the API key (`wwk_...`). It is shown only once.
+    2. Create a project and copy the `wwk_...` key (shown only once).
+    3. Add to your environment:
 
     ```bash .env
     WANIWANI_API_KEY=wwk_...
     ```
   </Step>
 
-  <Step title="Wrap your server">
-    Call `withWaniwani(server)` once. Every tool call now emits a `tool.called` event to your dashboard.
+  <Step title="Drop the store argument">
+    ```diff
+    - .compile({ store: new MemoryKvStore() });
+    + .compile();
+    ```
 
-    ```ts server/src/index.ts
-    import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-    import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+    With `WANIWANI_API_KEY` set, `createFlow` automatically uses `WaniwaniKvStore` — flow state persists on `app.waniwani.ai`, survives restarts, and shows up in your dashboard.
+  </Step>
+
+  <Step title="(Optional) Auto-track every tool">
+    One call wraps your server so every `tools/call` produces a `tool.called` event with duration, status, input/output, and session correlation.
+
+    ```ts
     import { withWaniwani } from "@waniwani/sdk/mcp";
-    import "dotenv/config";
-
-    const server = new McpServer({ name: "my-mcp", version: "0.0.1" });
-
-    server.registerTool(/* ... */);
 
     withWaniwani(server);
-
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-    await server.connect(transport);
     ```
+
+    Without an API key, `withWaniwani` still wraps tools but tracking is a silent no-op.
   </Step>
 
   <Step title="Verify">
-    Trigger any tool call, then check the [WaniWani dashboard](https://app.waniwani.ai). The event should appear within seconds.
-
-    If nothing shows up, confirm `WANIWANI_API_KEY` is set and look for `[waniwani]` lines in your server logs.
+    Trigger any tool call, then open the [dashboard](https://app.waniwani.ai). Events appear within seconds.
   </Step>
 </Steps>
+
+---
+
+## Mode 3: Self-hosted production
+
+Use OSS only with a production-grade `KvStore` adapter — Redis, Upstash, Cloudflare KV, DynamoDB, anything with `get`/`set`/`delete`.
+
+```ts
+import { createFlow } from "@waniwani/sdk/mcp";
+import { Redis } from "@upstash/redis";
+
+const redis = new Redis({ url: process.env.UPSTASH_URL!, token: process.env.UPSTASH_TOKEN! });
+
+const upstashStore = {
+  async get(key: string) { return redis.get(key); },
+  async set(key: string, value: unknown) { await redis.set(key, value); },
+  async delete(key: string) { await redis.del(key); },
+};
+
+const flow = createFlow({ /* … */ }).compile({ store: upstashStore });
+```
+
+See [KV store adapters](/flows/kv-store) for ready-made recipes (Redis, Upstash, Cloudflare KV, DynamoDB).
+
+---
+
+## Starter template
+
+A ready-to-go project with the SDK pre-wired, including a sample flow and dev tunnel for ChatGPT/Claude:
+
+```bash
+git clone https://github.com/WaniWani-AI/mcp-distribution-template.git my-mcp-server
+cd my-mcp-server
+bun install
+bun dev
+```
+
+The template ships in free-tier mode by default. To run OSS-only, replace the `WaniwaniKvStore` import with `MemoryKvStore` (or your own adapter) and drop the `WANIWANI_API_KEY` env var.
 
 ## What's next
 
 <CardGroup cols={2}>
+  <Card title="Flow engine" icon="diagram-project" href="/flows/overview">
+    Nodes, edges, interrupts, conditional branching.
+  </Card>
+  <Card title="KV store adapters" icon="database" href="/flows/kv-store">
+    Redis, Upstash, Cloudflare KV, DynamoDB.
+  </Card>
+  <Card title="Self-hosting" icon="server" href="/flows/self-hosting">
+    Deploy the OSS path end-to-end.
+  </Card>
   <Card title="Event tracking" icon="chart-line" href="/tracking/overview">
-    Custom events, sessions, and user identification.
-  </Card>
-  <Card title="Build a flow" icon="diagram-project" href="/flows/overview">
-    Multi-turn stateful conversations.
-  </Card>
-  <Card title="Knowledge base" icon="book" href="/knowledge-base/overview">
-    Ingest files and search with embeddings.
-  </Card>
-  <Card title="withWaniwani reference" icon="wand-magic-sparkles" href="/configuration/wrap-server">
-    All options for the server wrapper.
-  </Card>
-  <Card title="Tunnel" icon="globe" href="/guides/tunnel">
-    Expose your local server to ChatGPT and Claude.
+    Custom events, sessions, user identify.
   </Card>
 </CardGroup>

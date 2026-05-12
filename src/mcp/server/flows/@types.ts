@@ -6,9 +6,9 @@ import type {
 	ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
-import type { McpServer } from "../resources/types";
+import type { RegisteredTool } from "../../../legacy/mcp/tools/types";
 import type { ScopedWaniWaniClient } from "../scoped-client";
-import type { RegisteredTool } from "../tools/types";
+import type { McpServer } from "../types";
 import type { FlowStore } from "./flow-store";
 
 export type { McpServer };

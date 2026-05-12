@@ -1,0 +1,47 @@
+---
+title: MCP widget React hooks (legacy)
+description: "WidgetProvider, useWidgetClient, useToolOutput and the rest — preserved for back-compat."
+---
+
+<Warning>
+The MCP widget React hooks at `@waniwani/sdk/mcp/react` are **legacy APIs**, except for `useWaniwani` which is still actively supported. They are part of the [legacy tools & resources stack](/legacy/tools-resources) and will move to `@waniwani/sdk/legacy/react` in a future minor release.
+</Warning>
+
+## What these hooks do
+
+When an MCP widget is rendered inside a host (ChatGPT app, Claude Desktop, MCP Apps SDK), the widget runs in a sandboxed iframe and communicates with the host via either `window.openai` (OpenAI) or postMessage (MCP Apps). The hooks at `@waniwani/sdk/mcp/react` bridge that communication so React widgets can:
+
+- Read tool output, theme, display mode, locale, safe area
+- Call other tools, send follow-up messages, request display mode changes
+- Persist widget state across minimize/restore
+
+`WidgetProvider` is the context provider that initializes the host bridge. All other hooks (`useWidgetClient`, `useToolOutput`, `useDisplayMode`, `useTheme`, `useSafeArea`, `useMaxHeight`, `useLocale`, `useCallTool`, `useSendFollowUp`, `useFlowAction`, `useUpdateModelContext`, `useRequestDisplayMode`, `useToolResponseMetadata`, `useWidgetState`, `useIsChatGptApp`, `useOpenExternal`) read from that context.
+
+## Why they're legacy
+
+These hooks only make sense when you're using `createResource` and `createTool` to render widgets inside an MCP host. With `createFlow`, widget rendering is handled server-side through `showWidget`, and the model coordinates by calling display tools — no host-bridge integration needed in the React layer.
+
+## `useWaniwani` is **not** legacy
+
+`useWaniwani` is the in-browser tracking hook. It can read its config opportunistically from `WidgetProvider`'s context (if mounted), but it also works standalone — pass `{ endpoint, token }` explicitly and use it in any React app:
+
+```tsx
+import { useWaniwani } from "@waniwani/sdk/mcp/react";
+
+function MyComponent() {
+  const wani = useWaniwani({
+    endpoint: "https://app.waniwani.ai/api/mcp/events/v2/batch",
+    token: "...",
+  });
+
+  return (
+    <button onClick={() => wani.track("cta_clicked")}>Sign up</button>
+  );
+}
+```
+
+Without `endpoint`/`token` and outside a `WidgetProvider`, it gracefully degrades to no-op.
+
+## If you're stuck on the legacy path
+
+Like the rest of the legacy stack, the hooks are not going away in this release. They're marked `@deprecated` in JSDoc, so your IDE will surface deprecation warnings, but everything keeps working. When the entry-point split happens you'll switch imports from `@waniwani/sdk/mcp/react` to `@waniwani/sdk/legacy/react` and continue as-is.

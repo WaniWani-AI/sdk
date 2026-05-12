@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
+import { MemoryKvStore } from "../../kv/memory-kv-store";
 import type { McpServer } from "../@types";
 import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
@@ -62,7 +63,7 @@ describe("flow compile — redacted state fields on tool _meta", () => {
 			},
 		})
 			.addEdge(START, END)
-			.compile();
+			.compile({ store: new MemoryKvStore() });
 
 		const mock = mockServer();
 		await flow.register(mock.server);
@@ -85,7 +86,7 @@ describe("flow compile — redacted state fields on tool _meta", () => {
 			},
 		})
 			.addEdge(START, END)
-			.compile();
+			.compile({ store: new MemoryKvStore() });
 
 		const mock = mockServer();
 		await flow.register(mock.server);

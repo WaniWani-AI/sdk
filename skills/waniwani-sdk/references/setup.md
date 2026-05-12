@@ -1,8 +1,23 @@
 # Setup
 
-## Environment Variables
+The SDK has two tiers. Pick the one that matches your goal:
 
-Set these in `.env` (or your deployment config):
+- **Open source**: `createFlow` with a `KvStore` of your choice. No env vars required.
+- **Free tier**: set `WANIWANI_API_KEY` to unlock hosted flow state, tracking, KB, funnel.
+
+## Open-source setup (no env vars)
+
+```ts
+import { createFlow, MemoryKvStore } from "@waniwani/sdk/mcp";
+
+const flow = createFlow({ /* … */ }).compile({ store: new MemoryKvStore() });
+```
+
+For production self-hosting, replace `MemoryKvStore` with a Redis / Upstash / Cloudflare KV / DynamoDB adapter — see [kv-store.md](kv-store.md). Nothing in the OSS path touches `app.waniwani.ai`.
+
+## Free-tier setup (one env var)
+
+Set in `.env` (or your deployment config):
 
 ```env
 WANIWANI_API_KEY=wwk_...
@@ -10,14 +25,28 @@ WANIWANI_API_KEY=wwk_...
 # Optional -- defaults to https://app.waniwani.ai
 WANIWANI_API_URL=https://app.waniwani.ai
 
-# Optional -- encrypts flow state at rest (AES-256-GCM)
+# Optional -- encrypts hosted flow state at rest (AES-256-GCM)
 # Generate with: openssl rand -base64 32
 WANIWANI_ENCRYPTION_KEY=<base64-encoded 32-byte key>
 ```
 
-All SDK modules (tracking, flows, chat) read from these env vars automatically.
+With `WANIWANI_API_KEY` set, `createFlow().compile()` (no `store` argument) auto-selects `WaniwaniKvStore` and persists state on `app.waniwani.ai`. Tracking, KB, and funnel features also become active.
 
-When `WANIWANI_ENCRYPTION_KEY` is set, all KV store values (flow state) are encrypted before being sent to the WaniWani API and decrypted on read. The server never sees plaintext flow state.
+When `WANIWANI_ENCRYPTION_KEY` is set, all hosted KV values are encrypted before leaving the MCP server process and decrypted on read. The hosted API never sees plaintext flow state.
+
+## What if neither is configured?
+
+`createFlow().compile()` with no `{ store }` and no `WANIWANI_API_KEY` throws immediately with a clear message:
+
+```
+Error: [waniwani] createFlow "...": no flow store configured.
+Pass { store } to .compile() — use MemoryKvStore from "@waniwani/sdk/mcp"
+for local development, or plug in a Redis/Upstash/Cloudflare KV adapter
+for production. Alternatively, set WANIWANI_API_KEY to use hosted flow
+state on app.waniwani.ai.
+```
+
+No silent fallback. Pick a path.
 
 ## Client Singleton (`lib/waniwani.ts`)
 

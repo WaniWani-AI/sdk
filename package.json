@@ -46,15 +46,25 @@
       "import": "./dist/kb/index.js",
       "default": "./dist/kb/index.js"
     },
-    "./evals": {
-      "types": "./dist/evals/index.d.ts",
-      "import": "./dist/evals/index.js",
-      "default": "./dist/evals/index.js"
+    "./legacy": {
+      "types": "./dist/legacy/index.d.ts",
+      "import": "./dist/legacy/index.js",
+      "default": "./dist/legacy/index.js"
     },
-    "./evals/scorers": {
-      "types": "./dist/evals/scorers.d.ts",
-      "import": "./dist/evals/scorers.js",
-      "default": "./dist/evals/scorers.js"
+    "./legacy/react": {
+      "types": "./dist/legacy/mcp/react.d.ts",
+      "import": "./dist/legacy/mcp/react.js",
+      "default": "./dist/legacy/mcp/react.js"
+    },
+    "./legacy/next-js": {
+      "types": "./dist/legacy/chat/next-js/index.d.ts",
+      "import": "./dist/legacy/chat/next-js/index.js",
+      "default": "./dist/legacy/chat/next-js/index.js"
+    },
+    "./legacy/express-js": {
+      "types": "./dist/legacy/chat/express-js/index.d.ts",
+      "import": "./dist/legacy/chat/express-js/index.js",
+      "default": "./dist/legacy/chat/express-js/index.js"
     }
   },
   "files": [
@@ -84,9 +94,7 @@
     "zod": ">=4.0.0",
     "@ai-sdk/react": ">=1.0.0",
     "ai": ">=6.0.141",
-    "@ai-sdk/mcp": ">=1.0.0",
-    "braintrust": ">=3.0.0",
-    "autoevals": ">=0.0.100"
+    "@ai-sdk/mcp": ">=1.0.0"
   },
   "peerDependenciesMeta": {
     "@modelcontextprotocol/sdk": {
@@ -109,12 +117,6 @@
     },
     "@ai-sdk/mcp": {
       "optional": true
-    },
-    "braintrust": {
-      "optional": true
-    },
-    "autoevals": {
-      "optional": true
     }
   },
   "devDependencies": {
@@ -132,7 +134,6 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.2.3",
     "ai": "^6.0.141",
-    "autoevals": "^0.0.132",
     "clsx": "^2.1.1",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.7.0",

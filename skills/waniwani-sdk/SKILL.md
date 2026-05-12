@@ -1,6 +1,6 @@
 ---
 name: waniwani-sdk
-description: "Integrate the @waniwani/sdk package into MCP servers for event tracking, multi-step conversational flows, widget creation, knowledge base search, and chat components. Use when building or integrating WaniWani analytics, creating MCP tools with UI widgets, building multi-turn flows, or adding chat to a website."
+description: "Integrate @waniwani/sdk into MCP servers. Use this skill to build multi-step conversational flows with createFlow (open source, no API key required), persist flow state via the KvStore interface (in-memory, Redis, Upstash, Cloudflare KV, DynamoDB, or hosted), add event tracking and knowledge base search (free tier, one env var), or embed the chat widget. Trigger when the user wants to build, integrate, or extend a WaniWani-powered MCP server, write flows, plug in a custom state backend, add analytics, or ship the chat UI."
 license: MIT
 metadata:
   author: WaniWani
@@ -8,7 +8,10 @@ metadata:
 
 # WaniWani SDK (`@waniwani/sdk`)
 
-SDK for MCP event tracking, multi-step conversational flows, dual-platform widget creation, knowledge base search, and embeddable chat components. Works with `@modelcontextprotocol/sdk`, `@vercel/mcp-handler`, and Skybridge.
+Open-source flow engine for MCP servers, with an optional free tier for hosted analytics, knowledge base, and a playground. The split:
+
+- **Open source** — `createFlow`, `StateGraph`, the `KvStore` interface, `MemoryKvStore`. Runs with no API key against any state backend you implement.
+- **Free tier** — set `WANIWANI_API_KEY` to unlock hosted flow state, event tracking, funnel analytics, knowledge base, and the dashboard playground.
 
 Docs: [docs.waniwani.ai](https://docs.waniwani.ai)
 Dashboard: [app.waniwani.ai](https://app.waniwani.ai)
@@ -16,254 +19,137 @@ Dashboard: [app.waniwani.ai](https://app.waniwani.ai)
 ## Install
 
 ```bash
-bun add @waniwani/sdk     # or: pnpm add / npm install
+bun add @waniwani/sdk
 ```
 
-Peer dependencies vary by export path (see table below). The core tracking module has zero runtime dependencies.
+Core flow engine has no required runtime dependencies. Peer dependencies (`@modelcontextprotocol/sdk`, `zod`, etc.) vary by entry point — see the export table below.
 
-## Quick Start
+## Quick start — open source path
 
-1. Get an API key from [app.waniwani.ai](https://app.waniwani.ai) (create an MCP project, copy `wwk_...` key)
-2. Set the env var:
+For developers who want pure OSS with no telemetry:
+
+```typescript
+import { createFlow, MemoryKvStore, START, END } from "@waniwani/sdk/mcp";
+import { z } from "zod";
+
+const onboardingFlow = createFlow({
+  id: "onboarding",
+  title: "User Onboarding",
+  description: "Use when a new user wants to get started.",
+  state: {
+    email: z.string().describe("Work email"),
+    useCase: z.string().describe("What they want to build"),
+  },
+})
+  .addNode("ask_email", ({ interrupt }) =>
+    interrupt({ email: { question: "What's your work email?" } })
+  )
+  .addNode("ask_use_case", ({ interrupt }) =>
+    interrupt({ useCase: { question: "What do you want to build?" } })
+  )
+  .addEdge(START, "ask_email")
+  .addEdge("ask_email", "ask_use_case")
+  .addEdge("ask_use_case", END)
+  .compile({ store: new MemoryKvStore() });
+
+await onboardingFlow.register(server);
+```
+
+`MemoryKvStore` is fine for dev/tests. For production self-hosting, see [kv-store.md](references/kv-store.md) for Redis, Upstash, Cloudflare KV, and DynamoDB adapters.
+
+## Quick start — free tier path
+
+Same code, hosted features added:
 
 ```bash
 # .env
 WANIWANI_API_KEY=wwk_...
 ```
 
-3. Create a client singleton:
-
 ```typescript
-// lib/waniwani.ts
-import { waniwani } from "@waniwani/sdk";
+// Drop the `store` argument — flow state now lives on app.waniwani.ai
+const flow = createFlow({ /* …same… */ }).compile();
 
-export const wani = waniwani();
-// Reads WANIWANI_API_KEY from env — one instance, import everywhere
-```
-
-4. Wrap your MCP server for automatic tracking:
-
-```typescript
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+// Optional: auto-track every tool call
 import { withWaniwani } from "@waniwani/sdk/mcp";
-import { wani } from "../lib/waniwani";
-
-const server = new McpServer({ name: "my-server", version: "1.0.0" });
-
-// Every tool call now emits a tool.called event with timing and status
-withWaniwani(server, { client: wani });
-
-server.registerTool("get_pricing", /* ... */);
+withWaniwani(server);
 ```
 
-5. Verify: trigger any tool call, then check your [WaniWani dashboard](https://app.waniwani.ai).
+Get a free key at [app.waniwani.ai](https://app.waniwani.ai). See [setup.md](references/setup.md) for full configuration.
 
-## Export Paths
+## Export paths
 
-| Export | Purpose | Reference | Peer Dependencies |
-|--------|---------|-----------|-------------------|
-| `@waniwani/sdk` | Event tracking client | (this file) | None |
-| `@waniwani/sdk/mcp` | Server-side tools, widgets, flows, tracking | [tools-and-widgets](references/tools-and-widgets.md), [flows](references/flows.md) | `@modelcontextprotocol/sdk`, `zod` |
-| `@waniwani/sdk/mcp/react` | Client-side widget React hooks | [widget-react-hooks](references/widget-react-hooks.md) | `react` |
-| `@waniwani/sdk/chat` | Chat React component + embed script | [chat-widget](references/chat-widget.md) | `react`, `react-dom`, `@ai-sdk/react`, `ai` |
-| `@waniwani/sdk/chat/styles.css` | Chat widget stylesheet | [chat-widget](references/chat-widget.md) | -- |
-| `@waniwani/sdk/next-js` | Next.js route handler adapter | [chat-server](references/chat-server.md) | -- |
-| `@waniwani/sdk/kb` | Knowledge base client | [knowledge-base](references/knowledge-base.md) | None |
-| `@waniwani/sdk/chat/server` | Chat API handler (server-side) | [chat-server](references/chat-server.md) | `ai` |
-| `@waniwani/sdk/evals` | Eval framework (chat, conversation, scenarios) | -- | `ai` |
+| Export | Purpose | Tier | Reference |
+|---|---|---|---|
+| `@waniwani/sdk` | `waniwani()` client, `defineConfig`, `WaniWaniError` | Free tier | [setup.md](references/setup.md) |
+| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md) |
+| `@waniwani/sdk/mcp/react` | `useWaniwani` standalone tracking hook | OSS + Free tier | (rest of this entry point is legacy) |
+| `@waniwani/sdk/chat` | `ChatWidget`, `ChatBar`, `ChatCard`, `ChatEmbed`, themes | Free tier | [chat-widget.md](references/chat-widget.md) |
+| `@waniwani/sdk/chat/embed.js` | Self-contained `<script>` install for any website | Free tier | [chat-widget.md](references/chat-widget.md) |
+| `@waniwani/sdk/chat/styles.css` | Prebuilt Tailwind styles for chat components | Free tier | [chat-widget.md](references/chat-widget.md) |
+| `@waniwani/sdk/kb` | Knowledge base client | Free tier | [knowledge-base.md](references/knowledge-base.md) |
 
-## Core: Event Tracking (`@waniwani/sdk`)
+## Tier reference
 
-### `waniwani(config?)`
+### Open source (no API key required)
 
-Creates a client instance. Reads `WANIWANI_API_KEY` and `WANIWANI_API_URL` from env vars when called with no arguments.
+`createFlow` plus its supporting types. Drives multi-step conversations: pause on interrupts, branch on conditions, persist state across calls. Compiles into a single MCP tool the model invokes.
 
-```typescript
-import { waniwani } from "@waniwani/sdk";
+State persistence is pluggable through the `KvStore` interface. Built-in:
+- `MemoryKvStore` — in-process `Map`, dev only
+- `WaniwaniKvStore` — hosted (free tier; selected automatically when API key is set)
 
-const client = waniwani();
+Or write a 10-line adapter for any backend. See [kv-store.md](references/kv-store.md).
 
-// Or with explicit config:
-const client = waniwani({
-  apiKey: process.env.WANIWANI_API_KEY,
-  apiUrl: "https://app.waniwani.ai",  // default
-});
-```
+If no `{ store }` is passed and `WANIWANI_API_KEY` is not set, `.compile()` throws with a clear error pointing at the fix. No silent fallback.
 
-Create one client in `lib/waniwani.ts` and import it everywhere. Do not call `waniwani()` in multiple files.
+### Free tier (one env var: `WANIWANI_API_KEY`)
 
-### `defineConfig(config)`
+Adds hosted features on top of the OSS flow engine.
 
-Used in `waniwani.config.ts` to define project-level configuration:
+- **Hosted flow state** — `WaniwaniKvStore` used by default when no `{ store }` is passed.
+- **Event tracking** — `waniwani().track()` for custom events, `withWaniwani(server)` for auto-tracking every tool call.
+- **Knowledge base** — `createKbClient()` for ingest/search.
+- **Funnel analytics** — flow graphs auto-sync to the dashboard.
+- **Chat widget** — `ChatWidget` / `ChatEmbed` talk directly to `app.waniwani.ai`.
 
-```typescript
-import { defineConfig } from "@waniwani/sdk";
+`withWaniwani(server)` is safe to call with or without an API key — tracking silently no-ops when no key is set, but session-ID bridging and widget metadata forwarding still happen.
 
-export default defineConfig({
-  // WaniWaniProjectConfig fields
-});
-```
+### Legacy
 
-### `client.track(event)`
+The following are still exported for back-compat with existing customer MCPs but are no longer documented for new code: `createTool`, `createResource`, `registerTools`, `toNextJsHandler`, `toExpressJsHandler`, `createApiHandler`, all MCP-widget React hooks (`WidgetProvider`, `useWidgetClient`, `useToolOutput`, etc.) except `useWaniwani`, `InitializeNextJsInIframe`, `LoadingWidget`, `DevModeProvider`, `detectPlatform`, `isMCPApps`, `isOpenAI`.
 
-Enqueues an event for batched delivery. Returns immediately after enqueue.
+**Never recommend these for new code.** They will move to dedicated `@waniwani/sdk/legacy*` entry points in a future minor release. Existing apps using them keep working.
 
-```typescript
-await client.track({
-  event: "tool.called",
-  properties: { name: "get_pricing", type: "pricing" },
-  meta: extra._meta,  // MCP request metadata
-});
-```
+`@waniwani/sdk/evals` has been removed entirely — see [legacy/evals](https://docs.waniwani.ai/legacy/evals).
 
-### `client.identify(userId, properties?)`
+## Reading guide
 
-Sends a one-shot `user.identified` event.
+| You want to... | Read |
+|---|---|
+| Build a flow that runs without an API key | [flows.md](references/flows.md) |
+| Plug in a Redis / Upstash / Cloudflare KV / DynamoDB backend | [kv-store.md](references/kv-store.md) |
+| Deploy a pure OSS production MCP server | [self-hosting.md](references/self-hosting.md) |
+| Add a free-tier API key and unlock tracking + dashboard | [setup.md](references/setup.md) |
+| Use the flow API in detail (nodes, edges, interrupts, widgets) | [flows-api-reference.md](references/flows-api-reference.md) |
+| Add knowledge-base search | [knowledge-base.md](references/knowledge-base.md) |
+| Embed the chat widget on a website | [chat-widget.md](references/chat-widget.md) |
 
-```typescript
-await client.identify("user@example.com", { plan: "pro", company: "Acme" });
-```
-
-### Event Types
-
-| Event | Key Properties |
-|-------|---------------|
-| `session.started` | -- |
-| `tool.called` | `name`, `type` (`"pricing"`, `"product_info"`, `"availability"`, `"support"`, `"other"`) |
-| `quote.requested` | -- |
-| `quote.succeeded` | `amount`, `currency` |
-| `quote.failed` | -- |
-| `link.clicked` | `url` |
-| `purchase.completed` | `amount`, `currency` |
-
-### `meta` Field
-
-Pass MCP request metadata to auto-extract session and user info:
-
-- **`@modelcontextprotocol/sdk`**: `request.params._meta`
-- **`@vercel/mcp-handler`**: `extra._meta`
-
-### `client.flush()` / `client.shutdown(options?)`
-
-```typescript
-// Flush buffered events
-await client.flush();
-
-// Flush and stop transport (for serverless/tests)
-const result = await client.shutdown({ timeoutMs: 2000 });
-// => { timedOut: boolean, pendingEvents: number }
-```
-
-In Node environments, the SDK auto-flushes on `beforeExit`, `SIGINT`, and `SIGTERM`. For serverless or edge runtimes, call `shutdown()` explicitly.
-
-## Auto-Tracking: `withWaniwani` (`@waniwani/sdk/mcp`)
-
-Wraps an MCP server so all tool handlers automatically emit `tool.called` events **after** execution with `durationMs`, `status` (`"ok"` or `"error"`), and `errorMessage` (on failure).
-
-```typescript
-import { withWaniwani } from "@waniwani/sdk/mcp";
-import { wani } from "../lib/waniwani";
-
-withWaniwani(server, { client: wani });
-```
-
-**Options (all optional):**
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `client` | `WaniWaniClient` | auto from env | Pre-built client |
-| `toolType` | `string \| (name) => string` | `"other"` | Default tool type for events |
-| `metadata` | `Record<string, unknown>` | -- | Extra metadata on every event |
-| `flushAfterToolCall` | `boolean` | `false` | Flush after each tool call |
-| `onError` | `(error) => void` | -- | Non-fatal tracking error callback |
-| `injectWidgetToken` | `boolean` | `true` | Inject JWT into `_meta.waniwani` for browser widget tracking |
-
-### Combined example: auto-tracking + manual events
-
-```typescript
-const client = waniwani();
-
-withWaniwani(server, { client, flushAfterToolCall: true });
-
-server.registerTool("get_quote", config, async (input, extra) => {
-  // tool.called is tracked automatically
-  const quote = await generateQuote(input.product);
-
-  // Additional event tracked manually
-  await client.track({
-    event: "quote.succeeded",
-    properties: { amount: quote.amount, currency: "USD" },
-    meta: extra._meta,
-  });
-
-  return { content: [{ type: "text", text: `Quote: $${quote.amount}` }] };
-});
-```
-
-## Building Flows
-
-Multi-step conversational flows with server-side state. Define a state graph, compile it into an MCP tool, and let the AI drive the flow step by step.
-
-```typescript
-import { createFlow, START, END, registerTools } from "@waniwani/sdk/mcp";
-import { z } from "zod";
-
-const flow = createFlow({
-  id: "demo_qualification",
-  title: "Demo Qualification",
-  description: "Qualify a lead for a demo.",
-  state: {
-    email: z.string().describe("Work email"),
-    role: z.string().describe("Role at company"),
-  },
-})
-  .addNode("ask_email", ({ interrupt }) =>
-    interrupt({ email: { question: "What is your work email?" } })
-  )
-  .addNode("ask_role", ({ interrupt }) =>
-    interrupt({ role: { question: "What is your role?" } })
-  )
-  .addNode("done", ({ state }) => ({ summary: `${state.email}, ${state.role}` }))
-  .addEdge(START, "ask_email")
-  .addEdge("ask_email", "ask_role")
-  .addEdge("ask_role", "done")
-  .addEdge("done", END)
-  .compile();
-
-await registerTools(server, [flow]);
-```
-
-Flows support interrupt validation, conditional edges, widget steps, nested state, and pre-filling. See [references/flows.md](references/flows.md) for the full guide.
-
-## Guided Playbooks
-
-Step-by-step scripts for common tasks. Follow these when the user wants to build something from scratch.
+## Guided playbooks
 
 | User wants to... | Playbook |
-|------------------|----------|
-| Initialize a new MCP distribution from the template | [scripts/initialize.md](scripts/initialize.md) |
+|---|---|
+| Initialize a new MCP project from the template | [scripts/initialize.md](scripts/initialize.md) |
 | Create their first flow | [scripts/create-flow.md](scripts/create-flow.md) |
 | Tunnel the dev server for remote testing | [scripts/tunnel.md](scripts/tunnel.md) |
 
 When a playbook exists for the user's task, **follow the playbook step by step** instead of writing code directly. The playbooks include prerequisite checks, interactive design steps, and testing instructions.
 
-## Reading Guide
+## Common mistakes
 
-| You want to... | Read |
-|----------------|------|
-| Add analytics to an existing MCP server | [setup](references/setup.md) + auto-tracking section above |
-| Create tools with widget UIs | [tools-and-widgets](references/tools-and-widgets.md) + [widget-react-hooks](references/widget-react-hooks.md) |
-| Build multi-step conversational flows | [flows](references/flows.md) + [flows API reference](references/flows-api-reference.md) |
-| Add a knowledge base with search | [knowledge-base](references/knowledge-base.md) |
-| Embed a chat widget on a website | [chat-widget](references/chat-widget.md) + [chat-server](references/chat-server.md) |
-
-## Common Mistakes
-
-- **Missing `WANIWANI_API_KEY` env var** -- Flow state and tracking will throw. Set it in all environments (dev, Vercel, production).
-- **Creating multiple clients** -- Create one in `lib/waniwani.ts` and import everywhere.
-- **Wrong import paths** -- Hooks: `@waniwani/sdk/mcp/react`. Chat: `@waniwani/sdk/chat`. Tools: `@waniwani/sdk/mcp`.
-- **Missing `WidgetProvider` in page component** -- The page MUST wrap children in `<WidgetProvider>`. Never call hooks (`useToolOutput`, `useTheme`, etc.) directly in the page -- they throw `useWidgetClient must be used within a WidgetProvider`. Put all hook usage in a child component rendered inside `WidgetProvider`.
-- **Missing `InitializeNextJsInIframe` in layout** -- Add `<InitializeNextJsInIframe baseUrl={...} />` in the root layout's `<head>` so fetch/navigation work inside cross-origin iframes.
-- **Forgetting `START`/`END` edges in flows** -- Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`.
-- **Importing `interrupt`/`showWidget` directly** -- These come from the handler context: `({ interrupt }) => interrupt(...)`.
-- **Skybridge widget filename ≠ registered name** -- The file at `web/src/widgets/<name>.tsx` MUST match the name passed to `registerWidget(<name>, ...)` and `showWidget(<name>, ...)`. A mismatch surfaces as `[vite] Failed to fetch dynamically imported module: .../src/widgets/<name>` in the dev-server log and the widget never renders. When debugging "widget not rendering," check the dev-server log first -- it names the exact path Vite is looking for.
+- **`createFlow().compile()` throws "no flow store configured"** — Pass `{ store: new MemoryKvStore() }` to `.compile()` for dev, or set `WANIWANI_API_KEY` for the hosted store, or pass a custom KV adapter.
+- **Creating multiple clients** — Create one `waniwani()` in `lib/waniwani.ts` and import everywhere.
+- **Wrong import paths** — Flow primitives + KV: `@waniwani/sdk/mcp`. `useWaniwani`: `@waniwani/sdk/mcp/react`. Chat widget: `@waniwani/sdk/chat`.
+- **Forgetting `START`/`END` edges** — Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`.
+- **Calling `interrupt`/`showWidget` directly** — These come from the handler context: `({ interrupt }) => interrupt(...)`.
+- **Suggesting `createTool` / `createResource` for new code** — These are legacy. Use `createFlow` instead. They remain exported only for back-compat.

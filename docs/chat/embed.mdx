@@ -1,0 +1,70 @@
+---
+title: Chat embed
+description: "One-line <script> install for the WaniWani chat widget."
+---
+
+The chat embed is a self-contained IIFE bundle that drops the WaniWani chat into any website. It talks directly to `app.waniwani.ai` — no backend proxy required on your side.
+
+<Note>
+Requires a free WaniWani API key (project ID). [Get one at app.waniwani.ai](https://app.waniwani.ai).
+</Note>
+
+## Quick start
+
+Add the embed script and one initialization call to your site:
+
+```html
+<script src="https://cdn.waniwani.ai/embed.js"></script>
+<script>
+  WaniWaniChatEmbed.init({
+    projectId: "wwp_...",
+    theme: "auto",          // "light" | "dark" | "auto"
+    placement: "bottom-right",
+  });
+</script>
+```
+
+That's it. A chat bubble appears in the bottom-right corner, opens to a full chat panel, and conversations flow through your WaniWani project.
+
+## Self-hosting the embed
+
+If you'd rather not load from the WaniWani CDN, pin a specific SDK version and serve the file yourself:
+
+```bash
+bun add @waniwani/sdk
+cp node_modules/@waniwani/sdk/dist/chat/embed.js public/waniwani-embed.js
+```
+
+Then reference your local copy:
+
+```html
+<script src="/waniwani-embed.js"></script>
+<script>
+  WaniWaniChatEmbed.init({ projectId: "wwp_..." });
+</script>
+```
+
+## Configuration
+
+```ts
+WaniWaniChatEmbed.init({
+  projectId: "wwp_...",         // required
+  theme: "auto",                // optional
+  placement: "bottom-right",    // "bottom-right" | "bottom-left"
+  welcome: { title: "Hi!", message: "How can I help?" },
+  suggestions: ["Get started", "Pricing", "Talk to sales"],
+});
+```
+
+Full options reference: see [`ChatEmbedProps`](https://github.com/WaniWani-AI/sdk/blob/main/src/chat/web/%40types.ts).
+
+## How it works
+
+The embed bundles React + the chat UI into a single ~650KB JS file. On `init`:
+
+1. A floating bubble mounts via Shadow DOM (no CSS leakage into your page)
+2. When opened, the panel calls `app.waniwani.ai/api/chat` with the project ID
+3. Responses stream back through Server-Sent Events
+4. Conversation state lives in IndexedDB on the user's device
+
+No server-side integration on your side. If you want React-component-level control instead of the script tag, see [Chat in React](/chat/react).

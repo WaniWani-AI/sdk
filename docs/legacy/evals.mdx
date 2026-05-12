@@ -1,0 +1,39 @@
+---
+title: Evals (removed)
+description: "@waniwani/sdk/evals and @waniwani/sdk/evals/scorers have been removed from the SDK."
+---
+
+<Warning>
+`@waniwani/sdk/evals` and `@waniwani/sdk/evals/scorers` were removed entirely in this revision. The exports (`chat`, `conversation`, `loadScenarios`, `replayScenario`, `saveScenario`, `calledExpectedTool`, `hasOutput`, `toolInputFieldsMatch`, `FaqAccuracy`, `OutputFactuality`, `SafetyCheck`, `parseTaskOutput`, `createLocalReporter`) are no longer available.
+</Warning>
+
+## Why removed
+
+The evals surface was experimental, never reached a stable shape, and depended on the now-removed chat-server catch-all. Keeping it shipped would force the chat-server adapters to stay first-class indefinitely.
+
+## What used to live here
+
+- **`chat`, `conversation`, `replayScenario`** — drove a multi-turn chat eval by hitting a self-hosted `/api/waniwani` endpoint
+- **`loadScenarios`, `saveScenario`** — filesystem-based scenario fixtures
+- **Scorers** (`calledExpectedTool`, `hasOutput`, `toolInputFieldsMatch`, `FaqAccuracy`, `OutputFactuality`, `SafetyCheck`) — Braintrust-compatible scoring helpers
+- **`createLocalReporter`** — local terminal output for eval runs
+
+## If you depended on this
+
+You have a few options depending on what you were using:
+
+- **For test-driven eval runs against an MCP server**: use [Braintrust](https://braintrust.dev) directly with their MCP integration, or build your own test harness against your `/mcp` endpoint with `@modelcontextprotocol/sdk`.
+- **For scenario fixtures**: the JSON shape was just `{ name, turns: [{ role, content }] }`. Keep your fixtures and load them with your own loader.
+- **For tool-call scorers**: the implementations were thin wrappers over Braintrust's `autoevals`. Use `autoevals` directly.
+
+## Cross-repo migration
+
+The following internal projects had imports from `@waniwani/sdk/evals`:
+
+- `app/src/lib/evals/execute-eval-run.ts`
+- `app/src/lib/evals/evaluators.ts`
+- `app/src/app/api/mcp/projects/[id]/evaluators/[evaluatorId]/test/route.ts`
+- `app/src/app/api/mcp/scenarios/[scenarioId]/replay/route.ts`
+- `managed/lassie/evals/index.ts`
+
+These need to be migrated off `@waniwani/sdk/evals` (either by pinning to a pre-removal SDK version, or replacing the imports with direct Braintrust / custom logic) before they can pick up the new SDK version.

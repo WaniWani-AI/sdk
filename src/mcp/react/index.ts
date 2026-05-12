@@ -1,37 +1,42 @@
-// Client-side React hooks and components for MCP widgets
+// `@waniwani/sdk/mcp/react` entry point.
+//
+// Non-legacy: `useWaniwani` (standalone tracking hook) — see ./hooks/index.ts.
+// Legacy: everything else (MCP-widget-in-host bridge) — re-exported from
+// `src/legacy/mcp/react` for back-compat. New code should depend on
+// `@waniwani/sdk/legacy/react` for the legacy bits.
 
-// Components
-export { InitializeNextJsInIframe } from "./components/initialize-next-in-iframe";
-// Dev tools
+// Legacy — re-exported from src/legacy/mcp/react
+export type {
+	DeviceType,
+	DisplayMode,
+	FlowActionResult,
+	HostContext,
+	ModelContextContentBlock,
+	ModelContextUpdate,
+	SafeArea,
+	SafeAreaInsets,
+	SendFollowUpOptions,
+	Theme,
+	ToolCallResult,
+	ToolResult,
+	UnifiedWidgetClient,
+	UnknownObject,
+	UserAgent,
+	WidgetPlatform,
+} from "../../legacy/mcp/react";
 export {
 	DevModeProvider,
+	detectPlatform,
 	getMockState,
+	InitializeNextJsInIframe,
 	initializeMockOpenAI,
+	isMCPApps,
+	isOpenAI,
+	LoadingWidget,
 	updateMockDisplayMode,
 	updateMockGlobal,
 	updateMockTheme,
 	updateMockToolOutput,
-} from "./dev/index";
-// Client-side types
-export type {
-	DeviceType,
-	DisplayMode,
-	SafeArea,
-	SafeAreaInsets,
-	Theme,
-	UnknownObject,
-	UserAgent,
-} from "./hooks/@types";
-// Hooks and provider
-export type {
-	FlowActionResult,
-	ModelContextContentBlock,
-	ModelContextUpdate,
-	SendFollowUpOptions,
-	UseWaniwaniOptions,
-	WaniwaniWidget,
-} from "./hooks/index";
-export {
 	useCallTool,
 	useDisplayMode,
 	useFlowAction,
@@ -46,9 +51,10 @@ export {
 	useToolOutput,
 	useToolResponseMetadata,
 	useUpdateModelContext,
-	useWaniwani,
 	useWidgetClient,
 	useWidgetState,
 	WidgetProvider,
-} from "./hooks/index";
-export { LoadingWidget } from "./widgets/loading-widget";
+} from "../../legacy/mcp/react";
+// Non-legacy
+export type { UseWaniwaniOptions, WaniwaniWidget } from "./hooks/index";
+export { useWaniwani } from "./hooks/index";

@@ -4,7 +4,7 @@ import { waniwani } from "../../../waniwani.js";
 import type { FlowGraph } from "../flows/@types.js";
 import { REDACTED_STATE_UPDATE_FIELDS_META_KEY } from "../flows/redacted.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
-import type { McpServer } from "../tools/types";
+import type { McpServer } from "../types";
 import { extractSessionId } from "../utils.js";
 import { WidgetTokenCache } from "../widget-token.js";
 import { syncFlowGraphs } from "./funnel-sync.js";

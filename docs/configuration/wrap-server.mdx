@@ -1,62 +1,46 @@
 ---
 title: Wrap your MCP server
-description: "Automatically track every tool call with withWaniwani()."
+description: "Optional convenience wrapper that adds tool tracking, session bridging, and widget metadata forwarding."
 ---
 
-`withWaniwani(server)` instruments an MCP server so every tool call emits a `tool.called` event with duration, status, input, and output. One line, no changes inside your tool handlers.
+`withWaniwani(server)` is an optional convenience that instruments an MCP server. It's free-tier-flavored when an API key is configured, and a no-op-but-still-useful wrapper when it isn't.
 
-## Usage
+<Note>
+**Not required for OSS flows.** `createFlow` works without `withWaniwani`. Use this wrapper when you want auto-tracking, session-id bridging, or widget metadata forwarding on top.
+</Note>
 
-```ts server/src/index.ts
-import express from "express";
+## What it does — with `WANIWANI_API_KEY`
+
+Every tool invocation produces a `tool.called` event containing name, type, duration, status, input, output, client info, and session correlation. Flow graphs are synced to the dashboard so the funnel view lights up automatically.
+
+```ts
 import { withWaniwani } from "@waniwani/sdk/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import "dotenv/config";
 
 const server = new McpServer({ name: "my-mcp-app", version: "0.0.1" });
 
-// Register tools as usual
-server.registerTool(/* ... */);
-server.registerTool(/* ... */);
+server.registerTool(/* … */);
 
-// Instrument the server
 withWaniwani(server);
-
-// Connect the Streamable HTTP transport
-const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-await server.connect(transport);
-
-const app = express();
-app.use(express.json());
-app.post("/mcp", (req, res) => transport.handleRequest(req, res, req.body));
-app.listen(3000);
 ```
 
-With no `client` option, `withWaniwani` creates one internally via `waniwani()`, which reads `WANIWANI_API_KEY` from the environment.
+## What it does — without an API key
 
-<Tip>
-  Call order does not matter. `withWaniwani` walks existing `_registeredTools` at call time and intercepts `registerTool` for any future registrations. It is idempotent, so a second call on the same server is a no-op.
-</Tip>
+The wrapper still adds two genuinely useful things, even with no key configured:
 
-## What gets tracked
+1. **Transport session-ID bridging.** When the MCP transport carries a session ID via the `Mcp-Session-Id` header but the request `_meta` doesn't include one, the wrapper copies it into `_meta.waniwani/sessionId` so flow nodes and downstream tools can see the correlation.
+2. **Widget definition metadata forwarding.** Widget keys declared on a tool's definition `_meta` (`openai/outputTemplate`, `ui/resourceUri`, etc.) are forwarded into each tool result's `_meta`, so chat UIs that only see results can still render widgets.
 
-Every tool invocation produces a `tool.called` event containing:
+Tracking calls silently no-op when no key is configured — no errors, no thrown exceptions. You can safely wrap your server unconditionally.
 
-| Field           | Description                                              |
-| --------------- | -------------------------------------------------------- |
-| `name`          | Registered tool name                                     |
-| `type`          | Category derived from the `toolType` option              |
-| `durationMs`    | Handler execution time                                   |
-| `status`        | `"ok"` or `"error"`                                      |
-| `errorMessage`  | Present when the handler threw or returned `isError`     |
-| `input`         | Tool arguments                                           |
-| `output`        | Handler response                                         |
-| `clientName`    | MCP client name (for example `chatgpt`, `claude`)        |
-| `clientVersion` | MCP client version                                       |
-| `sessionId`     | Correlated from `_meta` (see [Sessions](/tracking/sessions)) |
+## When to use it
 
-Errors (thrown or `{ isError: true }`) are tracked and then re-thrown or returned unchanged, so your tool's error contract is preserved.
+| You want | Use `withWaniwani`? |
+|---|---|
+| Only run OSS flows, no telemetry | Optional (still useful for session bridging) |
+| OSS flows + hosted tracking (free tier) | Yes |
+| Hosted everything (flow state + tracking + funnel) | Yes |
+| Just custom event tracking via `waniwani().track()` | No — call `track()` directly |
 
 ## Options
 
@@ -91,12 +75,33 @@ withWaniwani(server, {
 </ResponseField>
 
 <ResponseField name="injectWidgetToken" type="boolean" default={true}>
-  Inject a short-lived widget tracking token into tool responses under `_meta.waniwani`, so browser widgets can post events directly to WaniWani without a proxy route. Leave enabled unless you need to disable token minting.
+  Inject a short-lived widget tracking token into tool responses under `_meta.waniwani`, so browser widgets can post events directly to WaniWani without a proxy route. Without an API key, the token is omitted and only the endpoint metadata is injected.
 </ResponseField>
 
 <ResponseField name="onError" type="(error: Error) => void">
   Callback for non-fatal tracking errors. Tracking failures never block tool execution; use this callback when you want visibility into them.
 </ResponseField>
+
+<Tip>
+  Call order does not matter. `withWaniwani` walks existing `_registeredTools` at call time and intercepts `registerTool` for any future registrations. It is idempotent — a second call on the same server is a no-op.
+</Tip>
+
+## Tracked event shape
+
+| Field           | Description                                              |
+| --------------- | -------------------------------------------------------- |
+| `name`          | Registered tool name                                     |
+| `type`          | Category derived from the `toolType` option              |
+| `durationMs`    | Handler execution time                                   |
+| `status`        | `"ok"` or `"error"`                                      |
+| `errorMessage`  | Present when the handler threw or returned `isError`     |
+| `input`         | Tool arguments                                           |
+| `output`        | Handler response                                         |
+| `clientName`    | MCP client name (for example `chatgpt`, `claude`)        |
+| `clientVersion` | MCP client version                                       |
+| `sessionId`     | Correlated from `_meta` (see [Sessions](/tracking/sessions)) |
+
+Errors (thrown or `{ isError: true }`) are tracked and then re-thrown or returned unchanged, so your tool's error contract is preserved.
 
 ## Custom events inside tools
 
@@ -122,7 +127,6 @@ server.registerTool(
 );
 ```
 
-## Also supported
+## Session-scoped client in flows
 
-- **Session-scoped client in flows.** Inside a [flow](/flows/overview) node, `ctx.waniwani` is a scoped client that auto-attaches session correlation, so you can call `ctx.waniwani.track({ event, properties })` without passing `meta`.
-- **Widget metadata forwarding.** Widget `_meta` declared on a tool definition (Skybridge's `registerWidget`, raw `ui/resourceUri`, OpenAI's `openai/outputTemplate`) is copied onto each tool result, so chat UIs that only see tool results can still render widgets.
+Inside a [flow](/flows/overview) node, `ctx.waniwani` is a scoped client that auto-attaches session correlation, so you can call `ctx.waniwani.track({ event, properties })` without passing `meta`.

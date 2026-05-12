@@ -96,9 +96,10 @@ export default defineConfig([
 			"@modelcontextprotocol/sdk",
 		],
 	},
-	// Next.js adapter
+	// Next.js adapter (legacy — source moved to src/legacy/chat/next-js,
+	// re-published at @waniwani/sdk/next-js for back-compat)
 	{
-		entry: { "chat/next-js/index": "src/chat/server/next-js/index.ts" },
+		entry: { "chat/next-js/index": "src/legacy/chat/next-js/index.ts" },
 		format: ["esm"],
 		target: "node20",
 		dts: true,
@@ -114,9 +115,86 @@ export default defineConfig([
 			"@modelcontextprotocol/sdk",
 		],
 	},
-	// Express adapter
+	// Express adapter (legacy — source moved to src/legacy/chat/express-js,
+	// re-published at @waniwani/sdk/express-js for back-compat)
 	{
-		entry: { "chat/express-js/index": "src/chat/server/express-js/index.ts" },
+		entry: { "chat/express-js/index": "src/legacy/chat/express-js/index.ts" },
+		format: ["esm"],
+		target: "node20",
+		dts: true,
+		clean: false,
+		shims: true,
+		splitting: true,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		external: [
+			"ai",
+			"@ai-sdk/mcp",
+			"@modelcontextprotocol/sdk",
+		],
+	},
+	// Legacy server-side MCP primitives (createTool, createResource, registerTools)
+	{
+		entry: { "legacy/index": "src/legacy/index.ts" },
+		format: ["esm"],
+		target: "node20",
+		dts: true,
+		clean: false,
+		shims: true,
+		splitting: true,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		external: [
+			"@modelcontextprotocol/sdk",
+			"@modelcontextprotocol/ext-apps",
+			"zod",
+			"react",
+		],
+	},
+	// Legacy MCP React hooks (WidgetProvider, useWidgetClient, etc.)
+	{
+		entry: { "legacy/mcp/react": "src/legacy/mcp/react/index.ts" },
+		format: ["esm"],
+		target: "es2022",
+		dts: true,
+		clean: false,
+		shims: false,
+		splitting: true,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		external: [
+			"react",
+			"@modelcontextprotocol/sdk",
+			"@modelcontextprotocol/ext-apps",
+		],
+		banner: {
+			js: '"use client";',
+		},
+	},
+	// Legacy Next.js adapter (mounted at @waniwani/sdk/legacy/next-js)
+	{
+		entry: { "legacy/chat/next-js/index": "src/legacy/chat/next-js/index.ts" },
+		format: ["esm"],
+		target: "node20",
+		dts: true,
+		clean: false,
+		shims: true,
+		splitting: true,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		external: [
+			"ai",
+			"@ai-sdk/mcp",
+			"@modelcontextprotocol/sdk",
+		],
+	},
+	// Legacy Express adapter (mounted at @waniwani/sdk/legacy/express-js)
+	{
+		entry: { "legacy/chat/express-js/index": "src/legacy/chat/express-js/index.ts" },
 		format: ["esm"],
 		target: "node20",
 		dts: true,
@@ -145,34 +223,6 @@ export default defineConfig([
 		minify: true,
 		outDir: "dist",
 		external: ["ai"],
-	},
-	// Evals (Node.js — replay, scenarios, chat — no optional deps)
-	{
-		entry: { "evals/index": "src/evals/index.ts" },
-		format: ["esm"],
-		target: "node20",
-		dts: true,
-		clean: false,
-		shims: true,
-		splitting: true,
-		sourcemap: true,
-		minify: true,
-		outDir: "dist",
-		external: ["ai", "zod"],
-	},
-	// Evals scorers (Node.js — braintrust + autoevals required)
-	{
-		entry: { "evals/scorers": "src/evals/scorers-entry.ts" },
-		format: ["esm"],
-		target: "node20",
-		dts: true,
-		clean: false,
-		shims: true,
-		splitting: true,
-		sourcemap: true,
-		minify: true,
-		outDir: "dist",
-		external: ["ai", "braintrust", "autoevals", "zod"],
 	},
 	// Chat embed (self-contained IIFE for any website)
 	{

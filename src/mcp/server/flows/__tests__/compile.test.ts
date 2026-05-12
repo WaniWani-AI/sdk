@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import type { RegisteredTool } from "../../tools/types";
+import type { RegisteredTool } from "../../../../legacy/mcp/tools/types";
 import { FLOW_META_KEY } from "../../utils";
 import type { FlowTokenContent, McpServer } from "../@types";
 import { END, START } from "../@types";
