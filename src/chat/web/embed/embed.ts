@@ -50,6 +50,7 @@ interface EmbedInstance {
 let currentInstance: EmbedInstance | null = null;
 let reactRoot: ReactDOM.Root | null = null;
 let hostElement: HTMLElement | null = null;
+let containerResizeObserver: ResizeObserver | null = null;
 
 // ---------------------------------------------------------------------------
 // CSS injection helper
@@ -99,26 +100,71 @@ function mountInline(
 		);
 	}
 
-	// Size the chat against the customer's container in two ways at once:
+	// Size the chat against the customer's container in two complementary
+	// ways:
 	//
 	//   1. `height: 100%; max-height: inherit` — works when the customer's
 	//      container has a definite height. CSS inheritance reaches across
 	//      the shadow boundary via the composed tree.
 	//   2. `flex: 1 1 auto; min-height: 0` + `display: flex; flex-direction:
 	//      column` — works when the customer's container is a flex column
-	//      bounded only by `max-height` (no `height`). The host fills the
-	//      flex-resolved space; declaring the host itself as a flex column
-	//      lets the chat root become its flex child, which sidesteps a
-	//      shadow-DOM quirk where `height: 100%` on a mount inside the
-	//      shadow does not resolve against a flex-sized host. With
-	//      `display: contents` the mount drops out of layout so the chat
-	//      root sizes directly off the host's flex container.
+	//      bounded only by `max-height`. The host fills the flex-resolved
+	//      space; declaring the host itself as a flex column lets the chat
+	//      root become its flex child, which sidesteps a shadow-DOM quirk
+	//      where `height: 100%` on a mount inside the shadow does not
+	//      resolve against a flex-sized host. The mount uses `display:
+	//      contents` so it drops out of layout entirely.
+	//   3. A `ResizeObserver` reflects the container's *maximum* content
+	//      area onto the host as an inline `max-height`. `max-height:
+	//      inherit` copies the parent's value verbatim, so a `max-height:
+	//      800px; padding: 24px; box-sizing: border-box` parent lets the
+	//      chat overflow by the padding amount. Recomputing from the
+	//      parent's CSS each time it resizes closes that gap. We read
+	//      `max-height` / `height` (not the current `contentBoxSize`) to
+	//      avoid a feedback loop: when the chat is shorter than the
+	//      parent's bound, the parent's content-box shrinks to fit, and
+	//      mirroring that would lock the host at its current size.
 	hostElement = document.createElement("div");
 	hostElement.id = "waniwani-chat-embed";
 	hostElement.style.cssText =
 		"width:100%;height:100%;max-height:inherit;" +
 		"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;";
 	container.appendChild(hostElement);
+
+	const host = hostElement;
+	const syncMaxHeight = () => {
+		const cs = getComputedStyle(container);
+		// Only mirror `max-height`. `getComputedStyle().height` returns the
+		// resolved size — when the parent is bounded by `max-height` alone
+		// and content is shorter, that resolved size shrinks to content,
+		// and using it would lock the host below the parent's true bound.
+		// When the parent uses an explicit `height`, the existing
+		// `height: 100%` chain already resolves correctly against its
+		// content box, so we leave the cap unset.
+		if (cs.maxHeight === "none") {
+			host.style.removeProperty("max-height");
+			return;
+		}
+		const outer = Number.parseFloat(cs.maxHeight);
+		if (!Number.isFinite(outer)) {
+			host.style.removeProperty("max-height");
+			return;
+		}
+		let inner = outer;
+		if (cs.boxSizing === "border-box") {
+			inner -=
+				(Number.parseFloat(cs.paddingTop) || 0) +
+				(Number.parseFloat(cs.paddingBottom) || 0) +
+				(Number.parseFloat(cs.borderTopWidth) || 0) +
+				(Number.parseFloat(cs.borderBottomWidth) || 0);
+		}
+		if (inner > 0) {
+			host.style.maxHeight = `${inner}px`;
+		}
+	};
+	syncMaxHeight();
+	containerResizeObserver = new ResizeObserver(syncMaxHeight);
+	containerResizeObserver.observe(container);
 
 	const shadowRoot = hostElement.attachShadow({ mode: "open" });
 	injectStyles(shadowRoot, config);
@@ -141,6 +187,8 @@ function mountInline(
 
 	return {
 		destroy: () => {
+			containerResizeObserver?.disconnect();
+			containerResizeObserver = null;
 			reactRoot?.unmount();
 			reactRoot = null;
 			hostElement?.remove();
