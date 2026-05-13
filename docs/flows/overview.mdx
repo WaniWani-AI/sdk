@@ -1,11 +1,25 @@
 ---
 title: Flows Overview
-description: "Multi-step, stateful MCP tools defined as a graph."
+description: "Multi-step MCP tools for sales funnels, lead generation, booking, and quote apps. Defined as a graph."
 ---
 
 A flow is a graph of nodes that compiles into a single MCP tool. Each tool call runs the engine one step at a time: it asks a question, validates the answer, branches on state, then persists progress server-side under the MCP session id. The model never has to carry a token between calls.
 
-Flows exist because MCP tools are stateless. Anything longer than a single-shot Q&A (onboarding, quoting, qualification, triage) otherwise becomes a hand-rolled state machine serialized through the model.
+## Flows are MCP funnels
+
+Most apps people build with flows are funnels: a sales funnel, a lead generation flow, a booking flow, an insurance quote flow, a pricing quote flow. The two vocabularies map cleanly:
+
+| Funnel term | Flow term |
+|---|---|
+| Funnel step / page | Node |
+| Drop-off / conversion | Edge taken vs. abandoned |
+| Form field | Interrupt |
+| Branching question | Conditional edge |
+| Funnel state (lead data) | Flow state (typed) |
+
+If you're building an MCP funnel, you're building a flow. The rest of this page is the graph engine that powers it.
+
+Flows exist because MCP tools are stateless. Anything longer than a single-shot Q&A (onboarding, quoting, qualification, triage, lead capture, booking) otherwise becomes a hand-rolled state machine serialized through the model.
 
 ## What you declare
 

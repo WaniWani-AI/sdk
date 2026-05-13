@@ -3,9 +3,16 @@
 [![npm](https://img.shields.io/npm/v/@waniwani/sdk.svg)](https://www.npmjs.com/package/@waniwani/sdk)
 [![license](https://img.shields.io/npm/l/@waniwani/sdk.svg)](./LICENSE)
 
-> Open-source flow engine for MCP servers. Free hosted tier for analytics, knowledge base, and chat — when you want them.
+> Open-source SDK for MCP funnels. Build sales funnels, lead generation, booking, insurance quote, and pricing quote flows on top of your MCP server. Free hosted tier for analytics, knowledge base, and chat.
 
-`@waniwani/sdk` is split into two tiers:
+`@waniwani/sdk` turns your MCP server into a distribution surface. Build:
+
+- **Sales funnels and lead generation** — qualify leads, capture intent, route to the right step. Multi-step conversations compiled into a single MCP tool.
+- **Booking and reservation flows** — collect what you need, branch on conditions, confirm.
+- **Quote flows** (insurance, pricing, custom) — gather inputs, call your pricing API, return a quote, optionally render a widget.
+- **Knowledge base and embedded chat** — ground answers in your docs, ship a chat widget for your site.
+
+The SDK is split into two tiers:
 
 - **Open source** — `createFlow` and the `KvStore` interface. LangGraph-inspired multi-step conversations, compiled into a single MCP tool. No API key needed. Plug in any state backend (in-memory, Redis, Upstash, Cloudflare KV) — or run pure self-hosted.
 - **Free tier** — add `WANIWANI_API_KEY` for hosted flow state, event tracking, funnel analytics, knowledge base, and a local playground. One env var. Same code.

@@ -1,6 +1,6 @@
 ---
 name: waniwani-sdk
-description: "Integrate @waniwani/sdk into MCP servers. Use this skill to build multi-step conversational flows with createFlow (open source, no API key required), persist flow state via the KvStore interface (in-memory, Redis, Upstash, Cloudflare KV, DynamoDB, or hosted), add event tracking and knowledge base search (free tier, one env var), or embed the chat widget. Trigger when the user wants to build, integrate, or extend a WaniWani-powered MCP server, write flows, plug in a custom state backend, add analytics, or ship the chat UI."
+description: "MCP distribution SDK: build sales funnels, lead generation, booking flows, insurance quote flows, pricing quote flows, and any multi-step conversational MCP app with @waniwani/sdk. Open source createFlow engine (no API key required) with pluggable state backends (in-memory, Redis, Upstash, Cloudflare KV, DynamoDB, or hosted). Optional free tier adds event tracking, funnel analytics, knowledge base, and a chat widget. Trigger when the user wants to add an MCP funnel, sales funnel, lead gen flow, booking flow, quote flow, knowledge base / FAQ tool, or embedded chat to an MCP server."
 license: MIT
 metadata:
   author: WaniWani
@@ -8,7 +8,7 @@ metadata:
 
 # WaniWani SDK (`@waniwani/sdk`)
 
-Open-source flow engine for MCP servers, with an optional free tier for hosted analytics, knowledge base, and a playground. The split:
+The MCP distribution SDK. Build sales funnels, lead generation, booking, insurance quote, and pricing quote apps on top of your MCP server. Open-source flow engine, with an optional free tier for hosted state, event tracking, funnel analytics, knowledge base, and a playground. The split:
 
 - **Open source** — `createFlow`, `StateGraph`, the `KvStore` interface, `MemoryKvStore`. Runs with no API key against any state backend you implement.
 - **Free tier** — set `WANIWANI_API_KEY` to unlock hosted flow state, event tracking, funnel analytics, knowledge base, and the dashboard playground.

@@ -27,6 +27,16 @@
             ]
           },
           {
+            "group": "Build MCP Funnels",
+            "pages": [
+              "funnels/overview",
+              "funnels/sales-funnel",
+              "funnels/lead-generation",
+              "funnels/booking",
+              "funnels/insurance-quote"
+            ]
+          },
+          {
             "group": "Open Source — Flows",
             "pages": [
               "flows/overview",

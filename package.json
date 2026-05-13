@@ -1,7 +1,7 @@
 {
   "name": "@waniwani/sdk",
   "version": "0.11.11",
-  "description": "WaniWani SDK - MCP event tracking, widget framework, and tools",
+  "description": "MCP distribution SDK. Build sales funnels, lead generation, booking, and quote apps on top of your MCP server. Event tracking, flows, widgets, knowledge base.",
   "type": "module",
   "exports": {
     ".": {
@@ -161,6 +161,18 @@
     "sdk",
     "mcp",
     "waniwani",
+    "mcp-funnel",
+    "mcp-distribution",
+    "mcp-sdk",
+    "sales-funnel",
+    "lead-generation",
+    "lead-capture",
+    "booking",
+    "insurance",
+    "quote",
+    "conversational-mcp",
+    "flows",
+    "knowledge-base",
     "tracking",
     "events",
     "tools",
