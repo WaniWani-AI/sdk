@@ -32,13 +32,14 @@ import { Button } from "../ui/button";
 /**
  * Bring-your-own-backend chat with internal scroll.
  *
- * Sizes via a pure-CSS `height: 100%; max-height: inherit` chain that
- * works for `height`, `max-height`, and flex/grid-bounded ancestors —
- * including across the embed's shadow boundary (CSS inherits through
- * the composed tree). When the parent is truly unbounded the chat grows
- * with content; bound it by setting `height` or `max-height` on the
- * parent. Internally a flex column: header and input pinned, messages
- * scrolling between them.
+ * Sizes off its parent via two complementary mechanisms applied by the
+ * embed host: a `height: 100%; max-height: inherit` chain for
+ * definite-height parents, and `flex: 1 1 auto; min-height: 0` so the
+ * chat also fills a flex-column parent bounded only by `max-height`.
+ * Both work across the shadow boundary. When the parent is truly
+ * unbounded the chat grows with content; bound it by setting `height`,
+ * `max-height`, or a flex/grid track on the parent. Internally a flex
+ * column: header and input pinned, messages scrolling between them.
  */
 export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 	function ChatEmbed(props, ref) {
@@ -135,6 +136,25 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 
 		useEffect(() => {
 			scrollToBottom("auto");
+		}, [scrollToBottom]);
+
+		// Keep the view pinned to the bottom when the scroll container resizes.
+		// The embed's host can settle asynchronously (ResizeObserver mirroring
+		// the parent's max-height runs after the first paint), which shrinks
+		// the scroll container and would otherwise leave scrollTop at 0 even
+		// though the initial mount effect already ran.
+		useEffect(() => {
+			const scroller = scrollRef.current;
+			if (!scroller || typeof ResizeObserver === "undefined") {
+				return;
+			}
+			const observer = new ResizeObserver(() => {
+				if (atBottomRef.current) {
+					scrollToBottom("auto");
+				}
+			});
+			observer.observe(scroller);
+			return () => observer.disconnect();
 		}, [scrollToBottom]);
 
 		const suggestionsState = useSuggestions({

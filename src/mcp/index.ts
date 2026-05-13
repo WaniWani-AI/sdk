@@ -6,6 +6,7 @@
 
 // Flow framework — OSS
 export type {
+	AddNodeConfig,
 	ConditionFn,
 	FlowConfig,
 	FlowTestResult,

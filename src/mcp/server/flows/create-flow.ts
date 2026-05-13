@@ -22,8 +22,14 @@ import { StateGraph } from "./state-graph";
  *     email: z.string().describe("The user's email address"),
  *   },
  * })
- *   .addNode("ask_name", () => interrupt({ question: "What's your name?", field: "name" }))
- *   .addNode("ask_email", () => interrupt({ question: "What's your email?", field: "email" }))
+ *   .addNode({
+ *     id: "ask_name",
+ *     run: () => interrupt({ question: "What's your name?", field: "name" }),
+ *   })
+ *   .addNode({
+ *     id: "ask_email",
+ *     run: () => interrupt({ question: "What's your email?", field: "email" }),
+ *   })
  *   .addEdge(START, "ask_name")
  *   .addEdge("ask_name", "ask_email")
  *   .addEdge("ask_email", END)

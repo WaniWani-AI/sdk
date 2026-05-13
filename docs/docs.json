@@ -83,6 +83,12 @@
               "legacy/chat-adapters",
               "legacy/evals"
             ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "migration"
+            ]
           }
         ]
       }

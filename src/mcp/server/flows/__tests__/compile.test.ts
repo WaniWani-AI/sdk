@@ -2140,3 +2140,65 @@ describe("nodesVisited flow path tracking", () => {
 		});
 	});
 });
+
+describe("addNode object form", () => {
+	test("accepts { id, run, label, hideFromFunnel } and behaves identically to positional form", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "object_form_flow",
+			title: "Object Form",
+			description: "Test the object-form addNode signature.",
+			state: {
+				computed: z.string().describe("Computed"),
+				name: z.string().describe("Name"),
+			},
+		})
+			.addNode({
+				id: "hidden_compute",
+				run: () => ({ computed: "done" }),
+				label: "Hidden Compute",
+				hideFromFunnel: true,
+			})
+			.addNode({
+				id: "ask_name",
+				run: ({ interrupt }) => interrupt({ name: { question: "Name?" } }),
+			})
+			.addEdge(START, "hidden_compute")
+			.addEdge("hidden_compute", "ask_name")
+			.addEdge("ask_name", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const meta = result._meta as Record<string, unknown>;
+
+		expect(meta[FLOW_META_KEY]).toEqual({
+			flowId: "object_form_flow",
+			nodesVisited: ["ask_name"],
+		});
+	});
+
+	test("object form without label defaults label to id", () => {
+		const flow = createFlow({
+			id: "default_label_flow",
+			title: "Default Label",
+			description: "Label defaults to id when omitted.",
+			state: { v: z.string() },
+		})
+			.addNode({
+				id: "first",
+				run: () => ({ v: "ok" }),
+			})
+			.addEdge(START, "first")
+			.addEdge("first", END);
+
+		const graphMd = flow.graph();
+		expect(graphMd).toContain("first[first]");
+	});
+});

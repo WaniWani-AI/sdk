@@ -50,6 +50,7 @@ interface EmbedInstance {
 let currentInstance: EmbedInstance | null = null;
 let reactRoot: ReactDOM.Root | null = null;
 let hostElement: HTMLElement | null = null;
+let containerResizeObserver: ResizeObserver | null = null;
 
 // ---------------------------------------------------------------------------
 // CSS injection helper
@@ -99,22 +100,87 @@ function mountInline(
 		);
 	}
 
-	// Propagate the customer's height / max-height down to the chat root
-	// via a `height: 100%; max-height: inherit` chain that crosses the
-	// shadow boundary (CSS inherits through the composed tree, so
-	// `max-height: inherit` on a shadow-tree element copies the value
-	// from its shadow host). Both host and mountContainer are links in
-	// the chain.
+	// Size the chat against the customer's container in two complementary
+	// ways:
+	//
+	//   1. `height: 100%; max-height: inherit` — works when the customer's
+	//      container has a definite height. CSS inheritance reaches across
+	//      the shadow boundary via the composed tree.
+	//   2. `flex: 1 1 auto; min-height: 0` + `display: flex; flex-direction:
+	//      column` — works when the customer's container is a flex column
+	//      bounded only by `max-height`. The host fills the flex-resolved
+	//      space; declaring the host itself as a flex column lets the chat
+	//      root become its flex child, which sidesteps a shadow-DOM quirk
+	//      where `height: 100%` on a mount inside the shadow does not
+	//      resolve against a flex-sized host. The mount uses `display:
+	//      contents` so it drops out of layout entirely.
+	//   3. A `ResizeObserver` reflects the container's *maximum* content
+	//      area onto the host as an inline `max-height`. `max-height:
+	//      inherit` copies the parent's value verbatim, so a `max-height:
+	//      800px; padding: 24px; box-sizing: border-box` parent lets the
+	//      chat overflow by the padding amount. Recomputing from the
+	//      parent's CSS each time it resizes closes that gap. We read
+	//      `max-height` / `height` (not the current `contentBoxSize`) to
+	//      avoid a feedback loop: when the chat is shorter than the
+	//      parent's bound, the parent's content-box shrinks to fit, and
+	//      mirroring that would lock the host at its current size.
 	hostElement = document.createElement("div");
 	hostElement.id = "waniwani-chat-embed";
-	hostElement.style.cssText = "width:100%;height:100%;max-height:inherit;";
+	hostElement.style.cssText =
+		"width:100%;height:100%;max-height:inherit;" +
+		"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;";
 	container.appendChild(hostElement);
+
+	const host = hostElement;
+	const syncMaxHeight = () => {
+		const cs = getComputedStyle(container);
+		// Only mirror `max-height`. `getComputedStyle().height` returns the
+		// resolved size — when the parent is bounded by `max-height` alone
+		// and content is shorter, that resolved size shrinks to content,
+		// and using it would lock the host below the parent's true bound.
+		// When the parent uses an explicit `height`, the existing
+		// `height: 100%` chain already resolves correctly against its
+		// content box, so we leave the cap unset.
+		//
+		// Bail unless we get a concrete pixel value: percentages with an
+		// indefinite containing block come back as `"80%"`, which would
+		// otherwise be parsed as `80` pixels and severely shrink the chat.
+		// `max-height: inherit` on the host handles those cases natively.
+		if (!cs.maxHeight.endsWith("px")) {
+			host.style.removeProperty("max-height");
+			return;
+		}
+		const outer = Number.parseFloat(cs.maxHeight);
+		if (!Number.isFinite(outer)) {
+			host.style.removeProperty("max-height");
+			return;
+		}
+		let inner = outer;
+		if (cs.boxSizing === "border-box") {
+			inner -=
+				(Number.parseFloat(cs.paddingTop) || 0) +
+				(Number.parseFloat(cs.paddingBottom) || 0) +
+				(Number.parseFloat(cs.borderTopWidth) || 0) +
+				(Number.parseFloat(cs.borderBottomWidth) || 0);
+		}
+		if (inner > 0) {
+			host.style.maxHeight = `${inner}px`;
+		} else {
+			// Padding + border exceed the parent's `max-height`. Clear any
+			// stale override so the host falls back to `max-height: inherit`
+			// rather than keeping a value from an earlier observation.
+			host.style.removeProperty("max-height");
+		}
+	};
+	syncMaxHeight();
+	containerResizeObserver = new ResizeObserver(syncMaxHeight);
+	containerResizeObserver.observe(container);
 
 	const shadowRoot = hostElement.attachShadow({ mode: "open" });
 	injectStyles(shadowRoot, config);
 
 	const mountContainer = document.createElement("div");
-	mountContainer.style.cssText = "width:100%;height:100%;max-height:inherit;";
+	mountContainer.className = "ww:contents";
 	shadowRoot.appendChild(mountContainer);
 
 	const inlineRef = React.createRef<InlineChatHandle>();
@@ -131,6 +197,8 @@ function mountInline(
 
 	return {
 		destroy: () => {
+			containerResizeObserver?.disconnect();
+			containerResizeObserver = null;
 			reactRoot?.unmount();
 			reactRoot = null;
 			hostElement?.remove();
