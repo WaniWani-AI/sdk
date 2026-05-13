@@ -99,22 +99,32 @@ function mountInline(
 		);
 	}
 
-	// Propagate the customer's height / max-height down to the chat root
-	// via a `height: 100%; max-height: inherit` chain that crosses the
-	// shadow boundary (CSS inherits through the composed tree, so
-	// `max-height: inherit` on a shadow-tree element copies the value
-	// from its shadow host). Both host and mountContainer are links in
-	// the chain.
+	// Size the chat against the customer's container in two ways at once:
+	//
+	//   1. `height: 100%; max-height: inherit` — works when the customer's
+	//      container has a definite height. CSS inheritance reaches across
+	//      the shadow boundary via the composed tree.
+	//   2. `flex: 1 1 auto; min-height: 0` + `display: flex; flex-direction:
+	//      column` — works when the customer's container is a flex column
+	//      bounded only by `max-height` (no `height`). The host fills the
+	//      flex-resolved space; declaring the host itself as a flex column
+	//      lets the chat root become its flex child, which sidesteps a
+	//      shadow-DOM quirk where `height: 100%` on a mount inside the
+	//      shadow does not resolve against a flex-sized host. With
+	//      `display: contents` the mount drops out of layout so the chat
+	//      root sizes directly off the host's flex container.
 	hostElement = document.createElement("div");
 	hostElement.id = "waniwani-chat-embed";
-	hostElement.style.cssText = "width:100%;height:100%;max-height:inherit;";
+	hostElement.style.cssText =
+		"width:100%;height:100%;max-height:inherit;" +
+		"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;";
 	container.appendChild(hostElement);
 
 	const shadowRoot = hostElement.attachShadow({ mode: "open" });
 	injectStyles(shadowRoot, config);
 
 	const mountContainer = document.createElement("div");
-	mountContainer.style.cssText = "width:100%;height:100%;max-height:inherit;";
+	mountContainer.className = "ww:contents";
 	shadowRoot.appendChild(mountContainer);
 
 	const inlineRef = React.createRef<InlineChatHandle>();
