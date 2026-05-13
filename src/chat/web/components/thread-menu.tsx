@@ -117,12 +117,20 @@ export function ThreadMenu({
 			return;
 		}
 		const handler = (event: MouseEvent) => {
-			if (
-				containerRef.current &&
-				!containerRef.current.contains(event.target as Node)
-			) {
-				setOpen(false);
+			const container = containerRef.current;
+			if (!container) {
+				return;
 			}
+			// In the embed we render inside a shadow root, so events that
+			// bubble to `document` are retargeted to the shadow host and
+			// `event.target` no longer points at the actual click target.
+			// `composedPath()` reports the true path through the shadow
+			// tree, which is what we need to distinguish clicks inside
+			// the menu from genuine outside-clicks.
+			if (event.composedPath().includes(container)) {
+				return;
+			}
+			setOpen(false);
 		};
 		document.addEventListener("mousedown", handler);
 		return () => document.removeEventListener("mousedown", handler);
