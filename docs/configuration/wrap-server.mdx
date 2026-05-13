@@ -9,7 +9,7 @@ description: "Optional convenience wrapper that adds tool tracking, session brid
 **Not required for OSS flows.** `createFlow` works without `withWaniwani`. Use this wrapper when you want auto-tracking, session-id bridging, or widget metadata forwarding on top.
 </Note>
 
-## What it does — with `WANIWANI_API_KEY`
+## What it does, with `WANIWANI_API_KEY`
 
 Every tool invocation produces a `tool.called` event containing name, type, duration, status, input, output, client info, and session correlation. Flow graphs are synced to the dashboard so the funnel view lights up automatically.
 
@@ -19,19 +19,19 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 const server = new McpServer({ name: "my-mcp-app", version: "0.0.1" });
 
-server.registerTool(/* … */);
+server.registerTool(/* ... */);
 
 withWaniwani(server);
 ```
 
-## What it does — without an API key
+## What it does, without an API key
 
 The wrapper still adds two genuinely useful things, even with no key configured:
 
 1. **Transport session-ID bridging.** When the MCP transport carries a session ID via the `Mcp-Session-Id` header but the request `_meta` doesn't include one, the wrapper copies it into `_meta.waniwani/sessionId` so flow nodes and downstream tools can see the correlation.
 2. **Widget definition metadata forwarding.** Widget keys declared on a tool's definition `_meta` (`openai/outputTemplate`, `ui/resourceUri`, etc.) are forwarded into each tool result's `_meta`, so chat UIs that only see results can still render widgets.
 
-Tracking calls silently no-op when no key is configured — no errors, no thrown exceptions. You can safely wrap your server unconditionally.
+Tracking calls silently no-op when no key is configured. No errors, no thrown exceptions. You can safely wrap your server unconditionally.
 
 ## When to use it
 
@@ -40,7 +40,7 @@ Tracking calls silently no-op when no key is configured — no errors, no thrown
 | Only run OSS flows, no telemetry | Optional (still useful for session bridging) |
 | OSS flows + hosted tracking (free tier) | Yes |
 | Hosted everything (flow state + tracking + funnel) | Yes |
-| Just custom event tracking via `waniwani().track()` | No — call `track()` directly |
+| Just custom event tracking via `waniwani().track()` | No, call `track()` directly |
 
 ## Options
 
@@ -83,7 +83,7 @@ withWaniwani(server, {
 </ResponseField>
 
 <Tip>
-  Call order does not matter. `withWaniwani` walks existing `_registeredTools` at call time and intercepts `registerTool` for any future registrations. It is idempotent — a second call on the same server is a no-op.
+  Call order does not matter. `withWaniwani` walks existing `_registeredTools` at call time and intercepts `registerTool` for any future registrations. It is idempotent: a second call on the same server is a no-op.
 </Tip>
 
 ## Tracked event shape

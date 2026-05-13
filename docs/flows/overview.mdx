@@ -79,24 +79,13 @@ Every tool call drives the engine until it hits one of three outcomes:
 
 Between those pause points, the engine auto-advances through action nodes (nodes that return a plain state update). No round-trip to the model. A single tool call can run several action nodes before hitting the next interrupt.
 
-State persists between calls in the flow store, keyed by the session id extracted from `_meta`. The default store is `WaniwaniFlowStore`, backed by the WaniWani API (reads `WANIWANI_API_KEY` and `WANIWANI_API_URL` from env). It works out of the box in serverless runtimes.
+State persists between calls in the flow store, keyed by the session id extracted from `_meta`. You pick the store at `.compile()` time. See [Persistence](/flows/kv-store) and [Tiers](/reference/tiers).
 
 ## Tool contract
 
-A compiled flow exposes a tool with this input shape:
+A compiled flow registers itself as a single MCP tool. The model calls it with `{ action: "start" | "continue", intent?, stateUpdates? }` and receives one of four response statuses: `interrupt`, `widget`, `complete`, or `error`. You don't usually parse responses yourself; the protocol is documented in the generated tool description so the model knows how to call it.
 
-```ts
-type FlowToolInput = {
-  action: "start" | "continue";
-  intent?: string; // required when action is "start"
-  stateUpdates?: Record<string, unknown>;
-};
-```
-
-- `start` begins a new run. `intent` is a short summary of why the user triggered the flow. `stateUpdates` can pre-fill any known fields so the engine auto-skips those questions.
-- `continue` resumes the current run with the user's latest answers in `stateUpdates`.
-
-Responses are JSON with `status: "interrupt" | "widget" | "complete" | "error"`. The protocol is documented inside the generated tool description, so the model knows how to call it. You do not parse responses yourself in normal usage.
+See [Flow tool contract](/reference/flow-tool-contract) for the full input/output schema.
 
 ## What to read next
 

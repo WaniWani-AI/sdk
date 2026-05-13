@@ -3,7 +3,7 @@ title: Migration
 description: "Upgrade paths for breaking and deprecated APIs across SDK versions."
 ---
 
-This page tracks API changes that require code updates, organized by the version that introduced them. Deprecations are safe to ignore short-term — the old shape keeps working until the removal version listed in the deprecation notice.
+This page tracks API changes that require code updates, organized by the version that introduced them. Deprecations are safe to ignore short-term. The old shape keeps working until the removal version listed in the deprecation notice.
 
 ## Deprecations at a glance
 
@@ -12,12 +12,12 @@ This page tracks API changes that require code updates, organized by the version
 | `.addNode(id, run, options?)` (positional) | Deprecated | 0.12.0 | 0.13.0 |
 
 <Tip>
-TypeScript will strike through deprecated signatures in your IDE — hover for the replacement.
+TypeScript will strike through deprecated signatures in your IDE. Hover for the replacement.
 </Tip>
 
 ---
 
-## 0.12.0 — `addNode` object form
+## 0.12.0: `addNode` object form
 
 The positional `.addNode(id, run, options?)` signature is deprecated in favor of an options-bag form. Metadata sits at the top of the call where the eye lands, the handler is a named field, and future options can be added without widening a positional signature.
 
@@ -52,11 +52,11 @@ flow.addNode({
 - `id` replaces the first positional argument.
 - `run` replaces the second positional argument (the handler).
 - `label` and `hideFromFunnel` move from the third `options` argument onto the same config object.
-- `label` is now optional — when omitted, it defaults to `id`. The positional form required `label` whenever you passed an `options` object.
+- `label` is now optional. When omitted, it defaults to `id`. The positional form required `label` whenever you passed an `options` object.
 
 ### Compatibility
 
-Both signatures are supported. The positional form is marked `@deprecated` and will be removed in **0.13.0**. You can mix the two within the same flow during the transition — there is no functional difference between the two shapes.
+Both signatures are supported. The positional form is marked `@deprecated` and will be removed in **0.13.0**. You can mix the two within the same flow during the transition. There is no functional difference between the two shapes.
 
 ### Type export
 

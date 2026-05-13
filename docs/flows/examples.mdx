@@ -282,10 +282,10 @@ FORMATTING: Write in flowing prose, not bullet points.`;
       displayBreed = parts.length > 0 ? `${parts.join(" & ")} Mix` : "Mixed breed";
     }
 
-    return showWidget(showPetSummaryTool, {
+    return showWidget("show_pet_summary", {
       field: "confirmed",
       description:
-        "You MUST now call the show_pet_summary tool with the pet data to display the summary card. Write a short, excited message first — something like 'Here's what I've got for [petName] — take a look!' Then immediately call show_pet_summary. The widget displays all the details, so do NOT repeat them in your text. After the widget renders, ask the user to confirm or let you know if anything needs fixing. If the user corrects anything, set confirmed to false and extract the correction. Only set confirmed to true when they explicitly say everything is correct.",
+        "You MUST now call the show_pet_summary tool with the pet data to display the summary card. Write a short, excited message first, something like 'Here's what I've got for [petName], take a look!' Then immediately call show_pet_summary. The widget displays all the details, so do NOT repeat them in your text. After the widget renders, ask the user to confirm or let you know if anything needs fixing. If the user corrects anything, set confirmed to false and extract the correction. Only set confirmed to true when they explicitly say everything is correct.",
       data: {
         animalType: state.animalType,
         petName: state.petName,
@@ -322,8 +322,8 @@ FORMATTING: Write in flowing prose, not bullet points.`;
 
     return {
       quoteId: quote.id,
-      ...showWidget(showPricingTool, {
-        description: `You MUST now call the show_pricing tool with the plans data to display the pricing cards. Write a brief intro — something like "Here are the plans available for [petName]!" Then immediately call show_pricing. COMPLIANCE: Do NOT recommend any plan. Only present factual differences. After the widget renders, let the user browse. If they want to adjust their deductible (options: 0, 250, 500, 750) or copay (options: 15%, 20%, 25%), set the new values and set pricingAction to "adjust". If they're happy, set pricingAction to "done".`,
+      ...showWidget("show_pricing", {
+        description: `You MUST now call the show_pricing tool with the plans data to display the pricing cards. Write a brief intro, something like "Here are the plans available for [petName]!" Then immediately call show_pricing. COMPLIANCE: Do NOT recommend any plan. Only present factual differences. After the widget renders, let the user browse. If they want to adjust their deductible (options: 0, 250, 500, 750) or copay (options: 15%, 20%, 25%), set the new values and set pricingAction to "adjust". If they're happy, set pricingAction to "done".`,
         data: {
           petName: state.petName,
           quoteId: quote.id,
@@ -357,65 +357,79 @@ FORMATTING: Write in flowing prose, not bullet points.`;
   .compile();
 ```
 
-## Display tools
+## Register the widget display tools
 
-These are the tools the flow uses to render widgets:
+`showWidget("show_pet_summary", ...)` and `showWidget("show_pricing", ...)` in the flow refer to tool IDs the model will call to render each widget. Register them directly on the MCP server alongside the flow:
 
 ```ts
-import { createTool } from "@waniwani/sdk/mcp";
 import { z } from "zod";
 
-export const showPetSummaryTool = createTool({
-  id: "show_pet_summary",
-  title: "Show Pet Summary",
-  description: "Displays a confirmation card with the pet's details.",
-  input: z.object({
-    animalType: z.enum(["dog", "cat"]),
-    petName: z.string(),
-    breed: z.string(),
-    gender: z.enum(["male", "female"]),
-    isNeutered: z.boolean(),
-    birthDate: z.string(),
-    indoorOutdoor: z.enum(["indoor", "outdoor"]).optional(),
-    municipality: z.string(),
+server.registerTool(
+  "show_pet_summary",
+  {
+    title: "Show Pet Summary",
+    description: "Displays a confirmation card with the pet's details.",
+    inputSchema: {
+      animalType: z.enum(["dog", "cat"]),
+      petName: z.string(),
+      breed: z.string(),
+      gender: z.enum(["male", "female"]),
+      isNeutered: z.boolean(),
+      birthDate: z.string(),
+      indoorOutdoor: z.enum(["indoor", "outdoor"]).optional(),
+      municipality: z.string(),
+    },
+    _meta: {
+      "openai/outputTemplate": "ui://widget/pet-summary",
+    },
+  },
+  async (input) => ({
+    content: [{ type: "text", text: `Pet summary for ${input.petName}` }],
+    structuredContent: input,
   }),
-  widget: "pet-summary",
-});
+);
 
-export const showPricingTool = createTool({
-  id: "show_pricing",
-  title: "Show Pricing Plans",
-  description: "Displays a scrollable grid of insurance plan cards.",
-  input: z.object({
-    petName: z.string(),
-    quoteId: z.string(),
-    plans: z.array(
-      z.object({
-        name: z.string(),
-        monthlyPrice: z.number(),
-        coverageLimit: z.number(),
-        deductible: z.number(),
-        copay: z.number(),
-        highlights: z.array(z.string()),
-      }),
-    ),
+server.registerTool(
+  "show_pricing",
+  {
+    title: "Show Pricing Plans",
+    description: "Displays a scrollable grid of insurance plan cards.",
+    inputSchema: {
+      petName: z.string(),
+      quoteId: z.string(),
+      plans: z.array(
+        z.object({
+          name: z.string(),
+          monthlyPrice: z.number(),
+          coverageLimit: z.number(),
+          deductible: z.number(),
+          copay: z.number(),
+          highlights: z.array(z.string()),
+        }),
+      ),
+    },
+    _meta: {
+      "openai/outputTemplate": "ui://widget/pricing",
+    },
+  },
+  async (input) => ({
+    content: [{ type: "text", text: `Pricing for ${input.petName}` }],
+    structuredContent: input,
   }),
-  widget: "pricing",
-});
+);
 ```
+
+The widget itself is wired through the tool's `_meta.openai/outputTemplate` (or the equivalent client-specific widget metadata). `withWaniwani(server)` will forward that metadata into every tool result so chat UIs render the widget automatically.
 
 ## Registration
 
 ```ts
 import { quoteFlow } from "./flows/quote";
-import { showPetSummaryTool, showPricingTool } from "./flows/display-tools";
 
 // Register the flow (compiles into a single MCP tool)
 await quoteFlow.register(server);
 
-// Register display tools (called by the flow to render widgets)
-await showPetSummaryTool.register(server);
-await showPricingTool.register(server);
+// Register the widget display tools above with server.registerTool(...).
 ```
 
 ## Key patterns explained
@@ -450,20 +464,20 @@ await showPricingTool.register(server);
   <Accordion title="How flows call widgets (the showWidget handoff)">
     Flows don't render widgets directly. Instead, `showWidget` creates a special interrupt that **instructs the LLM to call a separate display tool**. Here's the sequence:
 
-    1. The flow node calls `showWidget(showPricingTool, { description, data })` and pauses.
+    1. The flow node calls `showWidget("show_pricing", { description, data })` and pauses.
     2. The flow engine returns an interrupt to the LLM with the `description` you provided.
-    3. The LLM reads that description — which says "You MUST now call the `show_pricing` tool" — writes a short intro message, then calls the display tool.
+    3. The LLM reads that description (which says "You MUST now call the `show_pricing` tool"), writes a short intro message, then calls the display tool.
     4. The display tool renders the widget in the chat UI.
     5. After the user interacts with the widget, the LLM continues the flow with updated state.
 
-    The `description` is the key bridge — it's your instruction to the LLM about **what tool to call and how to frame it conversationally**. This is why it says things like "Write a brief intro, then immediately call show_pet_summary" rather than just describing what the widget does.
+    The `description` is the key bridge. It's your instruction to the LLM about **what tool to call and how to frame it conversationally**. This is why it says things like "Write a brief intro, then immediately call show_pet_summary" rather than just describing what the widget does.
 
     The `field` parameter tells the flow which state field the widget interaction resolves (e.g., `confirmed`). The `data` is passed directly to the widget component for rendering.
 
     ```ts
     // The flow pauses here and tells the LLM:
     // "Call show_pet_summary with this data"
-    return showWidget(showPetSummaryTool, {
+    return showWidget("show_pet_summary", {
       field: "confirmed",  // Which state field this resolves
       description: "You MUST now call the show_pet_summary tool...",
       data: { petName, breed, ... },  // Passed to the widget

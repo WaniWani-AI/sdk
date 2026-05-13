@@ -3,7 +3,7 @@ title: KV store adapters
 description: "Plug any key-value backend into createFlow via the KvStore interface."
 ---
 
-`createFlow` persists flow state through a tiny `KvStore` interface. Implement it against any key-value backend — Redis, Upstash, Cloudflare KV, DynamoDB, even a SQLite table. The SDK ships two implementations out of the box, and you can write your own in ~10 lines.
+`createFlow` persists flow state through a tiny `KvStore` interface. Implement it against any key-value backend: Redis, Upstash, Cloudflare KV, DynamoDB, even a SQLite table. The SDK ships two implementations out of the box, and you can write your own in ~10 lines.
 
 ## The interface
 
@@ -19,34 +19,23 @@ That's it. The engine handles serialization, session-key derivation, expiry sema
 
 ## Built-in implementations
 
-### `MemoryKvStore` (OSS)
-
-In-memory `Map`, no persistence. Good for development and tests.
+The SDK ships two implementations. Pick one or write your own (recipes below).
 
 ```ts
-import { MemoryKvStore } from "@waniwani/sdk/mcp";
+import { MemoryKvStore, WaniwaniKvStore } from "@waniwani/sdk/mcp";
 
-const flow = createFlow({ /* … */ }).compile({ store: new MemoryKvStore() });
+// In-memory Map, resets on restart. For development and tests.
+const flow = createFlow({ /* ... */ }).compile({ store: new MemoryKvStore() });
+
+// Hosted on app.waniwani.ai. Auto-selected when WANIWANI_API_KEY is set
+// and no explicit store is passed.
+const flow = createFlow({ /* ... */ }).compile(); // picks WaniwaniKvStore
+
+// Or instantiate it manually.
+const flow = createFlow({ /* ... */ }).compile({ store: new WaniwaniKvStore() });
 ```
 
-### `WaniwaniKvStore` (Free Tier)
-
-Persists against `app.waniwani.ai`. Selected automatically when `WANIWANI_API_KEY` is set and no explicit `store` is passed.
-
-```ts
-// env: WANIWANI_API_KEY=wwk_...
-const flow = createFlow({ /* … */ }).compile(); // ← no store, no fuss
-```
-
-You can also instantiate it manually if you want to keep flow state hosted while running other parts of the SDK offline:
-
-```ts
-import { WaniwaniKvStore } from "@waniwani/sdk/mcp";
-
-const flow = createFlow({ /* … */ }).compile({
-  store: new WaniwaniKvStore(),
-});
-```
+See [Tiers](/reference/tiers) for when each makes sense.
 
 ## Adapter recipes
 
@@ -118,7 +107,7 @@ export function cloudflareKvStore(ns: KVNamespace): KvStore {
 }
 
 // In your worker:
-const flow = createFlow({ /* … */ }).compile({
+const flow = createFlow({ /* ... */ }).compile({
   store: cloudflareKvStore(env.FLOW_STATE_KV),
 });
 ```
@@ -188,10 +177,10 @@ If your backend cannot guarantee encryption at rest, you can encrypt values your
 ```ts
 import type { KvStore } from "@waniwani/sdk/mcp";
 import { isEncryptedEnvelope } from "@waniwani/sdk/mcp";
-// (low-level helpers also exported: encryptValue, decryptValue — see src/mcp/server/kv/crypto.ts)
+// (low-level helpers also exported: encryptValue, decryptValue. See src/mcp/server/kv/crypto.ts)
 ```
 
-Or compose a wrapper around any adapter — the `KvStore` interface composes trivially.
+Or compose a wrapper around any adapter. The `KvStore` interface composes trivially.
 
 ## What gets stored
 

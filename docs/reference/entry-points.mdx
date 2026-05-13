@@ -1,0 +1,28 @@
+---
+title: SDK entry points
+description: "Which package path exports what."
+---
+
+The SDK is split into entry points so you only import what you need. The core flow engine ships zero runtime dependencies; the rest is opt-in.
+
+| Entry point | What you get | Requires API key? |
+|---|---|---|
+| `@waniwani/sdk` | `waniwani()` client, `defineConfig`, `WaniWaniError` | Yes |
+| `@waniwani/sdk/mcp` | `createFlow`, `StateGraph`, `START`, `END`, `KvStore`, `MemoryKvStore`, `WaniwaniKvStore`, `withWaniwani`, scoped client, tracking helpers | No (key unlocks hosted parts) |
+| `@waniwani/sdk/mcp/react` | `useWaniwani` standalone tracking hook | No |
+| `@waniwani/sdk/chat` | `ChatWidget`, `ChatBar`, `ChatCard`, `ChatEmbed`, themes, `embed.js`, `styles.css` | Yes |
+| `@waniwani/sdk/kb` | Knowledge-base client (`createKbClient`) | Yes |
+
+See [Tiers](/reference/tiers) for what "Requires API key" means in practice.
+
+## Bundle sizes
+
+- `@waniwani/sdk/mcp` core path: under 5 KB gzipped
+- `@waniwani/sdk/chat` (full widget bundle): ~650 KB (React included; tree-shakeable when you import individual layouts)
+- `@waniwani/sdk` client + tracking: ~10 KB gzipped
+
+## Peer dependencies
+
+- `@modelcontextprotocol/sdk` (required for server entry points)
+- `zod` (required for flow state schemas)
+- `react` (only required when using `@waniwani/sdk/chat` or `@waniwani/sdk/mcp/react`)

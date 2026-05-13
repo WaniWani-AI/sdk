@@ -1,0 +1,102 @@
+---
+title: Event schema
+description: "TrackEvent shape, the built-in event names, and the typed properties for each."
+---
+
+The full type-level reference for events sent via `wani.track()`. Usage recipes are in [Events](/tracking/events).
+
+## `TrackEvent`
+
+```ts
+import type { TrackInput } from "@waniwani/sdk";
+
+type TrackEvent = {
+  event: EventType;                     // required, one of the built-in names
+  properties?: Record<string, unknown>; // typed per event name
+  meta?: Record<string, unknown>;       // MCP request _meta
+  metadata?: Record<string, unknown>;   // free-form metadata on the envelope
+  sessionId?: string;                   // explicit override, usually omit
+  traceId?: string;
+  requestId?: string;
+  correlationId?: string;
+  externalUserId?: string;
+  eventId?: string;                     // supply your own id (idempotency)
+  timestamp?: string | Date;            // defaults to now
+  source?: string;                      // defaults to "@waniwani/sdk"
+};
+```
+
+<ResponseField name="event" type="EventType" required>
+  The event name. Must be one of the built-in `EventType` values listed below.
+</ResponseField>
+
+<ResponseField name="properties" type="Record<string, unknown>">
+  Event payload. For built-in events, the type is narrowed (for example, `quote.succeeded` expects `{ amount?: number; currency?: string }`).
+</ResponseField>
+
+<ResponseField name="meta" type="Record<string, unknown>">
+  MCP request metadata, typically `extra._meta` inside a tool handler. This is where the SDK reads the session id from. See [Sessions](/tracking/sessions).
+</ResponseField>
+
+<ResponseField name="sessionId" type="string">
+  Explicit session id override. Prefer passing `meta` instead.
+</ResponseField>
+
+<ResponseField name="externalUserId" type="string">
+  External user identifier. Equivalent to calling `identify()` inline. See [Identify](/tracking/identify).
+</ResponseField>
+
+<ResponseField name="eventId" type="string">
+  Client-generated id. If you omit it, the SDK generates `evt_<uuid>`. Supplying your own enables idempotent resends.
+</ResponseField>
+
+`track()` returns `{ eventId }` as soon as the envelope is enqueued, before the network request completes.
+
+## `EventType` union
+
+A closed union exported from `@waniwani/sdk`. Only these names are accepted by `track()`.
+
+| Event name | Typed properties | Notes |
+| --- | --- | --- |
+| `session.started` | none | Emitted by the WaniWani backend when it sees a new session id. Do not send it yourself. |
+| `tool.called` | `ToolCalledProperties` | Emitted automatically by `withWaniwani(server)`. Do not send it yourself. |
+| `quote.requested` | none | Top of a pricing funnel. |
+| `quote.succeeded` | `QuoteSucceededProperties` | A quote was produced. |
+| `quote.failed` | none | A quote could not be produced. |
+| `link.clicked` | `LinkClickedProperties` | An outbound link was followed. |
+| `purchase.completed` | `PurchaseCompletedProperties` | A purchase finished. |
+| `user.identified` | none | Prefer `client.identify()` over sending this directly. |
+
+## Typed property interfaces
+
+```ts
+import type {
+  ToolCalledProperties,
+  QuoteSucceededProperties,
+  LinkClickedProperties,
+  PurchaseCompletedProperties,
+} from "@waniwani/sdk";
+
+interface ToolCalledProperties {
+  name?: string;
+  type?: "pricing" | "product_info" | "availability" | "support" | "other";
+}
+
+interface QuoteSucceededProperties {
+  amount?: number;
+  currency?: string;
+}
+
+interface LinkClickedProperties {
+  url?: string;
+}
+
+interface PurchaseCompletedProperties {
+  amount?: number;
+  currency?: string;
+}
+```
+
+<Note>
+  The SDK also defines `widget_render`, `widget_click`, `widget_link_click`, `widget_error`, `widget_scroll`, `widget_form_field`, and `widget_form_submit` event types. These are emitted automatically by the widget runtime (`useWaniwani()` in a browser widget) and are not intended to be sent from server code.
+</Note>

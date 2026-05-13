@@ -37,7 +37,7 @@ export const leadGenFunnel = createFlow({
   title: "Lead Generation",
   description: "Use when a visitor expresses interest and we need to capture them as a lead. Collects email, role, and use case, then pushes to CRM.",
   state: {
-    email: z.string().describe("Work email — used to identify the lead"),
+    email: z.string().describe("Work email, used to identify the lead"),
     role: z.string().describe("Role at company (e.g. 'PM', 'Engineering Manager')"),
     useCase: z.string().describe("What they want to build or solve"),
     company: z.string().optional().describe("Company name, enriched from email domain"),
@@ -117,11 +117,11 @@ await leadGenFunnel.register(server);
 - **No form, no friction.** The user is already in ChatGPT or Claude. They never leave.
 - **The AI asks the questions in plain language.** Better completion rate than a form.
 - **Validation runs server-side.** If the email is malformed, the engine re-asks automatically.
-- **Enrichment happens silently.** `lookup_company` is an action node — no user interaction.
+- **Enrichment happens silently.** `lookup_company` is an action node, no user interaction.
 
 ## Add funnel analytics
 
-Set `WANIWANI_API_KEY` and every step is tracked. The funnel view shows three steps: **Ask for email → Ask role + use case → Push to CRM** (the labels are taken from each node's `label` field). `lookup_company` uses `hideFromFunnel: true` because enrichment is plumbing, not a step the user can drop off at. See [Tracking → Overview](/tracking/overview).
+Set `WANIWANI_API_KEY` and every step is tracked. The funnel view shows three steps: **Ask for email → Ask role + use case → Push to CRM** (the labels are taken from each node's `label` field). `lookup_company` uses `hideFromFunnel: true` because enrichment is plumbing, not a step the user can drop off at. See [Tracking / Overview](/tracking/overview).
 
 ## Next
 

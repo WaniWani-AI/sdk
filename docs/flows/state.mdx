@@ -3,7 +3,7 @@ title: State & Persistence
 description: "Typed fields collected by the flow, persisted via the pluggable KvStore interface."
 ---
 
-A flow has two things you control: a **state schema** (typed fields defined with Zod) and a **state store** (where those values live across calls). The store is the OSS-vs-free-tier inflection point — same code, three deployment modes.
+This page covers the state schema: the typed fields a flow collects. For where state lives across calls, see [Persistence](/flows/kv-store) and [Tiers](/reference/tiers).
 
 ## State schema
 
@@ -43,69 +43,6 @@ Inside a node:
 <Tip>
   Always add `.describe()` to every field. It is what the model reads when phrasing questions and deciding which values it can pre-fill. The most load-bearing piece of documentation your flow ships with.
 </Tip>
-
-## State persistence — three modes, same code
-
-`createFlow(...).compile()` needs to know where to persist flow state between MCP calls. You pick the backend.
-
-### Mode 1: In-memory (OSS, development)
-
-```ts
-import { createFlow, MemoryKvStore } from "@waniwani/sdk/mcp";
-
-const flow = createFlow({ /* … */ }).compile({
-  store: new MemoryKvStore(),
-});
-```
-
-State lives in a `Map` for the lifetime of the process. Lost on restart. Good for local development, unit tests, and anywhere you just want the engine to work.
-
-### Mode 2: Hosted (Free Tier)
-
-```ts
-// env: WANIWANI_API_KEY=wwk_...
-const flow = createFlow({ /* … */ }).compile(); // ← no store argument
-```
-
-With `WANIWANI_API_KEY` set, dropping the `store` argument auto-selects `WaniwaniKvStore`, which persists against `app.waniwani.ai`. State survives restarts, sessions show up in the dashboard, funnel views light up.
-
-### Mode 3: Self-hosted production (OSS)
-
-Implement the `KvStore` interface against your own backend. Anything with `get`/`set`/`delete` works.
-
-```ts
-import type { KvStore } from "@waniwani/sdk/mcp";
-import { Redis } from "@upstash/redis";
-
-const redis = new Redis({
-  url: process.env.UPSTASH_URL!,
-  token: process.env.UPSTASH_TOKEN!,
-});
-
-const upstashStore: KvStore = {
-  async get(key) { return redis.get(key); },
-  async set(key, value) { await redis.set(key, value); },
-  async delete(key) { await redis.del(key); },
-};
-
-const flow = createFlow({ /* … */ }).compile({ store: upstashStore });
-```
-
-See [KV store adapters](/flows/kv-store) for ready-made recipes (Redis, Upstash, Cloudflare KV, DynamoDB).
-
-### What happens if you misconfigure?
-
-`createFlow(...).compile()` with neither `{ store }` nor `WANIWANI_API_KEY` throws immediately at compile time:
-
-```
-Error: [waniwani] createFlow "...": no flow store configured.
-Pass { store } to .compile() — use MemoryKvStore from "@waniwani/sdk/mcp"
-for local development, or plug in a Redis/Upstash/Cloudflare KV adapter
-for production. Alternatively, set WANIWANI_API_KEY to use hosted flow
-state on app.waniwani.ai.
-```
-
-This is intentional — no silent fallback to a backend that doesn't exist in production.
 
 ## State is always partial
 

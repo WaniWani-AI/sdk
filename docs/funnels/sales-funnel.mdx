@@ -9,10 +9,10 @@ This page shows you how to **build a sales funnel MCP app** with `@waniwani/sdk`
 
 A sales funnel that:
 
-1. **Qualifies intent** — learn, evaluate, or buy
-2. **Captures lead info** — email, company, role, team size
-3. **Branches by stage** — different next steps for "evaluating" vs. "ready to buy"
-4. **Hands off to your CRM** — call your API in the last action node
+1. **Qualifies intent**: learn, evaluate, or buy
+2. **Captures lead info**: email, company, role, team size
+3. **Branches by stage**: different next steps for "evaluating" vs. "ready to buy"
+4. **Hands off to your CRM**: call your API in the last action node
 
 ## Flow graph
 
@@ -131,13 +131,13 @@ That's it. The funnel is now a tool the AI client can call. The engine runs the 
 
 ## Patterns this uses
 
-- **Conditional edges** — different paths by `intent`. See [Flows → Edges](/flows/edges).
-- **Multi-field interrupts** — capture several fields per turn. See [Flows → Interrupts](/flows/interrupts).
-- **Action nodes** — `push_to_crm` runs without user interaction. See [Flows → Nodes](/flows/nodes).
+- **Conditional edges.** Different paths by `intent`. See [Flows / Edges](/flows/edges).
+- **Multi-field interrupts.** Capture several fields per turn. See [Flows / Interrupts](/flows/interrupts).
+- **Action nodes.** `push_to_crm` runs without user interaction. See [Flows / Nodes](/flows/nodes).
 
 ## Add funnel analytics
 
-Set `WANIWANI_API_KEY` and every node visit is tracked. The dashboard shows step-by-step drop-off across `qualify_intent → capture_* → push_to_crm`. See [Tracking → Overview](/tracking/overview).
+Set `WANIWANI_API_KEY` and every node visit is tracked. The dashboard shows step-by-step drop-off across `qualify_intent → capture_* → push_to_crm`. See [Tracking / Overview](/tracking/overview).
 
 ## Next
 

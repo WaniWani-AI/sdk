@@ -23,11 +23,14 @@
             "group": "Get Started",
             "pages": [
               "introduction",
-              "quickstart"
+              "quickstart",
+              "configuration/installation",
+              "configuration/api-key",
+              "guides/tunnel"
             ]
           },
           {
-            "group": "Build MCP Funnels",
+            "group": "Build a funnel",
             "pages": [
               "funnels/overview",
               "funnels/sales-funnel",
@@ -37,32 +40,41 @@
             ]
           },
           {
-            "group": "Open Source — Flows",
+            "group": "Flow engine",
             "pages": [
               "flows/overview",
               "flows/nodes",
-              "flows/interrupts",
               "flows/edges",
+              "flows/interrupts",
               "flows/state",
-              "flows/kv-store",
               "flows/register",
-              "flows/self-hosting",
               "flows/examples"
             ]
           },
           {
-            "group": "Free Tier",
+            "group": "Persistence",
             "pages": [
-              "configuration/api-key",
+              "flows/kv-store",
+              "flows/self-hosting"
+            ]
+          },
+          {
+            "group": "Tracking & analytics",
+            "pages": [
               "tracking/overview",
               "tracking/events",
               "tracking/sessions",
-              "tracking/identify",
+              "tracking/identify"
+            ]
+          },
+          {
+            "group": "Knowledge base",
+            "pages": [
               "knowledge-base/overview"
             ]
           },
           {
-            "group": "Chat Widget",
+            "group": "Chat widget",
             "pages": [
               "chat/embed",
               "chat/react"
@@ -71,39 +83,39 @@
           {
             "group": "Configuration",
             "pages": [
-              "configuration/installation",
-              "configuration/environment-variables",
               "configuration/wrap-server",
+              "configuration/environment-variables",
               "configuration/security"
-            ]
-          },
-          {
-            "group": "Guides",
-            "pages": [
-              "guides/skills",
-              "guides/commands",
-              "guides/tunnel"
-            ]
-          },
-          {
-            "group": "Legacy",
-            "pages": [
-              "legacy/tools-resources",
-              "legacy/widget-hooks",
-              "legacy/chat-adapters",
-              "legacy/evals"
             ]
           },
           {
             "group": "Reference",
             "pages": [
+              "reference/tiers",
+              "reference/entry-points",
+              "reference/kv-store-api",
+              "reference/event-schema",
+              "reference/flow-tool-contract",
               "migration"
+            ]
+          },
+          {
+            "group": "Skills & commands",
+            "pages": [
+              "guides/skills",
+              "guides/commands"
             ]
           }
         ]
       }
     ]
   },
+  "redirects": [
+    { "source": "/legacy/tools-resources", "destination": "/reference/tiers" },
+    { "source": "/legacy/widget-hooks", "destination": "/reference/tiers" },
+    { "source": "/legacy/chat-adapters", "destination": "/chat/react" },
+    { "source": "/legacy/evals", "destination": "/reference/tiers" }
+  ],
   "navbar": {
     "links": [
       {

@@ -1,0 +1,44 @@
+---
+title: Flow tool contract
+description: "FlowToolInput shape and the response statuses a compiled flow emits."
+---
+
+A compiled flow registers itself as a single MCP tool. This page documents the wire contract between the model and that tool. You don't usually parse it yourself, but it's the reference if you're building tracing, replay, or test harnesses.
+
+## Input
+
+```ts
+type FlowToolInput = {
+  action: "start" | "continue";
+  intent?: string; // required when action is "start"
+  stateUpdates?: Record<string, unknown>;
+};
+```
+
+- `start` begins a new run. `intent` is a short summary of why the user triggered the flow. `stateUpdates` can pre-fill any known fields so the engine auto-skips those questions.
+- `continue` resumes the current run with the user's latest answers in `stateUpdates`.
+
+The full input schema lives in the generated tool description, so the model knows how to call it without docs.
+
+## Response statuses
+
+Every tool call drives the engine until it hits one of four outcomes:
+
+| Status | Meaning |
+|---|---|
+| `interrupt` | Pause and ask the user one or more questions. The response carries the question payload. |
+| `widget` | Pause and delegate rendering to a display tool. The response carries the widget reference. |
+| `complete` | The graph reached `END`. Server-side state is deleted. |
+| `error` | The handler threw or validation failed. The response carries an error message. |
+
+Between pause points, the engine auto-advances through action nodes (nodes that return a plain state update). No round-trip to the model. A single tool call can run several action nodes before hitting the next pause.
+
+## State persistence
+
+State persists between calls in the flow store, keyed by the session id extracted from `_meta`. Default behavior is described in [Tiers](/reference/tiers):
+
+- Without an explicit `store` and without `WANIWANI_API_KEY`, `.compile()` throws at compile time.
+- With an explicit `store: KvStore`, state lives wherever your adapter writes.
+- With `WANIWANI_API_KEY` and no explicit `store`, the SDK selects `WaniwaniKvStore` and state lives on `app.waniwani.ai`.
+
+See [State](/flows/state) for the state schema side of the contract, and [KV store adapters](/flows/kv-store) for backend options.

@@ -135,20 +135,6 @@ DEBUG=* bun run start 2>&1 | grep waniwani
 
 The only outbound calls the SDK makes are when the `waniwani()` client is instantiated with an API key, or when `WaniwaniKvStore`/`WaniwaniFlowStore` is used. Neither happens in self-hosted mode.
 
-## Upgrading to the Free Tier later
+## Want hosted dashboards or tracking later?
 
-If you want hosted dashboards, tracking, and the funnel view, you can opt in without rewriting anything:
-
-```diff
-- .compile({ store: flowStore });
-+ .compile(); // ← uses WaniwaniKvStore when WANIWANI_API_KEY is set
-```
-
-Add `WANIWANI_API_KEY=wwk_...` to your environment and redeploy. Your existing self-hosted flow state will not migrate automatically — sessions started before the switch stay in your KV backend, new sessions persist on `app.waniwani.ai`.
-
-To keep both — self-hosted state + free-tier tracking — keep the explicit `store: flowStore` and add `withWaniwani(server)`. Tracking calls fire to `app.waniwani.ai` while flow state stays in your backend.
-
-```ts
-withWaniwani(server);  // hosted tracking + funnel
-await onboardingFlow.register(server); // self-hosted flow state
-```
+See [Tiers / Upgrading later](/reference/tiers#upgrading-later). One env var flips the SDK from "self-hosted only" to "hosted state plus dashboards" without rewriting code.

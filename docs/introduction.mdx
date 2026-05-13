@@ -3,62 +3,31 @@ title: Introduction
 description: "Open-source SDK for MCP funnels. Build sales funnels, lead generation, booking, and quote flows on top of your MCP server."
 ---
 
-`@waniwani/sdk` is the MCP distribution SDK. Build **sales funnels**, **lead generation**, **booking flows**, **insurance quote flows**, and **pricing quote flows** on top of your MCP server — with multi-step conversations, event tracking, knowledge base, and embedded chat.
+`@waniwani/sdk` lets you build multi-step conversational funnels on top of any MCP server. A single MCP tool drives the conversation: it asks the next question, validates the answer, branches on state, and persists progress across calls. ChatGPT, Claude, and any other MCP-capable client become the front-end.
 
-It is split into two tiers so you only pay for what you use.
+## What people build with it
 
-## Open source — no API key
+<CardGroup cols={2}>
+  <Card title="Sales funnels" icon="filter" href="/funnels/sales-funnel">
+    Qualify intent, capture lead data, route to the right next step.
+  </Card>
+  <Card title="Lead generation" icon="user-plus" href="/funnels/lead-generation">
+    Collect email, role, and use case. Push to your CRM.
+  </Card>
+  <Card title="Booking flows" icon="calendar" href="/funnels/booking">
+    Pick a service, pick a slot, confirm. Branch on availability.
+  </Card>
+  <Card title="Insurance and pricing quotes" icon="shield" href="/funnels/insurance-quote">
+    Collect details, validate, return a quote with widget cards.
+  </Card>
+</CardGroup>
 
-The flow engine is fully open source. `createFlow` compiles a typed state graph into a single MCP tool that drives multi-turn conversations: pause on interrupts, branch on conditions, persist state across calls.
+## How it works
 
-State persistence is pluggable through the `KvStore` interface — start with `MemoryKvStore` for development, swap to Redis, Upstash, Cloudflare KV, or DynamoDB for production. **Nothing leaves your infrastructure unless you set an API key.**
+You declare a flow as a typed state graph. The graph compiles to one MCP tool that the model can call. The engine runs the graph, pauses to ask questions, branches on state, and resumes on the next tool call. Nothing in the model has to carry state between turns.
 
-```ts
-import { createFlow, MemoryKvStore, START, END } from "@waniwani/sdk/mcp";
+The flow engine is open source. Set `WANIWANI_API_KEY` to add hosted features (state, tracking, funnel analytics, knowledge base, chat widget). See [Tiers](/reference/tiers).
 
-const flow = createFlow({ /* … */ })
-  .addEdge(START, "ask_email")
-  // …
-  .compile({ store: new MemoryKvStore() });
-```
+## Next
 
-See [Flows → Overview](/flows/overview) to learn the engine.
-
-## Free tier — one env var, hosted features
-
-Set `WANIWANI_API_KEY` and the same code unlocks hosted features against `app.waniwani.ai`:
-
-- **Hosted flow state** — drop the `store` argument, state persists automatically
-- **Event tracking** — auto-tracked `tool.called` events with duration, status, input, output, session correlation
-- **Funnel analytics** — flow node visits surface in the dashboard funnel view
-- **Knowledge base** — ingest markdown files, search with embeddings
-- **Playground** — test your MCP server with a hosted chat agent
-
-Get a free key at [app.waniwani.ai](https://app.waniwani.ai). See [Free Tier → Get an API key](/configuration/api-key) for setup.
-
-## Picking your path
-
-| Goal | Use |
-|---|---|
-| Run flows locally with no telemetry, no third party | OSS only — pass a `KvStore` to `.compile()` |
-| Run flows in production with no telemetry | OSS only — implement a `KvStore` adapter (Redis, Upstash, CF KV) |
-| Run flows with hosted state and dashboards | Free tier — set `WANIWANI_API_KEY` |
-| Same code with mode-by-env-var | Pass nothing — without a key, in-memory; with a key, hosted (or self-host both modes) |
-
-## SDK entry points
-
-| Entry point | What you get | Tier |
-|---|---|---|
-| `@waniwani/sdk` | `waniwani()` client, `defineConfig`, `WaniWaniError` | Free tier |
-| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier |
-| `@waniwani/sdk/mcp/react` | `useWaniwani` standalone tracking hook (rest of this entry point is legacy) | OSS + Free tier |
-| `@waniwani/sdk/chat` | `ChatWidget`, layouts, themes, `embed.js`, `styles.css` | Free tier |
-| `@waniwani/sdk/kb` | Knowledge-base client | Free tier |
-
-## Legacy
-
-The SDK still ships `createTool`, `createResource`, `registerTools`, the Next.js/Express chat-server adapters, and the MCP-widget React hooks for back-compat with existing customer projects. They are marked `@deprecated` and not documented for new code. See [Legacy](/legacy/tools-resources) for migration notes.
-
-## Next step
-
-Head to the [Quickstart](/quickstart) to get a flow running in under 5 minutes.
+Head to the [Quickstart](/quickstart) to get a flow running in under 5 minutes, or jump straight into [building a funnel](/funnels/overview).

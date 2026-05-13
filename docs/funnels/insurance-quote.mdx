@@ -3,21 +3,21 @@ title: Build an insurance quote MCP
 description: "Build an insurance quote MCP: collect pet/vehicle/home details, validate, call your pricing API, return a quote with widget cards."
 ---
 
-This page shows you how to **build an insurance quote MCP** with `@waniwani/sdk`. The funnel collects what you need, validates it server-side, calls your pricing API, and shows the user a quote — all as one MCP tool inside ChatGPT, Claude, or any MCP client.
+This page shows you how to **build an insurance quote MCP** with `@waniwani/sdk`. The funnel collects what you need, validates it server-side, calls your pricing API, and shows the user a quote, all as one MCP tool inside ChatGPT, Claude, or any MCP client.
 
 ## Production example
 
 The most complete example in the docs is the **[Pet Insurance Quote flow](/flows/examples)**. It demonstrates every pattern an insurance quote funnel needs:
 
-- **Open-ended extraction** — one question pulls 5+ fields out of free-form text
-- **Conversational follow-ups** — ask the rest 1-2 at a time, not as a form
-- **Async validation** — breed and location validated against your API before quoting
-- **Conditional branching** — different paths for mixed breeds, indoor cats, etc.
-- **Confirmation widget** — show a summary card, let the user correct anything
-- **Correction loop** — corrections re-validate and re-display until the user confirms
-- **Pricing widget** — call the pricing API, render a grid of plan cards
-- **Adjustment loop** — user tweaks deductible/copay → recalculate → re-render
-- **Compliance rules in the description** — embedded "no recommendation" guardrails
+- **Open-ended extraction.** One question pulls 5+ fields out of free-form text.
+- **Conversational follow-ups.** Ask the rest 1-2 at a time, not as a form.
+- **Async validation.** Breed and location validated against your API before quoting.
+- **Conditional branching.** Different paths for mixed breeds, indoor cats, etc.
+- **Confirmation widget.** Show a summary card, let the user correct anything.
+- **Correction loop.** Corrections re-validate and re-display until the user confirms.
+- **Pricing widget.** Call the pricing API, render a grid of plan cards.
+- **Adjustment loop.** User tweaks deductible/copay, recalculate, re-render.
+- **Compliance rules in the description.** Embedded "no recommendation" guardrails.
 
 Open [the Pet Insurance Quote example](/flows/examples) for the full ~250-line code.
 
@@ -30,7 +30,7 @@ Open [the Pet Insurance Quote example](/flows/examples) for the full ~250-line c
 
 ## Skeleton for any quote vertical
 
-The pet insurance flow's shape works for **vehicle insurance**, **home insurance**, **business insurance**, and any vertical with the same shape: collect details → validate → quote → adjust.
+The pet insurance flow's shape works for **vehicle insurance**, **home insurance**, **business insurance**, and any vertical with the same shape: collect details, validate, quote, adjust.
 
 ```ts
 import { createFlow, START, END } from "@waniwani/sdk/mcp";
@@ -62,7 +62,7 @@ export const quoteFunnel = createFlow({
     run: ({ interrupt }) =>
       interrupt({
         make: {
-          question: "Tell me about your vehicle — make, model, year, and your postcode.",
+          question: "Tell me about your vehicle: make, model, year, and your postcode.",
           context: "Extract make, model, year, and postcode from the user's response.",
         },
       }),
@@ -81,7 +81,7 @@ export const quoteFunnel = createFlow({
     label: "Confirm details",
     run: ({ state, showWidget }) => {
       // see Pet Insurance Quote example for the showWidget pattern
-      return showWidget(/* … */);
+      return showWidget(/* ... */);
     },
   })
   .addNode({
@@ -89,10 +89,10 @@ export const quoteFunnel = createFlow({
     label: "Show pricing",
     run: async ({ state, showWidget }) => {
       // call pricing API, render widget
-      return { quoteId: "...", /* … */ };
+      return { quoteId: "...", /* ... */ };
     },
   })
-  // … edges and adjustment loop
+  // ... edges and adjustment loop
   .compile();
 ```
 
@@ -100,7 +100,7 @@ See the [full Pet Insurance Quote code](/flows/examples) for working versions of
 
 ## Add funnel analytics
 
-Set `WANIWANI_API_KEY` to track step-by-step drop-off across your quote funnel: `ask_vehicle → validate → show_confirmation → show_pricing`. The dashboard shows you where users abandon — typically at confirmation or at the price reveal. See [Tracking → Overview](/tracking/overview).
+Set `WANIWANI_API_KEY` to track step-by-step drop-off across your quote funnel: `ask_vehicle → validate → show_confirmation → show_pricing`. The dashboard shows you where users abandon, typically at confirmation or at the price reveal. See [Tracking / Overview](/tracking/overview).
 
 ## Next
 

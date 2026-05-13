@@ -1,0 +1,80 @@
+---
+title: Tiers
+description: "What the SDK does without an API key, and what unlocks when you set WANIWANI_API_KEY."
+---
+
+The SDK ships in two tiers. The same `createFlow` code runs in both. A single environment variable, `WANIWANI_API_KEY`, is the switch.
+
+## Without an API key (open source)
+
+The flow engine is fully open source. No telemetry, no outbound calls to `app.waniwani.ai`. Available out of the box:
+
+- `createFlow`, `StateGraph`, `START`, `END`, `redacted` from `@waniwani/sdk/mcp`
+- `KvStore` interface and `MemoryKvStore` for state persistence
+- `withWaniwani(server)` for transport session-id bridging and widget metadata forwarding (tracking silently no-ops without a key)
+- `useWaniwani()` browser hook in degrade-to-no-op mode (or bring-your-own endpoint)
+
+You must pass a `KvStore` to `.compile()` explicitly. `MemoryKvStore` is fine for development and tests; for production, plug in Redis, Upstash, Cloudflare KV, DynamoDB, or any other backend with `get`/`set`/`delete`. See [KV store adapters](/flows/kv-store).
+
+```ts
+import { createFlow, MemoryKvStore } from "@waniwani/sdk/mcp";
+
+const flow = createFlow({ /* ... */ }).compile({
+  store: new MemoryKvStore(),
+});
+```
+
+## With `WANIWANI_API_KEY` (free tier)
+
+Set the env var and the SDK unlocks hosted features against `app.waniwani.ai`:
+
+- **Hosted flow state.** Drop the `store` argument and `createFlow` selects `WaniwaniKvStore` automatically. State survives restarts and shows up in the dashboard.
+- **Event tracking.** `withWaniwani(server)` auto-emits `tool.called` events with duration, status, input, output, and session correlation.
+- **Funnel analytics.** Each node visit becomes a funnel step in the dashboard.
+- **Knowledge base.** Ingest markdown files, search with embeddings (`@waniwani/sdk/kb`).
+- **Chat widget.** Drop-in chat against your project (`@waniwani/sdk/chat`).
+- **Custom event tracking.** `waniwani().track()` for anything beyond `tool.called`.
+
+```ts
+// env: WANIWANI_API_KEY=wwk_...
+const flow = createFlow({ /* ... */ }).compile(); // hosted state, automatic
+```
+
+Get a free key at [app.waniwani.ai](https://app.waniwani.ai). See [API keys](/configuration/api-key) for setup.
+
+## What happens if you misconfigure
+
+`createFlow(...).compile()` with neither `{ store }` nor `WANIWANI_API_KEY` throws at compile time:
+
+```
+Error: [waniwani] createFlow "...": no flow store configured.
+Pass { store } to .compile(). Use MemoryKvStore from "@waniwani/sdk/mcp"
+for local development, or plug in a Redis/Upstash/Cloudflare KV adapter
+for production. Alternatively, set WANIWANI_API_KEY to use hosted flow
+state on app.waniwani.ai.
+```
+
+This is intentional. No silent fallback to a backend that doesn't exist in production.
+
+## Picking your path
+
+| Goal | Use |
+|---|---|
+| Run flows locally with no telemetry | OSS. Pass `MemoryKvStore` to `.compile()`. |
+| Run flows in production with no telemetry | OSS. Implement a `KvStore` adapter (Redis, Upstash, CF KV, DynamoDB). |
+| Run flows with hosted state and dashboards | Free tier. Set `WANIWANI_API_KEY`. |
+| Same code, switch by env var | Pass nothing. Without a key, throws at compile; with a key, hosted. |
+| Hosted tracking + funnel, self-hosted state | Free tier. Pass an explicit `store` and call `withWaniwani(server)`. |
+
+## Upgrading later
+
+Going from OSS to free tier is one line. Drop the `store` argument and set the env var:
+
+```diff
+- .compile({ store: flowStore });
++ .compile(); // uses WaniwaniKvStore when WANIWANI_API_KEY is set
+```
+
+Existing sessions stay where they started: pre-switch sessions continue reading from your KV backend, new sessions persist on `app.waniwani.ai`. There is no automatic migration.
+
+To keep self-hosted state and add hosted tracking on top, keep the explicit `store` and call `withWaniwani(server)`. Tracking fires to `app.waniwani.ai`; flow state stays in your backend.

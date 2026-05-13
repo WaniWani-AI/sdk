@@ -3,6 +3,10 @@ title: Sessions
 description: "How the SDK derives a session id from MCP _meta and attaches it to events."
 ---
 
+<Note>
+  Requires `WANIWANI_API_KEY`. See [Tiers](/reference/tiers) for what each tier unlocks.
+</Note>
+
 A session represents one conversation between a user and an MCP client. Events are grouped into a session by a `sessionId` that the SDK extracts from the MCP request metadata (`_meta`).
 
 You do not create sessions. You pass `meta: extra._meta` on every `track()` call, and the SDK does the correlation.

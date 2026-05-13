@@ -1,105 +1,15 @@
 ---
 title: Events
-description: "The TrackEvent shape, the built-in event names, and how to send them."
+description: "How to send custom events from your MCP server."
 ---
+
+<Note>
+  Requires `WANIWANI_API_KEY`. See [Tiers](/reference/tiers) for what each tier unlocks.
+</Note>
 
 An event is one call to `client.track()`. The SDK accepts a strongly typed `TrackEvent` shape and maps it to the canonical Events API V2 envelope before sending.
 
-## The `TrackInput` shape
-
-```ts
-import type { TrackInput } from "@waniwani/sdk";
-
-// TrackInput = TrackEvent | LegacyTrackEvent
-// Modern TrackEvent (preferred):
-type TrackEvent = {
-  event: EventType;                     // required, one of the built-in names
-  properties?: Record<string, unknown>; // typed per event name
-  meta?: Record<string, unknown>;       // MCP request _meta
-  metadata?: Record<string, unknown>;   // free-form metadata on the envelope
-  sessionId?: string;                   // explicit override, usually omit
-  traceId?: string;
-  requestId?: string;
-  correlationId?: string;
-  externalUserId?: string;
-  eventId?: string;                     // supply your own id (idempotency)
-  timestamp?: string | Date;            // defaults to now
-  source?: string;                      // defaults to "@waniwani/sdk"
-};
-```
-
-<ResponseField name="event" type="EventType" required>
-  The event name. Must be one of the built-in `EventType` values listed below.
-</ResponseField>
-
-<ResponseField name="properties" type="Record<string, unknown>">
-  Event payload. For built-in events, the type is narrowed (for example, `quote.succeeded` expects `{ amount?: number; currency?: string }`).
-</ResponseField>
-
-<ResponseField name="meta" type="Record<string, unknown>">
-  MCP request metadata, typically `extra._meta` inside a tool handler. This is where the SDK reads the session id from. See [Sessions](/tracking/sessions).
-</ResponseField>
-
-<ResponseField name="sessionId" type="string">
-  Explicit session id override. Prefer passing `meta` instead.
-</ResponseField>
-
-<ResponseField name="externalUserId" type="string">
-  External user identifier. Equivalent to calling `identify()` inline. See [Identify](/tracking/identify).
-</ResponseField>
-
-<ResponseField name="eventId" type="string">
-  Client-generated id. If you omit it, the SDK generates `evt_<uuid>`. Supplying your own enables idempotent resends.
-</ResponseField>
-
-`track()` returns `{ eventId }` as soon as the envelope is enqueued, before the network request completes.
-
-## Built-in event types
-
-`EventType` is a closed union exported from `@waniwani/sdk`. Only these names are accepted by `track()`.
-
-| Event name | Typed properties | Notes |
-| --- | --- | --- |
-| `session.started` | none | Emitted by the WaniWani backend when it sees a new session id. Do not send it yourself. |
-| `tool.called` | `ToolCalledProperties` | Emitted automatically by `withWaniwani(server)`. Do not send it yourself. |
-| `quote.requested` | none | Top of a pricing funnel. |
-| `quote.succeeded` | `QuoteSucceededProperties` | A quote was produced. |
-| `quote.failed` | none | A quote could not be produced. |
-| `link.clicked` | `LinkClickedProperties` | An outbound link was followed. |
-| `purchase.completed` | `PurchaseCompletedProperties` | A purchase finished. |
-| `user.identified` | none | Prefer `client.identify()` over sending this directly. |
-
-```ts
-import type {
-  ToolCalledProperties,
-  QuoteSucceededProperties,
-  LinkClickedProperties,
-  PurchaseCompletedProperties,
-} from "@waniwani/sdk";
-
-interface ToolCalledProperties {
-  name?: string;
-  type?: "pricing" | "product_info" | "availability" | "support" | "other";
-}
-
-interface QuoteSucceededProperties {
-  amount?: number;
-  currency?: string;
-}
-
-interface LinkClickedProperties {
-  url?: string;
-}
-
-interface PurchaseCompletedProperties {
-  amount?: number;
-  currency?: string;
-}
-```
-
-<Note>
-  The SDK also defines `widget_render`, `widget_click`, `widget_link_click`, `widget_error`, `widget_scroll`, `widget_form_field`, and `widget_form_submit` event types. These are emitted automatically by the widget runtime (`useWaniwani()` in a browser widget) and are not intended to be sent from server code.
-</Note>
+For the full type-level reference (the `TrackEvent` shape, the `EventType` union, all `*Properties` interfaces), see [Event schema](/reference/event-schema). This page is the usage guide.
 
 ## Recipes
 
@@ -151,7 +61,11 @@ const { eventId } = await wani.track({
 });
 ```
 
-`eventId` is stable and safe to log. It is assigned before the envelope leaves the process, so logging it tells you an event was accepted into the buffer, not that it reached the backend.
+`eventId` is stable and safe to log. It is assigned before the envelope leaves the process, so logging it tells you an event was accepted into the buffer, not that it reached the backend. `track()` returns as soon as the envelope is enqueued, before the network request completes.
+
+## Sessions and users
+
+Pass `meta: extra._meta` from inside a tool handler so the event is linked to the active MCP session. See [Sessions](/tracking/sessions). To attach a user identifier, pass `externalUserId` or call `client.identify()`. See [Identify](/tracking/identify).
 
 ## Flushing
 
@@ -166,7 +80,3 @@ Or stop the transport entirely:
 ```ts
 const { timedOut, pendingEvents } = await wani.shutdown({ timeoutMs: 5000 });
 ```
-
-<Note>
-  The SDK also accepts a legacy shape with `eventType`, `toolName`, `toolType`, `quoteAmount`, `quoteCurrency`, `linkUrl`, `purchaseAmount`, and `purchaseCurrency` fields. It is kept for backward compatibility with pre-V2 integrations. New code should use the modern `{ event, properties, meta }` shape shown above.
-</Note>

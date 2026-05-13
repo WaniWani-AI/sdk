@@ -1,147 +1,74 @@
 ---
 title: Quickstart
-description: "Run a flow in under 5 minutes. Open source by default, hosted features one env var away."
+description: "Boot a flow-driven MCP server in 60 seconds. No API key required."
 ---
 
-The same `createFlow` code runs in three modes. Start with mode 1 (OSS, no API key) and upgrade later — nothing changes except where state lives.
+A complete, runnable MCP server with one flow, in under 30 lines. No HTTP, no API key, no infrastructure. Runs over stdio so any MCP client can connect.
 
-<CardGroup cols={3}>
-  <Card title="Open source" icon="code" href="#mode-1-open-source-no-api-key">
-    Pure OSS, no telemetry, no third party. State in memory or your own KV.
+## 1. Install
+
+```bash
+bun add @waniwani/sdk @modelcontextprotocol/sdk zod
+```
+
+## 2. Write the server
+
+```ts hello.ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createFlow, END, MemoryKvStore, START } from "@waniwani/sdk/mcp";
+import { z } from "zod";
+
+const flow = createFlow({
+  id: "hello",
+  title: "Hello World",
+  description: "Say hello and ask a question.",
+  state: { name: z.string().describe("Your name") },
+})
+  .addNode("ask", ({ interrupt }) =>
+    interrupt({ name: { question: "What's your name?" } }),
+  )
+  .addNode("greet", ({ state }) => ({ greeted: true }))
+  .addEdge(START, "ask")
+  .addEdge("ask", "greet")
+  .addEdge("greet", END)
+  .compile({ store: new MemoryKvStore() });
+
+const server = new McpServer({ name: "hello-mcp", version: "1.0.0" });
+await flow.register(server);
+await server.connect(new StdioServerTransport());
+```
+
+## 3. Run it
+
+```bash
+bun run hello.ts
+```
+
+That's a complete MCP server with one flow-driven tool. Connect it to ChatGPT, Claude, or any MCP client over stdio.
+
+State lives in memory and resets on restart. Good for development. For production, swap `MemoryKvStore` for a real backend (see [KV store adapters](/flows/kv-store)) or set `WANIWANI_API_KEY` to use hosted state.
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="Build a funnel" icon="filter" href="/funnels/overview">
+    Sales funnels, lead gen, booking, quote flows.
   </Card>
-  <Card title="Free tier" icon="rocket" href="#mode-2-free-tier-with-api-key">
-    Drop the `store` argument, set `WANIWANI_API_KEY`, get hosted state + tracking + funnel.
+  <Card title="Flow engine" icon="diagram-project" href="/flows/overview">
+    Nodes, edges, interrupts, conditional branching.
   </Card>
-  <Card title="Self-hosted production" icon="server" href="#mode-3-self-hosted-production">
-    OSS code, swap `MemoryKvStore` for a Redis/Upstash/CF KV adapter.
+  <Card title="Tiers" icon="layer-group" href="/reference/tiers">
+    What the SDK does without a key, and what unlocks with one.
+  </Card>
+  <Card title="Self-hosting" icon="server" href="/flows/self-hosting">
+    Deploy the OSS path end-to-end.
   </Card>
 </CardGroup>
 
----
-
-## Mode 1: Open source (no API key)
-
-<Steps>
-  <Step title="Install the SDK">
-    ```bash
-    bun add @waniwani/sdk
-    ```
-  </Step>
-
-  <Step title="Write a flow">
-    ```ts flow.ts
-    import { createFlow, END, MemoryKvStore, START } from "@waniwani/sdk/mcp";
-    import { z } from "zod";
-
-    export const onboardingFlow = createFlow({
-      id: "onboarding",
-      title: "User Onboarding",
-      description: "Use when a new user wants to get started.",
-      state: {
-        email: z.string().describe("Work email"),
-        useCase: z.string().describe("What they want to build"),
-      },
-    })
-      .addNode("ask_email", () =>
-        interrupt({ email: { question: "What's your work email?" } }),
-      )
-      .addNode("ask_use_case", () =>
-        interrupt({
-          useCase: {
-            question: "What do you want to build?",
-            suggestions: ["Analytics", "Support", "Lead capture"],
-          },
-        }),
-      )
-      .addEdge(START, "ask_email")
-      .addEdge("ask_email", "ask_use_case")
-      .addEdge("ask_use_case", END)
-      .compile({ store: new MemoryKvStore() });
-    ```
-  </Step>
-
-  <Step title="Register with your MCP server">
-    ```ts
-    import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-    import { onboardingFlow } from "./flow";
-
-    const server = new McpServer({ name: "my-mcp", version: "0.0.1" });
-    await onboardingFlow.register(server);
-    ```
-  </Step>
-</Steps>
-
-State lives in memory and resets on restart. Fine for development and tests. For production self-hosting, see [Mode 3](#mode-3-self-hosted-production). For hosted state with zero infrastructure, see [Mode 2](#mode-2-free-tier-with-api-key).
-
----
-
-## Mode 2: Free tier (with API key)
-
-<Steps>
-  <Step title="Get a free API key">
-    1. Open [app.waniwani.ai/mcp](https://app.waniwani.ai/mcp) and sign in.
-    2. Create a project and copy the `wwk_...` key (shown only once).
-    3. Add to your environment:
-
-    ```bash .env
-    WANIWANI_API_KEY=wwk_...
-    ```
-  </Step>
-
-  <Step title="Drop the store argument">
-    ```diff
-    - .compile({ store: new MemoryKvStore() });
-    + .compile();
-    ```
-
-    With `WANIWANI_API_KEY` set, `createFlow` automatically uses `WaniwaniKvStore` — flow state persists on `app.waniwani.ai`, survives restarts, and shows up in your dashboard.
-  </Step>
-
-  <Step title="(Optional) Auto-track every tool">
-    One call wraps your server so every `tools/call` produces a `tool.called` event with duration, status, input/output, and session correlation.
-
-    ```ts
-    import { withWaniwani } from "@waniwani/sdk/mcp";
-
-    withWaniwani(server);
-    ```
-
-    Without an API key, `withWaniwani` still wraps tools but tracking is a silent no-op.
-  </Step>
-
-  <Step title="Verify">
-    Trigger any tool call, then open the [dashboard](https://app.waniwani.ai). Events appear within seconds.
-  </Step>
-</Steps>
-
----
-
-## Mode 3: Self-hosted production
-
-Use OSS only with a production-grade `KvStore` adapter — Redis, Upstash, Cloudflare KV, DynamoDB, anything with `get`/`set`/`delete`.
-
-```ts
-import { createFlow } from "@waniwani/sdk/mcp";
-import { Redis } from "@upstash/redis";
-
-const redis = new Redis({ url: process.env.UPSTASH_URL!, token: process.env.UPSTASH_TOKEN! });
-
-const upstashStore = {
-  async get(key: string) { return redis.get(key); },
-  async set(key: string, value: unknown) { await redis.set(key, value); },
-  async delete(key: string) { await redis.del(key); },
-};
-
-const flow = createFlow({ /* … */ }).compile({ store: upstashStore });
-```
-
-See [KV store adapters](/flows/kv-store) for ready-made recipes (Redis, Upstash, Cloudflare KV, DynamoDB).
-
----
-
 ## Starter template
 
-A ready-to-go project with the SDK pre-wired, including a sample flow and dev tunnel for ChatGPT/Claude:
+For a more complete project with chat widget, dev tunnel, and a sample funnel pre-wired:
 
 ```bash
 git clone https://github.com/WaniWani-AI/mcp-distribution-template.git my-mcp-server
@@ -149,22 +76,3 @@ cd my-mcp-server
 bun install
 bun dev
 ```
-
-The template ships in free-tier mode by default. To run OSS-only, replace the `WaniwaniKvStore` import with `MemoryKvStore` (or your own adapter) and drop the `WANIWANI_API_KEY` env var.
-
-## What's next
-
-<CardGroup cols={2}>
-  <Card title="Flow engine" icon="diagram-project" href="/flows/overview">
-    Nodes, edges, interrupts, conditional branching.
-  </Card>
-  <Card title="KV store adapters" icon="database" href="/flows/kv-store">
-    Redis, Upstash, Cloudflare KV, DynamoDB.
-  </Card>
-  <Card title="Self-hosting" icon="server" href="/flows/self-hosting">
-    Deploy the OSS path end-to-end.
-  </Card>
-  <Card title="Event tracking" icon="chart-line" href="/tracking/overview">
-    Custom events, sessions, user identify.
-  </Card>
-</CardGroup>
