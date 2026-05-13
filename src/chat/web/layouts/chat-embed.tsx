@@ -25,6 +25,7 @@ import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
+import { buildResourceEndpoint } from "../lib/resource-endpoint";
 import { cn } from "../lib/utils";
 import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
 import { Button } from "../ui/button";
@@ -71,6 +72,12 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			sessionId: engine.sessionId,
 			onCallTool: mcp?.onCallTool,
 		});
+
+		// Fall back to deriving the resource endpoint from `api` + the bearer
+		// token so callers (including the IIFE embed) get widget rendering
+		// without having to pass an `mcp` config. Mirrors ChatBar/ChatCard.
+		const resourceEndpoint =
+			mcp?.resourceEndpoint ?? buildResourceEndpoint(api, props.headers);
 
 		const animatedPlaceholder = useTypingPlaceholder(placeholder, !engine.text);
 
@@ -296,7 +303,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 							welcomeMessage={welcomeMessage}
 							welcome={welcome}
 							onSuggestionSelect={handleSuggestionSelect}
-							resourceEndpoint={mcp?.resourceEndpoint}
+							resourceEndpoint={resourceEndpoint}
 							chatSessionId={engine.sessionId}
 							isDark={isDark}
 							onFollowUp={handleWidgetMessage}
