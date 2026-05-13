@@ -28,9 +28,9 @@ const flow = createFlow({ /* ... */ }).compile({
 
 Set the env var and the SDK unlocks hosted features against `app.waniwani.ai`:
 
-- **Hosted flow state.** Drop the `store` argument and `createFlow` selects `WaniwaniKvStore` automatically. State survives restarts and shows up in the dashboard.
-- **Event tracking.** `withWaniwani(server)` auto-emits `tool.called` events with duration, status, input, output, and session correlation.
-- **Funnel analytics.** Each node visit becomes a funnel step in the dashboard.
+- **Hosted flow state.** Drop the `store` argument and `createFlow` selects `WaniwaniKvStore` automatically. State survives restarts, encrypted at rest, no infra to run. Powers the flow engine only, not dashboards.
+- **Event tracking.** `withWaniwani(server)` auto-emits `tool.called` events with duration, status, input, output, and session correlation. This is what feeds the dashboard.
+- **Funnel analytics.** Each tracked node visit becomes a funnel step in the dashboard. Driven by tracking events, independent of where flow state is stored.
 - **Knowledge base.** Ingest markdown files, search with embeddings (`@waniwani/sdk/kb`).
 - **Chat widget.** Drop-in chat against your project (`@waniwani/sdk/chat`).
 - **Custom event tracking.** `waniwani().track()` for anything beyond `tool.called`.
