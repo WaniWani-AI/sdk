@@ -141,7 +141,12 @@ function mountInline(
 		// When the parent uses an explicit `height`, the existing
 		// `height: 100%` chain already resolves correctly against its
 		// content box, so we leave the cap unset.
-		if (cs.maxHeight === "none") {
+		//
+		// Bail unless we get a concrete pixel value: percentages with an
+		// indefinite containing block come back as `"80%"`, which would
+		// otherwise be parsed as `80` pixels and severely shrink the chat.
+		// `max-height: inherit` on the host handles those cases natively.
+		if (!cs.maxHeight.endsWith("px")) {
 			host.style.removeProperty("max-height");
 			return;
 		}
@@ -160,6 +165,11 @@ function mountInline(
 		}
 		if (inner > 0) {
 			host.style.maxHeight = `${inner}px`;
+		} else {
+			// Padding + border exceed the parent's `max-height`. Clear any
+			// stale override so the host falls back to `max-height: inherit`
+			// rather than keeping a value from an earlier observation.
+			host.style.removeProperty("max-height");
 		}
 	};
 	syncMaxHeight();
