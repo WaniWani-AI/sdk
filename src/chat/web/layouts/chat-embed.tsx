@@ -138,6 +138,25 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			scrollToBottom("auto");
 		}, [scrollToBottom]);
 
+		// Keep the view pinned to the bottom when the scroll container resizes.
+		// The embed's host can settle asynchronously (ResizeObserver mirroring
+		// the parent's max-height runs after the first paint), which shrinks
+		// the scroll container and would otherwise leave scrollTop at 0 even
+		// though the initial mount effect already ran.
+		useEffect(() => {
+			const scroller = scrollRef.current;
+			if (!scroller || typeof ResizeObserver === "undefined") {
+				return;
+			}
+			const observer = new ResizeObserver(() => {
+				if (atBottomRef.current) {
+					scrollToBottom("auto");
+				}
+			});
+			observer.observe(scroller);
+			return () => observer.disconnect();
+		}, [scrollToBottom]);
+
 		const suggestionsState = useSuggestions({
 			messages: engine.messages,
 			status: engine.status,
