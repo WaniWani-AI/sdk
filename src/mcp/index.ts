@@ -12,6 +12,7 @@ export type {
 } from "./react/widgets/widget-client";
 // Flow framework
 export type {
+	AddNodeConfig,
 	ConditionFn,
 	FlowConfig,
 	FlowTestResult,

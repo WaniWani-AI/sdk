@@ -1,0 +1,75 @@
+---
+title: Migration
+description: "Upgrade paths for breaking and deprecated APIs across SDK versions."
+---
+
+This page tracks API changes that require code updates, organized by the version that introduced them. Deprecations are safe to ignore short-term — the old shape keeps working until the removal version listed in the deprecation notice.
+
+## Deprecations at a glance
+
+| API | Status | Since | Removed in |
+| --- | --- | --- | --- |
+| `.addNode(id, run, options?)` (positional) | Deprecated | 0.12.0 | 0.13.0 |
+
+<Tip>
+TypeScript will strike through deprecated signatures in your IDE — hover for the replacement.
+</Tip>
+
+---
+
+## 0.12.0 — `addNode` object form
+
+The positional `.addNode(id, run, options?)` signature is deprecated in favor of an options-bag form. Metadata sits at the top of the call where the eye lands, the handler is a named field, and future options can be added without widening a positional signature.
+
+### Before
+
+```ts
+flow
+  .addNode("ask_family_details", ({ interrupt }) => {
+    return interrupt({
+      partnerName: { question: "What is your partner's name?" },
+      numKids: { question: "How many children do you have?" },
+    });
+  }, { label: "Ask family details" });
+```
+
+### After
+
+```ts
+flow.addNode({
+  id: "ask_family_details",
+  label: "Ask family details",
+  run: ({ interrupt }) =>
+    interrupt({
+      partnerName: { question: "What is your partner's name?" },
+      numKids: { question: "How many children do you have?" },
+    }),
+});
+```
+
+### What changed
+
+- `id` replaces the first positional argument.
+- `run` replaces the second positional argument (the handler).
+- `label` and `hideFromFunnel` move from the third `options` argument onto the same config object.
+- `label` is now optional — when omitted, it defaults to `id`. The positional form required `label` whenever you passed an `options` object.
+
+### Compatibility
+
+Both signatures are supported. The positional form is marked `@deprecated` and will be removed in **0.13.0**. You can mix the two within the same flow during the transition — there is no functional difference between the two shapes.
+
+### Type export
+
+A new `AddNodeConfig<TState, TName>` type is exported from `@waniwani/sdk/mcp` if you need to type a config object outside the call site.
+
+```ts
+import type { AddNodeConfig } from "@waniwani/sdk/mcp";
+
+const askEmail: AddNodeConfig<MyState, "ask_email"> = {
+  id: "ask_email",
+  run: ({ interrupt }) =>
+    interrupt({ email: { question: "What's your email?" } }),
+};
+
+flow.addNode(askEmail);
+```

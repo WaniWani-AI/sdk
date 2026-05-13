@@ -70,6 +70,12 @@
               "flows/register",
               "flows/examples"
             ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "migration"
+            ]
           }
         ]
       }

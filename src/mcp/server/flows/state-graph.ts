@@ -1,4 +1,5 @@
 import type {
+	AddNodeConfig,
 	Edge,
 	FlowConfig,
 	NodeHandler,
@@ -39,8 +40,14 @@ function buildMermaidGraph(
  *   title: "User Onboarding",
  *   description: "Guides users through onboarding",
  * })
- *   .addNode("ask_name", ({ interrupt }) => interrupt({ question: "What's your name?", field: "name" }))
- *   .addNode("greet", ({ state }) => ({ greeting: `Hello ${state.name}!` }))
+ *   .addNode({
+ *     id: "ask_name",
+ *     run: ({ interrupt }) => interrupt({ question: "What's your name?", field: "name" }),
+ *   })
+ *   .addNode({
+ *     id: "greet",
+ *     run: ({ state }) => ({ greeting: `Hello ${state.name}!` }),
+ *   })
  *   .addEdge(START, "ask_name")
  *   .addEdge("ask_name", "greet")
  *   .addEdge("greet", END)
@@ -64,24 +71,58 @@ export class StateGraph<
 	 * Add a node with a handler.
 	 *
 	 * The handler receives a context object with `state`, `meta`, `interrupt`, and `showWidget`.
+	 *
+	 * @example
+	 * ```ts
+	 * .addNode({
+	 *   id: "ask_name",
+	 *   label: "Ask for name",
+	 *   run: ({ interrupt }) => interrupt({ question: "What's your name?", field: "name" }),
+	 * })
+	 * ```
+	 */
+	addNode<TName extends string>(
+		config: AddNodeConfig<TState, TName>,
+	): StateGraph<TState, TNodes | TName>;
+	/**
+	 * @deprecated Use the object form: `.addNode({ id, run, label? })`.
+	 * The positional form will be removed in v0.13.0
 	 */
 	addNode<TName extends string>(
 		name: TName,
 		handler: NodeHandler<TState>,
 		options?: NodeOptions,
+	): StateGraph<TState, TNodes | TName>;
+	addNode<TName extends string>(
+		configOrName: TName | AddNodeConfig<TState, TName>,
+		handler?: NodeHandler<TState>,
+		options?: NodeOptions,
 	): StateGraph<TState, TNodes | TName> {
-		if (name === START || name === END) {
+		const id =
+			typeof configOrName === "string" ? configOrName : configOrName.id;
+		const run =
+			typeof configOrName === "string"
+				? (handler as NodeHandler<TState>)
+				: configOrName.run;
+		const label =
+			typeof configOrName === "string" ? options?.label : configOrName.label;
+		const hideFromFunnel =
+			typeof configOrName === "string"
+				? options?.hideFromFunnel
+				: configOrName.hideFromFunnel;
+
+		if (id === START || id === END) {
 			throw new Error(
-				`"${name}" is a reserved name and cannot be used as a node name`,
+				`"${id}" is a reserved name and cannot be used as a node name`,
 			);
 		}
-		if (this.nodes.has(name)) {
-			throw new Error(`Node "${name}" already exists`);
+		if (this.nodes.has(id)) {
+			throw new Error(`Node "${id}" already exists`);
 		}
 
-		this.nodes.set(name, handler);
-		if (options) {
-			this.nodeOptions.set(name, options);
+		this.nodes.set(id, run);
+		if (label !== undefined || hideFromFunnel !== undefined) {
+			this.nodeOptions.set(id, { label: label ?? id, hideFromFunnel });
 		}
 		return this as unknown as StateGraph<TState, TNodes | TName>;
 	}
