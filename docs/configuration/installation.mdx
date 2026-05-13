@@ -7,10 +7,10 @@ description: "Install @waniwani/sdk and create a client."
 
 <CardGroup cols={2}>
   <Card title="Start from template" icon="rocket" href="#option-a-start-from-template">
-    Clone a ready-to-go MCP server with the SDK pre-configured. Best for **new projects**.
+    Clone a ready-to-go MCP app (server + widgets + UI) with the SDK pre-configured. Best for **new projects**.
   </Card>
   <Card title="Add to existing project" icon="plus" href="#option-b-add-to-existing-project">
-    Install the SDK package into your existing MCP server. Best for **existing projects**.
+    Install the SDK package into your existing MCP server or app. Best for **existing projects**.
   </Card>
 </CardGroup>
 
@@ -18,7 +18,11 @@ description: "Install @waniwani/sdk and create a client."
 
 ## Option A: Start from template
 
-The [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-template) gives you a production-ready MCP server with the SDK, event tracking, flows, and widgets already wired up.
+The [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-template) gives you a production-ready **MCP app** (server + widgets + UI) with the SDK, event tracking, flows, and widgets already wired up.
+
+<Note>
+  The template is an MCP app. If you only need a bare MCP server (no widgets or embedded UI), skip to [Option B](#option-b-add-to-existing-project) or follow the [Quickstart](/quickstart). The SDK works for both.
+</Note>
 
 <Steps>
   <Step title="Create your repo">

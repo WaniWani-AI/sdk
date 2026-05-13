@@ -87,12 +87,15 @@ createTool(
 Inside a flow node:
 
 ```ts
-.addNode("record", async ({ state, waniwani }) => {
-  await waniwani?.track({
-    event: "quote.succeeded",
-    properties: { amount: state.amount },
-  });
-  return {};
+.addNode({
+  id: "record",
+  run: async ({ state, waniwani }) => {
+    await waniwani?.track({
+      event: "quote.succeeded",
+      properties: { amount: state.amount },
+    });
+    return {};
+  },
 })
 ```
 

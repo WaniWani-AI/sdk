@@ -30,13 +30,16 @@ const flow = createFlow({
 Inside a node:
 
 ```ts
-.addNode("summarize", ({ state }) => {
-  // state is Partial<{
-  //   postalCode: string;
-  //   squareMeters: number;
-  //   heating: "gas" | "electric" | "oil" | "heat_pump";
-  // }>
-  return { summary: `${state.postalCode}, ${state.squareMeters}m2` };
+.addNode({
+  id: "summarize",
+  run: ({ state }) => {
+    // state is Partial<{
+    //   postalCode: string;
+    //   squareMeters: number;
+    //   heating: "gas" | "electric" | "oil" | "heat_pump";
+    // }>
+    return { summary: `${state.postalCode}, ${state.squareMeters}m2` };
+  },
 })
 ```
 
@@ -49,11 +52,14 @@ Inside a node:
 At any point during execution, only the fields filled by earlier nodes are populated. The engine types `ctx.state` as `Partial<TState>`, so always guard when reading fields.
 
 ```ts
-.addNode("review", ({ state }) => {
-  if (!state.email || !state.company) {
-    return {};
-  }
-  return { reviewed: true };
+.addNode({
+  id: "review",
+  run: ({ state }) => {
+    if (!state.email || !state.company) {
+      return {};
+    }
+    return { reviewed: true };
+  },
 })
 ```
 
@@ -101,12 +107,14 @@ state: {
 Interrupts target nested fields with dot-paths:
 
 ```ts
-.addNode("ask_driver", ({ interrupt }) =>
-  interrupt({
-    "driver.name": { question: "What's the driver's name?" },
-    "driver.licenseNumber": { question: "What's their license number?" },
-  }),
-)
+.addNode({
+  id: "ask_driver",
+  run: ({ interrupt }) =>
+    interrupt({
+      "driver.name": { question: "What's the driver's name?" },
+      "driver.licenseNumber": { question: "What's their license number?" },
+    }),
+})
 ```
 
 Action nodes that return nested objects are deep-merged, so returning `{ driver: { name: "John" } }` does not wipe `driver.licenseNumber`.

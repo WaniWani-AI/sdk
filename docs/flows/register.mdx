@@ -14,7 +14,7 @@ const onboardingFlow = createFlow({
   description: "Use when a new user wants to get started.",
   state: { /* ... */ },
 })
-  .addNode(/* ... */)
+  .addNode({ id: "...", run: () => ({}) })
   .addEdge(/* ... */)
   .compile();
 ```

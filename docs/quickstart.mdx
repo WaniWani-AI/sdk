@@ -25,10 +25,15 @@ const flow = createFlow({
   description: "Say hello and ask a question.",
   state: { name: z.string().describe("Your name") },
 })
-  .addNode("ask", ({ interrupt }) =>
-    interrupt({ name: { question: "What's your name?" } }),
-  )
-  .addNode("greet", ({ state }) => ({ greeted: true }))
+  .addNode({
+    id: "ask",
+    run: ({ interrupt }) =>
+      interrupt({ name: { question: "What's your name?" } }),
+  })
+  .addNode({
+    id: "greet",
+    run: ({ state }) => ({ greeted: true }),
+  })
   .addEdge(START, "ask")
   .addEdge("ask", "greet")
   .addEdge("greet", END)

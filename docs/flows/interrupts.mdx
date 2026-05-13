@@ -22,11 +22,13 @@ This has one operational consequence: if the server process restarts between the
 The smallest interrupt asks one question that writes its answer to one field.
 
 ```ts
-.addNode("ask_email", ({ interrupt }) =>
-  interrupt({
-    email: { question: "What's your work email?" },
-  }),
-)
+.addNode({
+  id: "ask_email",
+  run: ({ interrupt }) =>
+    interrupt({
+      email: { question: "What's your work email?" },
+    }),
+})
 ```
 
 The key (`email`) must be a field in the flow's state schema. TypeScript enforces this.
@@ -36,14 +38,16 @@ The key (`email`) must be a field in the flow's state schema. TypeScript enforce
 Pass `suggestions` to give the model a concrete list to offer. Pairs well with `z.enum()` state fields so the model validates the user's choice against a fixed set.
 
 ```ts
-.addNode("ask_level", ({ interrupt }) =>
-  interrupt({
-    level: {
-      question: "What's your ski level?",
-      suggestions: ["beginner", "intermediate", "advanced"],
-    },
-  }),
-)
+.addNode({
+  id: "ask_level",
+  run: ({ interrupt }) =>
+    interrupt({
+      level: {
+        question: "What's your ski level?",
+        suggestions: ["beginner", "intermediate", "advanced"],
+      },
+    }),
+})
 ```
 
 ## Hidden context
@@ -79,15 +83,17 @@ interrupt(
 A single interrupt can ask several questions at once. The model asks them in one conversational message and the user's answers arrive together.
 
 ```ts
-.addNode("ask_contact", ({ interrupt }) =>
-  interrupt(
-    {
-      name: { question: "What's your name?" },
-      email: { question: "What's your email?" },
-    },
-    { context: "Ask both in one natural message." },
-  ),
-)
+.addNode({
+  id: "ask_contact",
+  run: ({ interrupt }) =>
+    interrupt(
+      {
+        name: { question: "What's your name?" },
+        email: { question: "What's your email?" },
+      },
+      { context: "Ask both in one natural message." },
+    ),
+})
 ```
 
 If the user only answers some of the questions, the engine re-presents the interrupt with the unanswered ones filtered in. Validators run only once every field in the interrupt is filled.

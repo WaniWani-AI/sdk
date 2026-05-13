@@ -3,7 +3,7 @@ title: Nodes
 description: "Handlers that advance the flow: action, interrupt, or widget."
 ---
 
-A node is one step in a flow. You register it with `.addNode(name, handler)`. The handler receives a context object and returns one of three things:
+A node is one step in a flow. You register it with `.addNode({ id, run, label?, hideFromFunnel? })`. The `run` handler receives a context object and returns one of three things:
 
 1. A plain state update (action node).
 2. An interrupt signal (pause and ask).
@@ -12,10 +12,16 @@ A node is one step in a flow. You register it with `.addNode(name, handler)`. Th
 The return type determines what the engine does next.
 
 ```ts
-flow.addNode("ask_email", ({ interrupt }) =>
-  interrupt({ email: { question: "What is your work email?" } }),
-);
+flow.addNode({
+  id: "ask_email",
+  run: ({ interrupt }) =>
+    interrupt({ email: { question: "What is your work email?" } }),
+});
 ```
+
+<Tip>
+  An older positional form (`addNode(id, run, options?)`) is also accepted, but is deprecated. See [Migration / 0.12.0](/migration#0-12-0-addnode-object-form).
+</Tip>
 
 ## Node context
 
@@ -56,22 +62,28 @@ type NodeContext<TState> = {
 An action node returns a plain state update. The engine deep-merges the update into state and advances along the node's outgoing edge without pausing.
 
 ```ts
-.addNode("normalize_email", ({ state }) => {
-  if (!state.email) return {};
-  return { email: state.email.trim().toLowerCase() };
+.addNode({
+  id: "normalize_email",
+  run: ({ state }) => {
+    if (!state.email) return {};
+    return { email: state.email.trim().toLowerCase() };
+  },
 })
 ```
 
 Action nodes are where you put transformations, API calls, database writes, and analytics. Multiple action nodes in a row all run inside one tool call. The engine only pauses when a node returns an interrupt or widget signal.
 
 ```ts
-.addNode("check_stock", async ({ state, waniwani }) => {
-  const inStock = await stockService.check(state.sku);
-  await waniwani?.track({
-    event: "tool.called",
-    properties: { name: "check_stock", type: "other" },
-  });
-  return { inStock };
+.addNode({
+  id: "check_stock",
+  run: async ({ state, waniwani }) => {
+    const inStock = await stockService.check(state.sku);
+    await waniwani?.track({
+      event: "tool.called",
+      properties: { name: "check_stock", type: "other" },
+    });
+    return { inStock };
+  },
 })
 ```
 
@@ -80,14 +92,16 @@ Action nodes are where you put transformations, API calls, database writes, and 
 An interrupt node returns `interrupt(...)`. The engine stores the graph step, returns `status: "interrupt"` to the model, and waits for a `continue` call. When the user answers, the node's validators run (if any) and the engine advances.
 
 ```ts
-.addNode("ask_ski_level", ({ interrupt }) =>
-  interrupt({
-    level: {
-      question: "What's your ski level?",
-      suggestions: ["beginner", "intermediate", "advanced"],
-    },
-  }),
-)
+.addNode({
+  id: "ask_ski_level",
+  run: ({ interrupt }) =>
+    interrupt({
+      level: {
+        question: "What's your ski level?",
+        suggestions: ["beginner", "intermediate", "advanced"],
+      },
+    }),
+})
 ```
 
 See [Interrupts](/flows/interrupts) for multi-question interrupts, hidden context, validation, and re-ask on error.
@@ -97,16 +111,18 @@ See [Interrupts](/flows/interrupts) for multi-question interrupts, hidden contex
 A widget node returns `showWidget(tool, config)`. The engine returns `status: "widget"` pointing at a display tool (created with `createTool()`) and the flow pauses. When the user interacts, the host calls the flow back with `action: "continue"` and whatever values you want stored in `stateUpdates`.
 
 ```ts
-.addNode("show_pricing", ({ state, showWidget }) =>
-  showWidget(showPricingTool, {
-    data: {
-      postalCode: state.postalCode!,
-      sqm: Number(state.squareMeters),
-    },
-    description: "User must pick a plan.",
-    field: "selectedPlan",
-  }),
-)
+.addNode({
+  id: "show_pricing",
+  run: ({ state, showWidget }) =>
+    showWidget("show_pricing", {
+      data: {
+        postalCode: state.postalCode!,
+        sqm: Number(state.squareMeters),
+      },
+      description: "User must pick a plan.",
+      field: "selectedPlan",
+    }),
+})
 ```
 
 Setting `field` enables the same auto-skip behavior as interrupts: if `selectedPlan` is already filled when the flow reaches this node, the widget is skipped. Setting `interactive: false` makes the widget display-only and auto-advances after it renders.
@@ -120,12 +136,15 @@ Setting `field` enables the same auto-skip behavior as interrupts: if `selectedP
 Handlers can be sync or async. Most real handlers are async because they touch external services:
 
 ```ts
-.addNode("fetch_pricing", async ({ state }) => {
-  const prices = await pricingApi.quote({
-    postalCode: state.postalCode!,
-    size: state.squareMeters!,
-  });
-  return { prices };
+.addNode({
+  id: "fetch_pricing",
+  run: async ({ state }) => {
+    const prices = await pricingApi.quote({
+      postalCode: state.postalCode!,
+      size: state.squareMeters!,
+    });
+    return { prices };
+  },
 })
 ```
 

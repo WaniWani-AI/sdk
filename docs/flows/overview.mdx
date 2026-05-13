@@ -44,17 +44,21 @@ export const onboardingFlow = createFlow({
     useCase: z.string().describe("What they want to build"),
   },
 })
-  .addNode("ask_email", ({ interrupt }) =>
-    interrupt({ email: { question: "What is your work email?" } }),
-  )
-  .addNode("ask_use_case", ({ interrupt }) =>
-    interrupt({
-      useCase: {
-        question: "What do you want to build?",
-        suggestions: ["Analytics", "Support", "Lead capture"],
-      },
-    }),
-  )
+  .addNode({
+    id: "ask_email",
+    run: ({ interrupt }) =>
+      interrupt({ email: { question: "What is your work email?" } }),
+  })
+  .addNode({
+    id: "ask_use_case",
+    run: ({ interrupt }) =>
+      interrupt({
+        useCase: {
+          question: "What do you want to build?",
+          suggestions: ["Analytics", "Support", "Lead capture"],
+        },
+      }),
+  })
   .addEdge(START, "ask_email")
   .addEdge("ask_email", "ask_use_case")
   .addEdge("ask_use_case", END)

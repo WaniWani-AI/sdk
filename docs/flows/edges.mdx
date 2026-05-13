@@ -38,18 +38,25 @@ Use `.addConditionalEdge(from, condition)` when the next node depends on state. 
 
 ```ts
 flow
-  .addNode("ask_email", ({ interrupt }) =>
-    interrupt({ email: { question: "What's your email?" } }),
-  )
-  .addNode("analyze_email", ({ state }) => {
-    const domain = state.email?.split("@")[1] ?? "";
-    const generic = new Set(["gmail.com", "yahoo.com", "outlook.com"]);
-    return { isCompanyEmail: !generic.has(domain) };
+  .addNode({
+    id: "ask_email",
+    run: ({ interrupt }) =>
+      interrupt({ email: { question: "What's your email?" } }),
   })
-  .addNode("ask_company", ({ interrupt }) =>
-    interrupt({ companyName: { question: "What company are you with?" } }),
-  )
-  .addNode("done", () => ({ ready: true }))
+  .addNode({
+    id: "analyze_email",
+    run: ({ state }) => {
+      const domain = state.email?.split("@")[1] ?? "";
+      const generic = new Set(["gmail.com", "yahoo.com", "outlook.com"]);
+      return { isCompanyEmail: !generic.has(domain) };
+    },
+  })
+  .addNode({
+    id: "ask_company",
+    run: ({ interrupt }) =>
+      interrupt({ companyName: { question: "What company are you with?" } }),
+  })
+  .addNode({ id: "done", run: () => ({ ready: true }) })
   .addEdge(START, "ask_email")
   .addEdge("ask_email", "analyze_email")
   .addConditionalEdge("analyze_email", (state) =>
@@ -85,12 +92,17 @@ When execution reaches `END`, the engine returns `status: "complete"` to the mod
 A conditional edge that points back to an earlier node creates a loop. Useful for retries or collection gathering.
 
 ```ts
-.addNode("ask_item", ({ interrupt }) =>
-  interrupt({ item: { question: "Add an item (or say 'done')" } }),
-)
-.addNode("append", ({ state }) => ({
-  items: [...(state.items ?? []), state.item].filter(Boolean) as string[],
-}))
+.addNode({
+  id: "ask_item",
+  run: ({ interrupt }) =>
+    interrupt({ item: { question: "Add an item (or say 'done')" } }),
+})
+.addNode({
+  id: "append",
+  run: ({ state }) => ({
+    items: [...(state.items ?? []), state.item].filter(Boolean) as string[],
+  }),
+})
 .addEdge("ask_item", "append")
 .addConditionalEdge("append", (state) =>
   state.item === "done" ? "finalize" : "ask_item",

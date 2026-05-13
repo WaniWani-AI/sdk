@@ -159,11 +159,13 @@ DON'T: Sound sales-y. Be judgmental. Use walls of text. Be robotic.`,
 
   // ─── Node 1: Open-ended question ─────────────────────────────────────
   // One natural question → extract as many fields as possible from free-form text
-  .addNode("ask_about_pet", ({ interrupt }) => {
-    return interrupt({
-      petName: {
-        question: "Tell me about your pet!",
-        context: `Warmly greet the user and ask an OPEN-ENDED question. Something like:
+  .addNode({
+    id: "ask_about_pet",
+    run: ({ interrupt }) => {
+      return interrupt({
+        petName: {
+          question: "Tell me about your pet!",
+          context: `Warmly greet the user and ask an OPEN-ENDED question. Something like:
 "I'd love to help you explore insurance options! Tell me a bit about your pet - what kind of animal, their name, breed, age… anything you'd like to share :)"
 
 Do NOT list specific questions. Let the user share naturally.
@@ -175,13 +177,16 @@ From their response, extract as many fields as possible into stateUpdates:
 - isMixedBreed + mixedBreed if they mention a mix
 
 Only extract what is clearly stated. Do NOT guess missing fields.`,
-      },
-    });
+        },
+      });
+    },
   })
 
   // ─── Node 2: Conversational follow-ups ───────────────────────────────
   // Only ask what's still missing, 1-2 questions at a time
-  .addNode("ask_remaining_details", async ({ state, interrupt }) => {
+  .addNode({
+    id: "ask_remaining_details",
+    run: async ({ state, interrupt }) => {
     const breedList = await petApi.getBreedList(state.animalType);
 
     const sharedContext = `You're having a natural conversation, NOT filling out a form. Ask remaining questions ONE OR TWO at a time, weaving them in naturally. React to what the user shared previously with genuine interest before asking the next thing.
@@ -238,105 +243,120 @@ FORMATTING: Write in flowing prose, not bullet points.`;
       },
       { context: sharedContext },
     );
+    },
   })
 
   // ─── Node 3: Mixed breed - collect breed names ───────────────────────
-  .addNode("ask_mixed_breed_breeds", async ({ state, interrupt }) => {
-    if (!state.isMixedBreed || state.mixedBreed?.breed1) return {};
+  .addNode({
+    id: "ask_mixed_breed_breeds",
+    run: async ({ state, interrupt }) => {
+      if (!state.isMixedBreed || state.mixedBreed?.breed1) return {};
 
-    const breedList = await petApi.getBreedList(state.animalType);
+      const breedList = await petApi.getBreedList(state.animalType);
 
-    return interrupt({
-      "mixedBreed.breed1": {
-        question: "Which breeds is your dog a mix of?",
-        context: `Ask naturally: "Which breeds is ${state.petName} a mix of?" They must provide at least one, the second is optional.${breedList ? `\n\nValid breeds: ${breedList}. Match each to the closest official name.` : ""}`,
-        validate: async (breed1) => {
-          if (!breed1) return;
-          return petApi.validateMixedBreed(state.animalType!, {
-            ...state.mixedBreed,
-            breed1,
-          });
+      return interrupt({
+        "mixedBreed.breed1": {
+          question: "Which breeds is your dog a mix of?",
+          context: `Ask naturally: "Which breeds is ${state.petName} a mix of?" They must provide at least one, the second is optional.${breedList ? `\n\nValid breeds: ${breedList}. Match each to the closest official name.` : ""}`,
+          validate: async (breed1) => {
+            if (!breed1) return;
+            return petApi.validateMixedBreed(state.animalType!, {
+              ...state.mixedBreed,
+              breed1,
+            });
+          },
         },
-      },
-    });
+      });
+    },
   })
 
   // ─── Node 4: Validate breed + location against API ───────────────────
-  .addNode("validate_details", async ({ state }) => {
-    const [breedResult, locationResult] = await Promise.all([
-      state.isMixedBreed && state.mixedBreed
-        ? petApi.validateMixedBreed(state.animalType!, state.mixedBreed)
-        : petApi.validateBreed(state.animalType!, state.breed!),
-      petApi.validateLocation(state.municipality!),
-    ]);
+  .addNode({
+    id: "validate_details",
+    run: async ({ state }) => {
+      const [breedResult, locationResult] = await Promise.all([
+        state.isMixedBreed && state.mixedBreed
+          ? petApi.validateMixedBreed(state.animalType!, state.mixedBreed)
+          : petApi.validateBreed(state.animalType!, state.breed!),
+        petApi.validateLocation(state.municipality!),
+      ]);
 
-    return { ...breedResult, ...locationResult };
+      return { ...breedResult, ...locationResult };
+    },
   })
 
   // ─── Node 5: Show confirmation widget ────────────────────────────────
-  .addNode("show_confirmation", ({ state, showWidget }) => {
-    const mb = state.mixedBreed;
-    let displayBreed = state.breed ?? "";
-    if (mb) {
-      const parts = [mb.breed1, mb.breed2].filter(Boolean);
-      displayBreed = parts.length > 0 ? `${parts.join(" & ")} Mix` : "Mixed breed";
-    }
+  .addNode({
+    id: "show_confirmation",
+    run: ({ state, showWidget }) => {
+      const mb = state.mixedBreed;
+      let displayBreed = state.breed ?? "";
+      if (mb) {
+        const parts = [mb.breed1, mb.breed2].filter(Boolean);
+        displayBreed = parts.length > 0 ? `${parts.join(" & ")} Mix` : "Mixed breed";
+      }
 
-    return showWidget("show_pet_summary", {
-      field: "confirmed",
-      description:
-        "You MUST now call the show_pet_summary tool with the pet data to display the summary card. Write a short, excited message first, something like 'Here's what I've got for [petName], take a look!' Then immediately call show_pet_summary. The widget displays all the details, so do NOT repeat them in your text. After the widget renders, ask the user to confirm or let you know if anything needs fixing. If the user corrects anything, set confirmed to false and extract the correction. Only set confirmed to true when they explicitly say everything is correct.",
-      data: {
-        animalType: state.animalType,
-        petName: state.petName,
-        breed: displayBreed,
-        gender: state.gender,
-        isNeutered: state.isNeutered,
-        birthDate: state.birthDate,
-        indoorOutdoor: state.indoorOutdoor,
-        municipality: state.municipality,
-      },
-    });
+      return showWidget("show_pet_summary", {
+        field: "confirmed",
+        description:
+          "You MUST now call the show_pet_summary tool with the pet data to display the summary card. Write a short, excited message first, something like 'Here's what I've got for [petName], take a look!' Then immediately call show_pet_summary. The widget displays all the details, so do NOT repeat them in your text. After the widget renders, ask the user to confirm or let you know if anything needs fixing. If the user corrects anything, set confirmed to false and extract the correction. Only set confirmed to true when they explicitly say everything is correct.",
+        data: {
+          animalType: state.animalType,
+          petName: state.petName,
+          breed: displayBreed,
+          gender: state.gender,
+          isNeutered: state.isNeutered,
+          birthDate: state.birthDate,
+          indoorOutdoor: state.indoorOutdoor,
+          municipality: state.municipality,
+        },
+      });
+    },
   })
 
   // ─── Node 5b: Reset confirmed for correction loop ───────────────────
-  .addNode("fix_details", () => ({
-    confirmed: undefined,
-  }))
+  .addNode({
+    id: "fix_details",
+    run: () => ({ confirmed: undefined }),
+  })
 
   // ─── Node 6: Show pricing widget ────────────────────────────────────
-  .addNode("show_pricing", async ({ state, showWidget }) => {
-    const currentDeductible = state.deductible ?? 500;
-    const currentCopay = state.copay ?? 0.2;
+  .addNode({
+    id: "show_pricing",
+    run: async ({ state, showWidget }) => {
+      const currentDeductible = state.deductible ?? 500;
+      const currentCopay = state.copay ?? 0.2;
 
-    const quote = await petApi.getQuote({
-      animalType: state.animalType!,
-      breedId: state.breedId!,
-      birthDate: state.birthDate!,
-      gender: state.gender!,
-      neutered: !!state.isNeutered,
-      municipality: state.municipality!,
-      deductible: currentDeductible,
-      copay: currentCopay,
-    });
+      const quote = await petApi.getQuote({
+        animalType: state.animalType!,
+        breedId: state.breedId!,
+        birthDate: state.birthDate!,
+        gender: state.gender!,
+        neutered: !!state.isNeutered,
+        municipality: state.municipality!,
+        deductible: currentDeductible,
+        copay: currentCopay,
+      });
 
-    return {
-      quoteId: quote.id,
-      ...showWidget("show_pricing", {
-        description: `You MUST now call the show_pricing tool with the plans data to display the pricing cards. Write a brief intro, something like "Here are the plans available for [petName]!" Then immediately call show_pricing. COMPLIANCE: Do NOT recommend any plan. Only present factual differences. After the widget renders, let the user browse. If they want to adjust their deductible (options: 0, 250, 500, 750) or copay (options: 15%, 20%, 25%), set the new values and set pricingAction to "adjust". If they're happy, set pricingAction to "done".`,
-        data: {
-          petName: state.petName,
-          quoteId: quote.id,
-          plans: quote.plans,
-        },
-      }),
-    };
+      return {
+        quoteId: quote.id,
+        ...showWidget("show_pricing", {
+          description: `You MUST now call the show_pricing tool with the plans data to display the pricing cards. Write a brief intro, something like "Here are the plans available for [petName]!" Then immediately call show_pricing. COMPLIANCE: Do NOT recommend any plan. Only present factual differences. After the widget renders, let the user browse. If they want to adjust their deductible (options: 0, 250, 500, 750) or copay (options: 15%, 20%, 25%), set the new values and set pricingAction to "adjust". If they're happy, set pricingAction to "done".`,
+          data: {
+            petName: state.petName,
+            quoteId: quote.id,
+            plans: quote.plans,
+          },
+        }),
+      };
+    },
   })
 
   // ─── Node 6b: Reset pricingAction for adjustment loop ───────────────
-  .addNode("recalculate_pricing", () => ({
-    pricingAction: undefined as unknown as "adjust" | "done",
-  }))
+  .addNode({
+    id: "recalculate_pricing",
+    run: () => ({ pricingAction: undefined as unknown as "adjust" | "done" }),
+  })
 
   // ─── Edges ──────────────────────────────────────────────────────────
   .addEdge(START, "ask_about_pet")

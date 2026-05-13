@@ -77,11 +77,14 @@ When the server is wrapped with `withWaniwani()`, the scoped client on `context.
 
 ```ts
 // Inside a flow node
-.addNode("record_email", async ({ state, waniwani }) => {
-  if (state.email) {
-    await waniwani?.identify(state.email, { email: state.email });
-  }
-  return {};
+.addNode({
+  id: "record_email",
+  run: async ({ state, waniwani }) => {
+    if (state.email) {
+      await waniwani?.identify(state.email, { email: state.email });
+    }
+    return {};
+  },
 })
 ```
 
