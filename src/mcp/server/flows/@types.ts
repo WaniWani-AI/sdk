@@ -329,6 +329,23 @@ export type NodeOptions = {
 	hideFromFunnel?: boolean;
 };
 
+/**
+ * Config for the object form of `.addNode({ id, run, label?, hideFromFunnel? })`.
+ *
+ * Preferred over the positional form `.addNode(id, run, options?)` — metadata
+ * sits at the top where the eye lands, and the handler is a named field.
+ */
+export type AddNodeConfig<TState, TName extends string = string> = {
+	/** Unique node id within the flow. */
+	id: TName;
+	/** Node handler — receives ctx, returns state updates or a signal. */
+	run: NodeHandler<TState>;
+	/** Human-readable label for funnel visualization and graphs. Defaults to `id`. */
+	label?: string;
+	/** When true, this node is excluded from funnel analytics. */
+	hideFromFunnel?: boolean;
+};
+
 export type FlowGraphNode = {
 	id: string;
 	type: "widget" | "interrupt" | "action";

@@ -1,6 +1,7 @@
 // Flow framework — LangGraph-inspired multi-step flows for MCP tools
 
 export type {
+	AddNodeConfig,
 	ConditionFn,
 	FlowConfig,
 	InferFlowState,
