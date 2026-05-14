@@ -55,17 +55,21 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 
 		const theme = buildChatTheme(config);
 
+		const body: Record<string, unknown> = {};
+		if (config.mcpServerUrl) {
+			body.mcpServerUrl = config.mcpServerUrl;
+		}
+		if (config.channelId) {
+			body.channelId = config.channelId;
+		}
+
 		return (
 			<ChatEmbed
 				ref={chatRef}
 				api={config.api ?? ""}
 				headers={{ Authorization: `Bearer ${config.token}` }}
 				skipRemoteConfig
-				body={
-					config.mcpServerUrl
-						? { mcpServerUrl: config.mcpServerUrl }
-						: undefined
-				}
+				body={Object.keys(body).length > 0 ? body : undefined}
 				theme={theme}
 				title={config.title}
 				welcomeMessage={config.welcomeMessage}
@@ -74,6 +78,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 					config.suggestions ? { initial: config.suggestions } : undefined
 				}
 				enableThreadHistory={config.enableThreadHistory}
+				showToolCalls={config.showToolCalls}
 			/>
 		);
 	},

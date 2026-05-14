@@ -59,6 +59,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			title,
 			headerActions,
 			enableThreadHistory = false,
+			showToolCalls = true,
 		} = props;
 
 		const resolvedTheme = mergeTheme(userTheme);
@@ -355,6 +356,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 							onCallTool={handleCallTool}
 							fullscreenToolCallId={fullscreenToolCallId}
 							debug={debug}
+							showToolCalls={showToolCalls}
 							toolDefinitions={engine.toolDefinitions}
 							onWidgetDisplayModeChange={(mode, widget) => {
 								setFullscreenToolCallId(

@@ -52,6 +52,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			api,
 			debug,
 			enableThreadHistory = false,
+			showToolCalls = true,
 		} = props;
 
 		const effectiveApi = api ?? "/api/waniwani";
@@ -248,6 +249,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 							onCallTool={handleCallTool}
 							fullscreenToolCallId={fullscreenToolCallId}
 							debug={effectiveDebug}
+							showToolCalls={showToolCalls}
 							toolDefinitions={engine.toolDefinitions}
 							onWidgetDisplayModeChange={(mode, widget) => {
 								setFullscreenToolCallId(

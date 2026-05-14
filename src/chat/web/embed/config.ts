@@ -21,6 +21,22 @@ export interface EmbedConfig {
 	token: string;
 	/** Override MCP server URL (optional — resolved from environment by default). */
 	mcpServerUrl?: string;
+	/**
+	 * Agent channel ID. Sent to the chat API so the WaniWani app routes the
+	 * conversation to the right agent. Surfaced as `data-channel-id` on the
+	 * embed script tag.
+	 */
+	channelId?: string;
+	/**
+	 * Show tool call details (request/response panels) in the chat.
+	 *
+	 * When `false`, each tool call still renders a compact indicator so the
+	 * user can tell the agent is doing something, but the JSON request and
+	 * response panels are hidden. Defaults to `true`.
+	 *
+	 * Surfaced as `data-show-tool-calls` on the embed script tag.
+	 */
+	showToolCalls?: boolean;
 	/** Title shown in the chat header. Defaults to `"Assistant"`. */
 	title?: string;
 	/** Welcome message shown before the first user message. */
@@ -134,6 +150,16 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const mcpServerUrl = str("data-mcp-server-url");
 	if (mcpServerUrl) {
 		config.mcpServerUrl = mcpServerUrl;
+	}
+
+	const channelId = str("data-channel-id");
+	if (channelId) {
+		config.channelId = channelId;
+	}
+
+	const showToolCalls = bool("data-show-tool-calls");
+	if (showToolCalls !== undefined) {
+		config.showToolCalls = showToolCalls;
 	}
 
 	const css = str("data-css");
