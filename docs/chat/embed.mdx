@@ -13,7 +13,9 @@ The embed mounts **inline** wherever you place a `<div data-waniwani-embed></div
 
 ## Quick start
 
-Two pieces: a mount point and the script tag.
+The fastest path is to copy the pre-generated snippet from your project page on [app.waniwani.ai](https://app.waniwani.ai). It already has your token wired up.
+
+If you want to write it yourself, you need two pieces: a mount point and the script tag.
 
 ```html
 <!-- Where the chat appears, sized by your CSS -->
@@ -21,7 +23,7 @@ Two pieces: a mount point and the script tag.
 
 <!-- Load the embed. Auto-initializes when `data-token` is set. -->
 <script
-  src="https://cdn.waniwani.ai/embed.js"
+  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
   data-token="wwp_..."
   data-title="Assistant"
   data-welcome-message="How can I help?"
@@ -32,6 +34,10 @@ Two pieces: a mount point and the script tag.
 
 That's it. The chat mounts inside your marker div via Shadow DOM (so its styles never leak into your page).
 
+<Tip>
+For production, pin a version instead of `@latest`: `@waniwani/sdk@0.11.12/dist/chat/embed.js`. The latest tag is convenient during setup but exposes you to surprise upgrades.
+</Tip>
+
 ## Programmatic init
 
 Drop the `data-token` attribute and call `init()` manually if you need to compute config at runtime:
@@ -39,7 +45,7 @@ Drop the `data-token` attribute and call `init()` manually if you need to comput
 ```html
 <div data-waniwani-embed></div>
 
-<script src="https://cdn.waniwani.ai/embed.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js" defer></script>
 <script>
   window.addEventListener("DOMContentLoaded", () => {
     window.WaniWani.chat.init({
