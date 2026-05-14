@@ -10,10 +10,9 @@ This page walks through one full round-trip. If you understand the picture below
 ## The pieces
 
 ```mermaid
-flowchart TB
+flowchart LR
     Client["MCP client<br/>(ChatGPT, Claude, ...)"]
     subgraph Server["Your MCP server"]
-      direction LR
       Tool["Flow tool"]
       KV[("KV store")]
       Tool <-->|loads / saves| KV

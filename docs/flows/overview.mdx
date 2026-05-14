@@ -23,7 +23,7 @@ Most apps people build with flows are funnels: a sales funnel, a lead generation
 
 If you're building an MCP funnel, you're building a flow. The rest of this page is the graph engine that powers it.
 
-Flows exist because MCP tools are stateless. Anything longer than a single-shot Q&A (onboarding, quoting, qualification, triage, lead capture, booking) otherwise becomes a hand-rolled state machine serialized through the model.
+Flows exist because multi-step conversations need explicit state. Whether your MCP server runs as a long-running process or a serverless function, anything longer than a single-shot Q&A (onboarding, quoting, qualification, triage, lead capture, booking) otherwise becomes a hand-rolled state machine serialized through the model.
 
 ## What you declare
 
@@ -36,7 +36,7 @@ You call `.compile()` on the graph to get a `RegisteredFlow`, then register it o
 ## Minimal flow
 
 ```ts
-import { createFlow, END, START } from "@waniwani/sdk/mcp";
+import { createFlow, END, MemoryKvStore, START } from "@waniwani/sdk/mcp";
 import { z } from "zod";
 
 export const onboardingFlow = createFlow({
@@ -66,8 +66,10 @@ export const onboardingFlow = createFlow({
   .addEdge(START, "ask_email")
   .addEdge("ask_email", "ask_use_case")
   .addEdge("ask_use_case", END)
-  .compile();
+  .compile({ store: new MemoryKvStore() });
 ```
+
+`MemoryKvStore` is fine for development and tests. For production, plug in a real backend (Redis, Upstash, Cloudflare KV, DynamoDB) or set `WANIWANI_API_KEY` to use hosted state. See [KV store adapters](/flows/kv-store).
 
 Register it on your server:
 
@@ -98,6 +100,9 @@ See [Flow tool contract](/reference/flow-tool-contract) for the full input/outpu
 ## What to read next
 
 <CardGroup cols={2}>
+  <Card title="Architecture" icon="diagram-project" href="/flows/architecture">
+    How a tool call drives the engine, and why the KV store is required.
+  </Card>
   <Card title="State" icon="database" href="/flows/state">
     Declare the fields the flow collects. Type inference flows from here.
   </Card>
