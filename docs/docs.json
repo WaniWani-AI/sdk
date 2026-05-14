@@ -27,10 +27,17 @@
             "group": "Get Started",
             "pages": [
               "introduction",
+              "why-mcp-funnels",
               "quickstart",
               "configuration/installation",
               "configuration/api-key",
               "guides/tunnel"
+            ]
+          },
+          {
+            "group": "Compare",
+            "pages": [
+              "compare/vs-langgraph"
             ]
           },
           {

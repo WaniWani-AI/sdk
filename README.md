@@ -3,147 +3,114 @@
 [![npm](https://img.shields.io/npm/v/@waniwani/sdk.svg)](https://www.npmjs.com/package/@waniwani/sdk)
 [![license](https://img.shields.io/npm/l/@waniwani/sdk.svg)](./LICENSE)
 
-> Open-source SDK for MCP funnels. Build sales funnels, lead generation, booking, insurance quote, and pricing quote flows on top of your MCP server. Free hosted tier for analytics, knowledge base, and chat.
+> Open-source SDK for building **MCP funnels**: sales funnels, lead generation, booking, and quote flows that run as a single MCP tool inside ChatGPT, Claude, Cursor, and any MCP-capable client.
 
-`@waniwani/sdk` turns your MCP server into a distribution surface. Build:
+An **MCP funnel** is a multi-step conversation, hosted on your MCP server, that drives a user or agent from intent to outcome (a qualified lead, a booking, a quote, a purchase). One typed state graph compiles to one MCP tool. MIT licensed, bring your own store, optional hosted tier.
 
-- **Sales funnels and lead generation** — qualify leads, capture intent, route to the right step. Multi-step conversations compiled into a single MCP tool.
-- **Booking and reservation flows** — collect what you need, branch on conditions, confirm.
-- **Quote flows** (insurance, pricing, custom) — gather inputs, call your pricing API, return a quote, optionally render a widget.
-- **Knowledge base and embedded chat** — ground answers in your docs, ship a chat widget for your site.
+## Why this exists
 
-The SDK is split into two tiers:
+- **ChatGPT, Claude, and Cursor are the new browsers. MCP is the store.** One edit to your messaging deploys to every MCP-capable client and your own site.
+- **Conversational funnels are the new web forms.** They are where money will be made in the AI-distribution era. Recreating a real funnel inside MCP is harder than it looks.
+- **LLMs are not built to replicate forms.** Left to themselves, they rush through structured collection: they skip fields, paraphrase questions, and break validation. A real funnel needs deterministic order, typed fields, validation, branching, and resumable state across tool calls.
+- **Generic agent builders are not shaped for funnels.** LangChain and LangGraph are general-purpose. They expose every primitive, leaving you to re-invent funnel ergonomics (interrupts, re-ask on error, auto-skip pre-filled fields, widget cards, deterministic step order) on every project.
+- **`createFlow` is the missing abstraction.** A typed state graph (Zod-typed state, named nodes, direct and conditional edges, interrupts, widget signals) compiles to a single MCP tool. Funnel-shaped by design, not by convention.
+- **Production-validated.** Forked out of internal distribution MCPs we shipped for paying customers (insurance quoting, pet care, lead capture, booking). Open-sourced once we hit the same pattern enough times.
 
-- **Open source** — `createFlow` and the `KvStore` interface. LangGraph-inspired multi-step conversations, compiled into a single MCP tool. No API key needed. Plug in any state backend (in-memory, Redis, Upstash, Cloudflare KV) — or run pure self-hosted.
-- **Free tier** — add `WANIWANI_API_KEY` for hosted flow state, event tracking, funnel analytics, knowledge base, and a local playground. One env var. Same code.
+## What you can build today
 
-A separate [legacy section](#legacy) holds APIs we still ship for back-compat (`createTool`, `createResource`, chat-server adapters, MCP-widget React hooks) but no longer document for new code.
+- **[Sales funnel MCP](https://docs.waniwani.ai/guides/sales-funnel)**. Qualify intent, capture lead data, branch on stage, push to CRM.
+- **[Lead generation MCP](https://docs.waniwani.ai/guides/lead-generation)**. Collect email, role, use case. Webhook to your CRM.
+- **[Booking MCP](https://docs.waniwani.ai/guides/booking)**. Pick a service, check availability, pick a slot, confirm.
+- **[Insurance or pricing quote MCP](https://docs.waniwani.ai/guides/insurance-quote)**. Collect details, validate, call your pricing API, return widget cards.
 
-> **Status:** pre-alpha. APIs may change between releases. Pin versions in production.
+Any other multi-step MCP tool where order, validation, and resumability matter.
 
-## Quick start — open source (no API key)
+## 30-second example
 
 ```bash
-bun add @waniwani/sdk
+bun add @waniwani/sdk @modelcontextprotocol/sdk zod
 ```
 
 ```ts
-// flow.ts
+// hello.ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createFlow, END, MemoryKvStore, START } from "@waniwani/sdk/mcp";
 import { z } from "zod";
 
-export const onboardingFlow = createFlow({
-  id: "onboarding",
-  title: "User Onboarding",
-  description: "Use when a new user wants to get started.",
-  state: {
-    email: z.string().describe("Work email"),
-    useCase: z.string().describe("What they want to build"),
-  },
+const flow = createFlow({
+  id: "hello",
+  title: "Hello World",
+  description: "Say hello and ask a question.",
+  state: { name: z.string().describe("Your name") },
 })
-  .addNode("ask_email", () =>
-    interrupt({ email: { question: "What's your work email?" } }),
-  )
-  .addNode("ask_use_case", () =>
-    interrupt({
-      useCase: {
-        question: "What do you want to build?",
-        suggestions: ["Analytics", "Support", "Lead capture"],
-      },
-    }),
-  )
-  .addEdge(START, "ask_email")
-  .addEdge("ask_email", "ask_use_case")
-  .addEdge("ask_use_case", END)
+  .addNode({
+    id: "ask",
+    run: ({ interrupt }) =>
+      interrupt({ name: { question: "What's your name?" } }),
+  })
+  .addNode({
+    id: "greet",
+    run: () => ({ greeted: true }),
+  })
+  .addEdge(START, "ask")
+  .addEdge("ask", "greet")
+  .addEdge("greet", END)
   .compile({ store: new MemoryKvStore() });
 
-await onboardingFlow.register(server);
+const server = new McpServer({ name: "hello-mcp", version: "1.0.0" });
+await flow.register(server);
+await server.connect(new StdioServerTransport());
 ```
-
-`MemoryKvStore` is fine for local dev and tests. For self-hosted production, implement the [`KvStore`](src/mcp/server/kv/kv-store.ts) interface against Redis, Upstash, Cloudflare KV, DynamoDB — anything with `get` / `set` / `delete`.
-
-## Quick start — free tier (with API key)
 
 ```bash
-bun add @waniwani/sdk
-export WANIWANI_API_KEY=wwk_...
+bun run hello.ts
 ```
 
-The same flow works with zero code changes — drop the `store` argument and state lives on `app.waniwani.ai`, plus you get tracking, funnel, and the dashboard.
+That is a complete MCP server with one flow-driven tool, runnable over stdio. Connect it to ChatGPT, Claude, or any MCP client.
 
-```ts
-const onboardingFlow = createFlow({ /* ...same config... */ })
-  // ...same nodes and edges...
-  .compile(); // no store → uses hosted flow state
-```
+For production, swap `MemoryKvStore` for a real backend (Redis, Upstash, Cloudflare KV, DynamoDB, anything with `get` / `set` / `delete`), or set `WANIWANI_API_KEY` for hosted state plus tracking, funnel analytics, knowledge base, and a chat widget. Same code.
 
-Want event tracking too?
+## How WaniWani compares
 
-```ts
-import { waniwani } from "@waniwani/sdk";
-import { withWaniwani } from "@waniwani/sdk/mcp";
+**vs. LangChain / LangGraph.** General-purpose agent graphs. WaniWani is funnel-shaped: interrupts, re-ask on validation, auto-skip pre-filled fields, widget delegation, typed state via Zod. Smaller surface, sharper fit for MCP funnels.
 
-// Auto-track every tool call:
-withWaniwani(server);
+**vs. hand-rolling on the raw MCP SDK.** You would serialize state through the model on every turn. WaniWani persists state server-side under the session id, so the model carries nothing between calls.
 
-// Or track custom events:
-const wani = waniwani();
-await wani.track({
-  event: "quote.succeeded",
-  properties: { amount: 99, currency: "USD" },
-  meta: extra._meta,
-});
-```
+**vs. closed-source platform SDKs.** MIT licensed. The flow engine has zero runtime dependency on `app.waniwani.ai`. Bring any KV backend. The hosted tier is opt-in via `WANIWANI_API_KEY` and unlocks tracking, KB, chat widget, and managed flow state without changing your code.
 
-Get an API key at [app.waniwani.ai](https://app.waniwani.ai).
-
-## What's in each tier
+## Two tiers
 
 | Surface | Tier | What you get |
 |---|---|---|
 | `createFlow`, `StateGraph`, `KvStore`, `MemoryKvStore` | **OSS** | Multi-step conversational flows, runnable with no API key |
-| `WaniwaniKvStore` | Free tier | Hosted flow state on `app.waniwani.ai` |
-| `withWaniwani` | Both | Tool tracking + session bridging (no-op without an API key) |
-| `waniwani()`, `tracking`, `kb`, `createTrackingRoute` | Free tier | Event tracking, knowledge base, funnel routing |
-| `ChatWidget`, `ChatEmbed`, themes, `embed.js` | Free tier | Embeddable chat UI |
-| `useWaniwani` | Both | React hook for browser-side tracking (no-op until configured) |
+| `WaniwaniKvStore` | Free tier | Hosted, encrypted-at-rest flow state on `app.waniwani.ai` |
+| `withWaniwani`, `useWaniwani` | Both | Tool tracking, session bridging, browser hook (no-op without a key) |
+| `waniwani()`, `tracking`, `kb` | Free tier | Event tracking, funnel analytics, knowledge base |
+| `ChatWidget`, `ChatEmbed`, `embed.js` | Free tier | Embeddable chat UI |
 
-## Package entry points
-
-| Entry point | Use it for |
-|---|---|
-| `@waniwani/sdk` | `waniwani()` client, `defineConfig`, `WaniWaniError` |
-| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers |
-| `@waniwani/sdk/mcp/react` | `useWaniwani` (the only non-legacy hook here) |
-| `@waniwani/sdk/chat` | `ChatWidget`, `ChatBar`, `ChatCard`, `ChatEmbed`, themes |
-| `@waniwani/sdk/chat/embed.js` | Self-contained `<script>` install for any website |
-| `@waniwani/sdk/chat/styles.css` | Prebuilt Tailwind styles for `chat/` components |
-| `@waniwani/sdk/kb` | `createKbClient` for knowledge base ingest/search |
+Get a free key at [app.waniwani.ai](https://app.waniwani.ai).
 
 ## Documentation
 
-Full docs at **[docs.waniwani.ai](https://docs.waniwani.ai)** — same source as [`./docs/`](./docs) in this repo.
+Full docs at **[docs.waniwani.ai](https://docs.waniwani.ai)**. Same source as [`./docs/`](./docs) in this repo.
 
-- [Introduction](https://docs.waniwani.ai/introduction) — tiers and pitch
+**Build something:**
+- [Sales funnel MCP](https://docs.waniwani.ai/guides/sales-funnel)
+- [Lead generation MCP](https://docs.waniwani.ai/guides/lead-generation)
+- [Booking MCP](https://docs.waniwani.ai/guides/booking)
+- [Insurance or pricing quote MCP](https://docs.waniwani.ai/guides/insurance-quote)
+
+**Learn the engine:**
 - [Quickstart](https://docs.waniwani.ai/quickstart)
-- [Flows](https://docs.waniwani.ai/flows/overview)
+- [Flows overview](https://docs.waniwani.ai/flows/overview)
 - [KV store adapters](https://docs.waniwani.ai/flows/kv-store)
-- [Self-hosting](https://docs.waniwani.ai/flows/self-hosting)
+- [Self-hosting](https://docs.waniwani.ai/deployment/self-hosting)
+
+**Add the platform:**
 - [Tracking](https://docs.waniwani.ai/tracking/overview)
 - [Knowledge base](https://docs.waniwani.ai/knowledge-base/overview)
-
-## Legacy
-
-The following exports are preserved for back-compat with existing customer MCPs but are no longer documented. New code should use `createFlow` instead. They will move to dedicated `@waniwani/sdk/legacy*` entry points in a future minor release.
-
-- `createTool`, `createResource`, `registerTools` from `@waniwani/sdk/mcp`
-- `toNextJsHandler` from `@waniwani/sdk/next-js`
-- `toExpressJsHandler` from `@waniwani/sdk/express-js`
-- `createApiHandler` from `@waniwani/sdk/chat/server`
-- `WidgetProvider`, `useWidgetClient`, `useDisplayMode`, `useToolOutput`, etc. from `@waniwani/sdk/mcp/react`
-- `InitializeNextJsInIframe`, `LoadingWidget`, `DevModeProvider`
-
-See the [Legacy docs section](https://docs.waniwani.ai/legacy/tools-resources) for migration notes.
+- [Chat widget](https://docs.waniwani.ai/chat/embed)
 
 ## Links
 
@@ -156,4 +123,4 @@ See the [Legacy docs section](https://docs.waniwani.ai/legacy/tools-resources) f
 
 [MIT](./LICENSE) © WaniWani
 
-"WaniWani" is a trademark of WaniWani. The license covers the code, not the name.
+"WaniWani" is a trademark of WaniWani Inc. The license covers the code, not the name.

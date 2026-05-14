@@ -1,0 +1,167 @@
+---
+title: "WaniWani vs LangGraph"
+description: "When to use createFlow vs LangChain's LangGraph for MCP funnels and multi-step conversational tools."
+keywords: ["LangGraph alternative", "LangGraph MCP", "LangGraph vs WaniWani", "LangChain alternative", "conversational graph SDK", "MCP state machine", "TypeScript LangGraph"]
+---
+
+LangGraph is LangChain's graph framework for agent workflows. `@waniwani/sdk` is a graph framework specifically for MCP funnels. The two overlap. They are not interchangeable.
+
+This page is for developers who already know LangGraph and are evaluating whether to use it for a multi-step MCP tool.
+
+## TL;DR
+
+| | LangGraph | `@waniwani/sdk` (createFlow) |
+|---|---|---|
+| **Scope** | General-purpose agent graphs | MCP funnels specifically |
+| **Primary output** | A runnable graph | An MCP tool registered on a server |
+| **State persistence** | Pluggable checkpointer, Python-first | Pluggable KvStore, MCP-session-keyed |
+| **Built-in funnel ergonomics** | Build them yourself | Built in: interrupts, re-ask on validation, multi-field interrupts, auto-skip filled fields, widget signals |
+| **MCP integration** | None, you wire it | One call: `flow.register(server)` |
+| **Typed state** | Pydantic / TypedDict | Zod, end-to-end type inference |
+| **Language** | Python first, JS port secondary | TypeScript only |
+| **License** | MIT | MIT |
+
+If you are building a general-purpose agent (multiple LLM calls, retrievers, tool selection, planning), pick LangGraph. If you are building a funnel that runs as one MCP tool inside ChatGPT or Claude, pick `createFlow`.
+
+## What each one is
+
+**LangGraph** is a graph runtime. You declare nodes (functions), edges (direct or conditional), and a shared state object. The runtime drives the graph. It is unopinionated about what the nodes do, what the state contains, or how the graph is exposed.
+
+**`createFlow`** is also a graph runtime. The difference is opinion. A flow compiles to a single MCP tool. Nodes return state updates, interrupt signals, or widget signals. Interrupts pause the graph to ask a typed question, validate the answer, and re-ask on failure. State is keyed by the MCP session id and persisted to a `KvStore`. The graph is funnel-shaped on purpose.
+
+## When LangGraph is the better choice
+
+- You need an agent that plans, picks tools, and loops over its own output.
+- You want multiple LLM calls inside the graph itself, not just a single tool surface.
+- You need retrievers, parallel branches, or supervisor patterns.
+- Your team is Python-first and the rest of your stack lives in LangChain.
+- You are not building for MCP, or MCP is one surface among many.
+
+## When `createFlow` is the better choice
+
+- You are building a multi-step MCP tool: sales funnel, lead generation, booking, quote, intake.
+- You want deterministic step order with typed validation, not agent improvisation.
+- You want to skip the work of wiring an MCP tool around your graph.
+- You want state persistence keyed to the MCP session, not a homegrown checkpointer.
+- You want widget cards for confirmation steps without inventing a protocol.
+
+## Side by side: a two-question funnel
+
+The simplest case where the difference shows up.
+
+**LangGraph (conceptual):**
+
+```python
+from langgraph.graph import StateGraph, START, END
+from typing import TypedDict
+
+class State(TypedDict, total=False):
+    name: str
+    email: str
+
+def ask_name(state):
+    # You implement: pause the graph, expose a question to whatever UI is
+    # driving, parse the response, validate, re-ask on failure, write to state.
+    ...
+
+def ask_email(state):
+    # Same again. Validation, re-ask, persistence: all on you.
+    ...
+
+graph = StateGraph(State)
+graph.add_node("ask_name", ask_name)
+graph.add_node("ask_email", ask_email)
+graph.add_edge(START, "ask_name")
+graph.add_edge("ask_name", "ask_email")
+graph.add_edge("ask_email", END)
+app = graph.compile()
+# You still have to: expose this as an MCP tool, route the MCP session id to
+# the checkpointer, decide how interrupts are rendered to the model, etc.
+```
+
+**`createFlow`:**
+
+```ts
+import { createFlow, END, MemoryKvStore, START } from "@waniwani/sdk/mcp";
+import { z } from "zod";
+
+const flow = createFlow({
+  id: "intake",
+  title: "Intake",
+  description: "Collect name and email.",
+  state: {
+    name: z.string().describe("Full name"),
+    email: z.string().email().describe("Email address"),
+  },
+})
+  .addNode({
+    id: "ask_name",
+    run: ({ interrupt }) => interrupt({ name: { question: "What's your name?" } }),
+  })
+  .addNode({
+    id: "ask_email",
+    run: ({ interrupt }) => interrupt({ email: { question: "What's your email?" } }),
+  })
+  .addEdge(START, "ask_name")
+  .addEdge("ask_name", "ask_email")
+  .addEdge("ask_email", END)
+  .compile({ store: new MemoryKvStore() });
+
+await flow.register(server);
+```
+
+Both are graph definitions. The `createFlow` version compiles to a working MCP tool. The LangGraph version is a graph that still needs to be wrapped, exposed, and given an interaction protocol.
+
+## What you would re-implement on top of LangGraph
+
+If you choose LangGraph for an MCP funnel, you take on:
+
+1. **MCP tool surface.** Declare the tool, marshal arguments, route results.
+2. **Session-keyed state.** Map the MCP session id to a checkpointer thread id.
+3. **Interrupt semantics.** Pause the graph, emit a structured question, resume on the next tool call.
+4. **Validation loop.** Re-ask on schema failure without advancing the graph.
+5. **Auto-skip filled fields.** If state already has `email`, skip `ask_email`.
+6. **Widget signals.** If you want non-text rendering (cards, pickers), invent a protocol.
+7. **Multi-field interrupts.** Ask several questions in one turn when the model can fill them at once.
+
+These are the funnel ergonomics `createFlow` ships built in. None are hard individually. Together they are a project.
+
+## What `createFlow` does not do
+
+To be clear about scope:
+
+- **No agent loop.** A flow is a deterministic graph driven by tool calls, not an LLM-controlled agent.
+- **No retrieval.** Use [`@waniwani/sdk/kb`](/knowledge-base/overview) or your own retriever inside a node.
+- **No Python.** TypeScript only.
+- **No graph composition primitives** (subgraphs, supervisors). A flow is a single graph compiled to a single tool.
+
+If you need any of those, LangGraph or a hybrid is the right call. You can also call into a LangGraph (or any other) agent from inside a flow node.
+
+## Migration sketch
+
+If you have a LangGraph workflow that is funnel-shaped:
+
+1. Replace `TypedDict` state with a Zod schema map.
+2. Replace each node body with either `interrupt({...})`, a state-returning function, or a widget signal.
+3. Replace `add_edge` and `add_conditional_edges` with `.addEdge` and `.addConditionalEdge`.
+4. Replace the checkpointer with a [KV store adapter](/flows/kv-store).
+5. Call `.register(server)` instead of wiring an MCP tool by hand.
+
+The graph shape stays. The wrapping disappears.
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="Why MCP funnels" icon="lightbulb" href="/why-mcp-funnels">
+    The distribution shift behind the SDK.
+  </Card>
+  <Card title="Quickstart" icon="play" href="/quickstart">
+    A complete flow in under 30 lines.
+  </Card>
+  <Card title="Flow engine" icon="diagram-project" href="/flows/overview">
+    Nodes, edges, interrupts, branching.
+  </Card>
+  <Card title="KV store adapters" icon="database" href="/flows/kv-store">
+    Redis, Upstash, Cloudflare KV, DynamoDB.
+  </Card>
+</CardGroup>
