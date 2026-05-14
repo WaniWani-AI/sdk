@@ -1,6 +1,7 @@
 ---
 title: Architecture
 description: "What happens between an MCP tool call and the flow engine's response, and why a KV store is required."
+keywords: ["flow architecture", "MCP execution model", "KV store requirement", "engine internals"]
 ---
 
 A flow is a single MCP tool. The model calls that tool, the engine drives the graph one step at a time, and the response tells the model whether to ask the user something, render a widget, or stop. Between calls, everything the engine knows about the conversation lives in the KV store, keyed by the MCP session id.

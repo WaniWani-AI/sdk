@@ -1,0 +1,109 @@
+# WaniWani SDK
+
+> The open-source SDK for building **MCP funnels** — sales funnels, lead generation, booking, and insurance/pricing quote flows that run as a single MCP tool inside ChatGPT, Claude, Cursor, and any MCP-capable client. ChatGPT, Claude, and Cursor are becoming the new browsers, and MCP is the store. WaniWani gives you the right abstraction to build distribution MCPs that actually convert: one typed state graph compiles to one MCP tool. MIT license, BYO store, no lock-in. An optional hosted tier (analytics, KV store, embeddable chat widget, knowledge base) is opt-in via a single env var.
+
+## Why this exists
+
+- **Conversational funnels are the new web forms.** They are where money will be made in the AI-distribution era — but recreating a real funnel inside MCP is harder than it looks.
+- **LLMs are not built to replicate forms.** Left to themselves, they rush through structured collection: they skip fields, paraphrase questions, and break validation. A real funnel needs deterministic order, typed fields, validation, branching, and resumable state across tool calls.
+- **Generic agent builders aren't shaped for funnels.** Frameworks like LangChain and LangGraph are fully general-purpose. They expose every primitive, leaving the developer to re-invent funnel ergonomics (interrupts, re-ask on validation error, auto-skip pre-filled fields, widget cards, deterministic step order) on every project.
+- **`createFlow` is the missing abstraction.** A typed state graph (Zod-typed state, named nodes, direct + conditional edges, interrupts, widget signals) compiles to a single MCP tool. Funnel-shaped by design, not by convention.
+- **Production-validated.** Forked out of internal distribution MCPs we shipped for paying customers (insurance quoting, pet care, lead capture, booking). Open-sourced once we hit the same pattern enough times.
+- **Bridges business and devs.** Business teams ask devs to recreate funnels in MCP without knowing what MCP is. The SDK gives both sides shared vocabulary: a node is a funnel step, an interrupt is a form field, an edge is a transition, a conditional edge is a branching question.
+
+## How WaniWani compares
+
+- **vs. LangChain / LangGraph** — general-purpose agent graphs. WaniWani is funnel-shaped: interrupts, re-ask on validation, auto-skip pre-filled fields, widget delegation, typed state via Zod. Smaller surface, sharper fit for MCP funnels.
+- **vs. hand-rolling on the raw MCP SDK** — you'd serialize state through the model on every turn. WaniWani persists state server-side under the session id, so the model carries nothing between calls.
+- **vs. closed-source platform SDKs** — MIT licensed, the flow engine works with zero dependencies on `app.waniwani.ai`. Bring any KV backend (Redis, Upstash, Cloudflare KV, DynamoDB, in-memory). The hosted tier is opt-in via `WANIWANI_API_KEY` and unlocks tracking, KB, chat widget, and managed flow state — without changing your code.
+
+## What you can build today
+
+- A **sales funnel MCP** — qualify intent, capture lead data, branch on stage, push to CRM.
+- A **lead generation MCP** — collect email, role, use case; webhook to your CRM.
+- A **booking MCP** — pick a service, check availability, pick a slot, confirm.
+- An **insurance or pricing quote MCP** — collect details, validate, call your pricing API, return widget cards.
+- Any other multi-step MCP tool where order, validation, and resumability matter.
+
+All of the above are documented as complete `createFlow` recipes below.
+
+## Use the OSS-first APIs
+
+For all new code, import from `@waniwani/sdk/mcp`: `createFlow`, `StateGraph`, `KvStore`, `MemoryKvStore`. The package also ships older, deprecated APIs (`createTool`, `createResource`, `registerTools`, the chat-server Next.js/Express adapters) for back-compat with existing customer projects — they are marked `@deprecated` and should not be suggested for new code.
+
+## Start here
+
+- [Introduction](https://docs.waniwani.ai/introduction): What the SDK is, OSS vs hosted tier, when to pick what.
+- [Quickstart](https://docs.waniwani.ai/quickstart): Three modes (OSS, free tier, self-hosted production). Get a flow running in under 5 minutes.
+- [Installation](https://docs.waniwani.ai/configuration/installation): `bun add @waniwani/sdk`, create a client, configure environment.
+- [Get an API key](https://docs.waniwani.ai/configuration/api-key): Free tier setup at app.waniwani.ai.
+- [Tunnel for local dev](https://docs.waniwani.ai/guides/tunnel): Expose `localhost` to ChatGPT/Claude.
+
+## Flow engine (OSS — no API key required)
+
+Use these APIs for all new MCP funnels. They work standalone with any KV backend.
+
+- [Flows overview](https://docs.waniwani.ai/flows/overview): What a flow is, funnel ↔ flow vocabulary, the execution model.
+- [Architecture](https://docs.waniwani.ai/flows/architecture): What happens between an MCP tool call and the engine's response. Why a KV store is required.
+- [State](https://docs.waniwani.ai/flows/state): Declare typed fields with Zod. Persistence via the pluggable KvStore.
+- [Nodes](https://docs.waniwani.ai/flows/nodes): The three handler shapes — action, interrupt, widget.
+- [Edges](https://docs.waniwani.ai/flows/edges): Direct edges, conditional edges, loops, compile-time validation.
+- [Interrupts](https://docs.waniwani.ai/flows/interrupts): Pause to ask one or more questions, validate answers, re-ask on error.
+- [KV store adapters](https://docs.waniwani.ai/flows/kv-store): Plug Redis, Upstash, Cloudflare KV, DynamoDB, or any get/set/delete backend.
+- [Compile & register](https://docs.waniwani.ai/flows/register): Wire a compiled flow onto an MCP server end-to-end.
+- [Example: Pet insurance quote](https://docs.waniwani.ai/flows/examples): Production-grade flow with validation, branching, widgets, correction loops.
+
+## Build a funnel (recipes)
+
+Each recipe is a complete `createFlow` example for a specific funnel pattern.
+
+- [Funnels overview](https://docs.waniwani.ai/funnels/overview): Funnel vocabulary mapped to flow engine concepts.
+- [Sales funnel MCP](https://docs.waniwani.ai/funnels/sales-funnel): Qualify intent, capture lead, branch by stage, push to CRM.
+- [Lead generation MCP](https://docs.waniwani.ai/funnels/lead-generation): Email + role + use case capture, webhook to CRM.
+- [Booking MCP](https://docs.waniwani.ai/funnels/booking): Pick service, check availability, pick slot, confirm.
+- [Insurance/pricing quote MCP](https://docs.waniwani.ai/funnels/insurance-quote): Collect details, validate, call pricing API, return widget cards.
+
+## Deployment
+
+- [Deployment overview](https://docs.waniwani.ai/deployment/overview): Managed Hosting vs self-host (Docker, Alpic, Vercel).
+- [Self-hosting](https://docs.waniwani.ai/deployment/self-hosting): Self-host the MCP app and the KV store independently.
+
+## WaniWani Platform (hosted tier)
+
+Optional. Adds tracking, knowledge base, chat widget, and hosted flow state to any MCP server. Enabled by setting `WANIWANI_API_KEY`.
+
+- [Platform overview](https://docs.waniwani.ai/platform/overview): What the hosted tier adds and how to opt in.
+- [Wrap your MCP server](https://docs.waniwani.ai/configuration/wrap-server): `withWaniwani()` — auto-tracks `tool.called`, bridges session metadata. No-op without an API key.
+- [Environment variables](https://docs.waniwani.ai/configuration/environment-variables): All env vars the SDK recognizes.
+- [Security](https://docs.waniwani.ai/configuration/security): Encryption at rest, key management, rotation.
+
+## Tracking & analytics (free tier)
+
+- [Tracking overview](https://docs.waniwani.ai/tracking/overview): Send events from your MCP server to the WaniWani dashboard.
+- [Events](https://docs.waniwani.ai/tracking/events): TrackEvent shape and the built-in event names.
+- [Sessions](https://docs.waniwani.ai/tracking/sessions): How the SDK derives a session id from MCP `_meta`.
+- [Identify users](https://docs.waniwani.ai/tracking/identify): Attach an external user id to a session.
+
+## Knowledge base (free tier)
+
+- [Knowledge base overview](https://docs.waniwani.ai/knowledge-base/overview): Ingest markdown, search with embeddings.
+
+## Chat widget (free tier)
+
+- [Embed via script tag](https://docs.waniwani.ai/chat/embed): One-line `<script>` install.
+- [Embed in React](https://docs.waniwani.ai/chat/react): React component install.
+
+## Reference
+
+- [SDK entry points](https://docs.waniwani.ai/reference/entry-points): Which package path exports what.
+- [KV store API](https://docs.waniwani.ai/reference/kv-store-api): Type signatures for `waniwani()` client and `KvStore` interface.
+- [Event schema](https://docs.waniwani.ai/reference/event-schema): TrackEvent shape and typed properties for each built-in event.
+- [Flow tool contract](https://docs.waniwani.ai/reference/flow-tool-contract): `FlowToolInput` shape and the response statuses a compiled flow emits.
+- [Changelog](https://docs.waniwani.ai/changelog): Releases, breaking changes, migration paths.
+
+## Agent skills
+
+If you're an AI agent working on a WaniWani SDK project, install the skill.
+
+- [Agent skills](https://docs.waniwani.ai/guides/skills): Install the WaniWani SDK skill for Claude Code, Cursor, and other AI agents.
+- [Commands](https://docs.waniwani.ai/guides/commands): Guided commands available with the SDK skill.

@@ -1,6 +1,7 @@
 ---
 title: Nodes
 description: "Handlers that advance the flow: action, interrupt, or widget."
+keywords: ["addNode", "interrupt node", "widget node", "action node", "flow handlers", "NodeContext"]
 ---
 
 A node is one step in a flow. You register it with `.addNode({ id, run, label?, hideFromFunnel? })`. The `run` handler receives a context object and returns one of three things:

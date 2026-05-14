@@ -1,6 +1,7 @@
 ---
 title: Interrupts
 description: "Pause the flow to ask the user one or more questions."
+keywords: ["interrupt", "pause flow", "ask question", "validate answer", "flow re-ask"]
 ---
 
 An interrupt is the mechanism by which a flow collects information from the user. When a node returns `interrupt(...)`, the engine returns `status: "interrupt"` to the model, persists the current step, and waits. On the next `action: "continue"` call, the user's answers arrive in `stateUpdates`, validators run, and the engine advances along the node's outgoing edge.
