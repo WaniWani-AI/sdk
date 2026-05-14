@@ -92,8 +92,7 @@
               "reference/entry-points",
               "reference/kv-store-api",
               "reference/event-schema",
-              "reference/flow-tool-contract",
-              "migration"
+              "reference/flow-tool-contract"
             ]
           },
           {
@@ -119,12 +118,24 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "Changelog",
+        "groups": [
+          {
+            "group": "Releases",
+            "pages": [
+              "changelog"
+            ]
+          }
+        ]
       }
     ]
   },
   "redirects": [
     { "source": "/reference/tiers", "destination": "/platform/overview" },
     { "source": "/flows/self-hosting", "destination": "/deployment/self-hosting" },
+    { "source": "/migration", "destination": "/changelog" },
     { "source": "/legacy/tools-resources", "destination": "/platform/overview" },
     { "source": "/legacy/widget-hooks", "destination": "/platform/overview" },
     { "source": "/legacy/chat-adapters", "destination": "/chat/react" },
@@ -146,6 +157,20 @@
   "contextual": {
     "options": ["copy"],
     "display": "header"
+  },
+  "search": {
+    "prompt": "Search the WaniWani SDK..."
+  },
+  "seo": {
+    "indexing": "all",
+    "metatags": {
+      "og:type": "website",
+      "og:site_name": "WaniWani SDK",
+      "og:title": "WaniWani SDK — Build MCP funnels",
+      "og:description": "Open-source SDK for MCP funnels. Build sales funnels, lead generation, booking, and quote flows on top of any MCP server.",
+      "twitter:card": "summary_large_image",
+      "twitter:site": "@waniwani_ai"
+    }
   },
   "footer": {
     "socials": {
