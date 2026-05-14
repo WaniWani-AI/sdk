@@ -3,7 +3,7 @@ title: Wrap your MCP server
 description: "Optional convenience wrapper that adds tool tracking, session bridging, and widget metadata forwarding."
 ---
 
-`withWaniwani(server)` is an optional convenience that instruments an MCP server. It's free-tier-flavored when an API key is configured, and a no-op-but-still-useful wrapper when it isn't.
+`withWaniwani(server)` is an optional convenience that instruments an MCP server. It activates Platform tracking when an API key is configured, and stays a no-op-but-still-useful wrapper when it isn't.
 
 <Note>
 **Not required for OSS flows.** `createFlow` works without `withWaniwani`. Use this wrapper when you want auto-tracking, session-id bridging, or widget metadata forwarding on top.
@@ -38,7 +38,7 @@ Tracking calls silently no-op when no key is configured. No errors, no thrown ex
 | You want | Use `withWaniwani`? |
 |---|---|
 | Only run OSS flows, no telemetry | Optional (still useful for session bridging) |
-| OSS flows + hosted tracking (free tier) | Yes |
+| OSS flows + Platform tracking | Yes |
 | Hosted everything (flow state + tracking + funnel) | Yes |
 | Just custom event tracking via `waniwani().track()` | No, call `track()` directly |
 

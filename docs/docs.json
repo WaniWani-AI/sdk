@@ -43,6 +43,7 @@
             "group": "Flow engine",
             "pages": [
               "flows/overview",
+              "flows/architecture",
               "flows/nodes",
               "flows/edges",
               "flows/interrupts",
@@ -62,6 +63,12 @@
             "pages": [
               "flows/kv-store",
               "flows/self-hosting"
+            ]
+          },
+          {
+            "group": "WaniWani Platform",
+            "pages": [
+              "platform/overview"
             ]
           },
           {
@@ -97,7 +104,6 @@
           {
             "group": "Reference",
             "pages": [
-              "reference/tiers",
               "reference/entry-points",
               "reference/kv-store-api",
               "reference/event-schema",
@@ -117,10 +123,11 @@
     ]
   },
   "redirects": [
-    { "source": "/legacy/tools-resources", "destination": "/reference/tiers" },
-    { "source": "/legacy/widget-hooks", "destination": "/reference/tiers" },
+    { "source": "/reference/tiers", "destination": "/platform/overview" },
+    { "source": "/legacy/tools-resources", "destination": "/platform/overview" },
+    { "source": "/legacy/widget-hooks", "destination": "/platform/overview" },
     { "source": "/legacy/chat-adapters", "destination": "/chat/react" },
-    { "source": "/legacy/evals", "destination": "/reference/tiers" }
+    { "source": "/legacy/evals", "destination": "/platform/overview" }
   ],
   "navbar": {
     "links": [

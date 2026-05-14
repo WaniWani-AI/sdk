@@ -35,7 +35,7 @@ Between pause points, the engine auto-advances through action nodes (nodes that 
 
 ## State persistence
 
-State persists between calls in the flow store, keyed by the session id extracted from `_meta`. Default behavior is described in [Tiers](/reference/tiers):
+State persists between calls in the flow store, keyed by the session id extracted from `_meta`. Default behavior is described in the [Platform overview](/platform/overview):
 
 - Without an explicit `store` and without `WANIWANI_API_KEY`, `.compile()` throws at compile time.
 - With an explicit `store: KvStore`, state lives wherever your adapter writes.

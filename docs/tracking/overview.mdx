@@ -4,7 +4,7 @@ description: "Send events from your MCP server to the WaniWani dashboard."
 ---
 
 <Note>
-  Requires `WANIWANI_API_KEY`. See [Tiers](/reference/tiers) for what each tier unlocks.
+**Platform feature.** Requires `WANIWANI_API_KEY`. Works whether your MCP server is self-hosted or on Managed Hosting. [About the Platform](/platform/overview).
 </Note>
 
 The tracking module ships events from your MCP server to the WaniWani backend. You call `client.track()`, the SDK enqueues the event in memory, and a background transport batches and posts it to `POST /api/mcp/events/v2/batch`. Tracking never blocks your tool handler.

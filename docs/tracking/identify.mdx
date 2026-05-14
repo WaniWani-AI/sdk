@@ -4,7 +4,7 @@ description: "Attach an external user id to the current session."
 ---
 
 <Note>
-  Requires `WANIWANI_API_KEY`. See [Tiers](/reference/tiers) for what each tier unlocks.
+**Platform feature.** Requires `WANIWANI_API_KEY`. Works whether your MCP server is self-hosted or on Managed Hosting. [About the Platform](/platform/overview).
 </Note>
 
 `identify()` sends a `user.identified` event and attaches an `externalUserId` to the current session's correlation ids. Use it once you know who the user is (an email, a database id, a Stripe customer id, or any stable identifier in your system).

@@ -3,6 +3,10 @@ title: Flows Overview
 description: "Multi-step MCP tools for sales funnels, lead generation, booking, and quote apps. Defined as a graph."
 ---
 
+<Note>
+**Open source.** Works without an API key. Connect the [WaniWani Platform](/platform/overview) to add tracking, knowledge base, chat, and hosted state.
+</Note>
+
 A flow is a graph of nodes that compiles into a single MCP tool. Each tool call runs the engine one step at a time: it asks a question, validates the answer, branches on state, then persists progress server-side under the MCP session id. The model never has to carry a token between calls.
 
 ## Flows are MCP funnels
@@ -83,7 +87,7 @@ Every tool call drives the engine until it hits one of three outcomes:
 
 Between those pause points, the engine auto-advances through action nodes (nodes that return a plain state update). No round-trip to the model. A single tool call can run several action nodes before hitting the next interrupt.
 
-State persists between calls in the flow store, keyed by the session id extracted from `_meta`. You pick the store at `.compile()` time. See [Persistence](/flows/kv-store) and [Tiers](/reference/tiers).
+State persists between calls in the flow store, keyed by the session id extracted from `_meta`. You pick the store at `.compile()` time. See [KV store adapters](/flows/kv-store) and the [Platform overview](/platform/overview) for the hosted option.
 
 ## Tool contract
 

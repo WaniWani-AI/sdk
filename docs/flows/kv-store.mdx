@@ -3,6 +3,10 @@ title: KV store adapters
 description: "Plug any key-value backend into createFlow via the KvStore interface."
 ---
 
+<Note>
+**Open source.** The KV store interface works without an API key. The hosted `WaniwaniKvStore` requires the [WaniWani Platform](/platform/overview).
+</Note>
+
 A flow needs a place to persist its state between MCP calls. MCP tools are stateless, so without a store the engine has nothing to resume from on the next `continue` call. **Every compiled flow is therefore required to have a store.** `.compile()` throws at compile time if you pass neither a `store` argument nor configure `WANIWANI_API_KEY`.
 
 `createFlow` persists this state through a tiny `KvStore` interface. Implement it against any key-value backend: Redis, Upstash, Cloudflare KV, DynamoDB, even a SQLite table. The SDK ships two implementations out of the box, and you can write your own in ~10 lines.
@@ -41,7 +45,7 @@ const flow = createFlow({ /* ... */ }).compile(); // picks WaniwaniKvStore
 const flow = createFlow({ /* ... */ }).compile({ store: new WaniwaniKvStore() });
 ```
 
-See [Tiers](/reference/tiers) for when each makes sense.
+See the [Platform overview](/platform/overview) for when the hosted store makes sense versus a self-hosted adapter.
 
 ## Adapter recipes
 
@@ -221,7 +225,7 @@ Keys are derived from the MCP session identifier (`_meta.waniwani/sessionId` or 
 | Goal | Pick |
 |---|---|
 | Local dev, tests, ephemeral | `MemoryKvStore` |
-| Zero infra, encrypted at rest | `WaniwaniKvStore` (free tier) |
+| Zero infra, encrypted at rest | `WaniwaniKvStore` (Platform) |
 | Vercel / Netlify / serverless edge | Upstash Redis adapter |
 | Cloudflare Workers | Workers KV adapter |
 | AWS Lambda | DynamoDB adapter |

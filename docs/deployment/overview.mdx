@@ -1,22 +1,22 @@
 ---
 title: Deployment
-description: "Run your WaniWani-powered MCP app on managed hosting or self-host it yourself (Docker, Alpic, Vercel)."
+description: "Run your WaniWani-powered MCP app on Managed Hosting or self-host it yourself (Docker, Alpic, Vercel)."
 ---
 
-There are two ways to run a WaniWani-powered MCP app.
+Where your MCP server runs is independent of whether you connect the [WaniWani Platform](/platform/overview). This page covers the two server-hosting options. The Platform layer (tracking, KB, chat, hosted state) works the same in both.
 
 <CardGroup cols={2}>
-  <Card title="Managed" icon="cloud" href="#managed-projects">
+  <Card title="Managed Hosting" icon="cloud" href="#managed-hosting">
     WaniWani hosts your app. Provisioned, pre-configured, push to main and it deploys. Fastest path.
   </Card>
-  <Card title="Self-hosted" icon="server" href="#self-hosted-projects">
+  <Card title="Self-hosted" icon="server" href="#self-hosted-server">
     You host the app yourself. Docker, Alpic, or Vercel. Connect by giving us the MCP URL.
   </Card>
 </CardGroup>
 
 Both paths use the same [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-template). Pick based on where you want the server to live.
 
-## Managed projects
+## Managed Hosting
 
 When you create a managed project in the [WaniWani dashboard](https://app.waniwani.ai), we provision a copy of the distribution template fully wired up: API keys set, hosted URL assigned, everything ready. You don't configure anything.
 
@@ -38,9 +38,9 @@ Typical workflow:
 
 Best for: getting started fast, teams that don't want to run infrastructure, and projects that want one less moving part to maintain.
 
-## Self-hosted projects
+## Self-hosted server
 
-You run the server. WaniWani still powers state and tracking by default (set `WANIWANI_API_KEY` and you get hosted KV + dashboards out of the box), so the only thing you operate is the MCP app itself. If you want to push that further and self-host the state layer too, see [Advanced: bring your own session cache](#advanced-bring-your-own-session-cache) below.
+You run the server. By default we recommend connecting the [Platform](/platform/overview): set `WANIWANI_API_KEY` and you get hosted state + dashboards on top of your self-hosted server, with no extra infra. If you want to push that further and self-host the state layer too, see [Advanced: bring your own session cache](#advanced-bring-your-own-session-cache) below. If you want zero Platform dependency at all (no API key, no outbound calls), see the [open-source self-hosting walkthrough](/flows/self-hosting).
 
 The [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-template) ships three deployment targets. Pick whichever fits your stack.
 
@@ -85,7 +85,7 @@ Once your app is deployed, copy its public MCP URL (the endpoint where MCP clien
 
 ### Advanced: bring your own session cache
 
-By default a self-hosted project still uses `WaniwaniKvStore` for flow state (encrypted at rest, hosted by WaniWani, automatic when `WANIWANI_API_KEY` is set). That's the recommended setup: zero infrastructure to run for the state layer.
+By default a self-hosted server uses `WaniwaniKvStore` for flow state when `WANIWANI_API_KEY` is set (encrypted at rest, hosted by WaniWani, no infra). That's the recommended setup.
 
 If you want zero dependency on `app.waniwani.ai` for state too, plug in your own `KvStore` adapter at `.compile()` time:
 
@@ -96,10 +96,10 @@ import { flowStore } from "./kv-store"; // your Redis / Upstash / DynamoDB / SQL
 const flow = createFlow({ /* ... */ }).compile({ store: flowStore });
 ```
 
-See [KV store adapters](/flows/kv-store) for recipes (Redis, Upstash, Cloudflare KV, DynamoDB, SQLite) and the full [Persistence](/flows/self-hosting) walkthrough.
+See [KV store adapters](/flows/kv-store) for recipes (Redis, Upstash, Cloudflare KV, DynamoDB, SQLite) and the full [open-source self-hosting](/flows/self-hosting) walkthrough.
 
-This is the "fully self-hosted" path: your server, your state. You can still send tracking events to WaniWani by calling `withWaniwani(server)` separately, or skip that entirely for a pure OSS setup.
+Your server, your state. You can still send tracking events to the Platform by calling `withWaniwani(server)`, or skip that entirely for a fully open-source setup.
 
-## Tracking is separate
+## Platform features are orthogonal
 
-Tracking is independent of where your server lives and where your state lives. Both managed and self-hosted projects emit events through `withWaniwani(server)` and `client.track()`, and both surface in the same WaniWani dashboard. See [Tiers](/reference/tiers) for what's included and [Tracking](/tracking/overview) for the event pipeline.
+Tracking, KB, chat, funnel analytics, and hosted state are Platform features. They are independent of where your server lives and where your state lives. Both Managed Hosting and self-hosted servers emit events through `withWaniwani(server)` and `client.track()`, and both surface in the same WaniWani dashboard. See the [Platform overview](/platform/overview) for what's included and [Tracking](/tracking/overview) for the event pipeline.
