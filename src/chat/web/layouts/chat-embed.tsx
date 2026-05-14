@@ -19,6 +19,7 @@ import {
 } from "../ai-elements/prompt-input";
 import { ChatQueue } from "../components/chat-queue";
 import { MessageList } from "../components/message-list";
+import { PoweredBy } from "../components/powered-by";
 import { Suggestions } from "../components/suggestions";
 import { ThreadMenu } from "../components/thread-menu";
 import { useCallTool } from "../hooks/use-call-tool";
@@ -396,7 +397,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 							queuedMessages={engine.queuedMessages}
 							onRemove={engine.removeQueuedMessage}
 						/>
-						<div className="ww:px-4 ww:pb-4 ww:pt-2">
+						<div className="ww:px-4 ww:pb-2 ww:pt-2">
 							<div className="ww:mx-auto ww:w-full ww:max-w-3xl">
 								<PromptInput
 									onSubmit={engine.handleSubmit}
@@ -418,6 +419,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 										/>
 									</div>
 								</PromptInput>
+								<PoweredBy />
 							</div>
 						</div>
 					</div>
