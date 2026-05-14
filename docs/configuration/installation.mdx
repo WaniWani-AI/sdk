@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: "Install @waniwani/sdk and create a client."
+description: "Install @waniwani/sdk in a new or existing project."
 keywords: ["install SDK", "bun add", "npm install", "@waniwani/sdk install"]
 ---
 
@@ -14,6 +14,8 @@ keywords: ["install SDK", "bun add", "npm install", "@waniwani/sdk install"]
     Install the SDK package into your existing MCP server or app. Best for **existing projects**.
   </Card>
 </CardGroup>
+
+The SDK is open source and works without an API key. Set `WANIWANI_API_KEY` to connect the [WaniWani Platform](/platform/overview) and unlock hosted state, tracking, knowledge base, and the chat widget on top.
 
 ---
 
@@ -39,17 +41,16 @@ The [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-
     ```bash
     bun install
     cp .env.example .env
-    # Add your WANIWANI_API_KEY to .env
     bun dev
     ```
+
+    The template runs without an API key. Set `WANIWANI_API_KEY` in `.env` to connect the [Platform](/platform/overview) and enable hosted state, tracking, and the dashboard.
   </Step>
 
   <Step title="Customize">
     The template includes a reference flow (Alpine ski lessons) you can replace with your own. If you have the [agent skill](/guides/skills) installed, run `/waniwani-sdk initialize` to interactively scaffold a flow tailored to your business.
   </Step>
 </Steps>
-
-Skip to [Create a client](#create-a-client) once your project is set up.
 
 ---
 
@@ -62,7 +63,7 @@ Skip to [Create a client](#create-a-client) once your project is set up.
   - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk)
   - [Skybridge](https://github.com/alpic-ai/skybridge) (Alpic)
   - [`@vercel/mcp-handler`](https://www.npmjs.com/package/@vercel/mcp-handler)
-- A WaniWani account at [app.waniwani.ai](https://app.waniwani.ai)
+- A WaniWani account at [app.waniwani.ai](https://app.waniwani.ai) — optional, only needed for [Platform](/platform/overview) features.
 
 `@modelcontextprotocol/sdk` and `zod` are peer dependencies. Install them in your project if you do not already have them.
 
@@ -90,35 +91,65 @@ Skip to [Create a client](#create-a-client) once your project is set up.
   The SDK has zero runtime dependencies and targets a sub-5KB core bundle. It runs in long-lived Node processes, serverless functions, and edge runtimes.
 </Note>
 
-### Minimal setup
+### Pick what you need
 
-This is the minimum code needed to get the SDK working. Wrap your MCP server with `withWaniwani`. This enables automatic event tracking, session management, and flow support.
+Three things you can add independently to an existing MCP server. Any subset works.
+
+| Add | What it gives you | API key |
+|---|---|---|
+| `createFlow` | Multi-step typed flows registered as a single MCP tool. The primary entry point. | Not required. Required only if you want hosted state instead of bringing a `KvStore`. |
+| `withWaniwani(server)` | Wraps existing `registerTool` handlers to emit tracking events and bridge session IDs. No handler changes. | Required for events. Bridging works without. |
+| `waniwani()` client | Direct calls to Platform APIs (custom events, `identify()`, KB search). | Required. |
+
+### Add a flow to an existing server
+
+Assume you already have an `McpServer` instance with some tools registered on it. Define a flow and `.register()` it alongside them:
 
 ```ts
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { withWaniwani } from "@waniwani/sdk/mcp";
-import "dotenv/config";
+import { createFlow, END, MemoryKvStore, START } from "@waniwani/sdk/mcp";
+import { z } from "zod";
+import { server } from "./mcp-server"; // your existing McpServer
 
-const server = new McpServer({ name: "my-mcp", version: "0.1.0" });
+const onboardingFlow = createFlow({
+  id: "onboarding",
+  title: "User Onboarding",
+  description: "Use when a new user wants to get started.",
+  state: { name: z.string().describe("Their name") },
+})
+  .addNode({
+    id: "ask_name",
+    run: ({ interrupt }) =>
+      interrupt({ name: { question: "What is your name?" } }),
+  })
+  .addEdge(START, "ask_name")
+  .addEdge("ask_name", END)
+  .compile({ store: new MemoryKvStore() });
 
-// Your tools
-server.registerTool("hello", { /* ... */ });
-
-// This single line enables tracking, flows, and sessions
-withWaniwani(server);
+await onboardingFlow.register(server);
 ```
 
-Set your API key in `.env`:
+`MemoryKvStore` is fine for development and tests. For production, plug in a real backend (Redis, Upstash, Cloudflare KV, DynamoDB) or set `WANIWANI_API_KEY` to use hosted state. See [KV store adapters](/flows/kv-store).
+
+### Wrap an existing server for Platform tracking
+
+If your server already has plain `registerTool` handlers and you just want them tracked, wrap it once. No changes to the handlers themselves:
+
+```ts
+import { withWaniwani } from "@waniwani/sdk/mcp";
+import { server } from "./mcp-server"; // your existing McpServer
+
+withWaniwani(server);
+```
 
 ```bash .env
 WANIWANI_API_KEY=wwk_...
 ```
 
-That's it. Every tool call now emits events to your [WaniWani dashboard](https://app.waniwani.ai). See [Wrap your server](/configuration/wrap-server) for all `withWaniwani` options.
+Every wrapped tool call now emits a `tool.called` event to your [WaniWani dashboard](https://app.waniwani.ai). Without an API key, the wrapper still bridges session IDs and forwards widget metadata but emits no events. Safe to wrap unconditionally. See [Wrap your server](/configuration/wrap-server) for all options.
 
-## Create a client
+## Create a Platform client
 
-For manual event tracking beyond what `withWaniwani` provides automatically, create a client:
+The `waniwani()` client is needed only when you call Platform APIs directly (custom event tracking via `track()`, `identify()`, KB search). It is **not** required for `createFlow` or `withWaniwani`.
 
 ```ts
 import { waniwani } from "@waniwani/sdk";
@@ -126,17 +157,12 @@ import { waniwani } from "@waniwani/sdk";
 const wani = waniwani();
 ```
 
-With no arguments, the client reads `WANIWANI_API_KEY` from the environment and uses `https://app.waniwani.ai` as the base URL. This is the recommended setup.
+With no arguments, the client reads `WANIWANI_API_KEY` from the environment and uses `https://app.waniwani.ai` as the base URL.
 
-See [API keys](/configuration/api-key) for how to obtain and configure the key.
-
-## Configuration
-
-The full `waniwani()` client config (`apiKey`, `apiUrl`, `tracking.*`) and graceful-shutdown reference live in [Client & KV store reference](/reference/kv-store-api).
+See [API keys](/configuration/api-key) for how to obtain and configure the key, and [Client & KV store reference](/reference/kv-store-api) for the full client config.
 
 ## Also supported
 
 - **Project config file.** Create a `waniwani.config.ts` with `defineConfig({ ... })` from `@waniwani/sdk`, then import it once at startup. Subsequent calls to `waniwani()` pick up the registered config.
-- **Framework adapters.** Pass the client to `toExpressJsHandler(wani, { ... })` from `@waniwani/sdk/express-js` for Express middleware.
 
-Next: [get your API key](/configuration/api-key), then [wrap your MCP server](/configuration/wrap-server).
+Next: [get your API key](/configuration/api-key) (if you want Platform features), then [wrap your MCP server](/configuration/wrap-server).
