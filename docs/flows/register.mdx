@@ -60,43 +60,52 @@ server.registerTool(
 
 Both are equivalent.
 
-## Batch registration
+## Registering widget display tools alongside flows
 
-`registerTools` from `@waniwani/sdk/mcp` registers a mix of flows and regular tools in one call. Handy when a flow needs a display tool registered alongside it.
+When a flow uses `showWidget("name", ...)`, the named display tool must be registered on the same server. Use [Skybridge's](https://docs.skybridge.tech) `server.registerWidget(name, meta, schema, handler)` — it binds the widget name to the matching React component under `web/src/widgets/<name>.tsx` and emits the widget-rendering metadata that ChatGPT, Claude, and other MCP clients understand. You don't need to set `_meta.openai/outputTemplate` by hand.
 
 ```ts
-import { registerTools } from "@waniwani/sdk/mcp";
-
-await registerTools(server, [showPricingTool, onboardingFlow, quoteFlow]);
+server
+  .registerWidget(
+    "show_pricing",
+    { description: "Display the pricing plan grid. Do NOT list plans in text." },
+    { inputSchema: { /* zod fields */ }, annotations: { readOnlyHint: true } },
+    async (input) => ({
+      structuredContent: input,
+      content: [{ type: "text", text: "Pricing shown" }],
+      isError: false,
+    }),
+  )
+  .registerTool(quoteFlow.name, quoteFlow.config, quoteFlow.handler);
 ```
+
+See the [Pet insurance example](/guides/pet-insurance#register-the-widget-display-tools) for a complete server.
 
 ## Minimal end-to-end wiring
 
-A complete `server/src/index.ts` using `@modelcontextprotocol/sdk` looks like this:
+A complete `server/src/app.ts` looks like this:
 
-```ts server/src/index.ts
+```ts server/src/app.ts
 import "dotenv/config";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { waniwani } from "@waniwani/sdk";
-import { registerTools, withWaniwani } from "@waniwani/sdk/mcp";
+import { McpServer } from "skybridge/server";
+import { withWaniwani } from "@waniwani/sdk/mcp";
 import { onboardingFlow } from "./flows/onboarding.js";
 import { quoteFlow } from "./flows/quote.js";
 
-const server = new McpServer(
+export const server = new McpServer(
   { name: "my-mcp-app", version: "0.0.1" },
-  { capabilities: { tools: {} } },
-);
+  { capabilities: {} },
+)
+  .registerTool(onboardingFlow.name, onboardingFlow.config, onboardingFlow.handler)
+  .registerTool(quoteFlow.name, quoteFlow.config, quoteFlow.handler);
 
-// Wrap first. Subsequent tool registrations are auto-tracked.
-withWaniwani(server, { client: waniwani() });
+// Wrap after registrations to auto-track every tool call.
+withWaniwani(server);
 
-// Register flows (and any regular tools or display tools).
-await registerTools(server, [onboardingFlow, quoteFlow]);
-
-// Connect your Streamable HTTP transport as usual.
+export type AppType = typeof server;
 ```
 
-`withWaniwani` is idempotent, so calling it twice on the same server is a no-op. Because it wraps `registerTool` at the point of call, it must run before you register your flows.
+`withWaniwani` is idempotent — calling it twice on the same server is a no-op. The `skybridge/server` import is what the [MCP distribution template](https://github.com/WaniWani-AI/mcp-distribution-template) uses as the dev/build runtime; it provides the `.registerWidget(...)` fluent API plus widget mounting for the React components under `web/src/widgets/`.
 
 ## Debugging a compiled flow
 

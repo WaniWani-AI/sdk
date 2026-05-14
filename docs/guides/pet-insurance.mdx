@@ -382,78 +382,82 @@ FORMATTING: Write in flowing prose, not bullet points.`;
 
 ## Register the widget display tools
 
-`showWidget("show_pet_summary", ...)` and `showWidget("show_pricing", ...)` in the flow refer to tool IDs the model will call to render each widget. Register them directly on the MCP server alongside the flow:
+`showWidget("show_pet_summary", ...)` and `showWidget("show_pricing", ...)` in the flow refer to widget names the model will call to render each card. Register them with [Skybridge's](https://docs.skybridge.tech) `registerWidget` — it binds the named widget to the matching React component under `web/src/widgets/` and handles all of the OpenAI/Claude render plumbing for you:
 
-```ts
+```ts server/src/app.ts
+import { McpServer } from "skybridge/server";
+import { withWaniwani } from "@waniwani/sdk/mcp";
 import { z } from "zod";
+import { quoteFlow } from "./flows/quote.js";
 
-server.registerTool(
-  "show_pet_summary",
-  {
-    title: "Show Pet Summary",
-    description: "Displays a confirmation card with the pet's details.",
-    inputSchema: {
-      animalType: z.enum(["dog", "cat"]),
-      petName: z.string(),
-      breed: z.string(),
-      gender: z.enum(["male", "female"]),
-      isNeutered: z.boolean(),
-      birthDate: z.string(),
-      indoorOutdoor: z.enum(["indoor", "outdoor"]).optional(),
-      municipality: z.string(),
+export const server = new McpServer(
+  { name: "pet-insurance-mcp", version: "0.0.1" },
+  { capabilities: {} },
+)
+  .registerWidget(
+    "show_pet_summary",
+    {
+      description:
+        "You MUST call this tool to display the pet summary card. Do NOT repeat the pet details in text.",
     },
-    _meta: {
-      "openai/outputTemplate": "ui://widget/pet-summary",
+    {
+      inputSchema: {
+        animalType: z.enum(["dog", "cat"]),
+        petName: z.string(),
+        breed: z.string(),
+        gender: z.enum(["male", "female"]),
+        isNeutered: z.boolean(),
+        birthDate: z.string(),
+        indoorOutdoor: z.enum(["indoor", "outdoor"]).optional(),
+        municipality: z.string(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
     },
-  },
-  async (input) => ({
-    content: [{ type: "text", text: `Pet summary for ${input.petName}` }],
-    structuredContent: input,
-  }),
-);
+    async (input) => ({
+      structuredContent: input,
+      content: [{ type: "text", text: `Pet summary for ${input.petName}` }],
+      isError: false,
+    }),
+  )
+  .registerWidget(
+    "show_pricing",
+    {
+      description:
+        "You MUST call this tool to display the pricing plan grid. The widget renders every plan — do NOT list them in text.",
+    },
+    {
+      inputSchema: {
+        petName: z.string(),
+        quoteId: z.string(),
+        plans: z.array(
+          z.object({
+            name: z.string(),
+            monthlyPrice: z.number(),
+            coverageLimit: z.number(),
+            deductible: z.number(),
+            copay: z.number(),
+            highlights: z.array(z.string()),
+          }),
+        ),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async (input) => ({
+      structuredContent: input,
+      content: [{ type: "text", text: `Pricing for ${input.petName}` }],
+      isError: false,
+    }),
+  )
+  .registerTool(quoteFlow.name, quoteFlow.config, quoteFlow.handler);
 
-server.registerTool(
-  "show_pricing",
-  {
-    title: "Show Pricing Plans",
-    description: "Displays a scrollable grid of insurance plan cards.",
-    inputSchema: {
-      petName: z.string(),
-      quoteId: z.string(),
-      plans: z.array(
-        z.object({
-          name: z.string(),
-          monthlyPrice: z.number(),
-          coverageLimit: z.number(),
-          deductible: z.number(),
-          copay: z.number(),
-          highlights: z.array(z.string()),
-        }),
-      ),
-    },
-    _meta: {
-      "openai/outputTemplate": "ui://widget/pricing",
-    },
-  },
-  async (input) => ({
-    content: [{ type: "text", text: `Pricing for ${input.petName}` }],
-    structuredContent: input,
-  }),
-);
+withWaniwani(server);
 ```
 
-The widget itself is wired through the tool's `_meta.openai/outputTemplate` (or the equivalent client-specific widget metadata). `withWaniwani(server)` will forward that metadata into every tool result so chat UIs render the widget automatically.
+The widget itself lives at `web/src/widgets/show_pet_summary.tsx` (and `show_pricing.tsx`) and mounts via `mountWidget` from `skybridge/web`. The widget name passed to `registerWidget` matches the file name — that's how Skybridge wires the binding, so you never deal with `_meta.openai/outputTemplate` URIs by hand.
 
-## Registration
-
-```ts
-import { quoteFlow } from "./flows/quote";
-
-// Register the flow (compiles into a single MCP tool)
-await quoteFlow.register(server);
-
-// Register the widget display tools above with server.registerTool(...).
-```
+<Note>
+  Skybridge ships in the [MCP distribution template](https://github.com/WaniWani-AI/mcp-distribution-template) as the default dev/build runtime. If you're starting from that template (`bun dev` runs `skybridge dev`), `registerWidget` is already available on the server you instantiate. See the [Skybridge docs](https://docs.skybridge.tech) for the full widget mounting API.
+</Note>
 
 ## Key patterns explained
 

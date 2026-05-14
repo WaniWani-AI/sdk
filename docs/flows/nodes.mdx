@@ -129,7 +129,7 @@ A widget node returns `showWidget(tool, config)`. The engine returns `status: "w
 Setting `field` enables the same auto-skip behavior as interrupts: if `selectedPlan` is already filled when the flow reaches this node, the widget is skipped. Setting `interactive: false` makes the widget display-only and auto-advances after it renders.
 
 <Note>
-  The flow itself is a data-only tool. It never returns `structuredContent`. The display tool referenced by `showWidget` is the one that renders the widget. Register both alongside each other with `registerTools(server, [displayTool, flow])`.
+  The flow itself is a data-only tool. It never returns `structuredContent`. The display tool referenced by `showWidget` is the one that renders the widget. Register the display tool with [Skybridge's](https://docs.skybridge.tech) `server.registerWidget(name, meta, schema, handler)` and the flow with `flow.register(server)` — Skybridge handles all the widget-binding metadata for you. See the [Pet insurance example](/guides/pet-insurance#register-the-widget-display-tools) for the full pattern.
 </Note>
 
 ## Async handlers
