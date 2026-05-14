@@ -10,10 +10,11 @@ This page walks through one full round-trip. If you understand the picture below
 ## The pieces
 
 ```mermaid
-flowchart LR
+flowchart TB
     Client["MCP client<br/>(ChatGPT, Claude, ...)"]
     subgraph Server["Your MCP server"]
-      Tool["Flow tool (one)"]
+      direction LR
+      Tool["Flow tool"]
       KV[("KV store")]
       Tool <-->|loads / saves| KV
     end
@@ -21,7 +22,7 @@ flowchart LR
     Tool -->|response| Client
 ```
 
-The KV store is the only place state lives between two tool calls. MCP itself is stateless: each `tools/call` is a fresh HTTP request with no memory of the previous one. Without a store, the engine has nothing to resume from.
+The KV store is the only place the flow engine looks for state between two tool calls. Your MCP server itself can be either stateful (a long-running process, e.g. stdio or single-instance HTTP) or stateless (a serverless function where every call is a fresh process). The engine doesn't assume either — it always requires a `KvStore`. In a stateful runtime, `MemoryKvStore` is enough, because the process holds the state across calls. In a stateless runtime, you need a real backing store (Redis, Upstash, Cloudflare KV, DynamoDB, or `WaniwaniKvStore`) so state survives between cold starts and instances.
 
 ## First call: `action: "start"`
 
