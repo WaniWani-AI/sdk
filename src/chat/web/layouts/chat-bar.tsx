@@ -48,6 +48,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 			placeholder = "Ask me anything...",
 			triggerEvent = "triggerDemoRequest",
 			api,
+			showToolCalls = true,
 		} = props;
 
 		const expandedWidth =
@@ -269,6 +270,7 @@ export const ChatBar = forwardRef<ChatHandle, ChatBarProps>(
 								onFollowUp={handleWidgetMessage}
 								onCallTool={handleCallTool}
 								fullscreenToolCallId={fullscreenToolCallId}
+								showToolCalls={showToolCalls}
 								toolDefinitions={engine.toolDefinitions}
 								onWidgetDisplayModeChange={(mode, widget) => {
 									setFullscreenToolCallId(

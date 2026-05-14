@@ -129,6 +129,14 @@ export interface ChatBaseProps {
 	 */
 	debug?: boolean;
 	/**
+	 * Show tool call details (request/response panels). When `false`, each
+	 * tool call renders as a compact indicator so the user can still tell
+	 * the agent is doing something, but the JSON panels are hidden.
+	 * MCP App widgets attached to a tool call are always rendered.
+	 * Defaults to `true`.
+	 */
+	showToolCalls?: boolean;
+	/**
 	 * Skip fetching `/config` and `/tools` from the API on mount.
 	 * Use when the chat endpoint doesn't serve these routes (e.g. embed widgets
 	 * talking directly to the WaniWani app).

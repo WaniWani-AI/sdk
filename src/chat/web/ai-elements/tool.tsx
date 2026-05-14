@@ -273,6 +273,41 @@ export function ToolHeader({
 	);
 }
 
+export type ToolIndicatorProps = HTMLAttributes<HTMLDivElement> & {
+	title?: string;
+	state: ToolUIPart["state"];
+};
+
+/**
+ * Compact, non-interactive replacement for {@link ToolHeader} +
+ * {@link ToolContent}. Shows just the tool title in muted text, with a
+ * pulsing dot while the tool is still running — enough for the user to
+ * know the agent is doing something without implying there are
+ * request/response details to expand.
+ */
+export function ToolIndicator({
+	className,
+	title,
+	state,
+	...props
+}: ToolIndicatorProps) {
+	const isRunning = state === "input-available" || state === "input-streaming";
+	return (
+		<div
+			className={cn(
+				"ww:mb-4 ww:flex ww:items-center ww:gap-2 ww:py-1.5 ww:text-sm ww:text-muted-foreground ww:italic",
+				className,
+			)}
+			{...props}
+		>
+			<span className="ww:truncate">{title}</span>
+			{isRunning && (
+				<span className="ww:size-2 ww:shrink-0 ww:rounded-full ww:bg-primary ww:animate-pulse" />
+			)}
+		</div>
+	);
+}
+
 export type ToolServerInfoProps = HTMLAttributes<HTMLDivElement> & {
 	serverName?: string;
 	serverIcon?: string;

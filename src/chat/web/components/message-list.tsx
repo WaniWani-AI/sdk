@@ -19,6 +19,7 @@ import {
 	ToolContent,
 	type ToolDefinitionsMap,
 	ToolHeader,
+	ToolIndicator,
 	ToolInput,
 	ToolOutput,
 } from "../ai-elements/tool";
@@ -81,6 +82,13 @@ interface MessageListProps {
 	/** When true, show _meta in tool call inputs and outputs. */
 	debug?: boolean;
 	/**
+	 * Show tool call details (request/response panels). When `false`, render a
+	 * compact tool indicator instead so the user can still tell the agent is
+	 * doing something. MCP App widgets attached to a tool call are always
+	 * rendered regardless of this flag. Defaults to `true`.
+	 */
+	showToolCalls?: boolean;
+	/**
 	 * Cached tool catalog keyed by tool name. Drives spec-canonical widget
 	 * resolution: if a tool's definition `_meta` carries a widget resource
 	 * URI, the widget renders regardless of whether the server echoed it
@@ -104,6 +112,7 @@ export function MessageList({
 	onWidgetDisplayModeChange,
 	fullscreenToolCallId,
 	debug,
+	showToolCalls = true,
 	toolDefinitions,
 }: MessageListProps) {
 	const isLoading = status === "submitted" || status === "streaming";
@@ -198,24 +207,31 @@ export function MessageList({
 									}
 								>
 									<div style={isFullscreen ? { display: "none" } : undefined}>
-										<Tool>
-											<ToolHeader
+										{showToolCalls ? (
+											<Tool>
+												<ToolHeader
+													title={part.title ?? formatToolName(part.toolName)}
+													state={part.state}
+												/>
+												<ToolContent>
+													<ToolInput input={part.input} debug={debug} />
+													{output !== undefined && (
+														<ToolOutput
+															output={output}
+															errorText={
+																"errorText" in part ? part.errorText : undefined
+															}
+															debug={debug}
+														/>
+													)}
+												</ToolContent>
+											</Tool>
+										) : (
+											<ToolIndicator
 												title={part.title ?? formatToolName(part.toolName)}
 												state={part.state}
 											/>
-											<ToolContent>
-												<ToolInput input={part.input} debug={debug} />
-												{output !== undefined && (
-													<ToolOutput
-														output={output}
-														errorText={
-															"errorText" in part ? part.errorText : undefined
-														}
-														debug={debug}
-													/>
-												)}
-											</ToolContent>
-										</Tool>
+										)}
 									</div>
 									{resourceUri && resourceEndpoint && output !== undefined && (
 										<WidgetErrorBoundary>
