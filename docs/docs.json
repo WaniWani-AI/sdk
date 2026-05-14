@@ -109,12 +109,12 @@
           {
             "group": "Build a funnel",
             "pages": [
-              "funnels/overview",
-              "funnels/sales-funnel",
-              "funnels/lead-generation",
-              "funnels/booking",
-              "funnels/insurance-quote",
-              "flows/examples"
+              "guides/funnels",
+              "guides/sales-funnel",
+              "guides/lead-generation",
+              "guides/booking",
+              "guides/insurance-quote",
+              "guides/pet-insurance"
             ]
           }
         ]
@@ -135,6 +135,12 @@
   "redirects": [
     { "source": "/reference/tiers", "destination": "/platform/overview" },
     { "source": "/flows/self-hosting", "destination": "/deployment/self-hosting" },
+    { "source": "/flows/examples", "destination": "/guides/pet-insurance" },
+    { "source": "/funnels/overview", "destination": "/guides/funnels" },
+    { "source": "/funnels/sales-funnel", "destination": "/guides/sales-funnel" },
+    { "source": "/funnels/lead-generation", "destination": "/guides/lead-generation" },
+    { "source": "/funnels/booking", "destination": "/guides/booking" },
+    { "source": "/funnels/insurance-quote", "destination": "/guides/insurance-quote" },
     { "source": "/migration", "destination": "/changelog" },
     { "source": "/legacy/tools-resources", "destination": "/platform/overview" },
     { "source": "/legacy/widget-hooks", "destination": "/platform/overview" },

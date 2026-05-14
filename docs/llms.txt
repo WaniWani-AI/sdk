@@ -51,17 +51,17 @@ Use these APIs for all new MCP funnels. They work standalone with any KV backend
 - [Interrupts](https://docs.waniwani.ai/flows/interrupts): Pause to ask one or more questions, validate answers, re-ask on error.
 - [KV store adapters](https://docs.waniwani.ai/flows/kv-store): Plug Redis, Upstash, Cloudflare KV, DynamoDB, or any get/set/delete backend.
 - [Compile & register](https://docs.waniwani.ai/flows/register): Wire a compiled flow onto an MCP server end-to-end.
-- [Example: Pet insurance quote](https://docs.waniwani.ai/flows/examples): Production-grade flow with validation, branching, widgets, correction loops.
+- [Example: Pet insurance quote](https://docs.waniwani.ai/guides/pet-insurance): Production-grade flow with validation, branching, widgets, correction loops.
 
 ## Build a funnel (recipes)
 
 Each recipe is a complete `createFlow` example for a specific funnel pattern.
 
-- [Funnels overview](https://docs.waniwani.ai/funnels/overview): Funnel vocabulary mapped to flow engine concepts.
-- [Sales funnel MCP](https://docs.waniwani.ai/funnels/sales-funnel): Qualify intent, capture lead, branch by stage, push to CRM.
-- [Lead generation MCP](https://docs.waniwani.ai/funnels/lead-generation): Email + role + use case capture, webhook to CRM.
-- [Booking MCP](https://docs.waniwani.ai/funnels/booking): Pick service, check availability, pick slot, confirm.
-- [Insurance/pricing quote MCP](https://docs.waniwani.ai/funnels/insurance-quote): Collect details, validate, call pricing API, return widget cards.
+- [Funnels overview](https://docs.waniwani.ai/guides/funnels): Funnel vocabulary mapped to flow engine concepts.
+- [Sales funnel MCP](https://docs.waniwani.ai/guides/sales-funnel): Qualify intent, capture lead, branch by stage, push to CRM.
+- [Lead generation MCP](https://docs.waniwani.ai/guides/lead-generation): Email + role + use case capture, webhook to CRM.
+- [Booking MCP](https://docs.waniwani.ai/guides/booking): Pick service, check availability, pick slot, confirm.
+- [Insurance/pricing quote MCP](https://docs.waniwani.ai/guides/insurance-quote): Collect details, validate, call pricing API, return widget cards.
 
 ## Deployment
 

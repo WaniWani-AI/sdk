@@ -1,5 +1,5 @@
 ---
-title: Build an insurance quote MCP
+title: "Insurance quote"
 description: "Build an insurance quote MCP: collect pet/vehicle/home details, validate, call your pricing API, return a quote with widget cards."
 keywords: ["insurance quote MCP", "pricing quote", "pet insurance", "quote flow"]
 ---
@@ -8,7 +8,7 @@ This page shows you how to **build an insurance quote MCP** with `@waniwani/sdk`
 
 ## Production example
 
-The most complete example in the docs is the **[Pet Insurance Quote flow](/flows/examples)**. It demonstrates every pattern an insurance quote funnel needs:
+The most complete example in the docs is the **[Pet Insurance Quote flow](/guides/pet-insurance)**. It demonstrates every pattern an insurance quote funnel needs:
 
 - **Open-ended extraction.** One question pulls 5+ fields out of free-form text.
 - **Conversational follow-ups.** Ask the rest 1-2 at a time, not as a form.
@@ -20,7 +20,7 @@ The most complete example in the docs is the **[Pet Insurance Quote flow](/flows
 - **Adjustment loop.** User tweaks deductible/copay, recalculate, re-render.
 - **Compliance rules in the description.** Embedded "no recommendation" guardrails.
 
-Open [the Pet Insurance Quote example](/flows/examples) for the full ~250-line code.
+Open [the Pet Insurance Quote example](/guides/pet-insurance) for the full ~250-line code.
 
 ## Why an MCP funnel beats a quote form
 
@@ -97,7 +97,7 @@ export const quoteFunnel = createFlow({
   .compile();
 ```
 
-See the [full Pet Insurance Quote code](/flows/examples) for working versions of `show_confirmation`, `show_pricing`, the correction loop, and the adjustment loop.
+See the [full Pet Insurance Quote code](/guides/pet-insurance) for working versions of `show_confirmation`, `show_pricing`, the correction loop, and the adjustment loop.
 
 ## Add funnel analytics
 
@@ -106,8 +106,8 @@ Set `WANIWANI_API_KEY` to track step-by-step drop-off across your quote funnel: 
 ## Next
 
 <CardGroup cols={2}>
-  <Card title="Pet Insurance Quote (full example)" icon="shield" href="/flows/examples" />
-  <Card title="Widgets in flows" icon="window-maximize" href="/flows/examples" />
-  <Card title="Build a booking MCP app" icon="calendar" href="/funnels/booking" />
-  <Card title="Build a sales funnel MCP" icon="filter" href="/funnels/sales-funnel" />
+  <Card title="Pet Insurance Quote (full example)" icon="shield" href="/guides/pet-insurance" />
+  <Card title="Widgets in flows" icon="window-maximize" href="/guides/pet-insurance" />
+  <Card title="Build a booking MCP app" icon="calendar" href="/guides/booking" />
+  <Card title="Build a sales funnel MCP" icon="filter" href="/guides/sales-funnel" />
 </CardGroup>

@@ -1,5 +1,5 @@
 ---
-title: Build a booking MCP app
+title: "Booking"
 description: "Build a booking MCP app: pick a service, check availability, pick a slot, confirm. Runs as a single MCP tool."
 keywords: ["booking MCP", "appointment booking", "availability check", "slot picker"]
 ---
@@ -127,7 +127,7 @@ await bookingFunnel.register(server);
 
 - **Recurring availability cache.** Skip the `fetch_availability` node by pre-loading slots and rotating them daily.
 - **Multi-service with conditional branching.** Branch on `service` to ask different follow-up questions (e.g. "Bringing a guest?" only for consultations). See [Flows → Edges](/flows/edges).
-- **Add a confirmation widget.** Use `showWidget` to display the booking card visually. See the [Pet Insurance Quote example](/flows/examples) for the widget handoff pattern.
+- **Add a confirmation widget.** Use `showWidget` to display the booking card visually. See the [Pet Insurance Quote example](/guides/pet-insurance) for the widget handoff pattern.
 
 ## Add funnel analytics
 
@@ -136,8 +136,8 @@ Set `WANIWANI_API_KEY` and you'll see step-by-step drop-off using the node label
 ## Next
 
 <CardGroup cols={2}>
-  <Card title="Build a sales funnel MCP" icon="filter" href="/funnels/sales-funnel" />
-  <Card title="Build an insurance quote MCP" icon="shield" href="/funnels/insurance-quote" />
-  <Card title="Widgets in flows" icon="window-maximize" href="/flows/examples" />
+  <Card title="Build a sales funnel MCP" icon="filter" href="/guides/sales-funnel" />
+  <Card title="Build an insurance quote MCP" icon="shield" href="/guides/insurance-quote" />
+  <Card title="Widgets in flows" icon="window-maximize" href="/guides/pet-insurance" />
   <Card title="Conditional edges" icon="code-branch" href="/flows/edges" />
 </CardGroup>
