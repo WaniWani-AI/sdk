@@ -3,10 +3,10 @@ title: Chat in React
 description: "Embed the WaniWani chat as a React component in your app."
 ---
 
-For React apps where you want full control over placement, theming, and lifecycle, import the chat widget directly from `@waniwani/sdk/chat`.
+For React apps where you want full control over layout, theming, and lifecycle, import the chat directly from `@waniwani/sdk/chat`.
 
 <Note>
-**Platform feature.** Requires a WaniWani API key (project ID). [Get one at app.waniwani.ai](https://app.waniwani.ai) or read more about the [Platform](/platform/overview).
+**Platform feature.** Requires a WaniWani project token (`wwp_...`). [Get one at app.waniwani.ai](https://app.waniwani.ai) or read more about the [Platform](/platform/overview).
 </Note>
 
 ## Install
@@ -21,56 +21,88 @@ Add the stylesheet to your app once (e.g. in `_app.tsx` or your root layout):
 import "@waniwani/sdk/chat/styles.css";
 ```
 
-## Basic usage
+## Layouts
+
+Three layout primitives ship from `@waniwani/sdk/chat`. Pick the one that fits your page:
 
 ```tsx
-import { ChatWidget } from "@waniwani/sdk/chat";
+import { ChatBar, ChatCard, ChatEmbed } from "@waniwani/sdk/chat";
+```
 
-export default function App() {
+| Component | What it renders | Good for |
+|---|---|---|
+| `ChatBar` | A compact bar pinned at the bottom of its container that expands upward into a chat panel when clicked. | Marketing pages, app footers. |
+| `ChatCard` | An always-visible card with a header. Sized via `width` / `height`. | Sidebars, dashboards, dedicated chat panes. |
+| `ChatEmbed` | A borderless chat that fills its parent container. Bring your own backend `api`. | Embedding inside existing layouts that already provide chrome. |
+
+There is no floating-bubble layout. If you want a fixed-corner widget, wrap one of the above in your own positioned container.
+
+## ChatBar
+
+```tsx
+import { ChatBar } from "@waniwani/sdk/chat";
+
+export default function Page() {
   return (
-    <ChatWidget
-      projectId="wwp_..."
-      theme="auto"
-      placement="bottom-right"
+    <ChatBar
+      apiKey="wwp_..."
+      title="Assistant"
+      welcomeMessage="How can I help?"
+      suggestions={["Get started", "Pricing", "Talk to sales"]}
     />
   );
 }
 ```
 
-`<ChatWidget>` renders a floating bubble + panel, scoped to its own Shadow DOM so your global styles don't leak in (and ours don't leak out).
+`ChatBar` talks to the WaniWani hosted backend by default. Override `api` if you proxy through your own server.
 
-## Layout variants
-
-For more control over placement, use one of the layout primitives:
+## ChatCard
 
 ```tsx
-import { ChatCard, ChatBar, ChatEmbed } from "@waniwani/sdk/chat";
+import { ChatCard } from "@waniwani/sdk/chat";
 
-// Pinned card with a fixed size
-<ChatCard projectId="wwp_..." className="w-[400px] h-[600px]" />
+<ChatCard
+  apiKey="wwp_..."
+  title="Sales"
+  width={420}
+  height={600}
+/>;
+```
 
-// Bottom-of-page bar
-<ChatBar projectId="wwp_..." />
+## ChatEmbed
 
-// Inline embedded chat (fills its container)
-<ChatEmbed projectId="wwp_..." />
+Bring-your-own-backend variant. `api` is required; there is no default.
+
+```tsx
+import { ChatEmbed } from "@waniwani/sdk/chat";
+
+<ChatEmbed
+  api="/api/my-chat"
+  body={{ environmentId, sessionId }}
+  theme={{ backgroundColor: "#fff" }}
+/>;
 ```
 
 ## Theming
 
-The chat exposes a small set of CSS variables for branding:
+Themes are objects keyed by role. Merge with the default theme via `mergeTheme`:
 
 ```tsx
-import { ChatWidget, mergeTheme, DEFAULT_THEME } from "@waniwani/sdk/chat";
+import { ChatBar, mergeTheme, DEFAULT_THEME } from "@waniwani/sdk/chat";
 
 const theme = mergeTheme(DEFAULT_THEME, {
-  primary: "#03d916",
-  background: "#fffaf0",
+  primaryColor: "#03d916",
+  backgroundColor: "#fffaf0",
+  textColor: "#1a1a1a",
 });
 
-<ChatWidget projectId="wwp_..." theme={theme} />
+<ChatBar apiKey="wwp_..." theme={theme} />;
 ```
+
+Full theme keys: see [`ChatTheme`](https://github.com/WaniWani-AI/sdk/blob/main/src/chat/web/%40types.ts).
 
 ## How it works
 
-The widget talks directly to `app.waniwani.ai/api/chat` from the browser. No server-side handler required on your side.
+`ChatBar` and `ChatCard` post to the WaniWani hosted chat endpoint (`app.waniwani.ai/api/mcp/chat`) using your project token, and stream responses back through Server-Sent Events. Pass an `api` prop to proxy through your own backend.
+
+`ChatEmbed` is backend-agnostic: pass any `api` endpoint that implements the [Vercel AI SDK chat protocol](https://ai-sdk.dev) and the component handles the rest.
