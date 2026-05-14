@@ -30,16 +30,6 @@
             ]
           },
           {
-            "group": "Build a funnel",
-            "pages": [
-              "funnels/overview",
-              "funnels/sales-funnel",
-              "funnels/lead-generation",
-              "funnels/booking",
-              "funnels/insurance-quote"
-            ]
-          },
-          {
             "group": "Flow engine",
             "pages": [
               "flows/overview",
@@ -111,6 +101,21 @@
             "pages": [
               "guides/skills",
               "guides/commands"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Build a funnel",
+            "pages": [
+              "funnels/overview",
+              "funnels/sales-funnel",
+              "funnels/lead-generation",
+              "funnels/booking",
+              "funnels/insurance-quote"
             ]
           }
         ]
