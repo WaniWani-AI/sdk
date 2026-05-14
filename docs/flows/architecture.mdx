@@ -9,18 +9,16 @@ This page walks through one full round-trip. If you understand the picture below
 
 ## The pieces
 
-```
-┌──────────────┐    tools/call         ┌───────────────────────────────┐
-│  MCP client  │ ─────────────────────▶│  Your MCP server              │
-│  (ChatGPT,   │                       │  ┌─────────────────────────┐  │
-│  Claude, …)  │ ◀──── response ───────│  │  Flow tool (one)        │  │
-└──────────────┘                       │  │   ↕  loads / saves      │  │
-                                       │  └─────────┬───────────────┘  │
-                                       │            ▼                  │
-                                       │       ┌────────┐              │
-                                       │       │ KV store│             │
-                                       │       └────────┘              │
-                                       └───────────────────────────────┘
+```mermaid
+flowchart LR
+    Client["MCP client<br/>(ChatGPT, Claude, ...)"]
+    subgraph Server["Your MCP server"]
+      Tool["Flow tool (one)"]
+      KV[("KV store")]
+      Tool <-->|loads / saves| KV
+    end
+    Client -->|tools/call| Tool
+    Tool -->|response| Client
 ```
 
 The KV store is the only place state lives between two tool calls. MCP itself is stateless: each `tools/call` is a fresh HTTP request with no memory of the previous one. Without a store, the engine has nothing to resume from.
