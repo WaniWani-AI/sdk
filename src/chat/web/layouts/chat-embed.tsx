@@ -86,6 +86,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 		>(null);
 		const rootRef = useRef<HTMLDivElement>(null);
 		const scrollRef = useRef<HTMLDivElement>(null);
+		const scrollContentRef = useRef<HTMLDivElement>(null);
 		const bottomRef = useRef<HTMLDivElement>(null);
 		const [atBottom, setAtBottom] = useState(true);
 		const atBottomRef = useRef(atBottom);
@@ -133,10 +134,18 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			return () => observer.disconnect();
 		}, []);
 
-		// Auto-scroll on new messages / streaming tokens when user is at bottom.
+		// Auto-scroll on new messages / streaming tokens. When the user
+		// just sent a message we always jump to the bottom — they expect
+		// to see what they typed and the response forming below it. For
+		// streaming assistant tokens we only stick if the user is already
+		// at the bottom, so reading older messages mid-stream isn't yanked
+		// away. Forcing the scroll on user submit also flips `atBottom`
+		// back to true, so widget iframes growing afterward (via the
+		// content ResizeObserver below) re-stick the view too.
 		// biome-ignore lint/correctness/useExhaustiveDependencies: scroll on length + last-message identity changes
 		useEffect(() => {
-			if (atBottomRef.current) {
+			const last = engine.messages[engine.messages.length - 1];
+			if (last?.role === "user" || atBottomRef.current) {
 				scrollToBottom("smooth");
 			}
 		}, [engine.messages.length, engine.messages[engine.messages.length - 1]]);
@@ -145,22 +154,50 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			scrollToBottom("auto");
 		}, [scrollToBottom]);
 
-		// Keep the view pinned to the bottom when the scroll container resizes.
-		// The embed's host can settle asynchronously (ResizeObserver mirroring
-		// the parent's max-height runs after the first paint), which shrinks
-		// the scroll container and would otherwise leave scrollTop at 0 even
-		// though the initial mount effect already ran.
+		// Keep the view pinned to the bottom whenever either the scroll
+		// container or its inner content resizes. Two reasons:
+		//   - The embed host can settle asynchronously (`ResizeObserver`
+		//     mirroring the parent's max-height runs after the first paint)
+		//     which shrinks the scroll container.
+		//   - MCP App widgets render in iframes that grow once their
+		//     handshake completes and the host reports its content height;
+		//     the React `messages` array doesn't change, so the
+		//     length/identity effect above can't catch it.
+		//
+		// Track the previous scrollHeight so we can decide whether the user
+		// was at the bottom *before* this resize. `atBottom` from the
+		// IntersectionObserver is racy here: when an iframe suddenly grows,
+		// the bottom sentinel flicks out of view and the IO fires before
+		// the RO callback, leaving `atBottomRef.current = false` even
+		// though the user was clearly stuck to the bottom moments earlier.
 		useEffect(() => {
-			const scroller = scrollRef.current;
-			if (!scroller || typeof ResizeObserver === "undefined") {
+			if (typeof ResizeObserver === "undefined") {
 				return;
 			}
+			const scroller = scrollRef.current;
+			const content = scrollContentRef.current;
+			if (!scroller && !content) {
+				return;
+			}
+			let prevScrollHeight = scroller?.scrollHeight ?? 0;
 			const observer = new ResizeObserver(() => {
-				if (atBottomRef.current) {
+				const s = scrollRef.current;
+				if (!s) {
+					return;
+				}
+				const wasAtBottom =
+					s.scrollTop + s.clientHeight >= prevScrollHeight - 5;
+				prevScrollHeight = s.scrollHeight;
+				if (wasAtBottom) {
 					scrollToBottom("auto");
 				}
 			});
-			observer.observe(scroller);
+			if (scroller) {
+				observer.observe(scroller);
+			}
+			if (content) {
+				observer.observe(content);
+			}
 			return () => observer.disconnect();
 		}, [scrollToBottom]);
 
@@ -292,6 +329,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 					)}
 				>
 					<div
+						ref={scrollContentRef}
 						className={cn(
 							"ww:mx-auto ww:w-full ww:max-w-3xl ww:px-4 ww:py-6 ww:flex ww:flex-col ww:gap-6",
 							fullscreenToolCallId && "ww:!py-0",
