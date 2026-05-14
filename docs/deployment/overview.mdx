@@ -1,0 +1,105 @@
+---
+title: Deployment
+description: "Run your WaniWani-powered MCP app on managed hosting or self-host it yourself (Docker, Alpic, Vercel)."
+---
+
+There are two ways to run a WaniWani-powered MCP app.
+
+<CardGroup cols={2}>
+  <Card title="Managed" icon="cloud" href="#managed-projects">
+    WaniWani hosts your app. Provisioned, pre-configured, push to main and it deploys. Fastest path.
+  </Card>
+  <Card title="Self-hosted" icon="server" href="#self-hosted-projects">
+    You host the app yourself. Docker, Alpic, or Vercel. Connect by giving us the MCP URL.
+  </Card>
+</CardGroup>
+
+Both paths use the same [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-template). Pick based on where you want the server to live.
+
+## Managed projects
+
+When you create a managed project in the [WaniWani dashboard](https://app.waniwani.ai), we provision a copy of the distribution template fully wired up: API keys set, hosted URL assigned, everything ready. You don't configure anything.
+
+Typical workflow:
+
+<Steps>
+  <Step title="Create the project">
+    From [app.waniwani.ai](https://app.waniwani.ai), create a managed project. We spin up a repo from the template and deploy it on our managed hosting. Your tools, flows, widgets, and chat surface are live immediately.
+  </Step>
+
+  <Step title="Take ownership of the code">
+    Move the provisioned repo into your own GitHub organization when you want full control over the codebase. You keep the managed hosting; you just own the source now.
+  </Step>
+
+  <Step title="Push to main">
+    Every push to `main` auto-deploys to our managed hosting environment. API keys, URLs, and tracking continue to flow without any setup on your side.
+  </Step>
+</Steps>
+
+Best for: getting started fast, teams that don't want to run infrastructure, and projects that want one less moving part to maintain.
+
+## Self-hosted projects
+
+You run the server. WaniWani still powers state and tracking by default (set `WANIWANI_API_KEY` and you get hosted KV + dashboards out of the box), so the only thing you operate is the MCP app itself. If you want to push that further and self-host the state layer too, see [Advanced: bring your own session cache](#advanced-bring-your-own-session-cache) below.
+
+The [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-template) ships three deployment targets. Pick whichever fits your stack.
+
+<CardGroup cols={3}>
+  <Card title="Docker" icon="box" href="#docker">
+    Run anywhere a container runs.
+  </Card>
+  <Card title="Alpic" icon="bolt" href="#alpic">
+    MCP-native runtime.
+  </Card>
+  <Card title="Vercel" icon="triangle" href="#vercel">
+    One command from the template root.
+  </Card>
+</CardGroup>
+
+### Docker
+
+The template ships a `Dockerfile`. Build and run anywhere a container runs (Fly.io, Render, Railway, ECS, GCP Cloud Run, your own VPS, Kubernetes).
+
+```bash
+docker build -t my-mcp-app .
+docker run --env-file .env -p 3000:3000 my-mcp-app
+```
+
+Set `WANIWANI_API_KEY` and any backend secrets in the runtime's environment.
+
+### Alpic
+
+Deploy to [Alpic](https://github.com/alpic-ai/skybridge), an MCP-native hosting runtime. Follow Alpic's deployment instructions for the template repo. The SDK is tested against the Skybridge runtime, so flows, tracking, and widgets work out of the box.
+
+### Vercel
+
+```bash
+vercel deploy
+```
+
+From the template root. Set `WANIWANI_API_KEY` and any backend secrets in your Vercel project's environment variables.
+
+### Connect to WaniWani
+
+Once your app is deployed, copy its public MCP URL (the endpoint where MCP clients send `initialize` / `tools/call` requests). In the WaniWani dashboard, create a self-hosted project and paste that URL. WaniWani uses it as the entry point for chat requests, widget rendering, and analytics ingestion.
+
+### Advanced: bring your own session cache
+
+By default a self-hosted project still uses `WaniwaniKvStore` for flow state (encrypted at rest, hosted by WaniWani, automatic when `WANIWANI_API_KEY` is set). That's the recommended setup: zero infrastructure to run for the state layer.
+
+If you want zero dependency on `app.waniwani.ai` for state too, plug in your own `KvStore` adapter at `.compile()` time:
+
+```ts
+import { createFlow } from "@waniwani/sdk/mcp";
+import { flowStore } from "./kv-store"; // your Redis / Upstash / DynamoDB / SQLite adapter
+
+const flow = createFlow({ /* ... */ }).compile({ store: flowStore });
+```
+
+See [KV store adapters](/flows/kv-store) for recipes (Redis, Upstash, Cloudflare KV, DynamoDB, SQLite) and the full [Persistence](/flows/self-hosting) walkthrough.
+
+This is the "fully self-hosted" path: your server, your state. You can still send tracking events to WaniWani by calling `withWaniwani(server)` separately, or skip that entirely for a pure OSS setup.
+
+## Tracking is separate
+
+Tracking is independent of where your server lives and where your state lives. Both managed and self-hosted projects emit events through `withWaniwani(server)` and `client.track()`, and both surface in the same WaniWani dashboard. See [Tiers](/reference/tiers) for what's included and [Tracking](/tracking/overview) for the event pipeline.

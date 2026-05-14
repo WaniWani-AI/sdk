@@ -52,6 +52,12 @@
             ]
           },
           {
+            "group": "Deployment",
+            "pages": [
+              "deployment/overview"
+            ]
+          },
+          {
             "group": "Persistence",
             "pages": [
               "flows/kv-store",

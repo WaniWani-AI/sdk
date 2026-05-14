@@ -8,7 +8,7 @@ A flow needs a place to persist its state between MCP calls. MCP tools are state
 `createFlow` persists this state through a tiny `KvStore` interface. Implement it against any key-value backend: Redis, Upstash, Cloudflare KV, DynamoDB, even a SQLite table. The SDK ships two implementations out of the box, and you can write your own in ~10 lines.
 
 <Note>
-  The KV store powers the flow engine only. It is **not** what drives dashboards, funnel analytics, or event tracking — those are a separate pipeline fed by `withWaniwani(server)` and `client.track()`. You can run a fully self-hosted KV (no API key, nothing leaves your infra) and still get hosted dashboards by also calling `withWaniwani(server)` with `WANIWANI_API_KEY` set. The two paths are independent.
+  The KV store powers the flow engine only. It is **not** what drives dashboards, funnel analytics, or event tracking. Those are a separate pipeline fed by `withWaniwani(server)` and `client.track()`. You can run a fully self-hosted KV (no API key, nothing leaves your infra) and still get hosted dashboards by also calling `withWaniwani(server)` with `WANIWANI_API_KEY` set. The two paths are independent.
 </Note>
 
 ## The interface

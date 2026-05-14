@@ -6,7 +6,7 @@ description: "Expose your local MCP server to ChatGPT, Claude, and other remote 
 MCP clients like ChatGPT and Claude need a public URL to reach your server. A tunnel forwards traffic from a public URL to your local dev server -- no deployment required.
 
 <Note>
-  **Managed projects** handle this automatically. `bun dev` starts a Cloudflare tunnel and prints the public URL. This guide is for **external projects** or custom setups.
+  If you started from the [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-template), `bun dev` already spawns a Cloudflare tunnel and prints the public URL. You don't need this guide. Continue only if you're running a custom dev server.
 </Note>
 
 ## 1. Start your dev server
