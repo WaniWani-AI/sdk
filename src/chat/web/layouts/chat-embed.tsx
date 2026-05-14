@@ -164,12 +164,17 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 		//     the React `messages` array doesn't change, so the
 		//     length/identity effect above can't catch it.
 		//
-		// Track the previous scrollHeight so we can decide whether the user
-		// was at the bottom *before* this resize. `atBottom` from the
-		// IntersectionObserver is racy here: when an iframe suddenly grows,
-		// the bottom sentinel flicks out of view and the IO fires before
-		// the RO callback, leaving `atBottomRef.current = false` even
-		// though the user was clearly stuck to the bottom moments earlier.
+		// Track the previous scrollHeight *and* clientHeight so we can
+		// decide whether the user was at the bottom *before* this resize.
+		// `atBottom` from the IntersectionObserver is racy here: when an
+		// iframe suddenly grows, the bottom sentinel flicks out of view
+		// and the IO fires before the RO callback, leaving
+		// `atBottomRef.current = false` even though the user was clearly
+		// stuck to the bottom moments earlier. Both dimensions need the
+		// pre-resize value: e.g. when the host shrinks (its mirrored
+		// max-height settling), clientHeight drops while scrollHeight is
+		// unchanged, and using the post-resize clientHeight against the
+		// pre-resize scrollHeight would miss the at-bottom case.
 		useEffect(() => {
 			if (typeof ResizeObserver === "undefined") {
 				return;
@@ -180,14 +185,16 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 				return;
 			}
 			let prevScrollHeight = scroller?.scrollHeight ?? 0;
+			let prevClientHeight = scroller?.clientHeight ?? 0;
 			const observer = new ResizeObserver(() => {
 				const s = scrollRef.current;
 				if (!s) {
 					return;
 				}
 				const wasAtBottom =
-					s.scrollTop + s.clientHeight >= prevScrollHeight - 5;
+					s.scrollTop + prevClientHeight >= prevScrollHeight - 5;
 				prevScrollHeight = s.scrollHeight;
+				prevClientHeight = s.clientHeight;
 				if (wasAtBottom) {
 					scrollToBottom("auto");
 				}
