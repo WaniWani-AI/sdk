@@ -39,8 +39,7 @@
               "flows/edges",
               "flows/interrupts",
               "flows/kv-store",
-              "flows/register",
-              "flows/examples"
+              "flows/register"
             ]
           },
           {
@@ -114,7 +113,8 @@
               "funnels/sales-funnel",
               "funnels/lead-generation",
               "funnels/booking",
-              "funnels/insurance-quote"
+              "funnels/insurance-quote",
+              "flows/examples"
             ]
           }
         ]

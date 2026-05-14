@@ -1,13 +1,15 @@
 ---
-title: "Example: Pet Insurance Quote"
-description: "A production-grade flow showcasing open-ended questions, validation, conditional branching, widgets, and correction loops."
-keywords: ["pet insurance flow", "production flow example", "validation example", "widget flow example"]
+title: "Real example: Pet Insurance Quote"
+description: "Walk-through of a real production pet insurance quoting flow we built for a WaniWani customer. Showcases open-ended questions, validation, conditional branching, widgets, and correction loops."
+keywords: ["pet insurance flow", "production flow example", "real customer example", "validation example", "widget flow example", "case study"]
 ---
 
-This example is a simplified version of a production pet insurance quoting flow. It demonstrates how flows handle complex, multi-step conversations that feel natural, not like filling out a form.
+This is a real flow shipped in production by a WaniWani customer — a pet insurance distributor selling policies through their own MCP. It's the kind of build we open-sourced WaniWani for: a multi-step quote conversation that has to feel natural, validate input strictly, branch on edge cases (mixed-breed dogs), and let the user correct themselves without restarting.
+
+We're showing it here, simplified and anonymized, because every pattern in it is one we hit repeatedly across customer projects — and the shape of the answer is what `createFlow` was designed around.
 
 <Note>
-API calls use a fictional `petApi` for clarity. The patterns and architecture are real.
+API calls use a fictional `petApi` and the pricing logic is anonymized. The graph shape, validation patterns, widget hand-off, and correction loop are exactly as deployed.
 </Note>
 
 ## Flow graph
