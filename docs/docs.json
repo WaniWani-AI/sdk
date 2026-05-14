@@ -44,10 +44,11 @@
             "pages": [
               "flows/overview",
               "flows/architecture",
+              "flows/state",
               "flows/nodes",
               "flows/edges",
               "flows/interrupts",
-              "flows/state",
+              "flows/kv-store",
               "flows/register",
               "flows/examples"
             ]
@@ -55,14 +56,8 @@
           {
             "group": "Deployment",
             "pages": [
-              "deployment/overview"
-            ]
-          },
-          {
-            "group": "Persistence",
-            "pages": [
-              "flows/kv-store",
-              "flows/self-hosting"
+              "deployment/overview",
+              "deployment/self-hosting"
             ]
           },
           {
@@ -124,6 +119,7 @@
   },
   "redirects": [
     { "source": "/reference/tiers", "destination": "/platform/overview" },
+    { "source": "/flows/self-hosting", "destination": "/deployment/self-hosting" },
     { "source": "/legacy/tools-resources", "destination": "/platform/overview" },
     { "source": "/legacy/widget-hooks", "destination": "/platform/overview" },
     { "source": "/legacy/chat-adapters", "destination": "/chat/react" },

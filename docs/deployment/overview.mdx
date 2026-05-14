@@ -40,7 +40,7 @@ Best for: getting started fast, teams that don't want to run infrastructure, and
 
 ## Self-hosted server
 
-You run the server. By default we recommend connecting the [Platform](/platform/overview): set `WANIWANI_API_KEY` and you get hosted state + dashboards on top of your self-hosted server, with no extra infra. If you want to push that further and self-host the state layer too, see [Advanced: bring your own session cache](#advanced-bring-your-own-session-cache) below. If you want zero Platform dependency at all (no API key, no outbound calls), see the [open-source self-hosting walkthrough](/flows/self-hosting).
+You run the server. By default we recommend connecting the [Platform](/platform/overview): set `WANIWANI_API_KEY` and you get hosted state + dashboards on top of your self-hosted server, with no extra infra. If you want to push that further and self-host the state layer too, see [Advanced: bring your own session cache](#advanced-bring-your-own-session-cache) below. If you want zero Platform dependency at all (no API key, no outbound calls), see the [open-source self-hosting walkthrough](/deployment/self-hosting).
 
 The [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-template) ships three deployment targets. Pick whichever fits your stack.
 
@@ -96,7 +96,7 @@ import { flowStore } from "./kv-store"; // your Redis / Upstash / DynamoDB / SQL
 const flow = createFlow({ /* ... */ }).compile({ store: flowStore });
 ```
 
-See [KV store adapters](/flows/kv-store) for recipes (Redis, Upstash, Cloudflare KV, DynamoDB, SQLite) and the full [open-source self-hosting](/flows/self-hosting) walkthrough.
+See [KV store adapters](/flows/kv-store) for recipes (Redis, Upstash, Cloudflare KV, DynamoDB, SQLite) and the full [open-source self-hosting](/deployment/self-hosting) walkthrough.
 
 Your server, your state. You can still send tracking events to the Platform by calling `withWaniwani(server)`, or skip that entirely for a fully open-source setup.
 
