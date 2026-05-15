@@ -153,6 +153,21 @@ export default defineConfig([
 			"react",
 		],
 	},
+	// Internal SDK surface (mounted at @waniwani/sdk/internal — not public).
+	// Used by the WaniWani platform (app.waniwani.ai). Not for third parties.
+	{
+		entry: { "internal/index": "src/internal/index.ts" },
+		format: ["esm"],
+		target: "node20",
+		dts: true,
+		clean: false,
+		shims: true,
+		splitting: true,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		external: ["ai", "zod"],
+	},
 	// Legacy MCP React hooks (WidgetProvider, useWidgetClient, etc.)
 	{
 		entry: { "legacy/mcp/react": "src/legacy/mcp/react/index.ts" },

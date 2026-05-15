@@ -84,7 +84,7 @@ Get a free key at [app.waniwani.ai](https://app.waniwani.ai). See [setup.md](ref
 | `@waniwani/sdk` | `waniwani()` client, `defineConfig`, `WaniWaniError` | Free tier | [setup.md](references/setup.md) |
 | `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md) |
 | `@waniwani/sdk/mcp/react` | `useWaniwani` standalone tracking hook | OSS + Free tier | (rest of this entry point is legacy) |
-| `@waniwani/sdk/chat` | `ChatWidget`, `ChatBar`, `ChatCard`, `ChatEmbed`, themes | Free tier | [chat-widget.md](references/chat-widget.md) |
+| `@waniwani/sdk/chat` | `ChatEmbed`, themes | Free tier | [chat-widget.md](references/chat-widget.md) |
 | `@waniwani/sdk/chat/embed.js` | Self-contained `<script>` install for any website | Free tier | [chat-widget.md](references/chat-widget.md) |
 | `@waniwani/sdk/chat/styles.css` | Prebuilt Tailwind styles for chat components | Free tier | [chat-widget.md](references/chat-widget.md) |
 | `@waniwani/sdk/kb` | Knowledge base client | Free tier | [knowledge-base.md](references/knowledge-base.md) |
@@ -111,7 +111,7 @@ Adds hosted features on top of the OSS flow engine.
 - **Event tracking** — `waniwani().track()` for custom events, `withWaniwani(server)` for auto-tracking every tool call.
 - **Knowledge base** — `createKbClient()` for ingest/search.
 - **Funnel analytics** — flow graphs auto-sync to the dashboard.
-- **Chat widget** — `ChatWidget` / `ChatEmbed` talk directly to `app.waniwani.ai`.
+- **Chat widget** — `ChatEmbed` talks directly to `app.waniwani.ai`.
 
 `withWaniwani(server)` is safe to call with or without an API key — tracking silently no-ops when no key is set, but session-ID bridging and widget metadata forwarding still happen.
 

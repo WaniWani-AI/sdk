@@ -23,7 +23,7 @@ Same SDK, hosted features added when the key is present.
 - `waniwani()`, `tracking/*`, `withWaniwani`, `createTrackingRoute`, `widget-token`, `scoped-client` from `@waniwani/sdk` and `@waniwani/sdk/mcp`
 - `createKbClient` from `@waniwani/sdk/kb`
 - `useWaniwani` from `@waniwani/sdk/mcp/react` (also OSS — degrades to no-op without config; BYO endpoint also supported)
-- `ChatWidget`, `ChatBar`, `ChatCard`, `ChatEmbed`, themes, `embed.js`, `styles.css` from `@waniwani/sdk/chat`
+- `ChatEmbed`, themes, `embed.js`, `styles.css` from `@waniwani/sdk/chat`
 
 `withWaniwani` is no-key-safe: it wraps tools and bridges session metadata even without an API key. Tracking calls silently no-op when no key is configured.
 
@@ -33,10 +33,17 @@ Still used by ~14 internal customer MCPs. Kept exported for back-compat. **Never
 
 - `createTool`, `createResource`, `registerTools` from `@waniwani/sdk/mcp`
 - `toNextJsHandler` (`@waniwani/sdk/next-js`), `toExpressJsHandler` (`@waniwani/sdk/express-js`), `createApiHandler` (`@waniwani/sdk/chat/server`)
+- `ChatCard` (and `ChatCardProps`) from `@waniwani/sdk/chat` — superseded by `ChatEmbed`
 - All MCP-widget React hooks except `useWaniwani`: `WidgetProvider`, `useWidgetClient`, `useDisplayMode`, `useToolOutput`, `useSafeArea`, `useMaxHeight`, `useTheme`, `useLocale`, `useCallTool`, `useSendFollowUp`, `useFlowAction`, `useUpdateModelContext`, `useRequestDisplayMode`, `useToolResponseMetadata`, `useWidgetState`, `useIsChatGptApp`, `useOpenExternal`
 - `InitializeNextJsInIframe`, `LoadingWidget`, `DevModeProvider`, mocks, `detectPlatform`, `isMCPApps`, `isOpenAI`
 
-`evals/*` was removed entirely in this revision.
+### Internal (not part of the public API)
+
+`@waniwani/sdk/internal` is a private entry point for the WaniWani platform (app.waniwani.ai) to reuse SDK primitives that should not be exposed to third-party consumers. **Never document these in user-facing docs. Never suggest them for new code outside the WaniWani monorepo.**
+
+- `replayScenario`, `ConversationTurnResult`, `ConversationResult`, `EvalScenario`, `ChatResult`, `ToolCallTrace`, `TurnAssertion`, `EvalScenarioType` from `@waniwani/sdk/internal` — replay a recorded UIMessage conversation against an MCP-backed chat server. Used by the compliance/evals features in the app.
+
+The old `@waniwani/sdk/evals` public entry (with `chat`, `conversation`, `saveScenario`, `loadScenarios`, `braintrust`/`autoevals` scorers) was removed and is **not** restored at `/internal` — only the surface the app actually uses.
 
 ## Project structure
 
@@ -46,6 +53,8 @@ src/
 ├── waniwani.ts
 ├── tracking/             # Event tracking (free tier)
 ├── kb/                   # Knowledge base (free tier)
+├── internal/             # Private surface for app.waniwani.ai (replayScenario)
+├── legacy/               # LEGACY entry points (createTool, createResource, chat-server adapters)
 ├── mcp/
 │   ├── index.ts          # Public exports for @waniwani/sdk/mcp
 │   ├── server/

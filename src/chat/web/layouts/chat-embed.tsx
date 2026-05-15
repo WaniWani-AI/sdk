@@ -77,7 +77,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 
 		// Fall back to deriving the resource endpoint from `api` + the bearer
 		// token so callers (including the IIFE embed) get widget rendering
-		// without having to pass an `mcp` config. Mirrors ChatBar/ChatCard.
+		// without having to pass an `mcp` config. Mirrors ChatCard.
 		const resourceEndpoint =
 			mcp?.resourceEndpoint ?? buildResourceEndpoint(api, props.headers);
 

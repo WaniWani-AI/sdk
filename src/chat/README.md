@@ -6,8 +6,8 @@ Embeddable chat widget built with Tailwind CSS, composable AI elements, and stre
 
 ```
 chat/
-├── index.ts                  # Public exports (ChatWidget, ChatTheme, ChatWidgetProps, theme utils)
-├── @types.ts                 # ChatWidgetProps, ChatTheme interfaces
+├── index.ts                  # Public exports (ChatEmbed, ChatTheme, theme utils; ChatCard is @deprecated)
+├── @types.ts                 # ChatEmbedProps, ChatTheme interfaces (ChatCardProps is @deprecated)
 ├── theme.ts                  # Default theme + CSS variable generation
 ├── tailwind.css              # Tailwind theme mapping (--ww-* vars → Tailwind tokens)
 ├── lib/
@@ -19,22 +19,20 @@ chat/
 │   ├── loader.tsx            # Bouncing dots typing indicator
 │   ├── message.tsx           # Message bubble (user/assistant) + Streamdown markdown renderer
 │   └── prompt-input.tsx      # Composable input (textarea, submit, attachments, drag & drop)
-└── components/
-    └── chat-widget.tsx       # Root component (useChat, transport, theme, layout)
+└── layouts/
+    ├── chat-card.tsx         # @deprecated — always-visible card with header
+    └── chat-embed.tsx        # Borderless, bring-your-own-backend chat (primary)
 ```
 
 ## Usage
 
 ```tsx
-import { ChatWidget } from "@waniwani/sdk/chat";
+import { ChatEmbed } from "@waniwani/sdk/chat";
 
-<ChatWidget
-  apiKey="ww_..."
+<ChatEmbed
+  api="/api/my-chat"
   title="Support"
-  subtitle="Ask us anything"
   welcomeMessage="Hi! How can I help?"
-  width={400}
-  height={600}
   theme={{ primaryColor: "#6366f1" }}
   allowAttachments
   onMessageSent={(msg) => console.log(msg)}
@@ -82,7 +80,7 @@ CSS variables are bridged to Tailwind tokens via `tailwind.css`, so all componen
 
 ## Data flow
 
-1. `ChatWidget` creates a `DefaultChatTransport` (from `ai` SDK) pointed at the chat API
+1. `ChatEmbed` creates a `DefaultChatTransport` (from `ai` SDK) pointed at the chat API
 2. `useChat` (from `@ai-sdk/react`) manages message state and streaming
 3. User input → `sendMessage()` → API → streamed response → rendered via `Streamdown` markdown
 4. Tool invocations appear inline with status labels while running

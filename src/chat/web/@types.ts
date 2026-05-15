@@ -158,21 +158,6 @@ export interface ChatBaseProps {
 }
 
 // ============================================================================
-// ChatBar Props (compact bar that expands upward)
-// ============================================================================
-
-export interface ChatBarProps extends ChatBaseProps {
-	/** Chat bar width in pixels. Defaults to 600. */
-	width?: number;
-	/** Width of the expanded card in pixels. Defaults to width × 1.2. */
-	expandedWidth?: number;
-	/** Max height of the expanded messages panel in pixels. Defaults to 400. */
-	expandedHeight?: number;
-	/** Title shown in the header when expanded. Defaults to "Assistant". */
-	title?: string;
-}
-
-// ============================================================================
 // ChatEmbed Props (standalone, bring-your-own-backend chat)
 // ============================================================================
 
@@ -206,8 +191,8 @@ export type CallToolHandler = (params: {
 /**
  * Standalone, borderless chat component designed for embedding into existing pages.
  *
- * Unlike {@link ChatCardProps} and {@link ChatBarProps}, ChatEmbed does **not** rely on
- * the WaniWani hosted backend. It does not fetch `/config` or call `/tool` — you bring
+ * Unlike {@link ChatCardProps}, ChatEmbed does **not** rely on the WaniWani
+ * hosted backend. It does not fetch `/config` or call `/tool` — you bring
  * your own `api` endpoint.
  *
  * The component fills its parent container (`width: 100%; height: 100%`) with no
@@ -256,6 +241,7 @@ export interface ChatEmbedProps
 // ChatCard Props (always-visible card with header)
 // ============================================================================
 
+/** @deprecated Use `ChatEmbed` for new code. `ChatCard` is preserved for back-compat only. */
 export interface ChatCardProps extends ChatBaseProps {
 	/** Title shown in the card header. Defaults to "Assistant". */
 	title?: string;
@@ -270,10 +256,6 @@ export interface ChatCardProps extends ChatBaseProps {
 	/** Additional class names applied to the root element (e.g. Tailwind classes). */
 	className?: string;
 }
-
-// ============================================================================
-// Backward Compatibility
-// ============================================================================
 
 // ============================================================================
 // Imperative Handle (ref API)
@@ -294,10 +276,3 @@ export interface ChatHandle {
 	/** Current chat messages */
 	messages: import("ai").UIMessage[];
 }
-
-// ============================================================================
-// Backward Compatibility
-// ============================================================================
-
-/** @deprecated Use ChatBarProps instead */
-export type ChatWidgetProps = ChatBarProps;

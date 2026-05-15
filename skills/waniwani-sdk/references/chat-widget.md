@@ -1,72 +1,19 @@
 # Chat Widget (`@waniwani/sdk/chat`)
 
-React components for embedding an AI chat widget with theming, MCP Apps support, and automatic event tracking. Three layout variants for different use cases.
+React components for embedding an AI chat widget with theming, MCP Apps support, and automatic event tracking.
 
 ## Import
 
 ```tsx
-import { ChatBar, ChatCard, ChatEmbed } from "@waniwani/sdk/chat";
+import { ChatEmbed } from "@waniwani/sdk/chat";
 import "@waniwani/sdk/chat/styles.css";
 ```
-
-`ChatWidget` is a backward-compatible alias for `ChatBar`.
 
 Peer dependencies: `react`, `react-dom`, `@ai-sdk/react`, `ai`
 
 All other dependencies (icons, markdown rendering, scroll utilities) are bundled into the SDK.
 
 ## Layout Components
-
-### `ChatBar` (default)
-
-Compact floating bar that expands upward into a chat panel. Best for bottom-of-page placement.
-
-```tsx
-<ChatBar
-  apiKey="ww_..."
-  title="Support"
-  width={600}
-  expandedWidth={720}
-  expandedHeight={400}
-  theme={{ primaryColor: "#6366f1" }}
-/>
-```
-
-**ChatBar-specific props:**
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `width` | `number` | `600` | Bar width in pixels |
-| `expandedWidth` | `number` | `width * 1.2` | Expanded card width |
-| `expandedHeight` | `number` | `400` | Max height of expanded messages panel |
-| `title` | `string` | `"Assistant"` | Header title when expanded |
-
-### `ChatCard`
-
-Always-visible card with a header, status dot, and optional subtitle. Best for dedicated chat sections.
-
-```tsx
-<ChatCard
-  apiKey="ww_..."
-  title="Support"
-  subtitle="Ask us anything"
-  showStatus={true}
-  width={500}
-  height={600}
-  theme={{ primaryColor: "#6366f1" }}
-/>
-```
-
-**ChatCard-specific props:**
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `title` | `string` | `"Assistant"` | Header title |
-| `subtitle` | `string` | -- | Subtitle text under the title |
-| `showStatus` | `boolean` | `true` | Show the status dot in header |
-| `width` | `number \| string` | `500` | Card width (px number or CSS value like `"100%"`) |
-| `height` | `number \| string` | `600` | Card height (px number or CSS value like `"80vh"`) |
-| `className` | `string` | -- | Additional CSS class names |
 
 ### `ChatEmbed`
 
@@ -160,7 +107,7 @@ All layout components share these props:
 Rich welcome screen replacing `welcomeMessage`. Shown when the conversation is empty.
 
 ```tsx
-<ChatCard
+<ChatEmbed
   welcome={{
     icon: <Logo />,
     title: "Welcome to Support",
@@ -180,7 +127,7 @@ Rich welcome screen replacing `welcomeMessage`. Shown when the conversation is e
 ### `SuggestionsConfig`
 
 ```tsx
-<ChatCard suggestions={{ initial: ["Pricing", "Demo"], dynamic: true }} />
+<ChatEmbed suggestions={{ initial: ["Pricing", "Demo"], dynamic: true }} />
 ```
 
 | Field | Type | Default | Description |
@@ -194,7 +141,7 @@ Access chat methods via a ref. Works with all layout components.
 
 ```tsx
 import { useRef } from "react";
-import { ChatCard } from "@waniwani/sdk/chat";
+import { ChatEmbed } from "@waniwani/sdk/chat";
 import type { ChatHandle } from "@waniwani/sdk/chat";
 
 function App() {
@@ -202,7 +149,7 @@ function App() {
 
   return (
     <>
-      <ChatCard ref={chatRef} apiKey="ww_..." />
+      <ChatEmbed ref={chatRef} api="/api/my-chat" />
       <button onClick={() => chatRef.current?.sendMessage("Show pricing")}>
         Ask about pricing
       </button>
@@ -226,8 +173,8 @@ Pass a `theme` object to override defaults. A `DARK_THEME` preset is also availa
 ```tsx
 import { DARK_THEME, mergeTheme } from "@waniwani/sdk/chat";
 
-<ChatCard theme={DARK_THEME} />
-<ChatCard theme={mergeTheme(DARK_THEME, { primaryColor: "#6366f1" })} />
+<ChatEmbed theme={DARK_THEME} />
+<ChatEmbed theme={mergeTheme(DARK_THEME, { primaryColor: "#6366f1" })} />
 ```
 
 | Property | CSS Variable | Default |
@@ -374,4 +321,3 @@ Merge order (later wins): **defaults < remote config < `data-*` attrs < programm
 - **Missing peer deps** -- Requires `react`, `react-dom`, `@ai-sdk/react`, and `ai`. Everything else is bundled.
 - **Embed cleanup** -- Always call `chat.destroy()` on unmount to prevent memory leaks
 - **Shadow DOM styling** -- The embed script uses Shadow DOM; external CSS won't affect widget styles. Use the `theme` prop instead.
-- **Using `ChatWidget` for new code** -- `ChatWidget` is a deprecated alias for `ChatBar`. Use `ChatBar`, `ChatCard`, or `ChatEmbed` directly.

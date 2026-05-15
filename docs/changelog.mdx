@@ -11,10 +11,184 @@ This page tracks API changes that require code updates, organized by the version
 | API | Status | Since | Removed in |
 | --- | --- | --- | --- |
 | `.addNode(id, run, options?)` (positional) | Deprecated | 0.12.0 | 0.13.0 |
+| `createTool`, `createResource`, `registerTools` from `@waniwani/sdk/mcp` | Deprecated | 0.12.0 | 0.14.0 |
+| MCP-widget React host (`WidgetProvider`, `useToolOutput`, …) from `@waniwani/sdk/mcp/react` | Deprecated | 0.12.0 | 0.14.0 |
+| `toNextJsHandler` from `@waniwani/sdk/next-js` | Deprecated | 0.12.0 | 0.14.0 |
+| `toExpressJsHandler` from `@waniwani/sdk/express-js` | Deprecated | 0.12.0 | 0.14.0 |
+| Chat-server types from `@waniwani/sdk/chat/server` | Deprecated | 0.12.0 | 0.14.0 |
+| `ChatCard` from `@waniwani/sdk/chat` | Deprecated | 0.12.0 | 0.14.0 |
+| `evals/*` (entire subtree) | **Removed** | 0.12.0 | 0.12.0 |
 
 <Tip>
 TypeScript will strike through deprecated signatures in your IDE. Hover for the replacement.
 </Tip>
+
+---
+
+## 0.12.0: Legacy reorganization
+
+The MCP-widget-in-host stack (`createTool` / `createResource` / `WidgetProvider` and host bridge hooks) and the chat-server BFF adapters (`toNextJsHandler`, `toExpressJsHandler`, `createApiHandler`) were moved to dedicated `@waniwani/sdk/legacy*` entry points. New code should use `createFlow` from `@waniwani/sdk/mcp` and the direct-to-backend `ChatEmbed` from `@waniwani/sdk/chat`.
+
+The **old entry points still re-export every symbol unchanged** — your imports keep working without edits. The legacy entry points exist so you can adopt the final import paths now and avoid the next major bump.
+
+### Why
+
+- **OSS-first framing.** `@waniwani/sdk/mcp` is now the OSS surface: `createFlow`, `StateGraph`, `KvStore`, `MemoryKvStore`. No API key required, no hosted dependency on the core path.
+- **Smaller default bundle.** Splitting the legacy surface off lets host-only React hooks and the chat-server router stay out of the OSS bundle once the re-exports are dropped.
+- **Sunset signal.** The chat widget will talk directly to `app.waniwani.ai` in a future release, removing the need for a self-hosted BFF. The Next.js / Express adapters become unnecessary.
+
+### Migration matrix
+
+Every row is a mechanical rewrite — no behavior changes, only the import path. An LLM or codemod can apply all of these in one pass.
+
+| Symbol(s) | Old import | New import |
+| --- | --- | --- |
+| `createTool`, `registerTools`, `ToolConfig`, `ToolHandler`, `ToolHandlerContext`, `RegisteredTool`, `ToolToolCallback` | `@waniwani/sdk/mcp` | `@waniwani/sdk/legacy` |
+| `createResource`, `ResourceConfig`, `RegisteredResource`, `WidgetCSP` | `@waniwani/sdk/mcp` | `@waniwani/sdk/legacy` |
+| `detectPlatform`, `isMCPApps`, `isOpenAI`, `WidgetPlatform` | `@waniwani/sdk/mcp` | `@waniwani/sdk/legacy/react` |
+| `HostContext`, `ToolCallResult`, `ToolResult`, `UnifiedWidgetClient` | `@waniwani/sdk/mcp` | `@waniwani/sdk/legacy/react` |
+| `WidgetProvider`, `useWidgetClient` | `@waniwani/sdk/mcp/react` | `@waniwani/sdk/legacy/react` |
+| `useToolOutput`, `useToolResponseMetadata`, `useCallTool`, `useSendFollowUp`, `useFlowAction`, `useUpdateModelContext` | `@waniwani/sdk/mcp/react` | `@waniwani/sdk/legacy/react` |
+| `useDisplayMode`, `useRequestDisplayMode`, `useTheme`, `useLocale`, `useSafeArea`, `useMaxHeight`, `useWidgetState`, `useOpenExternal`, `useIsChatGptApp` | `@waniwani/sdk/mcp/react` | `@waniwani/sdk/legacy/react` |
+| `InitializeNextJsInIframe`, `LoadingWidget` | `@waniwani/sdk/mcp/react` | `@waniwani/sdk/legacy/react` |
+| `DevModeProvider`, `getMockState`, `initializeMockOpenAI`, `updateMockDisplayMode`, `updateMockGlobal`, `updateMockTheme`, `updateMockToolOutput` | `@waniwani/sdk/mcp/react` | `@waniwani/sdk/legacy/react` |
+| `DeviceType`, `DisplayMode`, `SafeArea`, `SafeAreaInsets`, `Theme`, `UnknownObject`, `UserAgent` (widget host types) | `@waniwani/sdk/mcp/react` | `@waniwani/sdk/legacy/react` |
+| `FlowActionResult`, `ModelContextContentBlock`, `ModelContextUpdate`, `SendFollowUpOptions` | `@waniwani/sdk/mcp/react` | `@waniwani/sdk/legacy/react` |
+| `toNextJsHandler`, `NextJsHandlerOptions`, `NextJsHandlerResult` | `@waniwani/sdk/next-js` | `@waniwani/sdk/legacy/next-js` |
+| `toExpressJsHandler`, `ExpressJsHandlerOptions`, `ExpressJsHandlerResult`, `ExpressLikeRequest`, `ExpressLikeResponse`, `ExpressMiddleware`, `ChatOptions` | `@waniwani/sdk/express-js` | `@waniwani/sdk/legacy/express-js` |
+| `ApiHandler`, `ApiHandlerOptions`, `BeforeRequestContext`, `BeforeRequestResult`, `ClientVisitorContext`, `VisitorMeta`, `WebSearchConfig`, `GeoLocation`, `extractGeoFromHeaders`, `WaniWaniError` (when imported from `chat/server`) | `@waniwani/sdk/chat/server` | _stays_ — `@waniwani/sdk/chat/server` is a re-export shim around `legacy/chat/server/*`. No required rewrite. Will be removed alongside the chat-server adapters in 0.14.0. |
+| `ChatCard`, `ChatCardProps` | `@waniwani/sdk/chat` | _no replacement_ — migrate to `ChatEmbed` (see below) |
+
+`useWaniwani`, `UseWaniwaniOptions`, and `WaniwaniWidget` stay on `@waniwani/sdk/mcp/react` — that hook is non-legacy.
+
+### What stays the same
+
+These remain on `@waniwani/sdk/mcp` and are the recommended surface for new code:
+
+- `createFlow`, `StateGraph`, `START`, `END`, `redacted`, `createFlowTestHarness`, `AddNodeConfig`, all flow-related types
+- `KvStore`, `MemoryKvStore`, `WaniwaniKvStore`
+- `withWaniwani`, `WithWaniwaniOptions`
+- `createTrackingRoute`, `TrackingRouteOptions`
+- `ScopedWaniWaniClient`
+- `McpServer`, `ZodRawShapeCompat` (shared MCP types)
+
+And on `@waniwani/sdk`:
+
+- `waniwani()`, `defineConfig`, `WaniWaniError`, all tracking helpers
+
+### Codemod recipe (one-shot)
+
+An agent updating a downstream repo can apply these substitutions in order. Each is a string-level rewrite of an `import … from "<path>"` statement — semantics are preserved end-to-end.
+
+```bash
+# 1. Server-side MCP primitives → @waniwani/sdk/legacy
+#    (createTool, createResource, registerTools, and their associated types)
+#    Rewrite any import of { createTool | createResource | registerTools |
+#    ToolConfig | ToolHandler | ToolHandlerContext | RegisteredTool |
+#    ToolToolCallback | ResourceConfig | RegisteredResource | WidgetCSP }
+#    from "@waniwani/sdk/mcp" → "@waniwani/sdk/legacy"
+
+# 2. Widget host hooks/components/types → @waniwani/sdk/legacy/react
+#    Rewrite any import of { WidgetProvider | useWidgetClient | useToolOutput |
+#    useToolResponseMetadata | useCallTool | useSendFollowUp | useFlowAction |
+#    useUpdateModelContext | useDisplayMode | useRequestDisplayMode | useTheme |
+#    useLocale | useSafeArea | useMaxHeight | useWidgetState | useOpenExternal |
+#    useIsChatGptApp | InitializeNextJsInIframe | LoadingWidget |
+#    DevModeProvider | getMockState | initializeMockOpenAI |
+#    updateMockDisplayMode | updateMockGlobal | updateMockTheme |
+#    updateMockToolOutput | DeviceType | DisplayMode | SafeArea |
+#    SafeAreaInsets | Theme | UnknownObject | UserAgent | FlowActionResult |
+#    ModelContextContentBlock | ModelContextUpdate | SendFollowUpOptions |
+#    HostContext | ToolCallResult | ToolResult | UnifiedWidgetClient |
+#    detectPlatform | isMCPApps | isOpenAI | WidgetPlatform }
+#    from "@waniwani/sdk/mcp/react" → "@waniwani/sdk/legacy/react"
+#
+#    Leave imports of { useWaniwani | UseWaniwaniOptions | WaniwaniWidget }
+#    on "@waniwani/sdk/mcp/react" — those are non-legacy.
+
+# 3. Next.js adapter → @waniwani/sdk/legacy/next-js
+#    Rewrite "@waniwani/sdk/next-js" → "@waniwani/sdk/legacy/next-js"
+#    (every export of the old path was moved; no symbol-level filtering needed)
+
+# 4. Express adapter → @waniwani/sdk/legacy/express-js
+#    Rewrite "@waniwani/sdk/express-js" → "@waniwani/sdk/legacy/express-js"
+
+# 5. Chat-server types
+#    "@waniwani/sdk/chat/server" still works as a re-export shim.
+#    No required rewrite. If you want to drop the shim early, point the imports
+#    at the legacy server-types module that backs your adapter.
+```
+
+If you split imports across files, the only ambiguous case is **step 1 vs step 3 (Express) when both come from the same root**. Mechanical rule: **the source path determines the destination, not the symbol name**. The same symbol does not appear in two unrelated source paths within this matrix.
+
+### Verifying a one-shot migration
+
+After substituting, the codebase should still typecheck and run unchanged. Run:
+
+```bash
+bun run typecheck
+bun run lint
+bun test
+```
+
+If you see errors of the form `Module '"@waniwani/sdk/mcp"' has no exported member 'X'`, it means that symbol is being moved entirely out of the old path in a later major (0.14.0). Until then the old import keeps working — the matrix above tells you the final destination.
+
+### Verifying a customer codebase has zero legacy imports
+
+To audit a downstream repo for any remaining legacy imports:
+
+```bash
+# Any import from a legacy path
+grep -rn "@waniwani/sdk/legacy" src/ app/ pages/
+
+# Legacy symbols still pulled through non-legacy paths.
+# These greps only flag the moved symbols; OSS symbols (createFlow, KvStore,
+# withWaniwani, useWaniwani, …) stay on the original paths and are not matched.
+
+grep -rEn 'createTool|createResource|registerTools|ToolConfig|ToolHandler|ToolHandlerContext|RegisteredTool|ToolToolCallback|ResourceConfig|RegisteredResource|WidgetCSP|detectPlatform|isMCPApps|isOpenAI|WidgetPlatform|HostContext|ToolCallResult|ToolResult|UnifiedWidgetClient' src/ app/ pages/ \
+  | grep "@waniwani/sdk/mcp"
+
+grep -rEn 'WidgetProvider|useWidgetClient|useToolOutput|useToolResponseMetadata|useCallTool|useSendFollowUp|useFlowAction|useUpdateModelContext|useDisplayMode|useRequestDisplayMode|useTheme|useLocale|useSafeArea|useMaxHeight|useWidgetState|useOpenExternal|useIsChatGptApp|InitializeNextJsInIframe|LoadingWidget|DevModeProvider' src/ app/ pages/ \
+  | grep "@waniwani/sdk/mcp/react"
+
+grep -rEn 'from ["'\'']@waniwani/sdk/next-js["'\'']' src/ app/ pages/
+grep -rEn 'from ["'\'']@waniwani/sdk/express-js["'\'']' src/ app/ pages/
+```
+
+The first command should produce hits (those are the new paths). The remaining commands should produce **either zero hits, or the same lines as before the migration** (meaning the back-compat shim is doing its job and you can defer the rewrite).
+
+### `ChatCard` → `ChatEmbed`
+
+`ChatCard` is still exported but marked `@deprecated`. It wraps `ChatEmbed` with always-visible card chrome (header, border, fixed dimensions) and assumes the WaniWani-hosted backend.
+
+```tsx
+// Before
+import { ChatCard } from "@waniwani/sdk/chat";
+
+<ChatCard
+  apiKey={process.env.NEXT_PUBLIC_WANIWANI_API_KEY}
+  title="Assistant"
+  width={500}
+  height={600}
+  welcomeMessage="Hi! How can I help?"
+/>
+```
+
+```tsx
+// After — bring-your-own-backend, no card chrome
+import { ChatEmbed } from "@waniwani/sdk/chat";
+
+<ChatEmbed
+  api="/api/my-chat-endpoint"
+  welcome={{ title: "Assistant", description: "Hi! How can I help?" }}
+/>
+```
+
+`ChatEmbed` does not fetch `/config` or `/tool` against the WaniWani host — you point `api` at your own endpoint and (optionally) supply `mcp.resourceEndpoint` if your backend serves widget resources.
+
+### `evals/*` removed
+
+The `src/evals/*` subtree (chat eval runner, scorers, reporter) was removed entirely. No re-export shim. If you imported `runChatEval`, `createScorer`, or any sibling from `@waniwani/sdk/evals`, the build will fail on upgrade — there is no equivalent in this release. Eval tooling has moved to the WaniWani platform and is no longer shipped in-SDK.
 
 ---
 

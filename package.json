@@ -46,6 +46,11 @@
       "import": "./dist/kb/index.js",
       "default": "./dist/kb/index.js"
     },
+    "./internal": {
+      "types": "./dist/internal/index.d.ts",
+      "import": "./dist/internal/index.js",
+      "default": "./dist/internal/index.js"
+    },
     "./legacy": {
       "types": "./dist/legacy/index.d.ts",
       "import": "./dist/legacy/index.js",

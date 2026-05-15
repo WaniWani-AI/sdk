@@ -24,6 +24,7 @@ import {
 import { ChatQueue } from "../components/chat-queue";
 import { ExportSessionButton } from "../components/export-session";
 import { MessageList } from "../components/message-list";
+import { PoweredBy } from "../components/powered-by";
 import { Suggestions } from "../components/suggestions";
 import { ThreadMenu } from "../components/thread-menu";
 import { useCallTool } from "../hooks/use-call-tool";
@@ -35,6 +36,7 @@ import { buildResourceEndpoint } from "../lib/resource-endpoint";
 import { cn } from "../lib/utils";
 import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
 
+/** @deprecated Use `ChatEmbed` for new code. `ChatCard` is preserved for back-compat only. */
 export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 	function ChatCard(props, ref) {
 		const {
@@ -302,6 +304,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 									/>
 								</div>
 							</PromptInput>
+							<PoweredBy />
 						</div>
 					</div>
 				</div>

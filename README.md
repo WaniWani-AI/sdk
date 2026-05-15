@@ -87,7 +87,7 @@ For production, swap `MemoryKvStore` for a real backend (Redis, Upstash, Cloudfl
 | `WaniwaniKvStore` | Free tier | Hosted, encrypted-at-rest flow state on `app.waniwani.ai` |
 | `withWaniwani`, `useWaniwani` | Both | Tool tracking, session bridging, browser hook (no-op without a key) |
 | `waniwani()`, `tracking`, `kb` | Free tier | Event tracking, funnel analytics, knowledge base |
-| `ChatWidget`, `ChatEmbed`, `embed.js` | Free tier | Embeddable chat UI |
+| `ChatEmbed`, `embed.js` | Free tier | Embeddable chat UI |
 
 Get a free key at [app.waniwani.ai](https://app.waniwani.ai).
 
