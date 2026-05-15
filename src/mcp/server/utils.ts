@@ -53,6 +53,8 @@ const EXTERNAL_USER_ID_KEYS = [
 
 const CORRELATION_ID_KEYS = ["correlationId", "openai/requestId"] as const;
 
+const TURN_COUNT_KEYS = ["waniwani/turnCount"] as const;
+
 /** Meta key for flow execution path (nodesVisited, flowId). */
 export const FLOW_META_KEY = "waniwani/flow" as const;
 
@@ -86,6 +88,29 @@ export function extractCorrelationId(
 	meta: Record<string, unknown> | undefined,
 ): string | undefined {
 	return meta ? pickFirst(meta, CORRELATION_ID_KEYS) : undefined;
+}
+
+/**
+ * Number of user messages in the current chat session, as counted by the
+ * WaniWani app before dispatching the MCP request. Useful for MCPs that
+ * gate behavior on conversation length (e.g. compulsory email verification
+ * after N turns) without each MCP having to track turn state itself.
+ *
+ * Forwarded as `waniwani/turnCount` (non-negative integer).
+ */
+export function extractTurnCount(
+	meta: Record<string, unknown> | undefined,
+): number | undefined {
+	if (!meta) {
+		return undefined;
+	}
+	for (const key of TURN_COUNT_KEYS) {
+		const value = meta[key];
+		if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+			return value;
+		}
+	}
+	return undefined;
 }
 
 const SOURCE_SESSION_KEYS = [
