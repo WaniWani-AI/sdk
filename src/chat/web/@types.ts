@@ -189,28 +189,34 @@ export type CallToolHandler = (params: {
 }>;
 
 /**
- * Standalone, borderless chat component designed for embedding into existing pages.
+ * **Advanced / bare-bones primitive.** Most apps should use
+ * `WaniwaniChat` instead — it wires up the hosted WaniWani backend
+ * (`app.waniwani.ai`) from a single `wwp_...` token and applies the
+ * dashboard's display config automatically.
  *
- * Unlike {@link ChatCardProps}, ChatEmbed does **not** rely on the WaniWani
- * hosted backend. It does not fetch `/config` or call `/tool` — you bring
- * your own `api` endpoint.
+ * `ChatEmbed` is the unmanaged escape hatch: you bring your own `api`
+ * endpoint, your own auth headers, your own theme, and your own
+ * (optional) MCP resource endpoint for widgets. Nothing is fetched or
+ * defaulted for you — `skipRemoteConfig` is implied by the BYO design.
+ * Reach for it when:
  *
- * The component fills its parent container (`width: 100%; height: 100%`) with no
- * header, border, or shadow — making it ideal for integrating into an existing layout
- * that already provides its own chrome.
+ * - You self-host the chat backend (Next.js/Express route, your own
+ *   provider) and don't want WaniWani's hosted features.
+ * - You need full control over headers, body, and tool-call dispatch.
  *
- * To enable MCP App widgets (iframes), pass the optional `mcp` config.
+ * The component fills its parent container (`width: 100%; height: 100%`)
+ * with no header, border, or shadow.
  *
  * @example
  * ```tsx
- * // Basic — no MCP Apps
+ * // Self-hosted chat endpoint, no MCP App widgets
  * <ChatEmbed
  *   api="/api/my-chat-endpoint"
  *   body={{ environmentId, sessionId }}
  *   theme={{ backgroundColor: "#fff" }}
  * />
  *
- * // With MCP Apps support
+ * // Self-hosted chat endpoint with MCP App widgets
  * <ChatEmbed
  *   api="/api/my-chat-endpoint"
  *   mcp={{ resourceEndpoint: "/api/mcp/resource" }}
@@ -237,25 +243,9 @@ export interface ChatEmbedProps
 	headerActions?: React.ReactNode;
 }
 
-// ============================================================================
-// ChatCard Props (always-visible card with header)
-// ============================================================================
-
-/** @deprecated Use `ChatEmbed` for new code. `ChatCard` is preserved for back-compat only. */
-export interface ChatCardProps extends ChatBaseProps {
-	/** Title shown in the card header. Defaults to "Assistant". */
-	title?: string;
-	/** Subtitle or status text shown under the title. */
-	subtitle?: string;
-	/** Show the status dot in the header. Defaults to true. */
-	showStatus?: boolean;
-	/** Card width. Accepts a pixel number or any CSS value (e.g. "100%", "50vw"). Defaults to 500. */
-	width?: number | string;
-	/** Card height. Accepts a pixel number or any CSS value (e.g. "100%", "80vh"). Defaults to 600. */
-	height?: number | string;
-	/** Additional class names applied to the root element (e.g. Tailwind classes). */
-	className?: string;
-}
+// `ChatCardProps` moved to `src/legacy/chat/web/chat-card.tsx` alongside the
+// `ChatCard` component. Still re-exported from `@waniwani/sdk/chat` for
+// back-compat — see `index.ts`.
 
 // ============================================================================
 // Imperative Handle (ref API)

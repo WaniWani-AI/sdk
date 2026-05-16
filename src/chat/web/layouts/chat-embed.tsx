@@ -32,7 +32,11 @@ import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
 import { Button } from "../ui/button";
 
 /**
- * Bring-your-own-backend chat with internal scroll.
+ * **Bare-bones, bring-your-own-backend chat primitive.** Most apps want
+ * `WaniwaniChat` (the hosted version) — `ChatEmbed` is the unmanaged
+ * escape hatch with no token, no remote config, no defaults, and no
+ * built-in MCP resource endpoint. You wire up `api`, `headers`, `body`,
+ * theme, and (optionally) `mcp` yourself.
  *
  * Sizes off its parent via two complementary mechanisms applied by the
  * embed host: a `height: 100%; max-height: inherit` chain for

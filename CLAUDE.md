@@ -23,7 +23,8 @@ Same SDK, hosted features added when the key is present.
 - `waniwani()`, `tracking/*`, `withWaniwani`, `createTrackingRoute`, `widget-token`, `scoped-client` from `@waniwani/sdk` and `@waniwani/sdk/mcp`
 - `createKbClient` from `@waniwani/sdk/kb`
 - `useWaniwani` from `@waniwani/sdk/mcp/react` (also OSS — degrades to no-op without config; BYO endpoint also supported)
-- `ChatEmbed`, themes, `embed.js`, `styles.css` from `@waniwani/sdk/chat`
+- `WaniwaniChat` (hosted React chat — recommended), themes, `embed.js` (IIFE for non-React hosts), `styles.css` from `@waniwani/sdk/chat`
+- `ChatEmbed` from `@waniwani/sdk/chat` — bare-bones bring-your-own-backend primitive. Exposed but **not** the recommended path for new code; reach for it only when self-hosting the chat backend.
 
 `withWaniwani` is no-key-safe: it wraps tools and bridges session metadata even without an API key. Tracking calls silently no-op when no key is configured.
 
@@ -33,7 +34,7 @@ Still used by ~14 internal customer MCPs. Kept exported for back-compat. **Never
 
 - `createTool`, `createResource`, `registerTools` from `@waniwani/sdk/mcp`
 - `toNextJsHandler` (`@waniwani/sdk/next-js`), `toExpressJsHandler` (`@waniwani/sdk/express-js`), `createApiHandler` (`@waniwani/sdk/chat/server`)
-- `ChatCard` (and `ChatCardProps`) from `@waniwani/sdk/chat` — superseded by `ChatEmbed`
+- `ChatCard` (and `ChatCardProps`) — canonical import is now `@waniwani/sdk/legacy`. Still re-exported from `@waniwani/sdk/chat` for back-compat; that re-export will be removed in a future minor release. Superseded by `WaniwaniChat`.
 - All MCP-widget React hooks except `useWaniwani`: `WidgetProvider`, `useWidgetClient`, `useDisplayMode`, `useToolOutput`, `useSafeArea`, `useMaxHeight`, `useTheme`, `useLocale`, `useCallTool`, `useSendFollowUp`, `useFlowAction`, `useUpdateModelContext`, `useRequestDisplayMode`, `useToolResponseMetadata`, `useWidgetState`, `useIsChatGptApp`, `useOpenExternal`
 - `InitializeNextJsInIframe`, `LoadingWidget`, `DevModeProvider`, mocks, `detectPlatform`, `isMCPApps`, `isOpenAI`
 
@@ -54,7 +55,7 @@ src/
 ├── tracking/             # Event tracking (free tier)
 ├── kb/                   # Knowledge base (free tier)
 ├── internal/             # Private surface for app.waniwani.ai (replayScenario)
-├── legacy/               # LEGACY entry points (createTool, createResource, chat-server adapters)
+├── legacy/               # LEGACY entry points (createTool, createResource, chat-server adapters, ChatCard)
 ├── mcp/
 │   ├── index.ts          # Public exports for @waniwani/sdk/mcp
 │   ├── server/
@@ -68,8 +69,8 @@ src/
 │   │   └── scoped-client.ts
 │   └── react/            # Mostly LEGACY (only useWaniwani is non-legacy)
 └── chat/
-    ├── web/              # Free tier chat widget
-    └── server/           # LEGACY chat-server adapters (next-js, express-js)
+    ├── web/              # Free tier chat widget (WaniwaniChat, ChatEmbed, embed.js IIFE)
+    └── server/           # Back-compat shim — re-exports from `src/legacy/chat/server/`
 ```
 
 ## Usage

@@ -1,0 +1,193 @@
+"use client";
+
+import { forwardRef, useEffect, useMemo, useState } from "react";
+import type { ChatHandle, ChatTheme, WelcomeConfig } from "../@types";
+import type { EmbedConfig } from "../embed/config";
+import { buildChatTheme, resolveConfig } from "../embed/config";
+import { fetchRemoteConfig } from "../embed/remote-config";
+import { ChatEmbed } from "./chat-embed";
+
+/**
+ * Per-page overrides for `WaniwaniChat`. The WaniWani dashboard is the
+ * source of truth for the agent's display config; reach for these only
+ * when you need a local tweak that doesn't justify cloning an agent.
+ *
+ * `welcome` (with a `ReactNode` icon) is the one field that cannot live
+ * in the dashboard — it has to be passed here when used.
+ */
+export interface WaniwaniChatOverrides {
+	/** Sticky header title. */
+	title?: string;
+	/** Greeting shown before the first user message. */
+	welcomeMessage?: string;
+	/** Rich welcome screen (icon, title, suggestion cards). Takes precedence over `welcomeMessage`. */
+	welcome?: WelcomeConfig;
+	/** Placeholder for the input field. */
+	placeholder?: string;
+	/** Initial suggestion chips. */
+	suggestions?: string[];
+	/** Persist conversations across reloads in IndexedDB. */
+	enableThreadHistory?: boolean;
+	/** Show tool call request/response panels. */
+	showToolCalls?: boolean;
+	/** Enable file attachments in the input. */
+	allowAttachments?: boolean;
+	/** Theme overrides. */
+	theme?: ChatTheme;
+	/** Chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
+	api?: string;
+	/** Override the MCP server URL (rarely needed). */
+	mcpServerUrl?: string;
+}
+
+/**
+ * Hosted-tier WaniWani chat. The React counterpart to the `<script>` embed.
+ *
+ * Configure the agent (title, welcome message, suggestions, theme, tool
+ * behavior) in the WaniWani dashboard — the component fetches that config
+ * on mount. Pass a `wwp_...` token and the `channelId` of the agent, and
+ * you're done.
+ *
+ * Forward a `ChatHandle` ref to drive the chat imperatively
+ * (`sendMessage`, `sendMessageAndWait`, `reset`, `focus`, `messages`).
+ *
+ * Use `overrides` only for per-page tweaks that don't justify a new agent,
+ * or for the `welcome` field (which can't be serialized to the dashboard
+ * because its `icon` is a `ReactNode`).
+ *
+ * If you are self-hosting the chat backend, use {@link ChatEmbed} instead.
+ *
+ * @example
+ * ```tsx
+ * import { useRef } from "react";
+ * import { WaniwaniChat, type ChatHandle } from "@waniwani/sdk/chat";
+ *
+ * function MyPage() {
+ *   const ref = useRef<ChatHandle>(null);
+ *
+ *   return (
+ *     <>
+ *       <WaniwaniChat
+ *         ref={ref}
+ *         token="wwp_..."
+ *         channelId="51c3658a-..."
+ *       />
+ *       <button onClick={() => ref.current?.sendMessage("Show me pricing")}>
+ *         Ask about pricing
+ *       </button>
+ *     </>
+ *   );
+ * }
+ * ```
+ */
+export interface WaniwaniChatProps {
+	/** Public token (`wwp_...`) from the WaniWani dashboard. */
+	token: string;
+	/** Agent channel ID — routes the conversation to the right agent. */
+	channelId?: string;
+	/** Additional class names applied to the root element. */
+	className?: string;
+	/**
+	 * Per-page overrides of dashboard-configured display fields. The
+	 * dashboard is the source of truth; use this only when a local tweak
+	 * doesn't justify a new agent, or to pass `welcome` (whose `icon`
+	 * can't be serialized to the dashboard).
+	 */
+	overrides?: WaniwaniChatOverrides;
+}
+
+const DEFAULT_API = "https://app.waniwani.ai/api/mcp/chat";
+
+export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
+	function WaniwaniChat(props, ref) {
+		const { token, channelId, className, overrides } = props;
+
+		const programmatic = useMemo<Partial<EmbedConfig>>(
+			() => ({
+				token,
+				channelId,
+				api: overrides?.api,
+				mcpServerUrl: overrides?.mcpServerUrl,
+				title: overrides?.title,
+				welcomeMessage: overrides?.welcomeMessage,
+				placeholder: overrides?.placeholder,
+				suggestions: overrides?.suggestions,
+				enableThreadHistory: overrides?.enableThreadHistory,
+				showToolCalls: overrides?.showToolCalls,
+				theme: overrides?.theme,
+			}),
+			[
+				token,
+				channelId,
+				overrides?.api,
+				overrides?.mcpServerUrl,
+				overrides?.title,
+				overrides?.welcomeMessage,
+				overrides?.placeholder,
+				overrides?.suggestions,
+				overrides?.enableThreadHistory,
+				overrides?.showToolCalls,
+				overrides?.theme,
+			],
+		);
+
+		// Remote config is fetched once per (api, token) pair. Display fields
+		// from the dashboard are merged below the programmatic overrides, so
+		// any local override always wins.
+		const [remote, setRemote] = useState<Partial<EmbedConfig>>({});
+		useEffect(() => {
+			if (!token) {
+				return;
+			}
+			const controller = new AbortController();
+			const resolvedApi = overrides?.api ?? DEFAULT_API;
+			void fetchRemoteConfig(resolvedApi, token, controller.signal)
+				.then((r) => {
+					if (!controller.signal.aborted) {
+						setRemote(r);
+					}
+				})
+				.catch((err) => {
+					console.error("[WaniWani] Remote config fetch failed:", err);
+				});
+			return () => controller.abort();
+		}, [overrides?.api, token]);
+
+		const config = useMemo(
+			() => resolveConfig(programmatic, remote, undefined),
+			[programmatic, remote],
+		);
+
+		const chatTheme = buildChatTheme(config);
+
+		const body: Record<string, unknown> = {};
+		if (config.mcpServerUrl) {
+			body.mcpServerUrl = config.mcpServerUrl;
+		}
+		if (config.channelId) {
+			body.channelId = config.channelId;
+		}
+
+		return (
+			<ChatEmbed
+				ref={ref}
+				api={config.api ?? DEFAULT_API}
+				headers={{ Authorization: `Bearer ${config.token}` }}
+				skipRemoteConfig
+				body={Object.keys(body).length > 0 ? body : undefined}
+				theme={chatTheme}
+				title={config.title}
+				welcomeMessage={config.welcomeMessage}
+				welcome={overrides?.welcome}
+				placeholder={config.placeholder}
+				suggestions={
+					config.suggestions ? { initial: config.suggestions } : undefined
+				}
+				enableThreadHistory={config.enableThreadHistory}
+				showToolCalls={config.showToolCalls}
+				allowAttachments={overrides?.allowAttachments}
+				className={className}
+			/>
+		);
+	},
+);

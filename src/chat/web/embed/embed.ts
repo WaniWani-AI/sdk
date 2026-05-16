@@ -6,6 +6,7 @@
 // shadow DOM for style isolation.
 // ============================================================================
 
+import type { UIMessage } from "ai";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import type { EmbedConfig } from "./config";
@@ -29,10 +30,22 @@ declare global {
 				init: (options?: Partial<EmbedConfig>) => EmbedInstance;
 				destroy: () => void;
 				/**
-				 * Programmatically submit a user message to the chat. No-op if the
-				 * embed has not mounted yet or the inner layout has not attached.
+				 * Submit a user message to the chat. No-op if the embed has not
+				 * mounted yet or the inner layout has not attached.
 				 */
 				sendMessage: (text: string) => void;
+				/**
+				 * Submit a user message and resolve with the final assistant
+				 * message once streaming completes. Resolves with `undefined`
+				 * if the embed has not mounted yet.
+				 */
+				sendMessageAndWait: (text: string) => Promise<UIMessage | undefined>;
+				/** Clear all messages and start a fresh conversation. */
+				reset: () => void;
+				/** Focus the chat input. */
+				focus: () => void;
+				/** Snapshot of the current chat messages. Empty until mounted. */
+				getMessages: () => UIMessage[];
 			};
 		};
 	}
@@ -45,6 +58,10 @@ declare global {
 interface EmbedInstance {
 	destroy: () => void;
 	sendMessage: (text: string) => void;
+	sendMessageAndWait: (text: string) => Promise<UIMessage | undefined>;
+	reset: () => void;
+	focus: () => void;
+	getMessages: () => UIMessage[];
 }
 
 let currentInstance: EmbedInstance | null = null;
@@ -206,6 +223,16 @@ function mountInline(
 			currentInstance = null;
 		},
 		sendMessage: (text: string) => inlineRef.current?.chat?.sendMessage(text),
+		sendMessageAndWait: async (text: string) => {
+			const chat = inlineRef.current?.chat;
+			if (!chat) {
+				return undefined;
+			}
+			return (await chat.sendMessageAndWait(text)) as UIMessage | undefined;
+		},
+		reset: () => inlineRef.current?.chat?.reset(),
+		focus: () => inlineRef.current?.chat?.focus(),
+		getMessages: () => inlineRef.current?.chat?.messages ?? [],
 	};
 }
 
@@ -248,6 +275,15 @@ window.WaniWani.chat = {
 	init,
 	destroy,
 	sendMessage: (text: string) => currentInstance?.sendMessage(text),
+	sendMessageAndWait: async (text: string) => {
+		if (!currentInstance) {
+			return undefined;
+		}
+		return currentInstance.sendMessageAndWait(text);
+	},
+	reset: () => currentInstance?.reset(),
+	focus: () => currentInstance?.focus(),
+	getMessages: () => currentInstance?.getMessages() ?? [],
 };
 
 // ---------------------------------------------------------------------------

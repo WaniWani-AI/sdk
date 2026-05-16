@@ -8,35 +8,61 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type { ModelContextUpdate } from "../../../shared/model-context";
-import type { ChatCardProps, ChatHandle } from "../@types";
+import type { ChatBaseProps, ChatHandle } from "../../../chat/web/@types";
 import {
 	Conversation,
 	ConversationContent,
 	ConversationScrollButton,
-} from "../ai-elements/conversation";
+} from "../../../chat/web/ai-elements/conversation";
 import {
 	PromptInput,
 	PromptInputAddAttachments,
 	PromptInputSubmit,
 	PromptInputTextarea,
-} from "../ai-elements/prompt-input";
-import { ChatQueue } from "../components/chat-queue";
-import { ExportSessionButton } from "../components/export-session";
-import { MessageList } from "../components/message-list";
-import { PoweredBy } from "../components/powered-by";
-import { Suggestions } from "../components/suggestions";
-import { ThreadMenu } from "../components/thread-menu";
-import { useCallTool } from "../hooks/use-call-tool";
-import { useChatEngine } from "../hooks/use-chat-engine";
-import { useConfig } from "../hooks/use-config";
-import { useSuggestions } from "../hooks/use-suggestions";
-import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
-import { buildResourceEndpoint } from "../lib/resource-endpoint";
-import { cn } from "../lib/utils";
-import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
+} from "../../../chat/web/ai-elements/prompt-input";
+import { ChatQueue } from "../../../chat/web/components/chat-queue";
+import { ExportSessionButton } from "../../../chat/web/components/export-session";
+import { MessageList } from "../../../chat/web/components/message-list";
+import { PoweredBy } from "../../../chat/web/components/powered-by";
+import { Suggestions } from "../../../chat/web/components/suggestions";
+import { ThreadMenu } from "../../../chat/web/components/thread-menu";
+import { useCallTool } from "../../../chat/web/hooks/use-call-tool";
+import { useChatEngine } from "../../../chat/web/hooks/use-chat-engine";
+import { useConfig } from "../../../chat/web/hooks/use-config";
+import { useSuggestions } from "../../../chat/web/hooks/use-suggestions";
+import { useTypingPlaceholder } from "../../../chat/web/hooks/use-typing-placeholder";
+import { buildResourceEndpoint } from "../../../chat/web/lib/resource-endpoint";
+import { cn } from "../../../chat/web/lib/utils";
+import {
+	isDarkTheme,
+	mergeTheme,
+	themeToCSSProperties,
+} from "../../../chat/web/theme";
+import type { ModelContextUpdate } from "../../../shared/model-context";
 
-/** @deprecated Use `ChatEmbed` for new code. `ChatCard` is preserved for back-compat only. */
+/** @deprecated Use `WaniwaniChat` (hosted, React) or the `<script>` embed for new code. `ChatCard` is preserved for back-compat only and lives under `@waniwani/sdk/legacy`. */
+export interface ChatCardProps extends ChatBaseProps {
+	/** Title shown in the card header. Defaults to "Assistant". */
+	title?: string;
+	/** Subtitle or status text shown under the title. */
+	subtitle?: string;
+	/** Show the status dot in the header. Defaults to true. */
+	showStatus?: boolean;
+	/** Card width. Accepts a pixel number or any CSS value (e.g. "100%", "50vw"). Defaults to 500. */
+	width?: number | string;
+	/** Card height. Accepts a pixel number or any CSS value (e.g. "100%", "80vh"). Defaults to 600. */
+	height?: number | string;
+	/** Additional class names applied to the root element (e.g. Tailwind classes). */
+	className?: string;
+}
+
+/**
+ * @deprecated Use `WaniwaniChat` from `@waniwani/sdk/chat` for new code.
+ * `ChatCard` is preserved for back-compat with customer MCPs that pre-date
+ * the hosted-tier React component. It is also re-exported from
+ * `@waniwani/sdk/chat` for now; that re-export will be removed in a future
+ * minor release — import from `@waniwani/sdk/legacy` going forward.
+ */
 export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 	function ChatCard(props, ref) {
 		const {

@@ -45,3 +45,11 @@ export * from "./mcp/react";
 // ----------------------------------------------------------------------------
 
 export * from "./chat/next-js";
+
+// ----------------------------------------------------------------------------
+// Legacy chat UI — `ChatCard` was the original always-visible card layout.
+// New code should use `WaniwaniChat` (hosted) or `ChatEmbed` (BYO backend)
+// from `@waniwani/sdk/chat`.
+// ----------------------------------------------------------------------------
+
+export { ChatCard, type ChatCardProps } from "./chat/web/chat-card";
