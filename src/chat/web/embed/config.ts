@@ -208,6 +208,27 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 // Merge: defaults < remote < script attrs < programmatic
 // ---------------------------------------------------------------------------
 
+/**
+ * Drop keys whose value is `undefined` so a spread doesn't overwrite an
+ * already-resolved value with nothing. Callers (notably `WaniwaniChat`)
+ * build `programmatic` by reading `overrides?.welcomeMessage` etc. — every
+ * unset override comes out as `{welcomeMessage: undefined, …}` and the
+ * trailing `...programmatic` would otherwise blow away values from earlier
+ * layers (defaults / remote / script).
+ */
+function compact<T extends object>(obj: T | undefined): Partial<T> {
+	if (!obj) {
+		return {};
+	}
+	const out: Partial<T> = {};
+	for (const key in obj) {
+		if (obj[key] !== undefined) {
+			out[key] = obj[key];
+		}
+	}
+	return out;
+}
+
 export function resolveConfig(
 	programmatic?: Partial<EmbedConfig>,
 	remote?: Partial<EmbedConfig>,
@@ -223,9 +244,9 @@ export function resolveConfig(
 	const merged: EmbedConfig = {
 		token: "",
 		...DEFAULTS,
-		...(remote ?? {}),
-		...fromScript,
-		...programmatic,
+		...compact(remote),
+		...compact(fromScript),
+		...compact(programmatic),
 		theme: {
 			...(remote?.theme ?? {}),
 			...fromScript.theme,
