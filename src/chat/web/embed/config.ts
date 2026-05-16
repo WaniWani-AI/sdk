@@ -52,13 +52,13 @@ export interface EmbedConfig {
 	 * resume previous threads. Defaults to `false` — opt in explicitly.
 	 */
 	enableThreadHistory?: boolean;
-	/** Theme overrides applied to the chat. */
-	theme?: {
-		primaryColor?: string;
-		backgroundColor?: string;
-		textColor?: string;
-		fontFamily?: string;
-	};
+	/**
+	 * Theme overrides applied to the chat. Accepts the full `ChatTheme`
+	 * surface — pass `DARK_THEME` or any subset of its keys. The script-tag
+	 * embed only sets a handful of these from `data-*` attributes, but
+	 * programmatic callers (`WaniwaniChat`, `ChatEmbed`) can pass anything.
+	 */
+	theme?: ChatTheme;
 }
 
 // ---------------------------------------------------------------------------
@@ -269,14 +269,12 @@ export function resolveConfig(
 // ---------------------------------------------------------------------------
 
 export function buildChatTheme(config: EmbedConfig): ChatTheme | undefined {
-	if (!config.theme) {
+	if (!config.theme || Object.keys(config.theme).length === 0) {
 		return undefined;
 	}
-	const t = config.theme;
-	return {
-		...(t.primaryColor ? { primaryColor: t.primaryColor } : {}),
-		...(t.backgroundColor ? { backgroundColor: t.backgroundColor } : {}),
-		...(t.textColor ? { textColor: t.textColor } : {}),
-		...(t.fontFamily ? { fontFamily: t.fontFamily } : {}),
-	};
+	// `config.theme` already conforms to `ChatTheme`. The old implementation
+	// hand-picked four keys, which silently dropped every other `DARK_THEME`
+	// field (headerBackgroundColor, inputBackgroundColor, assistantBubble…)
+	// and rendered a light header/input on top of a dark chat body.
+	return config.theme;
 }
