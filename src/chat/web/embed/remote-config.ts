@@ -9,6 +9,72 @@ import { useEffect, useState } from "react";
 import type { EmbedConfig } from "./config";
 import { resolveConfig } from "./config";
 
+// ---------------------------------------------------------------------------
+// Session cache
+//
+// Keeps the last-seen remote config in `sessionStorage` so a second mount in
+// the same tab can render the fully-assembled chrome immediately, with the
+// background revalidation updating fields silently if anything changed.
+// Session scope auto-expires per tab and is origin-isolated, so we don't
+// need an explicit TTL.
+// ---------------------------------------------------------------------------
+
+const CACHE_PREFIX = "waniwani:config:";
+
+function cacheKey(
+	api: string,
+	token: string,
+	channelId: string | undefined,
+): string {
+	return `${CACHE_PREFIX}${api}|${token}|${channelId ?? ""}`;
+}
+
+export function loadCachedConfig(
+	api: string,
+	token: string,
+	channelId?: string,
+): Partial<EmbedConfig> | null {
+	if (typeof window === "undefined") {
+		return null;
+	}
+	try {
+		const raw = window.sessionStorage.getItem(cacheKey(api, token, channelId));
+		if (!raw) {
+			return null;
+		}
+		const parsed = JSON.parse(raw) as Partial<EmbedConfig>;
+		return parsed && typeof parsed === "object" ? parsed : null;
+	} catch {
+		return null;
+	}
+}
+
+export function saveCachedConfig(
+	api: string,
+	token: string,
+	channelId: string | undefined,
+	config: Partial<EmbedConfig>,
+): void {
+	if (typeof window === "undefined") {
+		return;
+	}
+	try {
+		window.sessionStorage.setItem(
+			cacheKey(api, token, channelId),
+			JSON.stringify(config),
+		);
+	} catch {
+		// sessionStorage can be disabled (private mode, quota) — silently skip.
+	}
+}
+
+/**
+ * Safety net so a stalled `/config` doesn't leave the chat surface blank
+ * forever. After this, render with whatever config we have (programmatic +
+ * defaults) even if the fetch is still in flight.
+ */
+const READINESS_TIMEOUT_MS = 600;
+
 interface RemoteConfigResponse {
 	welcomeMessage: string | null;
 	title: string | null;
@@ -87,8 +153,13 @@ function remoteToConfigPartial(
 /**
  * Fetch the remote config on mount and return an `EmbedConfig` that
  * re-resolves through the layered merge (defaults < remote < data-attrs <
- * programmatic) once it arrives. While the request is in flight, returns
- * the initial config untouched.
+ * programmatic) once it arrives.
+ *
+ * Returns `{ config, ready }`. `ready` flips true when the chat surface can
+ * be revealed: immediately on a `sessionStorage` cache hit, otherwise after
+ * the fetch resolves or a {@link READINESS_TIMEOUT_MS} safety timer fires.
+ * Callers gate the first paint on `ready` so the chrome doesn't draw with
+ * stale defaults and then snap into the real content.
  *
  * `scriptConfig` must be the same `data-*` snapshot used for the initial
  * resolve. Re-parsing post-fetch is unsafe: `document.currentScript` is
@@ -99,8 +170,15 @@ export function useRemoteEmbedConfig(
 	initialConfig: EmbedConfig,
 	programmatic: Partial<EmbedConfig> | undefined,
 	scriptConfig: Partial<EmbedConfig> | undefined,
-): EmbedConfig {
-	const [config, setConfig] = useState(initialConfig);
+): { config: EmbedConfig; ready: boolean } {
+	// Initial state must match what would render on a server pass (no
+	// `window`). Reading `sessionStorage` in the initializer would cause a
+	// hydration mismatch on the cache-hit path. The cache is consulted in
+	// the `useEffect` below, which runs immediately after hydration; a hit
+	// flips state before the browser paints, so repeat visits still feel
+	// instant.
+	const [config, setConfig] = useState<EmbedConfig>(initialConfig);
+	const [ready, setReady] = useState<boolean>(false);
 
 	// Re-fetching on `programmatic` identity changes would be churn; the
 	// caller owns its lifetime — if props change meaningfully they should
@@ -109,37 +187,50 @@ export function useRemoteEmbedConfig(
 	useEffect(() => {
 		const api = initialConfig.api;
 		const token = initialConfig.token;
+		const channelId = initialConfig.channelId;
 		if (!api || !token) {
+			setReady(true);
 			return;
 		}
+		const cached = loadCachedConfig(api, token, channelId);
+		if (cached) {
+			try {
+				setConfig(resolveConfig(programmatic, cached, scriptConfig));
+				setReady(true);
+			} catch {
+				// Fall through to the fetch path.
+			}
+		}
 		const controller = new AbortController();
-		void fetchRemoteConfig(
-			api,
-			token,
-			controller.signal,
-			initialConfig.channelId,
-		)
+		const safety = setTimeout(() => setReady(true), READINESS_TIMEOUT_MS);
+		void fetchRemoteConfig(api, token, controller.signal, channelId)
 			.then((remote) => {
 				if (controller.signal.aborted) {
 					return;
 				}
-				if (Object.keys(remote).length === 0) {
-					return;
+				if (Object.keys(remote).length > 0) {
+					saveCachedConfig(api, token, channelId, remote);
+					try {
+						setConfig(resolveConfig(programmatic, remote, scriptConfig));
+					} catch (err) {
+						// `resolveConfig` throws if token is missing. Shouldn't happen
+						// here (initial resolve already validated), but swallow so a
+						// late failure doesn't become an unhandled rejection.
+						console.error("[WaniWani] Failed to apply remote config:", err);
+					}
 				}
-				try {
-					setConfig(resolveConfig(programmatic, remote, scriptConfig));
-				} catch (err) {
-					// `resolveConfig` throws if token is missing. Shouldn't happen
-					// here (initial resolve already validated), but swallow so a
-					// late failure doesn't become an unhandled rejection.
-					console.error("[WaniWani] Failed to apply remote config:", err);
-				}
+				setReady(true);
 			})
 			.catch((err) => {
 				console.error("[WaniWani] Remote config fetch failed:", err);
-			});
-		return () => controller.abort();
+				setReady(true);
+			})
+			.finally(() => clearTimeout(safety));
+		return () => {
+			controller.abort();
+			clearTimeout(safety);
+		};
 	}, [initialConfig.api, initialConfig.token, initialConfig.channelId]);
 
-	return config;
+	return { config, ready };
 }

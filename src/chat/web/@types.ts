@@ -248,6 +248,15 @@ export interface ChatEmbedProps
 	title?: string;
 	/** Extra React node rendered in the sticky header, right of the title. */
 	headerActions?: React.ReactNode;
+	/**
+	 * @internal
+	 * When `true`, the root renders at `opacity: 0` so the chrome doesn't
+	 * paint with stale defaults while the layout's remote config is still
+	 * loading. Flipping to `false` triggers a single coordinated fade-in.
+	 * Set by `WaniwaniChat` / the IIFE embed; standalone `ChatEmbed` callers
+	 * should leave this unset.
+	 */
+	initializing?: boolean;
 }
 
 // `ChatCardProps` moved to `src/legacy/chat/web/chat-card.tsx` alongside the

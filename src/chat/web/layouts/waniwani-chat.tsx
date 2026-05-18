@@ -4,8 +4,19 @@ import { forwardRef, useEffect, useMemo, useState } from "react";
 import type { ChatAppearance, ChatHandle, WelcomeConfig } from "../@types";
 import type { EmbedConfig } from "../embed/config";
 import { resolveConfig } from "../embed/config";
-import { fetchRemoteConfig } from "../embed/remote-config";
+import {
+	fetchRemoteConfig,
+	loadCachedConfig,
+	saveCachedConfig,
+} from "../embed/remote-config";
 import { ChatEmbed } from "./chat-embed";
+
+/**
+ * Safety net so a stalled `/config` doesn't leave the chat surface blank
+ * forever. After this, the chrome fades in with whatever we have
+ * (programmatic overrides + defaults) even if the fetch is still pending.
+ */
+const READINESS_TIMEOUT_MS = 600;
 
 /**
  * Per-page overrides for `WaniwaniChat`. The WaniWani dashboard is the
@@ -140,24 +151,50 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 		// Remote config is fetched once per (api, token) pair. Display fields
 		// from the dashboard are merged below the programmatic overrides, so
 		// any local override always wins.
+		//
+		// Initial state must match the server (no `window`) — reading
+		// `sessionStorage` here would cause a hydration mismatch on the
+		// cache-hit path. The cache is consulted in the `useEffect` below,
+		// which runs immediately after hydration; a cache hit flips state
+		// before the browser paints, so repeat visits still feel instant.
+		const resolvedApi = overrides?.api ?? DEFAULT_API;
+
 		const [remote, setRemote] = useState<Partial<EmbedConfig>>({});
+		const [ready, setReady] = useState<boolean>(false);
+
 		useEffect(() => {
 			if (!token) {
+				setReady(true);
 				return;
 			}
+			const cached = loadCachedConfig(resolvedApi, token, channelId);
+			if (cached) {
+				setRemote(cached);
+				setReady(true);
+			}
 			const controller = new AbortController();
-			const resolvedApi = overrides?.api ?? DEFAULT_API;
+			const safety = setTimeout(() => setReady(true), READINESS_TIMEOUT_MS);
 			void fetchRemoteConfig(resolvedApi, token, controller.signal, channelId)
 				.then((r) => {
-					if (!controller.signal.aborted) {
+					if (controller.signal.aborted) {
+						return;
+					}
+					if (Object.keys(r).length > 0) {
+						saveCachedConfig(resolvedApi, token, channelId, r);
 						setRemote(r);
 					}
+					setReady(true);
 				})
 				.catch((err) => {
 					console.error("[WaniWani] Remote config fetch failed:", err);
-				});
-			return () => controller.abort();
-		}, [overrides?.api, token, channelId]);
+					setReady(true);
+				})
+				.finally(() => clearTimeout(safety));
+			return () => {
+				controller.abort();
+				clearTimeout(safety);
+			};
+		}, [resolvedApi, token, channelId]);
 
 		const config = useMemo(
 			() => resolveConfig(programmatic, remote, undefined),
@@ -191,6 +228,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				showToolCalls={config.showToolCalls}
 				allowAttachments={overrides?.allowAttachments}
 				className={className}
+				initializing={!ready}
 			/>
 		);
 	},

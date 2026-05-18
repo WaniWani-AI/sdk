@@ -65,6 +65,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			headerActions,
 			enableThreadHistory = false,
 			showToolCalls = true,
+			initializing = false,
 		} = props;
 
 		// Preset → base theme. `light` and the unset case let the CSS
@@ -324,10 +325,16 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 		return (
 			<div
 				ref={rootRef}
-				style={{ ...cssVars, maxHeight: "inherit" }}
+				style={{
+					...cssVars,
+					maxHeight: "inherit",
+					opacity: initializing ? 0 : 1,
+					transition: "opacity 220ms ease-out",
+				}}
 				data-waniwani-chat=""
 				data-waniwani-layout="embed"
 				data-color-scheme={preset === "auto" ? "auto" : undefined}
+				{...(initializing ? { "data-waniwani-initializing": "" } : {})}
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className={cn(
 					"ww:relative ww:w-full ww:h-full ww:flex ww:flex-col ww:bg-background ww:text-foreground ww:font-[family-name:var(--ww-font)] ww:overflow-hidden",
