@@ -30,7 +30,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		{ config: initialConfig, programmatic, scriptConfig, onReady },
 		ref,
 	) {
-		const config = useRemoteEmbedConfig(
+		const { config, ready } = useRemoteEmbedConfig(
 			initialConfig,
 			programmatic,
 			scriptConfig,
@@ -79,6 +79,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 				}
 				enableThreadHistory={config.enableThreadHistory}
 				showToolCalls={config.showToolCalls}
+				initializing={!ready}
 			/>
 		);
 	},
