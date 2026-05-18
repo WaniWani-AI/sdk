@@ -58,14 +58,16 @@ export const MessageContent = ({
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
 const streamdownPlugins = { cjk, code };
+const defaultLinkSafety = { enabled: false } as const;
 
 export const MessageResponse = memo(
-	({ className, ...props }: MessageResponseProps) => (
+	({ className, linkSafety, ...props }: MessageResponseProps) => (
 		<Streamdown
 			className={cn(
 				"ww:size-full ww:[&>*:first-child]:mt-0 ww:[&>*:last-child]:mb-0",
 				className,
 			)}
+			linkSafety={linkSafety ?? defaultLinkSafety}
 			plugins={streamdownPlugins}
 			{...props}
 		/>
