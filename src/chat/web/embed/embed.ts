@@ -70,7 +70,37 @@ let hostElement: HTMLElement | null = null;
 let containerResizeObserver: ResizeObserver | null = null;
 
 // ---------------------------------------------------------------------------
-// CSS injection helper
+// Container defaults — injected into the light DOM so customers can override
+// with normal CSS specificity.
+// ---------------------------------------------------------------------------
+
+const DEFAULTS_STYLE_ID = "waniwani-chat-defaults";
+
+// Drop-in defaults applied to `[data-waniwani-embed]` itself (the customer's
+// container, in light DOM). Wrapped in `:where()` so the rule has zero
+// specificity — any normal selector targeting `[data-waniwani-embed]` wins,
+// including `min-height: 0` to opt out of the default floor in tight
+// layouts. No `background` here on purpose: the inner chat draws its own
+// background via `--ww-color-background`, which switches with the active
+// preset (light/dark/auto). Setting a light background here would show
+// through any rounded-corner gap in dark mode.
+const CONTAINER_DEFAULTS_CSS = `:where([data-waniwani-embed]){min-height:500px;max-height:100vh;border-radius:16px;overflow:hidden}`;
+
+function ensureContainerDefaults(): void {
+	if (typeof document === "undefined") {
+		return;
+	}
+	if (document.getElementById(DEFAULTS_STYLE_ID)) {
+		return;
+	}
+	const style = document.createElement("style");
+	style.id = DEFAULTS_STYLE_ID;
+	style.textContent = CONTAINER_DEFAULTS_CSS;
+	document.head.appendChild(style);
+}
+
+// ---------------------------------------------------------------------------
+// Shadow-root CSS injection
 // ---------------------------------------------------------------------------
 
 function injectStyles(shadowRoot: ShadowRoot, config: EmbedConfig): void {
@@ -141,8 +171,24 @@ function mountInline(
 	//      avoid a feedback loop: when the chat is shorter than the
 	//      parent's bound, the parent's content-box shrinks to fit, and
 	//      mirroring that would lock the host at its current size.
+
+	// Container chrome (`min-height`, `max-height`, `border-radius`,
+	// `overflow`) is opt-in via `data-theme` / `appearance.theme`. Without
+	// a preset, we touch nothing on the customer's container — they bring
+	// their own sizing and shape, same as before this option existed.
+	// When opted in, the rule is wrapped in `:where()` so any customer
+	// override on `[data-waniwani-embed]` still wins.
+	if (config.appearance?.theme) {
+		ensureContainerDefaults();
+	}
+
 	hostElement = document.createElement("div");
 	hostElement.id = "waniwani-chat-embed";
+	// Structural sizing only. `min-height: 0` is the flex-shrink unblocker:
+	// when the customer's container is a flex column, this lets the host
+	// (and the chat inside it) shrink below content size instead of
+	// expanding the parent. The visible floor (500px) lives on the
+	// container itself, not here.
 	hostElement.style.cssText =
 		"width:100%;height:100%;max-height:inherit;" +
 		"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;";

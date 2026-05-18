@@ -8,7 +8,11 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type { ChatBaseProps, ChatHandle } from "../../../chat/web/@types";
+import type {
+	ChatBaseProps,
+	ChatHandle,
+	ChatTheme,
+} from "../../../chat/web/@types";
 import {
 	Conversation,
 	ConversationContent,
@@ -33,11 +37,7 @@ import { useSuggestions } from "../../../chat/web/hooks/use-suggestions";
 import { useTypingPlaceholder } from "../../../chat/web/hooks/use-typing-placeholder";
 import { buildResourceEndpoint } from "../../../chat/web/lib/resource-endpoint";
 import { cn } from "../../../chat/web/lib/utils";
-import {
-	isDarkTheme,
-	mergeTheme,
-	themeToCSSProperties,
-} from "../../../chat/web/theme";
+import { mergeTheme, themeToCSSProperties } from "../../../chat/web/theme";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 
 /** @deprecated Use `WaniwaniChat` (hosted, React) or the `<script>` embed for new code. `ChatCard` is preserved for back-compat only and lives under `@waniwani/sdk/legacy`. */
@@ -54,6 +54,8 @@ export interface ChatCardProps extends ChatBaseProps {
 	height?: number | string;
 	/** Additional class names applied to the root element (e.g. Tailwind classes). */
 	className?: string;
+	/** Theme overrides. Legacy API; new code should use the `appearance` field on `WaniwaniChat` / `ChatEmbed`. */
+	theme?: ChatTheme;
 }
 
 /**
@@ -91,7 +93,13 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 
 		const resolvedTheme = mergeTheme(userTheme);
 		const cssVars = themeToCSSProperties(resolvedTheme);
-		const isDark = isDarkTheme(resolvedTheme);
+		// Legacy heuristic: dark when the background's perceived luminance is low.
+		// New code uses the explicit `appearance.theme` preset instead.
+		const hex = resolvedTheme.backgroundColor.replace("#", "");
+		const r = parseInt(hex.substring(0, 2), 16);
+		const g = parseInt(hex.substring(2, 4), 16);
+		const b = parseInt(hex.substring(4, 6), 16);
+		const isDark = (r * 299 + g * 587 + b * 114) / 1000 < 128;
 
 		const config = useConfig(
 			effectiveApi,

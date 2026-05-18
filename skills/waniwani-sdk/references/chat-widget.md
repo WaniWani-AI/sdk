@@ -82,7 +82,7 @@ The dashboard owns the agent's display and behavior config. Use `overrides` only
 | `enableThreadHistory` | `boolean` | Persist conversations across reloads in IndexedDB |
 | `showToolCalls` | `boolean` | Show tool call request/response panels |
 | `allowAttachments` | `boolean` | Enable file attachments in the input |
-| `theme` | `ChatTheme` | Theme overrides |
+| `appearance` | `ChatAppearance` | Theme preset + per-property overrides — see [Theming the chat widget](#theming-the-chat-widget) |
 | `api` | `string` | Chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat` |
 | `mcpServerUrl` | `string` | Override the MCP server URL (rare) |
 
@@ -177,10 +177,9 @@ Bound the chat by sizing `[data-waniwani-embed]` (or an ancestor) with `height`,
 | `data-enable-thread-history` | No | `"true"`/`"false"` — persist threads in IndexedDB, show thread menu in header |
 | `data-show-tool-calls` | No | `"true"`/`"false"` — toggle tool call panels |
 | `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |
-| `data-primary-color` | No | Primary color hex |
-| `data-background-color` | No | Background color hex |
-| `data-text-color` | No | Text color hex |
-| `data-font-family` | No | Font family |
+| `data-theme` | No | `"light"` (default), `"dark"`, or `"auto"` (follow `prefers-color-scheme`) |
+
+For finer-grained colour, radius, or font overrides, set CSS variables on the container — see [Theming the chat widget](#theming-the-chat-widget).
 
 ### Programmatic init + ref API
 
@@ -193,7 +192,7 @@ The IIFE exposes the same imperative methods as the React ref, both globally and
     const chat = window.WaniWani.chat.init({
       token: 'wwp_...',
       title: 'Support',
-      theme: { primaryColor: '#6366f1' },
+      appearance: { theme: 'dark', variables: { primaryColor: '#6366f1' } },
     });
 
     // Fire-and-forget
@@ -272,41 +271,139 @@ Rich welcome screen replacing `welcomeMessage`. Shown when the conversation is e
 | `description` | `string` | No | Description below the title |
 | `suggestions` | `string[]` | No | Clickable suggestion cards (disappear after first message) |
 
-### Theming
+### Theming the chat widget
 
-Theme is normally set in the dashboard. For per-page overrides, pass `theme` under `overrides`. A `DARK_THEME` preset is also available.
+Theming is opt-in via `data-theme` on the script tag (or `appearance.theme` on the React component). Without it, the widget renders into whatever container you give it, with no chrome assumed — exactly like a bare React component you'd drop into your own layout. Set `data-theme` and you get an opinionated card look plus a light/dark/auto preset.
+
+Themes layer cheapest → richest:
+
+1. **Pick a preset** — `light`, `dark`, or `auto` (follow `prefers-color-scheme`). Without one, no chrome is applied.
+2. **Override CSS variables** on the container — for ad-hoc colour or radius tweaks, write plain CSS
+3. **Pass `appearance.variables`** programmatically — for tweaks that depend on JS state
+
+#### 1. Theme presets
+
+Set the preset via `data-theme` on the script tag, or via `appearance.theme` on the React component:
+
+```html
+<!-- Script tag -->
+<div data-waniwani-embed></div>
+<script src="…/embed.js" data-token="wwp_..." data-theme="light"></script>
+```
 
 ```tsx
-import { DARK_THEME, mergeTheme } from "@waniwani/sdk/chat";
-
-<WaniwaniChat token="wwp_..." channelId="..." overrides={{ theme: DARK_THEME }} />
+// React
 <WaniwaniChat
   token="wwp_..."
   channelId="..."
-  overrides={{ theme: mergeTheme(DARK_THEME, { primaryColor: "#6366f1" }) }}
+  overrides={{ appearance: { theme: "auto" } }}
 />
 ```
 
-| Property | CSS Variable | Default |
-|----------|-------------|---------|
-| `primaryColor` | `--ww-primary` | `#6366f1` |
-| `primaryForeground` | `--ww-primary-fg` | `#ffffff` |
-| `backgroundColor` | `--ww-bg` | `#ffffff` |
-| `textColor` | `--ww-text` | `#1f2937` |
-| `mutedColor` | `--ww-muted` | `#6b7280` |
-| `borderColor` | `--ww-border` | `#e5e7eb` |
-| `assistantBubbleColor` | `--ww-assistant-bubble` | `#f3f4f6` |
-| `userBubbleColor` | `--ww-user-bubble` | (primary) |
-| `inputBackgroundColor` | `--ww-input-bg` | `#f9fafb` |
-| `headerBackgroundColor` | -- | (backgroundColor) |
-| `headerTextColor` | -- | (textColor) |
-| `statusColor` | -- | `#22c55e` |
-| `toolCardColor` | -- | light gray / `#262626` in dark |
-| `borderRadius` | `--ww-radius` | `16px` |
-| `messageBorderRadius` | `--ww-msg-radius` | `12px` |
-| `fontFamily` | `--ww-font` | system stack |
+`auto` follows the OS / browser dark-mode setting at runtime — no reload needed when the user flips it.
 
-Theme utilities: `DEFAULT_THEME`, `DARK_THEME`, `mergeTheme(base, overrides)`, `themeToCSSProperties(theme)`.
+#### Chrome defaults (only when `data-theme` is set)
+
+When you opt into a preset on the embed script, the bundle injects a low-specificity rule on `[data-waniwani-embed]` so the container looks like a card without any extra CSS from you:
+
+```css
+:where([data-waniwani-embed]) {
+  min-height: 500px;
+  max-height: 100vh;
+  border-radius: 16px;
+  overflow: hidden;
+}
+```
+
+It's wrapped in `:where()` (specificity `0,0,0`), so **any** normal rule targeting `[data-waniwani-embed]` wins. Examples:
+
+```css
+/* Smaller card */
+[data-waniwani-embed] {
+  height: 300px;
+  min-height: 0;       /* opt out of the 500px floor */
+}
+
+/* Rectangular, no clipping */
+[data-waniwani-embed] {
+  border-radius: 0;
+}
+
+/* Inside a flex column where the chat should shrink with the parent */
+[data-waniwani-embed] {
+  flex: 1;
+  min-height: 0;
+}
+```
+
+Don't want any defaults at all? Leave `data-theme` off — the embed mounts into your container untouched, the way it did before this feature existed.
+
+#### 2. CSS variable overrides
+
+The widget exposes a `--ww-*` namespace that pierces the shadow boundary. Set any of these on the container in plain CSS:
+
+```html
+<style>
+  [data-waniwani-embed] {
+    --ww-primary: #ff6b6b;
+    --ww-radius: 8px;
+    --ww-font: "Inter", sans-serif;
+  }
+</style>
+<div data-waniwani-embed></div>
+```
+
+Unset variables fall back to the preset's defaults, so you only override what you care about. This works for both light and dark presets — your `--ww-primary: red` wins in both modes.
+
+| CSS Variable | Property | Default (light) | Default (dark) |
+|--------------|----------|-----------------|----------------|
+| `--ww-primary` | Primary brand colour | `#6366f1` | `#6366f1` |
+| `--ww-primary-fg` | Text on primary | `#1f2937` | `#ffffff` |
+| `--ww-bg` | Panel background | `#ffffff` | `#212121` |
+| `--ww-text` | Default text colour | `#1f2937` | `#ececec` |
+| `--ww-muted` | Secondary text | `#6b7280` | `#8e8ea0` |
+| `--ww-border` | Border colour | `#e5e7eb` | `#444444` |
+| `--ww-assistant-bubble` | Assistant bubble bg | `#f3f4f6` | `#2f2f2f` |
+| `--ww-user-bubble` | User bubble bg | `#f4f4f4` | `#303030` |
+| `--ww-input-bg` | Input field bg | `#f9fafb` | `#2f2f2f` |
+| `--ww-header-bg` | Header background | `#ffffff` | `#1e1e1e` |
+| `--ww-header-text` | Header text | `#1f2937` | `#ececec` |
+| `--ww-status` | Status dot | `#22c55e` | `#22c55e` |
+| `--ww-tool-card` | Tool call card bg | `#f4f4f5` | `#262626` |
+| `--ww-radius` | Panel border-radius | `16px` | `16px` |
+| `--ww-msg-radius` | Message bubble radius | `12px` | `12px` |
+| `--ww-font` | Font family | system stack | system stack |
+
+#### 3. Programmatic `appearance`
+
+For JS-driven theming, pass an `appearance` object. Same shape on every surface:
+
+```js
+// embed.js
+window.WaniWani.chat.init({
+  token: "wwp_...",
+  appearance: {
+    theme: "dark",
+    variables: { primaryColor: "#ff6b6b", borderRadius: 8 },
+  },
+});
+```
+
+```tsx
+// React
+<WaniwaniChat
+  token="wwp_..."
+  channelId="..."
+  overrides={{
+    appearance: {
+      theme: "dark",
+      variables: { primaryColor: "#ff6b6b", borderRadius: 8 },
+    },
+  }}
+/>
+```
+
+`variables` accepts the same keys as `ChatTheme`. The helpers `DEFAULT_THEME`, `DARK_THEME`, and `mergeTheme(base, overrides)` are exported from `@waniwani/sdk/chat` for assembling custom variable sets.
 
 ### Event tracking
 
@@ -333,7 +430,7 @@ import { ChatEmbed } from "@waniwani/sdk/chat";
 <ChatEmbed
   api="/api/my-chat-endpoint"
   body={{ environmentId, sessionId }}
-  theme={{ backgroundColor: "#fff" }}
+  appearance={{ theme: "dark" }}
 />
 
 // With MCP App widget support
@@ -356,7 +453,7 @@ The component fills its parent container (`width: 100%; height: 100%`) with no h
 | `readOnly` | `boolean` | No | Hide the input bar |
 | `className` | `string` | No | Additional CSS class names |
 
-Plus all shared `ChatBaseProps` (`headers`, `body`, `theme`, `welcomeMessage`, `welcome`, `placeholder`, `suggestions`, `allowAttachments`, `enableThreadHistory`, `showToolCalls`, `onMessageSent`, `onResponseReceived`, `onCallTool`, `debug`, `triggerEvent`).
+Plus all shared `ChatBaseProps` (`headers`, `body`, `appearance`, `welcomeMessage`, `welcome`, `placeholder`, `suggestions`, `allowAttachments`, `enableThreadHistory`, `showToolCalls`, `onMessageSent`, `onResponseReceived`, `onCallTool`, `debug`, `triggerEvent`).
 
 The same `ChatHandle` ref API works on `ChatEmbed`. See [Imperative handle](#imperative-handle) above.
 
@@ -370,5 +467,5 @@ The same `ChatHandle` ref API works on `ChatEmbed`. See [Imperative handle](#imp
 - **Missing stylesheet** — Import `@waniwani/sdk/chat/styles.css` alongside the component
 - **Missing peer deps** — Requires `react`, `react-dom`, `@ai-sdk/react`, and `ai`. Everything else is bundled.
 - **Embed cleanup** — Always call `chat.destroy()` (or unmount the React tree) to prevent memory leaks
-- **Shadow DOM styling** — The `<script>` embed uses Shadow DOM; external CSS won't affect widget styles. Use the `theme` prop / `data-*-color` attrs instead.
+- **Shadow DOM styling** — The `<script>` embed uses Shadow DOM, so most external CSS won't reach the widget. CSS custom properties (`--ww-*`) are the exception — they cascade through the shadow boundary, so setting them on `[data-waniwani-embed]` is the simplest way to theme the widget from plain CSS. For finer-grained control, pass `appearance` programmatically.
 - **Using `ChatEmbed` when `WaniwaniChat` would do** — `ChatEmbed` is the BYO-backend primitive; if you're talking to `app.waniwani.ai`, `WaniwaniChat` is the right choice.

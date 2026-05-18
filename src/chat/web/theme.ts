@@ -62,20 +62,20 @@ export function mergeTheme(userTheme?: ChatTheme): Required<ChatTheme> {
 	return { ...DEFAULT_THEME, ...userTheme };
 }
 
-export function isDarkTheme(theme: Required<ChatTheme>): boolean {
-	const hex = theme.backgroundColor.replace("#", "");
-	const r = parseInt(hex.substring(0, 2), 16);
-	const g = parseInt(hex.substring(2, 4), 16);
-	const b = parseInt(hex.substring(4, 6), 16);
-	return (r * 299 + g * 587 + b * 114) / 1000 < 128;
-}
-
-export function themeToCSSProperties(
-	theme: Required<ChatTheme>,
-): Record<string, string> {
+/**
+ * Serialise a (partial) `ChatTheme` to inline CSS custom properties. Only
+ * keys present on the input are emitted — unspecified properties fall back
+ * to the cascade in `tailwind.css` (`var(--ww-primary, #6366f1)` chain).
+ * This lets a customer's `[data-waniwani-embed] { --ww-primary: ... }` win
+ * over the chat root's defaults when only a few keys are customised.
+ */
+export function themeToCSSProperties(theme: ChatTheme): Record<string, string> {
 	const vars: Record<string, string> = {};
 	for (const [key, cssVars] of Object.entries(CSS_VAR_MAP)) {
 		const value = theme[key as keyof ChatTheme];
+		if (value === undefined) {
+			continue;
+		}
 		const resolved = typeof value === "number" ? `${value}px` : String(value);
 		for (const cssVar of cssVars) {
 			vars[cssVar] = resolved;

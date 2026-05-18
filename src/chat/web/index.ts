@@ -9,12 +9,14 @@ export {
 	type ChatCardProps,
 } from "../../legacy/chat/web/chat-card";
 export type {
+	ChatAppearance,
 	ChatBaseProps,
 	ChatEmbedMcpConfig,
 	ChatEmbedProps,
 	ChatHandle,
 	ChatTheme,
 	SuggestionsConfig,
+	ThemePreset,
 	WelcomeConfig,
 } from "./@types";
 export type {
