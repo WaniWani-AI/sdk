@@ -141,7 +141,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			}
 			const controller = new AbortController();
 			const resolvedApi = overrides?.api ?? DEFAULT_API;
-			void fetchRemoteConfig(resolvedApi, token, controller.signal)
+			void fetchRemoteConfig(resolvedApi, token, controller.signal, channelId)
 				.then((r) => {
 					if (!controller.signal.aborted) {
 						setRemote(r);
@@ -151,7 +151,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					console.error("[WaniWani] Remote config fetch failed:", err);
 				});
 			return () => controller.abort();
-		}, [overrides?.api, token]);
+		}, [overrides?.api, token, channelId]);
 
 		const config = useMemo(
 			() => resolveConfig(programmatic, remote, undefined),

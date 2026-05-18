@@ -29,9 +29,13 @@ export async function fetchRemoteConfig(
 	api: string,
 	token: string,
 	signal?: AbortSignal,
+	channelId?: string,
 ): Promise<Partial<EmbedConfig>> {
 	try {
-		const url = `${api.replace(/\/$/, "")}/config`;
+		const base = `${api.replace(/\/$/, "")}/config`;
+		const url = channelId
+			? `${base}?channel=${encodeURIComponent(channelId)}`
+			: base;
 		const res = await fetch(url, {
 			method: "GET",
 			headers: { Authorization: `Bearer ${token}` },
@@ -109,7 +113,7 @@ export function useRemoteEmbedConfig(
 			return;
 		}
 		const controller = new AbortController();
-		void fetchRemoteConfig(api, token, controller.signal)
+		void fetchRemoteConfig(api, token, controller.signal, initialConfig.channelId)
 			.then((remote) => {
 				if (controller.signal.aborted) {
 					return;
@@ -130,7 +134,7 @@ export function useRemoteEmbedConfig(
 				console.error("[WaniWani] Remote config fetch failed:", err);
 			});
 		return () => controller.abort();
-	}, [initialConfig.api, initialConfig.token]);
+	}, [initialConfig.api, initialConfig.token, initialConfig.channelId]);
 
 	return config;
 }
