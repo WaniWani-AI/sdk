@@ -90,7 +90,8 @@
     "release:minor": "npm version minor && git push --follow-tags",
     "release:major": "npm version major && git push --follow-tags",
     "release:beta": "npm version prerelease --preid beta && git push --follow-tags",
-    "release:alpha": "npm version prerelease --preid alpha && git push --follow-tags"
+    "release:alpha": "npm version prerelease --preid alpha && git push --follow-tags",
+    "postinstall": "lefthook install || true"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "~1.29.0",
@@ -142,6 +143,7 @@
     "clsx": "^2.1.1",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.7.0",
+    "lefthook": "^2.0.16",
     "lucide-react": "^0.563.0",
     "postcss": "^8.5.6",
     "react": "^19.0.0",

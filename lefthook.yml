@@ -1,0 +1,10 @@
+pre-commit:
+  parallel: true
+  commands:
+    check:
+      glob: "*.{js,jsx,ts,tsx,json,css}"
+      exclude: '\.claude/'
+      run: bunx biome check --write --no-errors-on-unmatched {staged_files} && git add {staged_files}
+    typecheck:
+      glob: "*.{ts,tsx}"
+      run: bun run typecheck

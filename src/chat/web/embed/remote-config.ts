@@ -113,7 +113,12 @@ export function useRemoteEmbedConfig(
 			return;
 		}
 		const controller = new AbortController();
-		void fetchRemoteConfig(api, token, controller.signal, initialConfig.channelId)
+		void fetchRemoteConfig(
+			api,
+			token,
+			controller.signal,
+			initialConfig.channelId,
+		)
 			.then((remote) => {
 				if (controller.signal.aborted) {
 					return;
