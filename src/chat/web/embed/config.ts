@@ -76,6 +76,10 @@ const DEFAULTS = {
 // ---------------------------------------------------------------------------
 
 function findScriptTag(): HTMLScriptElement | null {
+	if (typeof document === "undefined") {
+		return null;
+	}
+
 	// Preferred: works in synchronous execution during script load
 	if (document.currentScript instanceof HTMLScriptElement) {
 		return document.currentScript;
