@@ -3,7 +3,7 @@ import type {
 	TrackInput,
 } from "../../../tracking/index.js";
 import type { WaniWaniClient } from "../../../types.js";
-import { extractSessionId, extractSource } from "../utils.js";
+import { extractSessionId, extractSource, FLOW_META_KEY } from "../utils.js";
 import type { WidgetTokenCache } from "../widget-token.js";
 import type { FunnelSyncPayload } from "./funnel-sync.js";
 
@@ -140,6 +140,18 @@ export function buildTrackInput(
 				}
 			: io?.output;
 
+	const responseMeta =
+		isRecord(io?.output) && isRecord((io.output as UnknownRecord)._meta)
+			? ((io.output as UnknownRecord)._meta as UnknownRecord)
+			: undefined;
+	const flowMeta = responseMeta?.[FLOW_META_KEY];
+	const mergedMeta =
+		flowMeta && meta
+			? { ...meta, [FLOW_META_KEY]: flowMeta }
+			: flowMeta
+				? { [FLOW_META_KEY]: flowMeta }
+				: meta;
+
 	return {
 		event: "tool.called",
 		properties: {
@@ -149,7 +161,7 @@ export function buildTrackInput(
 			...(input !== undefined && { input }),
 			...(output !== undefined && { output }),
 		},
-		meta,
+		meta: mergedMeta,
 		source: extractSource(meta),
 		metadata: {
 			...(options.metadata ?? {}),
