@@ -85,17 +85,20 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 		// by message components and the iframe theme handshake). For
 		// `auto` we track the system preference at runtime so iframe
 		// widgets receive the right theme.
-		const [autoIsDark, setAutoIsDark] = useState(() => {
-			if (typeof window === "undefined") {
-				return false;
-			}
-			return window.matchMedia("(prefers-color-scheme: dark)").matches;
-		});
+		//
+		// Initial state must be deterministic across server and client to
+		// avoid hydration mismatches on `data-waniwani-dark` — reading
+		// `matchMedia` in the initializer would render `true` on a
+		// dark-OS client against the server's `false`. The effect below
+		// syncs the real value immediately after mount and subscribes to
+		// future changes.
+		const [autoIsDark, setAutoIsDark] = useState(false);
 		useEffect(() => {
 			if (preset !== "auto" || typeof window === "undefined") {
 				return;
 			}
 			const mq = window.matchMedia("(prefers-color-scheme: dark)");
+			setAutoIsDark(mq.matches);
 			const onChange = () => setAutoIsDark(mq.matches);
 			mq.addEventListener("change", onChange);
 			return () => mq.removeEventListener("change", onChange);
