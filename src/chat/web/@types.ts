@@ -19,6 +19,10 @@ export interface ChatTheme {
 	mutedColor?: string;
 	/** Border color */
 	borderColor?: string;
+	/** Border width for the panel (px). Defaults to 0 (no border). */
+	borderWidth?: number;
+	/** Box-shadow shorthand applied to the panel. Use any valid CSS box-shadow string (e.g. `"0 10px 25px rgba(0,0,0,0.1)"`). Defaults to `none`. */
+	boxShadow?: string;
 	/** Assistant message bubble background */
 	assistantBubbleColor?: string;
 	/** User message bubble background */

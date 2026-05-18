@@ -97,6 +97,15 @@
 	--ww-color-tool-card: var(--ww-tool-card, #f4f4f5);
 	--ww-radius: var(--ww-radius, 16px);
 	--ww-font-sans: var(--ww-font, system-ui, -apple-system, "Segoe UI", sans-serif);
+
+	/* Opt-in panel chrome. Defaults are no-ops so customers who slot
+	   `<ChatEmbed>` into their own bordered/shadowed container see no
+	   change. Set `appearance.variables.borderWidth` / `boxShadow` or
+	   override the CSS vars directly to enable. */
+	border-style: solid;
+	border-width: var(--ww-border-width, 0);
+	border-color: var(--ww-color-border);
+	box-shadow: var(--ww-shadow, none);
 }
 
 .dark [data-waniwani-chat],

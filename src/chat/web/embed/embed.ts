@@ -74,29 +74,59 @@ let containerResizeObserver: ResizeObserver | null = null;
 // with normal CSS specificity.
 // ---------------------------------------------------------------------------
 
-const DEFAULTS_STYLE_ID = "waniwani-chat-defaults";
+const STRUCTURAL_STYLE_ID = "waniwani-chat-defaults";
+const CHROME_STYLE_ID = "waniwani-chat-chrome";
 
-// Drop-in defaults applied to `[data-waniwani-embed]` itself (the customer's
-// container, in light DOM). Wrapped in `:where()` so the rule has zero
-// specificity — any normal selector targeting `[data-waniwani-embed]` wins,
-// including `min-height: 0` to opt out of the default floor in tight
-// layouts. No `background` here on purpose: the inner chat draws its own
-// background via `--ww-color-background`, which switches with the active
-// preset (light/dark/auto). Setting a light background here would show
-// through any rounded-corner gap in dark mode.
-const CONTAINER_DEFAULTS_CSS = `:where([data-waniwani-embed]){min-height:500px;max-height:100vh;border-radius:16px;overflow:hidden}`;
+// Structural defaults — applied only when a preset is chosen. Without one,
+// we touch nothing on the customer's container so they keep their own
+// sizing and shape. `:where()` keeps specificity at 0 so any normal
+// customer selector wins (e.g. `min-height: 0` to opt out of the floor).
+// No `background` here on purpose: the inner chat draws its own background
+// via `--ww-color-background`, which switches with the active preset
+// (light/dark/auto). Setting a light background here would show through
+// any rounded-corner gap in dark mode.
+const STRUCTURAL_DEFAULTS_CSS = `:where([data-waniwani-embed]){min-height:500px;max-height:100vh;border-radius:16px;overflow:hidden}`;
 
-function ensureContainerDefaults(): void {
-	if (typeof document === "undefined") {
-		return;
-	}
-	if (document.getElementById(DEFAULTS_STYLE_ID)) {
+// Chrome defaults (border, shadow). Always injected because the vars
+// default to no-op values — invisible until the customer passes
+// `appearance.variables.borderWidth` / `boxShadow` (bridged onto the
+// container by `applyContainerAppearance`) or sets `--ww-*` themselves.
+// Lives on the container (not the chat root) because the container's
+// `overflow:hidden` would clip a shadow drawn inside.
+const CONTAINER_CHROME_CSS = `:where([data-waniwani-embed]){border-style:solid;border-width:var(--ww-border-width,0);border-color:var(--ww-border,transparent);box-shadow:var(--ww-shadow,none)}`;
+
+function ensureStyle(id: string, css: string): void {
+	if (typeof document === "undefined" || document.getElementById(id)) {
 		return;
 	}
 	const style = document.createElement("style");
-	style.id = DEFAULTS_STYLE_ID;
-	style.textContent = CONTAINER_DEFAULTS_CSS;
+	style.id = id;
+	style.textContent = css;
 	document.head.appendChild(style);
+}
+
+// Mirror the container-level appearance vars onto the customer's container
+// element. The chat root inside a shadow root can't push CSS vars back up to
+// light DOM, so border + shadow live on the container itself. Only the few
+// vars that actually affect the container are bridged — colors etc. stay
+// scoped to the chat root.
+function applyContainerAppearance(
+	container: Element,
+	config: EmbedConfig,
+): void {
+	const vars = config.appearance?.variables;
+	if (!vars || !(container instanceof HTMLElement)) {
+		return;
+	}
+	if (typeof vars.borderWidth === "number") {
+		container.style.setProperty("--ww-border-width", `${vars.borderWidth}px`);
+	}
+	if (vars.borderColor) {
+		container.style.setProperty("--ww-border", vars.borderColor);
+	}
+	if (vars.boxShadow) {
+		container.style.setProperty("--ww-shadow", vars.boxShadow);
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -179,8 +209,10 @@ function mountInline(
 	// When opted in, the rule is wrapped in `:where()` so any customer
 	// override on `[data-waniwani-embed]` still wins.
 	if (config.appearance?.theme) {
-		ensureContainerDefaults();
+		ensureStyle(STRUCTURAL_STYLE_ID, STRUCTURAL_DEFAULTS_CSS);
 	}
+	ensureStyle(CHROME_STYLE_ID, CONTAINER_CHROME_CSS);
+	applyContainerAppearance(container, config);
 
 	hostElement = document.createElement("div");
 	hostElement.id = "waniwani-chat-embed";
