@@ -140,6 +140,25 @@ function injectStyles(shadowRoot: ShadowRoot, config: EmbedConfig): void {
 		shadowRoot.appendChild(style);
 	}
 
+	// In the embed.js path the outer `[data-waniwani-embed]` container draws
+	// panel border + shadow (see `CONTAINER_CHROME_CSS`). CSS variables
+	// inherit through the shadow boundary, so without this reset the chat
+	// root's own chrome rule (`border-width: var(--ww-border-width, 0)`)
+	// would render the same border/shadow again — visibly doubling them.
+	// Two key properties of this fix:
+	//   - It lives in the shadow root only, so the React paths
+	//     (`<WaniwaniChat>`, `<ChatEmbed>`) still draw chrome on the chat
+	//     root (the React surfaces have no outer container to delegate to).
+	//   - It zeroes `border-width` / `box-shadow` directly. The chat root
+	//     has no inline `border-width` (only `--ww-border-width` as a
+	//     custom property), so a later same-specificity rule wins by
+	//     cascade order — no `!important` and no JS-side list of
+	//     "container vars" to keep in sync.
+	const chromeReset = document.createElement("style");
+	chromeReset.textContent =
+		"[data-waniwani-chat]{border-width:0;box-shadow:none}";
+	shadowRoot.appendChild(chromeReset);
+
 	if (config.css) {
 		try {
 			const cssUrl = new URL(config.css, window.location.href);
