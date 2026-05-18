@@ -171,28 +171,14 @@ export function useRemoteEmbedConfig(
 	programmatic: Partial<EmbedConfig> | undefined,
 	scriptConfig: Partial<EmbedConfig> | undefined,
 ): { config: EmbedConfig; ready: boolean } {
-	const [config, setConfig] = useState<EmbedConfig>(() => {
-		const { api, token, channelId } = initialConfig;
-		if (!api || !token) {
-			return initialConfig;
-		}
-		const cached = loadCachedConfig(api, token, channelId);
-		if (!cached) {
-			return initialConfig;
-		}
-		try {
-			return resolveConfig(programmatic, cached, scriptConfig);
-		} catch {
-			return initialConfig;
-		}
-	});
-	const [ready, setReady] = useState<boolean>(() => {
-		const { api, token, channelId } = initialConfig;
-		if (!api || !token) {
-			return true;
-		}
-		return loadCachedConfig(api, token, channelId) != null;
-	});
+	// Initial state must match what would render on a server pass (no
+	// `window`). Reading `sessionStorage` in the initializer would cause a
+	// hydration mismatch on the cache-hit path. The cache is consulted in
+	// the `useEffect` below, which runs immediately after hydration; a hit
+	// flips state before the browser paints, so repeat visits still feel
+	// instant.
+	const [config, setConfig] = useState<EmbedConfig>(initialConfig);
+	const [ready, setReady] = useState<boolean>(false);
 
 	// Re-fetching on `programmatic` identity changes would be churn; the
 	// caller owns its lifetime — if props change meaningfully they should
@@ -205,6 +191,15 @@ export function useRemoteEmbedConfig(
 		if (!api || !token) {
 			setReady(true);
 			return;
+		}
+		const cached = loadCachedConfig(api, token, channelId);
+		if (cached) {
+			try {
+				setConfig(resolveConfig(programmatic, cached, scriptConfig));
+				setReady(true);
+			} catch {
+				// Fall through to the fetch path.
+			}
 		}
 		const controller = new AbortController();
 		const safety = setTimeout(() => setReady(true), READINESS_TIMEOUT_MS);

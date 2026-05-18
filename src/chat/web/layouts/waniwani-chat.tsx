@@ -146,29 +146,25 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 		// from the dashboard are merged below the programmatic overrides, so
 		// any local override always wins.
 		//
-		// On mount we seed from `sessionStorage` so repeat visits in the same
-		// tab render the fully-assembled chrome immediately — the fetch still
-		// runs in the background and silently updates if anything changed.
+		// Initial state must match the server (no `window`) — reading
+		// `sessionStorage` here would cause a hydration mismatch on the
+		// cache-hit path. The cache is consulted in the `useEffect` below,
+		// which runs immediately after hydration; a cache hit flips state
+		// before the browser paints, so repeat visits still feel instant.
 		const resolvedApi = overrides?.api ?? DEFAULT_API;
 
-		const [remote, setRemote] = useState<Partial<EmbedConfig>>(() => {
-			if (!token) {
-				return {};
-			}
-			return loadCachedConfig(resolvedApi, token, channelId) ?? {};
-		});
-
-		const [ready, setReady] = useState<boolean>(() => {
-			if (!token) {
-				return true;
-			}
-			return loadCachedConfig(resolvedApi, token, channelId) != null;
-		});
+		const [remote, setRemote] = useState<Partial<EmbedConfig>>({});
+		const [ready, setReady] = useState<boolean>(false);
 
 		useEffect(() => {
 			if (!token) {
 				setReady(true);
 				return;
+			}
+			const cached = loadCachedConfig(resolvedApi, token, channelId);
+			if (cached) {
+				setRemote(cached);
+				setReady(true);
 			}
 			const controller = new AbortController();
 			const safety = setTimeout(() => setReady(true), READINESS_TIMEOUT_MS);
