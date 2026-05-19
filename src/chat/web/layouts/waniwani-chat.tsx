@@ -55,6 +55,11 @@ export interface WaniwaniChatOverrides {
 	api?: string;
 	/** Override the MCP server URL (rarely needed). */
 	mcpServerUrl?: string;
+	/**
+	 * AI transparency notice rendered under the input (EU AI Act compliance).
+	 * String overrides the default wording; `false` hides it.
+	 */
+	disclaimer?: string | false;
 }
 
 /**
@@ -132,6 +137,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				enableThreadHistory: overrides?.enableThreadHistory,
 				showToolCalls: overrides?.showToolCalls,
 				appearance: overrides?.appearance,
+				disclaimer: overrides?.disclaimer,
 			}),
 			[
 				token,
@@ -145,6 +151,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				overrides?.enableThreadHistory,
 				overrides?.showToolCalls,
 				overrides?.appearance,
+				overrides?.disclaimer,
 			],
 		);
 
@@ -226,6 +233,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				}
 				enableThreadHistory={config.enableThreadHistory}
 				showToolCalls={config.showToolCalls}
+				disclaimer={config.disclaimer}
 				allowAttachments={overrides?.allowAttachments}
 				className={className}
 				initializing={!ready}

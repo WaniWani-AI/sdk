@@ -166,6 +166,12 @@ export interface ChatBaseProps {
 	activeThreadId?: string;
 	/** Fired whenever the active thread changes (new chat, switch, delete). */
 	onThreadChange?: (threadId: string) => void;
+	/**
+	 * AI transparency notice rendered under the input (EU AI Act compliance).
+	 * Defaults to `"AI can make mistakes. Verify important information."`.
+	 * Pass a string to override the wording, or `false` to hide it entirely.
+	 */
+	disclaimer?: string | false;
 }
 
 // ============================================================================

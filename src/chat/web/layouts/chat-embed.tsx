@@ -17,6 +17,7 @@ import {
 	PromptInputSubmit,
 	PromptInputTextarea,
 } from "../ai-elements/prompt-input";
+import { AiDisclaimer } from "../components/ai-disclaimer";
 import { ChatQueue } from "../components/chat-queue";
 import { MessageList } from "../components/message-list";
 import { PoweredBy } from "../components/powered-by";
@@ -66,6 +67,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			enableThreadHistory = false,
 			showToolCalls = true,
 			initializing = false,
+			disclaimer,
 		} = props;
 
 		// Preset → base theme. `light` and the unset case let the CSS
@@ -465,7 +467,18 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 										/>
 									</div>
 								</PromptInput>
-								<PoweredBy />
+								<div className="ww:pt-2 ww:pb-1 ww:flex ww:justify-center ww:items-center ww:gap-1.5">
+									<PoweredBy />
+									{disclaimer !== false && (
+										<span
+											aria-hidden
+											className="ww:text-[11px] ww:text-muted-foreground ww:opacity-70"
+										>
+											·
+										</span>
+									)}
+									<AiDisclaimer text={disclaimer} />
+								</div>
 							</div>
 						</div>
 					</div>

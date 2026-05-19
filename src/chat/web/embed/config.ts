@@ -69,6 +69,13 @@ export interface EmbedConfig {
 	placeholder?: string;
 	/** Initial suggestion chips displayed before the first message. */
 	suggestions?: string[];
+	/**
+	 * AI transparency notice rendered under the input (EU AI Act compliance).
+	 * String overrides the default wording; `false` hides it. Surfaced as
+	 * `data-disclaimer` on the embed script tag (use `data-disclaimer="false"`
+	 * to hide).
+	 */
+	disclaimer?: string | false;
 	/** URL to a custom stylesheet injected into the shadow root. */
 	css?: string;
 	/**
@@ -210,6 +217,17 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const themeRaw = str("data-theme");
 	if (themeRaw === "light" || themeRaw === "dark" || themeRaw === "auto") {
 		config.appearance = { theme: themeRaw };
+	}
+
+	const disclaimerRaw = str("data-disclaimer");
+	if (disclaimerRaw !== undefined) {
+		const trimmed = disclaimerRaw.trim();
+		const lowered = trimmed.toLowerCase();
+		if (lowered === "false" || lowered === "0") {
+			config.disclaimer = false;
+		} else if (trimmed) {
+			config.disclaimer = trimmed;
+		}
 	}
 
 	return config;
