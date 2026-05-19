@@ -32,7 +32,7 @@ import { ChatEmbed } from "@waniwani/sdk/chat";
 <ChatEmbed
   api="/api/my-chat"
   body={{ environmentId, sessionId }}
-  theme={{ backgroundColor: "#fff" }}
+  appearance={{ theme: "dark" }}
 />;
 ```
 
@@ -40,18 +40,21 @@ import { ChatEmbed } from "@waniwani/sdk/chat";
 
 ## Theming
 
-Themes are objects keyed by role. Merge with the default theme via `mergeTheme`:
+Pick a preset (`light`, `dark`, or `auto`) and optionally layer per-property overrides on top:
 
 ```tsx
-import { ChatEmbed, mergeTheme, DEFAULT_THEME } from "@waniwani/sdk/chat";
+import { ChatEmbed } from "@waniwani/sdk/chat";
 
-const theme = mergeTheme(DEFAULT_THEME, {
-  primaryColor: "#03d916",
-  backgroundColor: "#fffaf0",
-  textColor: "#1a1a1a",
-});
-
-<ChatEmbed api="/api/my-chat" theme={theme} />;
+<ChatEmbed
+  api="/api/my-chat"
+  appearance={{
+    theme: "dark",
+    variables: {
+      primaryColor: "#03d916",
+      borderRadius: 12,
+    },
+  }}
+/>;
 ```
 
-Full theme keys: see [`ChatTheme`](https://github.com/WaniWani-AI/sdk/blob/main/src/chat/web/%40types.ts).
+`auto` follows the host's `prefers-color-scheme`. For finer-grained customisation, set `--ww-*` CSS variables on the chat's container — see [Theming the chat widget](https://github.com/WaniWani-AI/sdk/blob/main/skills/waniwani-sdk/references/chat-widget.md#theming-the-chat-widget) for the full variable list.

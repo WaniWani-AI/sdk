@@ -5,6 +5,30 @@
 import type { ChatTheme } from "../@types";
 
 /**
+ * Built-in theme presets. `auto` follows the host's `prefers-color-scheme`
+ * and switches at runtime without re-rendering.
+ */
+export type ThemePreset = "light" | "dark" | "auto";
+
+/**
+ * Appearance config for the chat widget. Pick a preset and (optionally) layer
+ * per-property `variables` on top.
+ *
+ * ```ts
+ * appearance: { theme: "dark", variables: { primaryColor: "#ff6b6b" } }
+ * ```
+ *
+ * The same shape is accepted by the `embed.js` script (`init({ appearance })`),
+ * `<WaniwaniChat overrides={{ appearance }} />`, and `<ChatEmbed appearance />`.
+ */
+export interface ChatAppearance {
+	/** Base theme preset. Defaults to `"light"`. */
+	theme?: ThemePreset;
+	/** Per-property overrides applied on top of the preset. */
+	variables?: ChatTheme;
+}
+
+/**
  * Configuration for the embeddable chat widget.
  *
  * Resolution priority (later wins):
@@ -53,12 +77,11 @@ export interface EmbedConfig {
 	 */
 	enableThreadHistory?: boolean;
 	/**
-	 * Theme overrides applied to the chat. Accepts the full `ChatTheme`
-	 * surface — pass `DARK_THEME` or any subset of its keys. The script-tag
-	 * embed only sets a handful of these from `data-*` attributes, but
-	 * programmatic callers (`WaniwaniChat`, `ChatEmbed`) can pass anything.
+	 * Theme preset + per-property overrides. The script tag exposes the
+	 * preset via `data-theme="light|dark|auto"`; programmatic callers can
+	 * additionally pass `variables` to tweak individual colours.
 	 */
-	theme?: ChatTheme;
+	appearance?: ChatAppearance;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,25 +207,9 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.enableThreadHistory = enableThreadHistory;
 	}
 
-	const primaryColor = str("data-primary-color");
-	const backgroundColor = str("data-background-color");
-	const textColor = str("data-text-color");
-	const fontFamily = str("data-font-family");
-
-	if (primaryColor || backgroundColor || textColor || fontFamily) {
-		config.theme = {};
-		if (primaryColor) {
-			config.theme.primaryColor = primaryColor;
-		}
-		if (backgroundColor) {
-			config.theme.backgroundColor = backgroundColor;
-		}
-		if (textColor) {
-			config.theme.textColor = textColor;
-		}
-		if (fontFamily) {
-			config.theme.fontFamily = fontFamily;
-		}
+	const themeRaw = str("data-theme");
+	if (themeRaw === "light" || themeRaw === "dark" || themeRaw === "auto") {
+		config.appearance = { theme: themeRaw };
 	}
 
 	return config;
@@ -245,17 +252,15 @@ export function resolveConfig(
 	// `data-*` overrides.
 	const fromScript = scriptConfig ?? parseConfigFromScript();
 
+	const appearance = mergeAppearance(remote, fromScript, programmatic);
+
 	const merged: EmbedConfig = {
 		token: "",
 		...DEFAULTS,
 		...compact(remote),
 		...compact(fromScript),
 		...compact(programmatic),
-		theme: {
-			...(remote?.theme ?? {}),
-			...fromScript.theme,
-			...programmatic?.theme,
-		},
+		...(appearance ? { appearance } : {}),
 	};
 
 	if (!merged.token) {
@@ -268,17 +273,30 @@ export function resolveConfig(
 	return merged;
 }
 
-// ---------------------------------------------------------------------------
-// Theme adapter — EmbedConfig.theme → chat ChatTheme
-// ---------------------------------------------------------------------------
-
-export function buildChatTheme(config: EmbedConfig): ChatTheme | undefined {
-	if (!config.theme || Object.keys(config.theme).length === 0) {
+function mergeAppearance(
+	remote: Partial<EmbedConfig> | undefined,
+	fromScript: Partial<EmbedConfig>,
+	programmatic: Partial<EmbedConfig> | undefined,
+): ChatAppearance | undefined {
+	const theme =
+		programmatic?.appearance?.theme ??
+		fromScript.appearance?.theme ??
+		remote?.appearance?.theme;
+	const variables: ChatTheme = {
+		...(remote?.appearance?.variables ?? {}),
+		...(fromScript.appearance?.variables ?? {}),
+		...(programmatic?.appearance?.variables ?? {}),
+	};
+	const hasVars = Object.keys(variables).length > 0;
+	if (!theme && !hasVars) {
 		return undefined;
 	}
-	// `config.theme` already conforms to `ChatTheme`. The old implementation
-	// hand-picked four keys, which silently dropped every other `DARK_THEME`
-	// field (headerBackgroundColor, inputBackgroundColor, assistantBubble…)
-	// and rendered a light header/input on top of a dark chat body.
-	return config.theme;
+	const out: ChatAppearance = {};
+	if (theme) {
+		out.theme = theme;
+	}
+	if (hasVars) {
+		out.variables = variables;
+	}
+	return out;
 }

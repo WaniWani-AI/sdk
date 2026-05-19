@@ -10,7 +10,6 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { ChatHandle } from "../@types";
 import { ChatEmbed } from "../layouts/chat-embed";
 import type { EmbedConfig } from "./config";
-import { buildChatTheme } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
 
 export interface InlineChatProps {
@@ -53,8 +52,6 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			[],
 		);
 
-		const theme = buildChatTheme(config);
-
 		const body: Record<string, unknown> = {};
 		if (config.mcpServerUrl) {
 			body.mcpServerUrl = config.mcpServerUrl;
@@ -70,7 +67,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 				headers={{ Authorization: `Bearer ${config.token}` }}
 				skipRemoteConfig
 				body={Object.keys(body).length > 0 ? body : undefined}
-				theme={theme}
+				appearance={config.appearance}
 				title={config.title}
 				welcomeMessage={config.welcomeMessage}
 				placeholder={config.placeholder}

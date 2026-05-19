@@ -55,19 +55,29 @@ describe("resolveConfig — programmatic", () => {
 		expect(config.css).toBe("https://example.com/custom.css");
 	});
 
-	test("theme merges correctly", () => {
+	test("appearance.variables merges correctly", () => {
 		const config = resolveConfig({
 			token: "tok",
-			theme: { primaryColor: "#ff0000", fontFamily: "monospace" },
+			appearance: {
+				variables: { primaryColor: "#ff0000", fontFamily: "monospace" },
+			},
 		});
 
-		expect(config.theme?.primaryColor).toBe("#ff0000");
-		expect(config.theme?.fontFamily).toBe("monospace");
+		expect(config.appearance?.variables?.primaryColor).toBe("#ff0000");
+		expect(config.appearance?.variables?.fontFamily).toBe("monospace");
 	});
 
-	test("empty theme object allowed", () => {
-		const config = resolveConfig({ token: "tok", theme: {} });
-		expect(config.theme).toEqual({});
+	test("appearance.theme preset is preserved", () => {
+		const config = resolveConfig({
+			token: "tok",
+			appearance: { theme: "dark" },
+		});
+		expect(config.appearance?.theme).toBe("dark");
+	});
+
+	test("no appearance set when unused", () => {
+		const config = resolveConfig({ token: "tok" });
+		expect(config.appearance).toBeUndefined();
 	});
 });
 

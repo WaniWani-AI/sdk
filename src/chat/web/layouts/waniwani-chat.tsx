@@ -1,9 +1,9 @@
 "use client";
 
 import { forwardRef, useEffect, useMemo, useState } from "react";
-import type { ChatHandle, ChatTheme, WelcomeConfig } from "../@types";
+import type { ChatAppearance, ChatHandle, WelcomeConfig } from "../@types";
 import type { EmbedConfig } from "../embed/config";
-import { buildChatTheme, resolveConfig } from "../embed/config";
+import { resolveConfig } from "../embed/config";
 import {
 	fetchRemoteConfig,
 	loadCachedConfig,
@@ -43,8 +43,14 @@ export interface WaniwaniChatOverrides {
 	showToolCalls?: boolean;
 	/** Enable file attachments in the input. */
 	allowAttachments?: boolean;
-	/** Theme overrides. */
-	theme?: ChatTheme;
+	/**
+	 * Theme preset (`light`/`dark`/`auto`) plus per-property overrides.
+	 *
+	 * ```tsx
+	 * appearance={{ theme: "dark", variables: { primaryColor: "#ff6b6b" } }}
+	 * ```
+	 */
+	appearance?: ChatAppearance;
 	/** Chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
 	api?: string;
 	/** Override the MCP server URL (rarely needed). */
@@ -125,7 +131,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				suggestions: overrides?.suggestions,
 				enableThreadHistory: overrides?.enableThreadHistory,
 				showToolCalls: overrides?.showToolCalls,
-				theme: overrides?.theme,
+				appearance: overrides?.appearance,
 			}),
 			[
 				token,
@@ -138,7 +144,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				overrides?.suggestions,
 				overrides?.enableThreadHistory,
 				overrides?.showToolCalls,
-				overrides?.theme,
+				overrides?.appearance,
 			],
 		);
 
@@ -195,8 +201,6 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			[programmatic, remote],
 		);
 
-		const chatTheme = buildChatTheme(config);
-
 		const body: Record<string, unknown> = {};
 		if (config.mcpServerUrl) {
 			body.mcpServerUrl = config.mcpServerUrl;
@@ -212,7 +216,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				headers={{ Authorization: `Bearer ${config.token}` }}
 				skipRemoteConfig
 				body={Object.keys(body).length > 0 ? body : undefined}
-				theme={chatTheme}
+				appearance={config.appearance}
 				title={config.title}
 				welcomeMessage={config.welcomeMessage}
 				welcome={overrides?.welcome}

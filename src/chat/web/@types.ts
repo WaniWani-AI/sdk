@@ -2,6 +2,10 @@
 // Chat Theme
 // ============================================================================
 
+import type { ChatAppearance } from "./embed/config";
+
+export type { ChatAppearance, ThemePreset } from "./embed/config";
+
 export interface ChatTheme {
 	/** Primary brand color (bubble, send button, user messages) */
 	primaryColor?: string;
@@ -15,6 +19,10 @@ export interface ChatTheme {
 	mutedColor?: string;
 	/** Border color */
 	borderColor?: string;
+	/** Border width for the panel (px). Defaults to 0 (no border). */
+	borderWidth?: number;
+	/** Box-shadow shorthand applied to the panel. Use any valid CSS box-shadow string (e.g. `"0 10px 25px rgba(0,0,0,0.1)"`). Defaults to `none`. */
+	boxShadow?: string;
 	/** Assistant message bubble background */
 	assistantBubbleColor?: string;
 	/** User message bubble background */
@@ -90,8 +98,11 @@ export interface ChatBaseProps {
 	 * Takes precedence over `welcomeMessage` when provided.
 	 */
 	welcome?: WelcomeConfig;
-	/** Theme overrides */
-	theme?: ChatTheme;
+	/**
+	 * Theme preset (`light`/`dark`/`auto`) plus per-property overrides.
+	 * See `ChatAppearance` for the shape.
+	 */
+	appearance?: ChatAppearance;
 	/** Additional headers to send with chat API requests */
 	headers?: Record<string, string>;
 	/** Additional body fields to send with each chat request */
@@ -213,7 +224,7 @@ export type CallToolHandler = (params: {
  * <ChatEmbed
  *   api="/api/my-chat-endpoint"
  *   body={{ environmentId, sessionId }}
- *   theme={{ backgroundColor: "#fff" }}
+ *   appearance={{ theme: "dark" }}
  * />
  *
  * // Self-hosted chat endpoint with MCP App widgets

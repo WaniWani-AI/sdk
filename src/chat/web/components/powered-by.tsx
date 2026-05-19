@@ -23,6 +23,7 @@ export function PoweredBy() {
 					alt="WaniWani"
 					width={72}
 					height={10}
+					data-waniwani-logo=""
 					className="ww:h-2.5 ww:w-auto"
 				/>
 			</a>

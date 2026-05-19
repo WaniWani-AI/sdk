@@ -28,7 +28,7 @@ import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
 import { cn } from "../lib/utils";
-import { isDarkTheme, mergeTheme, themeToCSSProperties } from "../theme";
+import { themeToCSSProperties } from "../theme";
 import { Button } from "../ui/button";
 
 /**
@@ -50,7 +50,7 @@ import { Button } from "../ui/button";
 export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 	function ChatEmbed(props, ref) {
 		const {
-			theme: userTheme,
+			appearance,
 			className,
 			allowAttachments = false,
 			welcomeMessage,
@@ -68,9 +68,42 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			initializing = false,
 		} = props;
 
-		const resolvedTheme = mergeTheme(userTheme);
-		const cssVars = themeToCSSProperties(resolvedTheme);
-		const isDark = isDarkTheme(resolvedTheme);
+		// Preset → base theme. `light` and the unset case let the CSS
+		// defaults in tailwind.css drive the look (no inline vars needed).
+		// `dark` switches via the `.dark` class on the wrapper, which flips
+		// the CSS-var fallbacks. `auto` switches via `data-color-scheme`
+		// and a `prefers-color-scheme` media query in tailwind.css.
+		const preset = appearance?.theme;
+		const userVars = appearance?.variables;
+
+		// `preset: dark` doesn't need its full DARK_THEME table emitted as
+		// inline vars — the `.dark [data-waniwani-chat]` rule handles the
+		// fallback chain. We only emit the customer's overrides on top.
+		const cssVars = userVars ? themeToCSSProperties(userVars) : {};
+
+		// `isDark` drives the legacy `data-waniwani-dark` attribute (read
+		// by message components and the iframe theme handshake). For
+		// `auto` we track the system preference at runtime so iframe
+		// widgets receive the right theme.
+		//
+		// Initial state must be deterministic across server and client to
+		// avoid hydration mismatches on `data-waniwani-dark` — reading
+		// `matchMedia` in the initializer would render `true` on a
+		// dark-OS client against the server's `false`. The effect below
+		// syncs the real value immediately after mount and subscribes to
+		// future changes.
+		const [autoIsDark, setAutoIsDark] = useState(false);
+		useEffect(() => {
+			if (preset !== "auto" || typeof window === "undefined") {
+				return;
+			}
+			const mq = window.matchMedia("(prefers-color-scheme: dark)");
+			setAutoIsDark(mq.matches);
+			const onChange = () => setAutoIsDark(mq.matches);
+			mq.addEventListener("change", onChange);
+			return () => mq.removeEventListener("change", onChange);
+		}, [preset]);
+		const isDark = preset === "dark" || (preset === "auto" && autoIsDark);
 
 		const engine = useChatEngine({ ...props, api });
 		const handleCallTool = useCallTool({
@@ -303,19 +336,21 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 				}}
 				data-waniwani-chat=""
 				data-waniwani-layout="embed"
+				data-color-scheme={preset === "auto" ? "auto" : undefined}
 				{...(initializing ? { "data-waniwani-initializing": "" } : {})}
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className={cn(
 					"ww:relative ww:w-full ww:h-full ww:flex ww:flex-col ww:bg-background ww:text-foreground ww:font-[family-name:var(--ww-font)] ww:overflow-hidden",
+					preset === "dark" && "dark",
 					className,
 				)}
 			>
 				{showHeader && (
 					<div
-						className="ww:shrink-0 ww:flex ww:items-center ww:gap-2 ww:px-6 ww:py-3 ww:bg-background ww:border-b ww:border-border"
+						className="ww:shrink-0 ww:flex ww:items-center ww:gap-2 ww:px-6 ww:py-3 ww:border-b ww:border-border"
 						style={{
-							backgroundColor: resolvedTheme.headerBackgroundColor,
-							color: resolvedTheme.headerTextColor,
+							backgroundColor: "var(--ww-color-card-header)",
+							color: "var(--ww-color-card-header-foreground)",
 						}}
 					>
 						{title && (
