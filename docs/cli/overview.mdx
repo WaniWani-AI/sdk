@@ -1,0 +1,212 @@
+---
+title: CLI overview
+description: "The @waniwani/cli connects a local repo to a WaniWani agent and runs your MCP server against the hosted playground in one command."
+keywords: ["WaniWani CLI", "@waniwani/cli", "MCP CLI", "waniwani login", "waniwani connect", "waniwani dev", "MCP dev workflow"]
+---
+
+`@waniwani/cli` is the official command-line tool for [WaniWani](https://app.waniwani.ai). It wires a local repo to a WaniWani agent, runs your MCP server locally against the hosted playground, and removes the manual steps of provisioning GitHub, Vercel, and API keys.
+
+The CLI is **optional**. [`@waniwani/sdk`](/configuration/installation) works on its own — the CLI is the fastest way to skip the dashboard for project setup and local development.
+
+## Install
+
+<CodeGroup>
+  ```bash bun
+  bun add -g @waniwani/cli
+  ```
+
+  ```bash pnpm
+  pnpm add -g @waniwani/cli
+  ```
+
+  ```bash npm
+  npm install -g @waniwani/cli
+  ```
+
+  ```bash yarn
+  yarn global add @waniwani/cli
+  ```
+</CodeGroup>
+
+Requires Node.js 20 or later.
+
+## Quickstart
+
+```bash
+waniwani login     # browser-based OAuth2 PKCE
+waniwani connect   # pick an org + agent, writes waniwani.config.ts
+waniwani dev       # run local MCP, open playground bridged to localhost
+```
+
+Three commands. Your local MCP server is now reachable from ChatGPT, Claude, and Cursor through the WaniWani playground, with no tunnel setup.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| [`waniwani login`](#login) | Browser-based OAuth2 PKCE. Stores tokens in `.waniwani/settings.json`. |
+| [`waniwani logout`](#logout) | Clear local credentials. |
+| [`waniwani connect`](#connect) | Pick an org, pick or create an agent, write the binding to `waniwani.config.ts`. |
+| [`waniwani dev`](#dev) | Run your MCP locally and open the WaniWani playground against it. |
+
+### login
+
+```bash
+waniwani login [--no-browser] [--json]
+```
+
+Runs the OAuth2 PKCE flow: spins up a local callback server on port `54321`, opens your browser to `app.waniwani.ai`, exchanges the code for an access token, and persists access + refresh tokens to `.waniwani/settings.json` in the current directory.
+
+If you're already logged in with an expired token, it auto-refreshes and exits. Pass `--no-browser` to print the URL instead of launching a browser (useful on headless machines).
+
+### logout
+
+```bash
+waniwani logout [--json]
+```
+
+Clears the stored auth tokens. Keeps non-auth config (like `apiUrl`) intact. No-op if you're already logged out.
+
+### connect
+
+```bash
+waniwani connect
+```
+
+Interactive only. Walks you through:
+
+1. **Pick an organization.** If you're in one org, it's auto-selected.
+2. **Pick or create an agent.** Either select an existing project, create a new **managed** agent (WaniWani provisions a GitHub repo + Vercel project from the [MCP distribution template](https://github.com/WaniWani-AI/mcp-distribution-template) with API keys pre-wired), or create a new **external** agent (you host the MCP server; the CLI gives you a production API key to set as `WANIWANI_API_KEY`).
+3. **Write the binding.** Adds `orgId` and `projectId` to `waniwani.config.ts` at the repo root. If the file already exists, the CLI merges the keys in; if the shape isn't recognized, it prints the snippet for you to paste.
+
+Re-run anytime to switch the repo to a different agent.
+
+#### Managed vs external agents
+
+| | Managed | External |
+|---|---|---|
+| Where the server runs | WaniWani-hosted Vercel project | Your infra (Docker, Cloudflare Workers, fly.io, etc.) |
+| Source code | Auto-provisioned from [mcp-distribution-template](https://github.com/WaniWani-AI/mcp-distribution-template) | Yours |
+| API key | Pre-configured in the Vercel env | Printed once by the CLI — save it as `WANIWANI_API_KEY` |
+| Deploys on | Push to `main` | Whatever you already use |
+
+See [Deployment](/deployment/overview) for the full picture.
+
+### dev
+
+```bash
+waniwani dev [-p <port>]
+```
+
+Interactive only. The end-to-end local dev loop:
+
+1. Ensures you're logged in (runs `login` if not) and that `waniwani.config.ts` has a `projectId` (runs `connect` if not).
+2. Detects your package manager (`bun` / `pnpm` / `yarn` / `npm`) and spawns the dev script with `PORT` set.
+3. Waits for the local server to bind to the port.
+4. Creates a dev session against the WaniWani API and starts a heartbeat.
+5. Opens the playground at `app.waniwani.ai/agents/<projectId>/playground?localMode=1` so chat traffic routes to your local server.
+6. Ctrl-C tears the dev session down cleanly.
+
+**Options:**
+
+- `-p, --port <port>` — Port the local MCP listens on. Defaults to `devPort` in `waniwani.config.ts`, or `3000`.
+
+`dev` runs your existing dev script — it does not start the MCP for you. The script must bind to `process.env.PORT`.
+
+## Global flags
+
+| Flag | Description |
+|---|---|
+| `--json` | Output as JSON. Supported by `login` and `logout`. Interactive commands (`connect`, `dev`) error out under `--json`. |
+| `--verbose` | Enable verbose logging. |
+| `--version` | Print the CLI version. |
+| `--help` | Print help. |
+
+## Configuration
+
+### Auth & local state — `.waniwani/settings.json`
+
+Per-repo, gitignored. Holds OAuth tokens and the resolved API URL:
+
+```json
+{
+  "apiUrl": "https://app.waniwani.ai",
+  "accessToken": "…",
+  "refreshToken": "…",
+  "expiresAt": "2026-05-20T12:00:00Z",
+  "clientId": "…"
+}
+```
+
+Access tokens auto-refresh on 401. Add `.waniwani/` to your `.gitignore`.
+
+### Project config — `waniwani.config.ts`
+
+Shared with [`@waniwani/sdk`](/configuration/installation). `waniwani connect` writes `orgId` and `projectId`; other fields are optional and consumed by the SDK and the `dev` command:
+
+```ts waniwani.config.ts
+import type { WaniWaniProjectConfig } from "@waniwani/sdk";
+
+export default {
+  orgId: "org_…",
+  projectId: "proj_…",
+  devPort: 3000,
+} satisfies WaniWaniProjectConfig;
+```
+
+### Environment variables
+
+| Variable | Purpose |
+|---|---|
+| `WANIWANI_API_URL` | Override the API base URL. Defaults to `https://app.waniwani.ai`. |
+| `WANIWANI_API_KEY` | Use a long-lived API key instead of OAuth (useful in CI). See [API keys](/configuration/api-key). |
+
+Resolution order for the API URL: env var → `waniwani.config.ts` → `.waniwani/settings.json` → default. For auth: API key → OAuth tokens (with auto-refresh).
+
+## Typical workflow
+
+```bash
+# One-time
+bun add -g @waniwani/cli
+waniwani login
+
+# Per-project
+cd my-mcp-server
+waniwani connect              # creates / picks the agent, writes waniwani.config.ts
+waniwani dev                  # runs the dev loop bridged to the playground
+```
+
+To start a fresh project, clone the template first:
+
+```bash
+git clone https://github.com/WaniWani-AI/mcp-distribution-template.git my-mcp-server
+cd my-mcp-server
+bun install
+waniwani connect
+waniwani dev
+```
+
+## For AI coding agents
+
+If you're [Claude Code](https://claude.com/claude-code), Cursor, or another AI agent setting up WaniWani in a user's repo:
+
+1. Confirm the user is in an MCP project (`@waniwani/sdk` in `package.json`, or it's the [distribution template](https://github.com/WaniWani-AI/mcp-distribution-template)). If not, scaffold one with the [SDK quickstart](/quickstart) first.
+2. Run `waniwani login` — opens the browser; the user authenticates once.
+3. Run `waniwani connect` — interactive; ask the user which org / agent they want, or recommend "managed" if they don't already host.
+4. Run `waniwani dev` to verify the bridge works.
+
+The CLI is interactive — `connect` and `dev` cannot run under `--json`. Pair it with the [agent skill](/guides/skills) for code generation:
+
+```bash
+bunx skills add WaniWani-AI/sdk -s waniwani-sdk
+```
+
+The skill teaches your agent the SDK APIs (flows, tracking, widgets, knowledge base). The CLI handles platform wiring. They're independent — install whichever you need.
+
+## Source
+
+- **npm:** [`@waniwani/cli`](https://www.npmjs.com/package/@waniwani/cli)
+- **GitHub:** [WaniWani-AI/cli](https://github.com/WaniWani-AI/cli)
+- **Issues:** [github.com/WaniWani-AI/cli/issues](https://github.com/WaniWani-AI/cli/issues)
+
+MIT licensed, like the rest of the WaniWani stack.

@@ -104,6 +104,19 @@ For a fuller starter project with chat widget, dev tunnel, and a sample funnel p
 git clone https://github.com/WaniWani-AI/mcp-distribution-template.git my-mcp-server
 ```
 
+## CLI
+
+The companion [`@waniwani/cli`](https://www.npmjs.com/package/@waniwani/cli) wires a local repo to a WaniWani agent and runs your MCP server against the hosted playground in one command. Optional — the SDK works without it.
+
+```bash
+bun add -g @waniwani/cli
+waniwani login     # browser-based OAuth2 PKCE
+waniwani connect   # pick an org + agent, writes waniwani.config.ts
+waniwani dev       # run local MCP, open playground bridged to localhost
+```
+
+See the [CLI docs](https://docs.waniwani.ai/cli/overview) for the full command reference.
+
 ## Documentation
 
 Full docs at **[docs.waniwani.ai](https://docs.waniwani.ai)**. Same source as [`./docs/`](./docs).

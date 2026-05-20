@@ -35,6 +35,12 @@
             ]
           },
           {
+            "group": "CLI",
+            "pages": [
+              "cli/overview"
+            ]
+          },
+          {
             "group": "Compare",
             "pages": [
               "compare/vs-langgraph"

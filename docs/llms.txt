@@ -39,6 +39,12 @@ For all new code, import from `@waniwani/sdk/mcp`: `createFlow`, `StateGraph`, `
 - [Get an API key](https://docs.waniwani.ai/configuration/api-key): Free tier setup at app.waniwani.ai.
 - [Tunnel for local dev](https://docs.waniwani.ai/guides/tunnel): Expose `localhost` to ChatGPT/Claude.
 
+## CLI (`@waniwani/cli`)
+
+The official CLI wires a local repo to a WaniWani agent in one command. `waniwani login` (browser OAuth2 PKCE) → `waniwani connect` (pick org + agent, writes `waniwani.config.ts`) → `waniwani dev` (runs your local MCP and opens the playground bridged to it). Install via `bun add -g @waniwani/cli` or `npm i -g @waniwani/cli`. Optional; the SDK works without it.
+
+- [CLI overview](https://docs.waniwani.ai/cli/overview): Install, commands (`login`, `logout`, `connect`, `dev`), config files, env vars, and the recommended dev workflow.
+
 ## Flow engine (OSS — no API key required)
 
 Use these APIs for all new MCP funnels. They work standalone with any KV backend.
