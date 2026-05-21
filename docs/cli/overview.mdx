@@ -34,7 +34,7 @@ Requires Node.js 20 or later.
 
 ```bash
 waniwani login     # browser-based OAuth2 PKCE
-waniwani connect   # pick an org + agent, writes waniwani.config.ts
+waniwani connect   # pick an org + agent, writes waniwani.json
 waniwani dev       # run local MCP, open playground bridged to localhost
 ```
 
@@ -46,7 +46,7 @@ Three commands. Your local MCP server is now reachable from ChatGPT, Claude, and
 |---|---|
 | [`waniwani login`](#login) | Browser-based OAuth2 PKCE. Stores tokens in `.waniwani/settings.json`. |
 | [`waniwani logout`](#logout) | Clear local credentials. |
-| [`waniwani connect`](#connect) | Pick an org, pick or create an agent, write the binding to `waniwani.config.ts`. |
+| [`waniwani connect`](#connect) | Pick an org, pick or create an agent, write the binding to `waniwani.json`. |
 | [`waniwani dev`](#dev) | Run your MCP locally and open the WaniWani playground against it. |
 
 ### login
@@ -77,7 +77,7 @@ Interactive only. Walks you through:
 
 1. **Pick an organization.** If you're in one org, it's auto-selected.
 2. **Pick or create an agent.** Either select an existing project, create a new **managed** agent (WaniWani provisions a GitHub repo + Vercel project from the [MCP distribution template](https://github.com/WaniWani-AI/mcp-distribution-template) with API keys pre-wired), or create a new **external** agent (you host the MCP server; the CLI gives you a production API key to set as `WANIWANI_API_KEY`).
-3. **Write the binding.** Adds `orgId` and `projectId` to `waniwani.config.ts` at the repo root. If the file already exists, the CLI merges the keys in; if the shape isn't recognized, it prints the snippet for you to paste.
+3. **Write the binding.** Writes `waniwani.json` at the repo root with `$schema`, `orgId`, and `projectId`. If the file already exists, the CLI merges the keys in; if the shape isn't recognized, it prints the snippet for you to paste. If a legacy `waniwani.config.ts` is present, it's removed after the JSON file is written.
 
 Re-run anytime to switch the repo to a different agent.
 
@@ -100,7 +100,7 @@ waniwani dev [-p <port>]
 
 Interactive only. The end-to-end local dev loop:
 
-1. Ensures you're logged in (runs `login` if not) and that `waniwani.config.ts` has a `projectId` (runs `connect` if not).
+1. Ensures you're logged in (runs `login` if not) and that `waniwani.json` has a `projectId` (runs `connect` if not).
 2. Detects your package manager (`bun` / `pnpm` / `yarn` / `npm`) and spawns the dev script with `PORT` set.
 3. Waits for the local server to bind to the port.
 4. Creates a dev session against the WaniWani API and starts a heartbeat.
@@ -109,7 +109,7 @@ Interactive only. The end-to-end local dev loop:
 
 **Options:**
 
-- `-p, --port <port>` — Port the local MCP listens on. Defaults to `devPort` in `waniwani.config.ts`, or `3000`.
+- `-p, --port <port>` — Port the local MCP listens on. Defaults to `devPort` in `waniwani.json`, or `3000`.
 
 `dev` runs your existing dev script — it does not start the MCP for you. The script must bind to `process.env.PORT`.
 
@@ -140,19 +140,22 @@ Per-repo, gitignored. Holds OAuth tokens and the resolved API URL:
 
 Access tokens auto-refresh on 401. Add `.waniwani/` to your `.gitignore`.
 
-### Project config — `waniwani.config.ts`
+### Project config — `waniwani.json`
 
-Shared with [`@waniwani/sdk`](/configuration/installation). `waniwani connect` writes `orgId` and `projectId`; other fields are optional and consumed by the SDK and the `dev` command:
+Shared with [`@waniwani/sdk`](/configuration/installation). `waniwani connect` writes `$schema`, `orgId`, and `projectId`; other fields are optional and consumed by the SDK and the `dev` command:
 
-```ts waniwani.config.ts
-import type { WaniWaniProjectConfig } from "@waniwani/sdk";
-
-export default {
-  orgId: "org_…",
-  projectId: "proj_…",
-  devPort: 3000,
-} satisfies WaniWaniProjectConfig;
+```json waniwani.json
+{
+  "$schema": "https://app.waniwani.ai/waniwani.json",
+  "orgId": "org_…",
+  "projectId": "proj_…",
+  "devPort": 3000
+}
 ```
+
+The `$schema` field unlocks autocomplete and validation in editors that support JSON Schema (VS Code, JetBrains, Neovim with LSP). It's ignored at runtime.
+
+Legacy `waniwani.config.ts` files are still read for now (with a deprecation warning), but new projects should use `waniwani.json`. Running `waniwani connect` against a repo that has a `.ts` file removes it and writes a `.json` in its place.
 
 ### Environment variables
 
@@ -161,7 +164,7 @@ export default {
 | `WANIWANI_API_URL` | Override the API base URL. Defaults to `https://app.waniwani.ai`. |
 | `WANIWANI_API_KEY` | Use a long-lived API key instead of OAuth (useful in CI). See [API keys](/configuration/api-key). |
 
-Resolution order for the API URL: env var → `waniwani.config.ts` → `.waniwani/settings.json` → default. For auth: API key → OAuth tokens (with auto-refresh).
+Resolution order for the API URL: env var → `waniwani.json` → `.waniwani/settings.json` → default. For auth: API key → OAuth tokens (with auto-refresh).
 
 ## Typical workflow
 
@@ -172,7 +175,7 @@ waniwani login
 
 # Per-project
 cd my-mcp-server
-waniwani connect              # creates / picks the agent, writes waniwani.config.ts
+waniwani connect              # creates / picks the agent, writes waniwani.json
 waniwani dev                  # runs the dev loop bridged to the playground
 ```
 

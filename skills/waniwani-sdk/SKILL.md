@@ -81,7 +81,7 @@ Get a free key at [app.waniwani.ai](https://app.waniwani.ai). See [setup.md](ref
 
 | Export | Purpose | Tier | Reference |
 |---|---|---|---|
-| `@waniwani/sdk` | `waniwani()` client, `defineConfig`, `WaniWaniError` | Free tier | [setup.md](references/setup.md) |
+| `@waniwani/sdk` | `waniwani()` client, `WaniWaniError` | Free tier | [setup.md](references/setup.md) |
 | `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md) |
 | `@waniwani/sdk/mcp/react` | `useWaniwani` standalone tracking hook | OSS + Free tier | (rest of this entry point is legacy) |
 | `@waniwani/sdk/chat` | `ChatEmbed`, themes | Free tier | [chat-widget.md](references/chat-widget.md) |

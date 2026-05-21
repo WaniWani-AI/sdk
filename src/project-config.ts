@@ -1,78 +1,100 @@
-import type { TrackingConfig } from "./tracking/@types.js";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 /**
  * Project-level configuration for WaniWani MCP projects.
  *
- * This is the single source of truth for both CLI tools (`waniwani eval`,
- * `waniwani embed`, etc.) and the runtime SDK client (`waniwani()`).
+ * Mirrors the JSON Schema hosted at https://app.waniwani.ai/waniwani.json.
+ * The canonical config file is `waniwani.json` at the project root:
  *
- * Create a `waniwani.config.ts` at the project root:
- * ```ts
- * import { defineConfig } from "@waniwani/sdk";
- *
- * export default defineConfig({
- *   apiKey: process.env.WANIWANI_API_KEY,
- *   evals: {
- *     mcpServerUrl: "http://localhost:3001",
- *   },
- * });
+ * ```json
+ * {
+ *   "$schema": "https://app.waniwani.ai/waniwani.json",
+ *   "orgId": "...",
+ *   "projectId": "..."
+ * }
  * ```
  *
- * Then import it as a side-effect to register the config globally:
- * ```ts
- * import "./waniwani.config";
- * import { waniwani } from "@waniwani/sdk";
- *
- * const wani = waniwani(); // picks up config from defineConfig
- * ```
+ * `waniwani()` and the CLI both read this file automatically — no
+ * explicit import is required.
  */
 export interface WaniWaniProjectConfig {
-	/**
-	 * Your MCP environment API key.
-	 * Defaults to `process.env.WANIWANI_API_KEY` if not provided.
-	 */
-	apiKey?: string;
+	/** URL of the JSON Schema for editor autocomplete. Ignored at runtime. */
+	$schema?: string;
+	/** WaniWani organization ID this project belongs to. */
+	orgId?: string;
+	/** WaniWani MCP project ID. */
+	projectId?: string;
 	/**
 	 * The base URL of the WaniWani API.
 	 * Defaults to `https://app.waniwani.ai`.
 	 */
 	apiUrl?: string;
-	/** Tracking transport behavior. */
-	tracking?: TrackingConfig;
-	evals?: {
-		/** Path to the evals directory (relative to project root).
-		 *
-		 * @default ./evals */
-		dir?: string;
-		/** MCP server URL to test against. */
-		mcpServerUrl: string;
-	};
-	knowledgeBase?: {
-		/** Path to the knowledge base directory (relative to project root).
-		 *
-		 * @default ./knowledge-base
-		 */
-		dir?: string;
-	};
+	/**
+	 * Local port the MCP listens on during `waniwani dev`. Overridden by
+	 * `--port`. Defaults to 3000.
+	 */
+	devPort?: number;
 }
 
 // ---------------------------------------------------------------------------
-// Global singleton — uses globalThis so the config is shared across all
-// SDK entry points (e.g. @waniwani/sdk and @waniwani/sdk/mcp) even when
-// they are bundled as separate chunks with their own module scopes.
+// waniwani.json loader
+// ---------------------------------------------------------------------------
+
+const CONFIG_FILENAME = "waniwani.json";
+
+let _cached: WaniWaniProjectConfig | null | undefined;
+
+/**
+ * Load `waniwani.json` from the current working directory.
+ *
+ * Returns `null` if the file doesn't exist or the runtime doesn't support
+ * synchronous filesystem reads (e.g. edge / worker runtimes). Cached after
+ * the first call.
+ *
+ * @internal
+ */
+export function loadProjectConfig(): WaniWaniProjectConfig | null {
+	if (_cached !== undefined) {
+		return _cached;
+	}
+
+	try {
+		const filePath = resolve(process.cwd(), CONFIG_FILENAME);
+		if (!existsSync(filePath)) {
+			_cached = null;
+			return null;
+		}
+		const raw = readFileSync(filePath, "utf-8");
+		_cached = JSON.parse(raw) as WaniWaniProjectConfig;
+		return _cached;
+	} catch {
+		_cached = null;
+		return null;
+	}
+}
+
+/**
+ * Reset the cached config. Test-only.
+ *
+ * @internal
+ */
+export function resetProjectConfigCache(): void {
+	_cached = undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy: defineConfig + globalThis registration
 // ---------------------------------------------------------------------------
 
 const GLOBAL_KEY = "__waniwani_config__" as const;
 
 /**
- * Define and register a WaniWani project configuration.
+ * Register a WaniWani project configuration on `globalThis`.
  *
- * Calling this stores the config on `globalThis` so that
- * `waniwani()` and `withWaniwani()` can read from it automatically
- * when no explicit config is passed — even across different SDK
- * entry points (`@waniwani/sdk`, `@waniwani/sdk/mcp`, etc.).
- *
- * The config is also returned for direct use.
+ * @deprecated Create a `waniwani.json` at the project root instead. The SDK
+ *   and CLI both auto-load that file — no `defineConfig` call required.
+ *   See https://app.waniwani.ai/waniwani.json for the schema.
  */
 export function defineConfig(
 	config: WaniWaniProjectConfig,
@@ -83,7 +105,8 @@ export function defineConfig(
 
 /**
  * Retrieve the globally registered config (set by `defineConfig`).
- * Returns `undefined` if `defineConfig` has not been called.
+ *
+ * @deprecated Use `loadProjectConfig()` instead. `defineConfig` is going away.
  * @internal
  */
 export function getGlobalConfig(): WaniWaniProjectConfig | undefined {

@@ -1,15 +1,19 @@
 // WaniWani SDK - Main Entry
 
 import { createKbClient } from "./kb/client.js";
-import type { WaniWaniProjectConfig } from "./project-config.js";
+import {
+	getGlobalConfig,
+	loadProjectConfig,
+	type WaniWaniProjectConfig,
+} from "./project-config.js";
 import { createTrackingClient } from "./tracking/index.js";
 import type { WaniWaniClient, WaniWaniConfig } from "./types.js";
 
 /**
  * Create a WaniWani SDK client
  *
- * @param config - Configuration options. When omitted, reads from the global
- *   config registered by `defineConfig()`, then falls back to env vars.
+ * @param config - Configuration options. When omitted, reads `waniwani.json`
+ *   from the current working directory, then falls back to env vars.
  * @returns A fully typed WaniWani client
  *
  * @example
@@ -28,7 +32,10 @@ import type { WaniWaniClient, WaniWaniConfig } from "./types.js";
 export function waniwani(
 	config?: WaniWaniConfig | WaniWaniProjectConfig,
 ): WaniWaniClient {
-	const effective = config;
+	const projectConfig = config ?? loadProjectConfig() ?? getGlobalConfig();
+	const effective = projectConfig as
+		| (WaniWaniConfig & WaniWaniProjectConfig)
+		| undefined;
 
 	const apiUrl = effective?.apiUrl ?? "https://app.waniwani.ai";
 	const apiKey = effective?.apiKey ?? process.env.WANIWANI_API_KEY;
