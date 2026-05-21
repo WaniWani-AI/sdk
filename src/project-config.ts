@@ -4,12 +4,12 @@ import { resolve } from "node:path";
 /**
  * Project-level configuration for WaniWani MCP projects.
  *
- * Mirrors the JSON Schema hosted at https://app.waniwani.ai/waniwani.json.
+ * Mirrors the JSON Schema hosted at https://docs.waniwani.ai/waniwani.json.
  * The canonical config file is `waniwani.json` at the project root:
  *
  * ```json
  * {
- *   "$schema": "https://app.waniwani.ai/waniwani.json",
+ *   "$schema": "https://docs.waniwani.ai/waniwani.json",
  *   "orgId": "...",
  *   "projectId": "..."
  * }
@@ -94,7 +94,7 @@ const GLOBAL_KEY = "__waniwani_config__" as const;
  *
  * @deprecated Create a `waniwani.json` at the project root instead. The SDK
  *   and CLI both auto-load that file — no `defineConfig` call required.
- *   See https://app.waniwani.ai/waniwani.json for the schema.
+ *   See https://docs.waniwani.ai/waniwani.json for the schema.
  */
 export function defineConfig(
 	config: WaniWaniProjectConfig,

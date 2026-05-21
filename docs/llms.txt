@@ -41,7 +41,7 @@ For all new code, import from `@waniwani/sdk/mcp`: `createFlow`, `StateGraph`, `
 
 ## CLI (`@waniwani/cli`)
 
-The official CLI wires a local repo to a WaniWani agent in one command. `waniwani login` (browser OAuth2 PKCE) → `waniwani connect` (pick org + agent, writes `waniwani.json` with `$schema: "https://app.waniwani.ai/waniwani.json"`) → `waniwani dev` (runs your local MCP and opens the playground bridged to it). Install via `bun add -g @waniwani/cli` or `npm i -g @waniwani/cli`. Optional; the SDK works without it.
+The official CLI wires a local repo to a WaniWani agent in one command. `waniwani login` (browser OAuth2 PKCE) → `waniwani connect` (pick org + agent, writes `waniwani.json` with `$schema: "https://docs.waniwani.ai/waniwani.json"`) → `waniwani dev` (runs your local MCP and opens the playground bridged to it). Install via `bun add -g @waniwani/cli` or `npm i -g @waniwani/cli`. Optional; the SDK works without it.
 
 - [CLI overview](https://docs.waniwani.ai/cli/overview): Install, commands (`login`, `logout`, `connect`, `dev`), config files, env vars, and the recommended dev workflow.
 

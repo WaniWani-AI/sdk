@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://app.waniwani.ai/waniwani.json",
+  "$id": "https://docs.waniwani.ai/waniwani.json",
   "title": "WaniWani project configuration",
   "description": "Project-level configuration for WaniWani MCP projects. Consumed by @waniwani/sdk at runtime and by @waniwani/cli for local dev, evals, and knowledge-base tooling.",
   "type": "object",
