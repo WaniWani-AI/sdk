@@ -34,16 +34,12 @@ export function mapTrackEventToV2(
 		extractSource(meta) ??
 		options.source ??
 		DEFAULT_SOURCE;
-	const rawLegacy = isLegacyTrackEvent(input) ? { ...input } : undefined;
 
 	const mappedMetadata: Record<string, unknown> = {
 		...metadata,
 	};
 	if (Object.keys(meta).length > 0) {
 		mappedMetadata.meta = meta;
-	}
-	if (rawLegacy) {
-		mappedMetadata.rawLegacy = rawLegacy;
 	}
 
 	return {
@@ -55,7 +51,6 @@ export function mapTrackEventToV2(
 		correlation,
 		properties: mapProperties(input, eventName),
 		metadata: mappedMetadata,
-		rawLegacy,
 	};
 }
 

@@ -1,4 +1,4 @@
-import type { EventType, LegacyTrackEvent } from "./@types.js";
+import type { EventType } from "./@types.js";
 
 export type V2EnvelopeType = "mcp.event";
 
@@ -19,7 +19,6 @@ export interface V2EventEnvelope {
 	correlation: V2CorrelationIds;
 	properties: Record<string, unknown>;
 	metadata: Record<string, unknown>;
-	rawLegacy?: LegacyTrackEvent;
 }
 
 export interface V2BatchRequest {

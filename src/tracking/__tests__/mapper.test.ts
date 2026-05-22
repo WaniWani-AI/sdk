@@ -3,7 +3,7 @@ import type { LegacyTrackEvent } from "../@types.js";
 import { mapTrackEventToV2 } from "../mapper.js";
 
 describe("mapTrackEventToV2", () => {
-	test("maps legacy eventType input and preserves raw legacy payload", () => {
+	test("maps legacy eventType input into V2 envelope", () => {
 		const legacyEvent: LegacyTrackEvent = {
 			eventType: "tool.called",
 			sessionId: "session-explicit",
@@ -26,8 +26,11 @@ describe("mapTrackEventToV2", () => {
 		expect(mapped.correlation.requestId).toBe("request-from-meta");
 		expect(mapped.properties).toEqual({ name: "pricing", type: "pricing" });
 		expect(mapped.metadata).toMatchObject({ from: "legacy" });
-		expect(mapped.metadata.rawLegacy).toBeDefined();
-		expect(mapped.rawLegacy?.eventType).toBe("tool.called");
+		expect(mapped.metadata).not.toHaveProperty("rawLegacy");
+		expect(mapped).not.toHaveProperty("rawLegacy");
+		// Belt-and-suspenders: catch any reintroduction of rawLegacy via nested
+		// spreading (e.g. inside metadata.meta) that the top-level assertions miss.
+		expect(JSON.stringify(mapped)).not.toContain("rawLegacy");
 	});
 
 	test("maps docs-style quote fields and merges with explicit properties", () => {
