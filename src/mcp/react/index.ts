@@ -21,6 +21,7 @@ export type {
 	ToolResult,
 	UnifiedWidgetClient,
 	UnknownObject,
+	UnstableSendFollowUpWithGhostGuardResult,
 	UserAgent,
 	WidgetPlatform,
 } from "../../legacy/mcp/react";
@@ -33,6 +34,7 @@ export {
 	isMCPApps,
 	isOpenAI,
 	LoadingWidget,
+	unstable_useSendFollowUpWithGhostGuard,
 	updateMockDisplayMode,
 	updateMockGlobal,
 	updateMockTheme,

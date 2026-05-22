@@ -34,8 +34,10 @@ export type {
 	ModelContextContentBlock,
 	ModelContextUpdate,
 	SendFollowUpOptions,
+	UnstableSendFollowUpWithGhostGuardResult,
 } from "./hooks/index";
 export {
+	unstable_useSendFollowUpWithGhostGuard,
 	useCallTool,
 	useDisplayMode,
 	useFlowAction,
