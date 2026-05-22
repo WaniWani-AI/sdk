@@ -7,6 +7,8 @@ export type {
 } from "../../../../shared/model-context";
 // Types
 export type * from "./@types";
+export type { UnstableSendFollowUpWithGhostGuardResult } from "./unstable-use-send-follow-up";
+export { unstable_useSendFollowUpWithGhostGuard } from "./unstable-use-send-follow-up";
 export { useCallTool } from "./use-call-tool";
 export { useDisplayMode } from "./use-display-mode";
 export type { FlowActionResult } from "./use-flow-action";
