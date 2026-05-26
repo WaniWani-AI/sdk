@@ -24,10 +24,7 @@ interface WaniwaniConfig {
 	source?: string;
 }
 
-/**
- * Options for the useWaniwani hook.
- */
-export interface UseWaniwaniOptions {
+interface BaseUseWaniwaniOptions {
 	/**
 	 * JWT widget token for authenticating directly with the WaniWani backend.
 	 * If omitted, the hook resolves from tool response metadata
@@ -35,23 +32,11 @@ export interface UseWaniwaniOptions {
 	 */
 	token?: string;
 	/**
-	 * The V2 batch endpoint URL to POST tracking events to.
-	 * If omitted, the hook resolves from tool response metadata
-	 * (`toolResponseMetadata.waniwani` or `toolResponseMetadata._meta.waniwani`).
-	 */
-	endpoint?: string;
-	/**
 	 * Session ID to use for event correlation.
 	 * If omitted, the hook resolves from tool response metadata
 	 * (`toolResponseMetadata.waniwani.sessionId`), then falls back to a random UUID.
 	 */
 	sessionId?: string;
-	/**
-	 * Originating session source (e.g. `"chatgpt"`, `"chatbar"`, `"playground"`).
-	 * If omitted, the hook resolves from tool response metadata
-	 * (`toolResponseMetadata.waniwani.source`).
-	 */
-	source?: string;
 	/**
 	 * Additional metadata to include with every tracked event.
 	 */
@@ -66,6 +51,34 @@ export interface UseWaniwaniOptions {
 	 */
 	capture?: AutoCaptureToggles;
 }
+
+/**
+ * Context-driven options: `endpoint` and `source` are resolved from
+ * `WidgetProvider`'s `toolResponseMetadata.waniwani`. `source` may be
+ * overridden explicitly.
+ */
+interface ContextDrivenOptions extends BaseUseWaniwaniOptions {
+	endpoint?: undefined;
+	/** Optional override; otherwise resolved from context. */
+	source?: string;
+}
+
+/**
+ * Explicit-endpoint options: when `endpoint` is passed directly, `source`
+ * is required so events never get stamped with a placeholder.
+ */
+interface ExplicitEndpointOptions extends BaseUseWaniwaniOptions {
+	/** V2 batch endpoint URL to POST tracking events to. */
+	endpoint: string;
+	/** Required when `endpoint` is explicit (e.g. `"chatgpt"`, `"chatbar"`). */
+	source: string;
+}
+
+/**
+ * Options for the useWaniwani hook. Either rely on `WidgetProvider`
+ * context (omit `endpoint`) or pass `endpoint` + `source` explicitly.
+ */
+export type UseWaniwaniOptions = ContextDrivenOptions | ExplicitEndpointOptions;
 
 /**
  * The tracking API returned by `useWaniwani()`.
