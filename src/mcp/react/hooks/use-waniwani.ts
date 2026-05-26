@@ -49,11 +49,7 @@ export interface UseWaniwaniOptions {
 	/**
 	 * Originating session source (e.g. `"chatgpt"`, `"chatbar"`, `"playground"`).
 	 * If omitted, the hook resolves from tool response metadata
-	 * (`toolResponseMetadata.waniwani.source`). When neither an explicit option
-	 * nor context provides a source the tracker stays a no-op — events are
-	 * dropped rather than emitted with a misleading default — so that callers
-	 * that pass `endpoint` without a known source don't pollute session
-	 * attribution.
+	 * (`toolResponseMetadata.waniwani.source`).
 	 */
 	source?: string;
 	/**
@@ -118,15 +114,6 @@ function normalizeString(value: unknown): string | undefined {
 	}
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function createNoopState(): WidgetState {
-	return {
-		widget: NOOP_WIDGET,
-		cleanup: () => {},
-		config: null,
-		captureKey: "",
-	};
 }
 
 function captureKeyOf(capture?: AutoCaptureToggles): string {
@@ -341,11 +328,7 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 	const explicitSessionId = normalizeString(options.sessionId);
 	const explicitSource = normalizeString(options.source);
 
-	// Stabilize config identity — only changes when the primitives change.
-	// When `source` cannot be resolved (neither explicitly passed nor injected
-	// by `withWaniwani` via context), return `null` so the tracker stays a
-	// no-op. Emitting events with a synthetic fallback source would corrupt
-	// per-session attribution on the backend (the original "widget" sink).
+	// Stabilize config identity — only changes when the primitives change
 	const config = useMemo<ResolvedConfig | null>(() => {
 		const source = explicitSource ?? contextConfig?.source;
 		if (!source) {
@@ -399,11 +382,9 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 		}
 
 		if (!config) {
-			if (state?.config) {
-				state.cleanup();
-				state = createNoopState();
-				setWidget(NOOP_WIDGET);
-			}
+			// Local no-op: another consumer may still be driving the singleton,
+			// so don't tear it down here.
+			setWidget(NOOP_WIDGET);
 			return;
 		}
 
@@ -413,8 +394,8 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 		) {
 			state?.cleanup();
 			state = createState(config, metadataRef.current, captureRef.current);
-			setWidget(state.widget);
 		}
+		setWidget(state?.widget ?? NOOP_WIDGET);
 	}, [config, captureKey]);
 
 	return widget;

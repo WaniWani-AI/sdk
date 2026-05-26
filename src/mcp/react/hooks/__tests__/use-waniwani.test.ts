@@ -173,17 +173,6 @@ describe("auto-capture (baseFields)", () => {
 	});
 });
 
-// ── Source attribution regression ─────────────────────────────────────
-//
-// Regression: prior versions stamped events with the literal string
-// "widget" when no source had been resolved from the request `_meta`.
-// That synthetic value corrupted per-session attribution on the backend
-// (sessions that should have shown "chatgpt" / "chatbar" / etc. ended up
-// bucketed under "widget"). Two layers now guarantee the placeholder
-// cannot leak: `useWaniwani` refuses to start the tracker without a
-// known source, and `toV2Envelope` passes `ev.source` through verbatim
-// instead of papering it over.
-
 describe("source attribution", () => {
 	const mockFetch = mock(() =>
 		Promise.resolve(new Response("{}", { status: 200 })),

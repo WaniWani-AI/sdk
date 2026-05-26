@@ -22,11 +22,6 @@ interface AutoCaptureConfig {
 	sessionId?: string;
 	traceId?: string;
 	metadata?: Record<string, unknown>;
-	/**
-	 * Required. The caller (`useWaniwani`) refuses to start auto-capture without
-	 * a resolved source so events never get stamped with a misleading
-	 * placeholder.
-	 */
 	source: string;
 	capture?: AutoCaptureToggles;
 }
