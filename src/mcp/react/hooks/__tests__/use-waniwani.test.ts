@@ -172,3 +172,37 @@ describe("auto-capture (baseFields)", () => {
 		expect((event.metadata as Record<string, unknown>)?.click_x).toBe(100);
 	});
 });
+
+describe("source attribution", () => {
+	const mockFetch = mock(() =>
+		Promise.resolve(new Response("{}", { status: 200 })),
+	);
+
+	beforeEach(() => {
+		mockFetch.mockClear();
+		globalThis.fetch = mockFetch as unknown as typeof fetch;
+	});
+
+	test("toV2Envelope preserves the explicit source verbatim", async () => {
+		const { WidgetTransport } = await import("../widget-transport");
+		const transport = new WidgetTransport({
+			endpoint: "https://app.waniwani.ai/api/mcp/events/v2/batch",
+		});
+
+		transport.send([
+			{
+				event_id: "e1",
+				event_type: "widget_click",
+				timestamp: new Date().toISOString(),
+				source: "chatgpt",
+			},
+		]);
+
+		await transport.flush();
+		transport.stop();
+
+		const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+		const body = JSON.parse(opts.body as string);
+		expect(body.events[0].source).toBe("chatgpt");
+	});
+});

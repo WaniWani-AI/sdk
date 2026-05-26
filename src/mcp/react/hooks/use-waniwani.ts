@@ -24,22 +24,13 @@ interface WaniwaniConfig {
 	source?: string;
 }
 
-/**
- * Options for the useWaniwani hook.
- */
-export interface UseWaniwaniOptions {
+interface BaseUseWaniwaniOptions {
 	/**
 	 * JWT widget token for authenticating directly with the WaniWani backend.
 	 * If omitted, the hook resolves from tool response metadata
 	 * (`toolResponseMetadata.waniwani` or `toolResponseMetadata._meta.waniwani`).
 	 */
 	token?: string;
-	/**
-	 * The V2 batch endpoint URL to POST tracking events to.
-	 * If omitted, the hook resolves from tool response metadata
-	 * (`toolResponseMetadata.waniwani` or `toolResponseMetadata._meta.waniwani`).
-	 */
-	endpoint?: string;
 	/**
 	 * Session ID to use for event correlation.
 	 * If omitted, the hook resolves from tool response metadata
@@ -60,6 +51,34 @@ export interface UseWaniwaniOptions {
 	 */
 	capture?: AutoCaptureToggles;
 }
+
+/**
+ * Context-driven options: `endpoint` and `source` are resolved from
+ * `WidgetProvider`'s `toolResponseMetadata.waniwani`. `source` may be
+ * overridden explicitly.
+ */
+interface ContextDrivenOptions extends BaseUseWaniwaniOptions {
+	endpoint?: undefined;
+	/** Optional override; otherwise resolved from context. */
+	source?: string;
+}
+
+/**
+ * Explicit-endpoint options: when `endpoint` is passed directly, `source`
+ * is required so events never get stamped with a placeholder.
+ */
+interface ExplicitEndpointOptions extends BaseUseWaniwaniOptions {
+	/** V2 batch endpoint URL to POST tracking events to. */
+	endpoint: string;
+	/** Required when `endpoint` is explicit (e.g. `"chatgpt"`, `"chatbar"`). */
+	source: string;
+}
+
+/**
+ * Options for the useWaniwani hook. Either rely on `WidgetProvider`
+ * context (omit `endpoint`) or pass `endpoint` + `source` explicitly.
+ */
+export type UseWaniwaniOptions = ContextDrivenOptions | ExplicitEndpointOptions;
 
 /**
  * The tracking API returned by `useWaniwani()`.
@@ -83,10 +102,14 @@ const NOOP_WIDGET: WaniwaniWidget = {
 	conversion() {},
 };
 
+interface ResolvedConfig extends WaniwaniConfig {
+	source: string;
+}
+
 interface WidgetState {
 	widget: WaniwaniWidget;
 	cleanup: () => void;
-	config: WaniwaniConfig | null;
+	config: ResolvedConfig | null;
 	captureKey: string;
 }
 
@@ -104,15 +127,6 @@ function normalizeString(value: unknown): string | undefined {
 	}
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function createNoopState(): WidgetState {
-	return {
-		widget: NOOP_WIDGET,
-		cleanup: () => {},
-		config: null,
-		captureKey: "",
-	};
 }
 
 function captureKeyOf(capture?: AutoCaptureToggles): string {
@@ -204,7 +218,7 @@ function useContextConfig(
 }
 
 function createState(
-	config: WaniwaniConfig,
+	config: ResolvedConfig,
 	metadata?: Record<string, unknown>,
 	capture?: AutoCaptureToggles,
 ): WidgetState {
@@ -223,7 +237,7 @@ function createState(
 		transport.send(events);
 	};
 
-	const source = config.source ?? "widget";
+	const source = config.source;
 
 	const cleanupCapture = initAutoCapture(
 		{ sessionId, traceId, metadata, source, capture },
@@ -304,9 +318,9 @@ function createState(
  * instance shared across all consumers.
  *
  * Config resolution order:
- * 1. Explicit `endpoint` (+ optional `token` / `sessionId`) options
+ * 1. Explicit `endpoint` / `token` / `sessionId` / `source` options
  * 2. `toolResponseMetadata.waniwani` from WidgetProvider context
- * 3. No-op if neither is available
+ * 3. No-op if `endpoint` cannot be resolved or `source` is unknown
  *
  * @example
  * ```tsx
@@ -325,19 +339,33 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 	const explicitEndpoint = normalizeString(options.endpoint);
 	const explicitToken = normalizeString(options.token);
 	const explicitSessionId = normalizeString(options.sessionId);
+	const explicitSource = normalizeString(options.source);
 
 	// Stabilize config identity — only changes when the primitives change
-	const config = useMemo<WaniwaniConfig | null>(() => {
+	const config = useMemo<ResolvedConfig | null>(() => {
+		const source = explicitSource ?? contextConfig?.source;
+		if (!source) {
+			return null;
+		}
 		if (explicitEndpoint) {
 			return {
 				endpoint: explicitEndpoint,
 				token: explicitToken ?? contextConfig?.token,
 				sessionId: explicitSessionId ?? contextConfig?.sessionId,
-				source: contextConfig?.source,
+				source,
 			};
 		}
-		return contextConfig;
-	}, [explicitEndpoint, explicitToken, explicitSessionId, contextConfig]);
+		if (!contextConfig) {
+			return null;
+		}
+		return { ...contextConfig, source };
+	}, [
+		explicitEndpoint,
+		explicitToken,
+		explicitSessionId,
+		explicitSource,
+		contextConfig,
+	]);
 
 	const [widget, setWidget] = useState<WaniwaniWidget>(NOOP_WIDGET);
 	const metadataRef = useRef(options.metadata);
@@ -346,32 +374,21 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 	captureRef.current = options.capture;
 	const captureKey = captureKeyOf(options.capture);
 
-	// Track consumer mount/unmount for singleton lifecycle
-	useEffect(() => {
-		consumerCount++;
-		return () => {
-			consumerCount = Math.max(consumerCount - 1, 0);
-			if (consumerCount === 0) {
-				state?.cleanup();
-				state = null;
-			}
-		};
-	}, []);
-
 	// Create/swap singleton state when config changes.
 	// All side effects (timers, DOM listeners) happen here in useEffect,
 	// making this safe in Strict Mode and concurrent rendering.
+	//
+	// Only consumers with a resolved config hold a stake in the singleton.
+	// A consumer with `config === null` becomes a local no-op without
+	// touching the singleton (other consumers may still be driving it),
+	// and the singleton is torn down only when the last stake is released.
 	useEffect(() => {
 		if (typeof window === "undefined") {
 			return;
 		}
 
 		if (!config) {
-			if (state?.config) {
-				state.cleanup();
-				state = createNoopState();
-				setWidget(NOOP_WIDGET);
-			}
+			setWidget(NOOP_WIDGET);
 			return;
 		}
 
@@ -381,8 +398,17 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 		) {
 			state?.cleanup();
 			state = createState(config, metadataRef.current, captureRef.current);
-			setWidget(state.widget);
 		}
+		setWidget(state.widget);
+		consumerCount++;
+
+		return () => {
+			consumerCount = Math.max(consumerCount - 1, 0);
+			if (consumerCount === 0) {
+				state?.cleanup();
+				state = null;
+			}
+		};
 	}, [config, captureKey]);
 
 	return widget;

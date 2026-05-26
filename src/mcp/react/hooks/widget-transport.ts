@@ -67,7 +67,7 @@ function toV2Envelope(ev: WidgetEvent): Record<string, unknown> {
 		id: ev.event_id,
 		type: "mcp.event",
 		name: eventName,
-		source: ev.source || "widget",
+		source: ev.source,
 		timestamp: ev.timestamp,
 		correlation,
 		properties,
