@@ -35,7 +35,7 @@ describe("data-ww-conversion", () => {
 		document.body.appendChild(btn);
 
 		cleanup = initAutoCapture(
-			{ sessionId: "sess-1", traceId: "trace-1" },
+			{ sessionId: "sess-1", traceId: "trace-1", source: "chatgpt" },
 			(events) => enqueued.push(events),
 		);
 		btn.click();
@@ -60,7 +60,7 @@ describe("data-ww-conversion", () => {
 		document.body.appendChild(btn);
 
 		cleanup = initAutoCapture(
-			{ sessionId: "sess-1", traceId: "trace-1" },
+			{ sessionId: "sess-1", traceId: "trace-1", source: "chatgpt" },
 			(events) => enqueued.push(events),
 		);
 		btn.click();
@@ -84,7 +84,7 @@ describe("data-ww-conversion", () => {
 		document.body.appendChild(btn);
 
 		cleanup = initAutoCapture(
-			{ sessionId: "sess-1", traceId: "trace-1" },
+			{ sessionId: "sess-1", traceId: "trace-1", source: "chatgpt" },
 			(events) => enqueued.push(events),
 		);
 		span.click();
@@ -105,7 +105,7 @@ describe("data-ww-conversion", () => {
 		document.body.appendChild(btn);
 
 		cleanup = initAutoCapture(
-			{ sessionId: "sess-1", traceId: "trace-1" },
+			{ sessionId: "sess-1", traceId: "trace-1", source: "chatgpt" },
 			(events) => enqueued.push(events),
 		);
 		btn.click();
@@ -133,7 +133,7 @@ describe("data-ww-step", () => {
 		document.body.appendChild(btn2);
 
 		cleanup = initAutoCapture(
-			{ sessionId: "sess-1", traceId: "trace-1" },
+			{ sessionId: "sess-1", traceId: "trace-1", source: "chatgpt" },
 			(events) => enqueued.push(events),
 		);
 		btn1.click();
@@ -157,7 +157,7 @@ describe("data-ww-step", () => {
 		document.body.appendChild(btn);
 
 		cleanup = initAutoCapture(
-			{ sessionId: "sess-1", traceId: "trace-1" },
+			{ sessionId: "sess-1", traceId: "trace-1", source: "chatgpt" },
 			(events) => enqueued.push(events),
 		);
 		btn.click();
@@ -183,7 +183,7 @@ describe("data-ww-step", () => {
 		document.body.appendChild(btn);
 
 		cleanup = initAutoCapture(
-			{ sessionId: "sess-1", traceId: "trace-1" },
+			{ sessionId: "sess-1", traceId: "trace-1", source: "chatgpt" },
 			(events) => enqueued.push(events),
 		);
 		span.click();
@@ -201,7 +201,7 @@ describe("data-ww-step", () => {
 		document.body.appendChild(btn);
 
 		cleanup = initAutoCapture(
-			{ sessionId: "sess-1", traceId: "trace-1" },
+			{ sessionId: "sess-1", traceId: "trace-1", source: "chatgpt" },
 			(events) => enqueued.push(events),
 		);
 		btn.click();

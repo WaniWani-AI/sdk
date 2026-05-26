@@ -47,6 +47,16 @@ export interface UseWaniwaniOptions {
 	 */
 	sessionId?: string;
 	/**
+	 * Originating session source (e.g. `"chatgpt"`, `"chatbar"`, `"playground"`).
+	 * If omitted, the hook resolves from tool response metadata
+	 * (`toolResponseMetadata.waniwani.source`). When neither an explicit option
+	 * nor context provides a source the tracker stays a no-op — events are
+	 * dropped rather than emitted with a misleading default — so that callers
+	 * that pass `endpoint` without a known source don't pollute session
+	 * attribution.
+	 */
+	source?: string;
+	/**
 	 * Additional metadata to include with every tracked event.
 	 */
 	metadata?: Record<string, unknown>;
@@ -83,10 +93,14 @@ const NOOP_WIDGET: WaniwaniWidget = {
 	conversion() {},
 };
 
+interface ResolvedConfig extends WaniwaniConfig {
+	source: string;
+}
+
 interface WidgetState {
 	widget: WaniwaniWidget;
 	cleanup: () => void;
-	config: WaniwaniConfig | null;
+	config: ResolvedConfig | null;
 	captureKey: string;
 }
 
@@ -204,7 +218,7 @@ function useContextConfig(
 }
 
 function createState(
-	config: WaniwaniConfig,
+	config: ResolvedConfig,
 	metadata?: Record<string, unknown>,
 	capture?: AutoCaptureToggles,
 ): WidgetState {
@@ -223,7 +237,7 @@ function createState(
 		transport.send(events);
 	};
 
-	const source = config.source ?? "widget";
+	const source = config.source;
 
 	const cleanupCapture = initAutoCapture(
 		{ sessionId, traceId, metadata, source, capture },
@@ -304,9 +318,9 @@ function createState(
  * instance shared across all consumers.
  *
  * Config resolution order:
- * 1. Explicit `endpoint` (+ optional `token` / `sessionId`) options
+ * 1. Explicit `endpoint` / `token` / `sessionId` / `source` options
  * 2. `toolResponseMetadata.waniwani` from WidgetProvider context
- * 3. No-op if neither is available
+ * 3. No-op if `endpoint` cannot be resolved or `source` is unknown
  *
  * @example
  * ```tsx
@@ -325,19 +339,37 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 	const explicitEndpoint = normalizeString(options.endpoint);
 	const explicitToken = normalizeString(options.token);
 	const explicitSessionId = normalizeString(options.sessionId);
+	const explicitSource = normalizeString(options.source);
 
-	// Stabilize config identity — only changes when the primitives change
-	const config = useMemo<WaniwaniConfig | null>(() => {
+	// Stabilize config identity — only changes when the primitives change.
+	// When `source` cannot be resolved (neither explicitly passed nor injected
+	// by `withWaniwani` via context), return `null` so the tracker stays a
+	// no-op. Emitting events with a synthetic fallback source would corrupt
+	// per-session attribution on the backend (the original "widget" sink).
+	const config = useMemo<ResolvedConfig | null>(() => {
+		const source = explicitSource ?? contextConfig?.source;
+		if (!source) {
+			return null;
+		}
 		if (explicitEndpoint) {
 			return {
 				endpoint: explicitEndpoint,
 				token: explicitToken ?? contextConfig?.token,
 				sessionId: explicitSessionId ?? contextConfig?.sessionId,
-				source: contextConfig?.source,
+				source,
 			};
 		}
-		return contextConfig;
-	}, [explicitEndpoint, explicitToken, explicitSessionId, contextConfig]);
+		if (!contextConfig) {
+			return null;
+		}
+		return { ...contextConfig, source };
+	}, [
+		explicitEndpoint,
+		explicitToken,
+		explicitSessionId,
+		explicitSource,
+		contextConfig,
+	]);
 
 	const [widget, setWidget] = useState<WaniwaniWidget>(NOOP_WIDGET);
 	const metadataRef = useRef(options.metadata);

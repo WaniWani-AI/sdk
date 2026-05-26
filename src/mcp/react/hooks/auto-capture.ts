@@ -22,7 +22,12 @@ interface AutoCaptureConfig {
 	sessionId?: string;
 	traceId?: string;
 	metadata?: Record<string, unknown>;
-	source?: string;
+	/**
+	 * Required. The caller (`useWaniwani`) refuses to start auto-capture without
+	 * a resolved source so events never get stamped with a misleading
+	 * placeholder.
+	 */
+	source: string;
 	capture?: AutoCaptureToggles;
 }
 
@@ -39,7 +44,7 @@ function baseFields(
 		event_id: eventId(),
 		event_type: eventType,
 		timestamp: new Date().toISOString(),
-		source: config.source ?? "widget",
+		source: config.source,
 		session_id: config.sessionId,
 		trace_id: config.traceId,
 		...extra,
