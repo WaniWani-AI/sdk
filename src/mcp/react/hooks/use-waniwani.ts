@@ -361,29 +361,20 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 	captureRef.current = options.capture;
 	const captureKey = captureKeyOf(options.capture);
 
-	// Track consumer mount/unmount for singleton lifecycle
-	useEffect(() => {
-		consumerCount++;
-		return () => {
-			consumerCount = Math.max(consumerCount - 1, 0);
-			if (consumerCount === 0) {
-				state?.cleanup();
-				state = null;
-			}
-		};
-	}, []);
-
 	// Create/swap singleton state when config changes.
 	// All side effects (timers, DOM listeners) happen here in useEffect,
 	// making this safe in Strict Mode and concurrent rendering.
+	//
+	// Only consumers with a resolved config hold a stake in the singleton.
+	// A consumer with `config === null` becomes a local no-op without
+	// touching the singleton (other consumers may still be driving it),
+	// and the singleton is torn down only when the last stake is released.
 	useEffect(() => {
 		if (typeof window === "undefined") {
 			return;
 		}
 
 		if (!config) {
-			// Local no-op: another consumer may still be driving the singleton,
-			// so don't tear it down here.
 			setWidget(NOOP_WIDGET);
 			return;
 		}
@@ -395,7 +386,16 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 			state?.cleanup();
 			state = createState(config, metadataRef.current, captureRef.current);
 		}
-		setWidget(state?.widget ?? NOOP_WIDGET);
+		setWidget(state.widget);
+		consumerCount++;
+
+		return () => {
+			consumerCount = Math.max(consumerCount - 1, 0);
+			if (consumerCount === 0) {
+				state?.cleanup();
+				state = null;
+			}
+		};
 	}, [config, captureKey]);
 
 	return widget;
