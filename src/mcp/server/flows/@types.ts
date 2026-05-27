@@ -64,12 +64,6 @@ export type WidgetSignal = {
 	/** Data to pass to the display tool */
 	data: Record<string, unknown>;
 	/**
-	 * @deprecated The engine now emits a standardized instruction telling the AI
-	 * to call the widget tool. Return any per-widget description from the widget
-	 * tool's own response instead — that's where it belongs.
-	 */
-	description?: string;
-	/**
 	 * Whether the user is expected to interact with the widget before the flow continues.
 	 * Defaults to true. Set to false for informational widgets that should render and then
 	 * immediately advance to the next flow step.
@@ -133,12 +127,12 @@ export function showWidget(
 	config: {
 		data: Record<string, unknown>;
 		/**
-		 * @deprecated The engine now emits a standardized instruction telling the AI
+		 * REMOVED — the engine now emits a standardized instruction telling the AI
 		 * to call the widget tool. Return any per-widget description from the widget
-		 * tool's own response instead — that's where it belongs. Passing this field
-		 * throws at runtime.
+		 * tool's own response instead. Typed as `never` so the field is a compile-
+		 * time error; the runtime check below catches JS callers as a safety net.
 		 */
-		description?: string;
+		description?: never;
 		interactive?: boolean;
 		field?: string;
 	},
@@ -299,11 +293,12 @@ export type TypedShowWidget<TState> = (
 	config: {
 		data: Record<string, unknown>;
 		/**
-		 * @deprecated The engine now emits a standardized instruction telling the AI
+		 * REMOVED — the engine now emits a standardized instruction telling the AI
 		 * to call the widget tool. Return any per-widget description from the widget
-		 * tool's own response instead — that's where it belongs.
+		 * tool's own response instead. Typed as `never` so passing it is a compile-
+		 * time error pointing authors at the new channel.
 		 */
-		description?: string;
+		description?: never;
 		interactive?: boolean;
 		field?: FieldPaths<TState>;
 	},

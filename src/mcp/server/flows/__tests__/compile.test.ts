@@ -564,10 +564,16 @@ describe("compileFlow response contract", () => {
 			},
 		})
 			.addNode("pick_plan", ({ showWidget }) =>
-				showWidget("plan_picker", {
-					data: {},
-					description: "User must pick a plan.",
-				} as Parameters<typeof showWidget>[1]),
+				showWidget(
+					"plan_picker",
+					// `description` is typed as `never` on the new shape — JS callers can
+					// still pass it; the runtime check below catches them. We cast through
+					// `unknown` to simulate that JS path and confirm the throw.
+					{
+						data: {},
+						description: "User must pick a plan.",
+					} as unknown as Parameters<typeof showWidget>[1],
+				),
 			)
 			.addEdge(START, "pick_plan")
 			.addEdge("pick_plan", END)
