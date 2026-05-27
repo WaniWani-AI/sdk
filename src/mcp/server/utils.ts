@@ -113,19 +113,6 @@ export function extractTurnCount(
 	return undefined;
 }
 
-/**
- * Session-ID keys that uniquely identify a specific host and therefore imply
- * a source. `openai/sessionId` and `openai/session` are only ever set by an
- * OpenAI host (ChatGPT, Apps SDK), so seeing one is a reliable signal.
- *
- * `waniwani/sessionId` is deliberately NOT in this list: it doubles as a
- * generic correlation ID — set by the WaniWani chatbar/playground/embed AND
- * auto-derived from `mcp-session-id` headers as a fallback by `withWaniwani`.
- * Treating it as an implicit "chatbar" signal mis-attributes any non-chatbar
- * caller that happens to carry that key (e.g. a ChatGPT session whose `_meta`
- * also carries `waniwani/sessionId`). Callers that genuinely come from the
- * chatbar set `waniwani/source` explicitly.
- */
 const SOURCE_SESSION_KEYS = [
 	{ key: "openai/sessionId", source: "chatgpt" },
 	{ key: "openai/session", source: "chatgpt" },
@@ -137,12 +124,10 @@ export function extractSource(
 	if (!meta) {
 		return undefined;
 	}
-	// Explicit source set by the caller (e.g. "chatbar", "playground", "embed")
 	const explicit = meta["waniwani/source"];
 	if (typeof explicit === "string" && explicit.length > 0) {
 		return explicit;
 	}
-	// Derive from session ID keys that uniquely identify a host
 	for (const { key, source } of SOURCE_SESSION_KEYS) {
 		const value = meta[key];
 		if (typeof value === "string" && value.length > 0) {
