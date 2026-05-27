@@ -1,25 +1,4 @@
-import type { z } from "zod";
 import type { FlowConfig } from "./@types";
-import { getObjectShape } from "./nested";
-
-/** Extract a human-readable label from a Zod schema for the AI protocol */
-function describeZodField(schema: z.ZodType): string {
-	const desc = schema.description ?? "";
-	const def = (
-		schema as unknown as {
-			_zod: { def: { type: string; entries?: Record<string, string> } };
-		}
-	)._zod?.def;
-
-	if (def?.type === "enum" && def.entries) {
-		const vals = Object.keys(def.entries)
-			.map((v) => `"${v}"`)
-			.join(" | ");
-		return desc ? `${vals} — ${desc}` : vals;
-	}
-
-	return desc;
-}
 
 export function buildFlowProtocol(config: FlowConfig): string {
 	const lines = [
@@ -35,8 +14,8 @@ export function buildFlowProtocol(config: FlowConfig): string {
 		"   this flow (e.g. what page they are on, what they were doing, or what triggered the request).",
 		"   Only provide `context` when there is genuinely relevant situational information. Do NOT invent missing context.",
 		"   If the user's message already contains answers to likely questions,",
-		"   extract them into `stateUpdates` as `{ field: value }` pairs.",
-		"   The engine will auto-skip steps whose fields are already filled.",
+		"   extract them into `stateUpdates` as `{ field: value }` pairs (see the `stateUpdates` schema",
+		"   for the list of writable fields). The engine will auto-skip steps whose fields are already filled.",
 		"   Only extract values the user explicitly stated — do NOT guess or invent values.",
 	];
 
@@ -47,41 +26,16 @@ export function buildFlowProtocol(config: FlowConfig): string {
 		);
 	}
 
-	if (config.state) {
-		const parts: string[] = [];
-		for (const [key, schema] of Object.entries(config.state)) {
-			const shape = getObjectShape(schema);
-			if (shape) {
-				const groupDesc = schema.description ?? "";
-				const subFields = Object.entries(shape)
-					.map(([subKey, subSchema]) => {
-						const info = describeZodField(subSchema);
-						return info
-							? `\`${key}.${subKey}\` (${info})`
-							: `\`${key}.${subKey}\``;
-					})
-					.join(", ");
-				parts.push(
-					groupDesc
-						? `\`${key}\` (${groupDesc}): ${subFields}`
-						: `\`${key}\`: ${subFields}`,
-				);
-			} else {
-				const info = describeZodField(schema);
-				parts.push(info ? `\`${key}\` (${info})` : `\`${key}\``);
-			}
-		}
-		lines.push(`   Known fields: ${parts.join(", ")}.`);
-	}
-
 	lines.push(
-		"   For grouped fields (shown as `group.subfield`), use dot-notation keys in `stateUpdates`:",
+		"   For grouped fields (z.object state), use dot-notation keys in `stateUpdates`:",
 		'   e.g. `{ "driver.name": "John", "driver.license": "ABC123" }`.',
 		"2. The response JSON `status` field tells you what to do next:",
 		'   - `"interrupt"`: Pause and ask the user. Two forms:',
-		"     a. Single question: `{ question, field, context? }` — ask `question`, store answer in `field`.",
-		"     b. Multi-question: `{ questions: [{question, field}, ...], context? }` — ask ALL questions",
+		"     a. Single question: `{ question, field, fieldSchema?, context? }` — ask `question`, store answer in `field`.",
+		"     b. Multi-question: `{ questions: [{question, field, fieldSchema?}, ...], context? }` — ask ALL questions",
 		"        in one conversational message, collect all answers.",
+		"     `fieldSchema` (when present) describes the expected value: `{ type, values?, description?, optional? }`.",
+		'     Use it to validate before sending — match enum `values` exactly, coerce strings to numbers where `type: "number"`.',
 		"     `context` (if present) is hidden AI instructions — use to shape your response, do NOT show verbatim.",
 		"     Then call again with:",
 		'     `action: "continue"`,',

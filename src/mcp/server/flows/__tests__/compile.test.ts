@@ -2233,3 +2233,233 @@ describe("addNode object form", () => {
 		expect(graphMd).toContain("first[first]");
 	});
 });
+
+describe("fieldSchema in interrupt/widget responses", () => {
+	test("single-question interrupt carries fieldSchema for the awaited field", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "field_schema_single",
+			title: "Field Schema Single",
+			description: "JIT field schema in interrupt response.",
+			state: {
+				journeyType: z
+					.enum(["creation", "reprise", "entreprise"])
+					.describe("How the user intends to engage with the offer."),
+			},
+		})
+			.addNode("ask_journey", ({ interrupt }) =>
+				interrupt({
+					journeyType: { question: "What journey would you like?" },
+				}),
+			)
+			.addEdge(START, "ask_journey")
+			.addEdge("ask_journey", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed).toMatchObject({
+			status: "interrupt",
+			field: "journeyType",
+			fieldSchema: {
+				type: "enum",
+				values: ["creation", "reprise", "entreprise"],
+				description: "How the user intends to engage with the offer.",
+			},
+		});
+	});
+
+	test("multi-question interrupt carries fieldSchema on each unanswered question", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "field_schema_multi",
+			title: "Field Schema Multi",
+			description: "JIT field schema on every question.",
+			state: {
+				amount: z.number().describe("Requested financing amount in euros."),
+				purpose: z.string().describe("Why the user needs the financing."),
+			},
+		})
+			.addNode("ask_both", ({ interrupt }) =>
+				interrupt({
+					amount: { question: "How much?" },
+					purpose: { question: "For what?" },
+				}),
+			)
+			.addEdge(START, "ask_both")
+			.addEdge("ask_both", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.status).toBe("interrupt");
+		const questions = parsed.questions as Array<Record<string, unknown>>;
+		expect(questions).toHaveLength(2);
+		const amount = questions.find((q) => q.field === "amount");
+		const purpose = questions.find((q) => q.field === "purpose");
+		expect(amount?.fieldSchema).toEqual({
+			type: "number",
+			description: "Requested financing amount in euros.",
+		});
+		expect(purpose?.fieldSchema).toEqual({
+			type: "string",
+			description: "Why the user needs the financing.",
+		});
+	});
+
+	test("widget response carries field and fieldSchema when showWidget declares a field", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "field_schema_widget",
+			title: "Field Schema Widget",
+			description: "JIT field schema in widget response.",
+			state: {
+				plan: z
+					.enum(["starter", "pro"])
+					.describe("Which plan the user picked."),
+			},
+		})
+			.addNode("pick_plan", ({ showWidget }) =>
+				showWidget(mockPlanPickerTool, {
+					data: { plans: ["starter", "pro"] },
+					field: "plan",
+				}),
+			)
+			.addEdge(START, "pick_plan")
+			.addEdge("pick_plan", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed).toMatchObject({
+			status: "widget",
+			tool: "plan_picker",
+			field: "plan",
+			fieldSchema: {
+				type: "enum",
+				values: ["starter", "pro"],
+				description: "Which plan the user picked.",
+			},
+		});
+	});
+
+	test("optional field is flagged optional: true in fieldSchema", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "field_schema_optional",
+			title: "Field Schema Optional",
+			description: "Optional wrapper surfaces optional: true.",
+			state: {
+				nickname: z.string().optional().describe("Optional nickname."),
+			},
+		})
+			.addNode("ask_nick", ({ interrupt }) =>
+				interrupt({ nickname: { question: "Nickname?" } }),
+			)
+			.addEdge(START, "ask_nick")
+			.addEdge("ask_nick", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.fieldSchema).toEqual({
+			type: "string",
+			description: "Optional nickname.",
+			optional: true,
+		});
+	});
+
+	test("dot-path field resolves fieldSchema from a nested z.object", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "field_schema_nested",
+			title: "Field Schema Nested",
+			description: "Dot-path resolves nested schema.",
+			state: {
+				driver: z.object({
+					name: z.string().describe("Driver's full name."),
+				}),
+			},
+		})
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ "driver.name": { question: "Driver's name?" } }),
+			)
+			.addEdge(START, "ask_name")
+			.addEdge("ask_name", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed.field).toBe("driver.name");
+		expect(parsed.fieldSchema).toEqual({
+			type: "string",
+			description: "Driver's full name.",
+		});
+	});
+
+	test("Known fields prose dump no longer appears in tool description", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "no_known_fields",
+			title: "No Known Fields",
+			description: "Top-level description.",
+			state: {
+				foo: z.string().describe("Some foo"),
+				bar: z.number().describe("Some bar"),
+			},
+		})
+			.addNode("only", ({ interrupt }) =>
+				interrupt({ foo: { question: "Foo?" } }),
+			)
+			.addEdge(START, "only")
+			.addEdge("only", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const [, toolConfig] = registered[0] as RegisterToolArgs;
+		const description = toolConfig.description as string;
+
+		expect(description).not.toContain("Known fields");
+	});
+});

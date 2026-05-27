@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import type { ScopedWaniWaniClient } from "../scoped-client";
 import type {
 	Edge,
@@ -8,7 +9,10 @@ import type {
 	NodeOptions,
 } from "./@types";
 import { END, interrupt, isInterrupt, isWidget, showWidget } from "./@types";
+import { resolveFieldSchema } from "./field-schema";
 import { deepMerge, deleteNestedValue, getNestedValue } from "./nested";
+
+export type StateSchema = Record<string, z.ZodType>;
 
 // ============================================================================
 // Helpers
@@ -54,6 +58,7 @@ export function buildInterruptResult<TState extends Record<string, unknown>>(
 	context: string | undefined,
 	currentNode: string,
 	state: TState,
+	stateSchema?: StateSchema,
 ): ExecutionResult | null {
 	// All filled — caller should advance to the next node
 	if (
@@ -64,10 +69,18 @@ export function buildInterruptResult<TState extends Record<string, unknown>>(
 		return null;
 	}
 
-	// Filter out questions whose fields are already answered
-	const unanswered = questions.filter(
-		(q) => !isFilled(getNestedValue(state as Record<string, unknown>, q.field)),
-	);
+	// Filter out questions whose fields are already answered, and attach JIT
+	// schema fragments so the LLM sees the field's type/values/description at
+	// the moment it needs to fill it.
+	const unanswered = questions
+		.filter(
+			(q) =>
+				!isFilled(getNestedValue(state as Record<string, unknown>, q.field)),
+		)
+		.map((q) => {
+			const fieldSchema = resolveFieldSchema(stateSchema, q.field);
+			return fieldSchema ? { ...q, fieldSchema } : q;
+		});
 
 	// Single-question shorthand: unwrap for cleaner AI payload
 	const isSingle = unanswered.length === 1;
@@ -79,6 +92,7 @@ export function buildInterruptResult<TState extends Record<string, unknown>>(
 					question: q0.question,
 					field: q0.field,
 					...(q0.suggestions ? { suggestions: q0.suggestions } : {}),
+					...(q0.fieldSchema ? { fieldSchema: q0.fieldSchema } : {}),
 					...(q0.context || context ? { context: q0.context ?? context } : {}),
 				}
 			: {
@@ -110,6 +124,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 	meta?: Record<string, unknown>,
 	waniwani?: ScopedWaniWaniClient,
 	nodeOptions?: Map<string, NodeOptions>,
+	stateSchema?: StateSchema,
 ): Promise<ExecutionResult> {
 	let currentNode = startNodeName;
 	let state = { ...startState };
@@ -173,6 +188,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 					result.context,
 					currentNode,
 					state,
+					stateSchema,
 				);
 
 				if (interruptResult) {
@@ -213,6 +229,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 								result.context,
 								currentNode,
 								state,
+								stateSchema,
 							);
 							if (errResult) {
 								return { ...errResult, nodesVisited };
@@ -261,6 +278,9 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 					}
 				}
 
+				const widgetFieldSchema = widgetField
+					? resolveFieldSchema(stateSchema, widgetField)
+					: undefined;
 				return {
 					content: {
 						status: "widget",
@@ -268,6 +288,8 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 						data: result.data,
 						description: `IMPORTANT: You MUST now call the ${result.tool} tool to display the widget. Do NOT skip this step`,
 						interactive: result.interactive !== false,
+						...(widgetField ? { field: widgetField } : {}),
+						...(widgetFieldSchema ? { fieldSchema: widgetFieldSchema } : {}),
 					},
 					flowTokenContent: {
 						step: currentNode,

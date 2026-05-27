@@ -9,7 +9,10 @@ import type { z } from "zod";
 import type { RegisteredTool } from "../../../legacy/mcp/tools/types";
 import type { ScopedWaniWaniClient } from "../scoped-client";
 import type { McpServer } from "../types";
+import type { FieldSchemaInfo } from "./field-schema";
 import type { FlowStore } from "./flow-store";
+
+export type { FieldSchemaInfo };
 
 export type { McpServer };
 
@@ -523,6 +526,12 @@ export type InterruptQuestionData = {
 	field: string;
 	suggestions?: string[];
 	context?: string;
+	/**
+	 * JIT schema fragment for the field, derived from the flow's state schema.
+	 * The LLM uses this to know the field's type, allowed values, and meaning
+	 * at the exact moment it needs to fill it — without consulting a global dump.
+	 */
+	fieldSchema?: FieldSchemaInfo;
 };
 
 export type FlowInterruptContent = {
@@ -531,6 +540,8 @@ export type FlowInterruptContent = {
 	question?: string;
 	field?: string;
 	suggestions?: string[];
+	/** JIT schema fragment for the single-question shorthand. */
+	fieldSchema?: FieldSchemaInfo;
 	/** Multi-question */
 	questions?: InterruptQuestionData[];
 	context?: string;
@@ -550,6 +561,10 @@ export type FlowWidgetContent = {
 	description?: string;
 	/** Whether the widget expects user interaction before continuing */
 	interactive?: boolean;
+	/** State field the widget fills, when declared via `showWidget({ field })`. */
+	field?: string;
+	/** JIT schema fragment for the field the widget fills. */
+	fieldSchema?: FieldSchemaInfo;
 };
 
 export type FlowCompleteContent = {

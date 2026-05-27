@@ -161,6 +161,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				meta,
 				waniwani,
 				input.nodeOptions,
+				config.state,
 			);
 		}
 
@@ -234,6 +235,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					meta,
 					waniwani,
 					input.nodeOptions,
+					config.state,
 				);
 			}
 
@@ -249,6 +251,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				meta,
 				waniwani,
 				input.nodeOptions,
+				config.state,
 			);
 		}
 
@@ -317,6 +320,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				meta,
 				waniwani,
 				input.nodeOptions,
+				config.state,
 			);
 		}
 
