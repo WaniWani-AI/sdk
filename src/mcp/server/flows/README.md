@@ -146,7 +146,6 @@ const flow = createFlow({
   .addNode("show_pricing", (state) =>
     showWidget(showPricing, {
       data: { postalCode: state.postalCode!, sqm: Number(state.sqm) },
-      description: "User must pick a plan.",
       field: "selectedPlan",
     }),
   )

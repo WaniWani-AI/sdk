@@ -60,7 +60,11 @@ export type WidgetSignal = {
 	tool: string;
 	/** Data to pass to the display tool */
 	data: Record<string, unknown>;
-	/** Description of what the widget does (for the AI's context) */
+	/**
+	 * @deprecated The engine now emits a standardized instruction telling the AI
+	 * to call the widget tool. Return any per-widget description from the widget
+	 * tool's own response instead — that's where it belongs.
+	 */
 	description?: string;
 	/**
 	 * Whether the user is expected to interact with the widget before the flow continues.
@@ -125,11 +129,26 @@ export function showWidget(
 	tool: RegisteredTool | string,
 	config: {
 		data: Record<string, unknown>;
+		/**
+		 * @deprecated The engine now emits a standardized instruction telling the AI
+		 * to call the widget tool. Return any per-widget description from the widget
+		 * tool's own response instead — that's where it belongs. Passing this field
+		 * throws at runtime.
+		 */
 		description?: string;
 		interactive?: boolean;
 		field?: string;
 	},
 ): WidgetSignal {
+	if ((config as { description?: unknown }).description !== undefined) {
+		const toolId = typeof tool === "string" ? tool : tool.id;
+		throw new Error(
+			`showWidget("${toolId}", { description }) is no longer supported. ` +
+				`The engine now emits a standardized instruction telling the AI to call ` +
+				`the widget tool. Return any per-widget description from the "${toolId}" ` +
+				`tool's own response instead.`,
+		);
+	}
 	return {
 		__type: WIDGET,
 		tool: typeof tool === "string" ? tool : tool.id,
@@ -276,6 +295,11 @@ export type TypedShowWidget<TState> = (
 	tool: RegisteredTool | string,
 	config: {
 		data: Record<string, unknown>;
+		/**
+		 * @deprecated The engine now emits a standardized instruction telling the AI
+		 * to call the widget tool. Return any per-widget description from the widget
+		 * tool's own response instead — that's where it belongs.
+		 */
 		description?: string;
 		interactive?: boolean;
 		field?: FieldPaths<TState>;
@@ -518,6 +542,11 @@ export type FlowWidgetContent = {
 	tool: string;
 	/** Data to pass to the display tool */
 	data: Record<string, unknown>;
+	/**
+	 * Standardized instruction to the AI to call the widget tool. Auto-generated
+	 * by the engine from the tool id; the value previously passed via
+	 * `showWidget({ description })` is ignored.
+	 */
 	description?: string;
 	/** Whether the widget expects user interaction before continuing */
 	interactive?: boolean;

@@ -427,7 +427,6 @@ describe("compileFlow response contract", () => {
 			.addNode("show_info", ({ showWidget }) =>
 				showWidget(mockInfoPanelTool, {
 					data: { message: "Hello" },
-					description: "Show info panel",
 				}),
 			)
 			.addNode("done", () => ({ result: "finished" }))
@@ -474,7 +473,6 @@ describe("compileFlow response contract", () => {
 			.addNode("pick_plan", ({ showWidget }) =>
 				showWidget(mockPlanPickerTool, {
 					data: { plans: ["starter", "pro"] },
-					description: "Pick your plan",
 					field: "plan",
 				}),
 			)
@@ -496,7 +494,8 @@ describe("compileFlow response contract", () => {
 			status: "widget",
 			tool: "plan_picker",
 			data: { plans: ["starter", "pro"] },
-			description: "Pick your plan",
+			description:
+				"IMPORTANT: You MUST now call the plan_picker tool to display the widget. Do NOT skip this step",
 		});
 		// Verify widget metadata in store
 		const tokenData = await store.get(TEST_SESSION_ID);
@@ -521,7 +520,6 @@ describe("compileFlow response contract", () => {
 			.addNode("pick_plan", ({ showWidget }) =>
 				showWidget("plan_picker", {
 					data: { plans: ["starter", "pro"] },
-					description: "Pick your plan",
 					field: "plan",
 				}),
 			)
@@ -543,7 +541,8 @@ describe("compileFlow response contract", () => {
 			status: "widget",
 			tool: "plan_picker",
 			data: { plans: ["starter", "pro"] },
-			description: "Pick your plan",
+			description:
+				"IMPORTANT: You MUST now call the plan_picker tool to display the widget. Do NOT skip this step",
 		});
 		const tokenData = await store.get(TEST_SESSION_ID);
 		expect(tokenData).toMatchObject({
@@ -552,6 +551,39 @@ describe("compileFlow response contract", () => {
 			field: "plan",
 			widgetId: "plan_picker",
 		});
+	});
+
+	test("returns an error when showWidget is called with the deprecated description field", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "widget_flow_with_description",
+			title: "Widget Flow (description)",
+			description: "Should error because description is deprecated.",
+			state: {
+				plan: z.string().describe("Selected plan"),
+			},
+		})
+			.addNode("pick_plan", ({ showWidget }) =>
+				showWidget("plan_picker", {
+					data: {},
+					description: "User must pick a plan.",
+				} as Parameters<typeof showWidget>[1]),
+			)
+			.addEdge(START, "pick_plan")
+			.addEdge("pick_plan", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+		expect(parsed.status).toBe("error");
+		expect((parsed as { error: string }).error).toMatch(/no longer supported/);
 	});
 
 	test("marks display-only widget steps as non-interactive", async () => {
@@ -567,7 +599,6 @@ describe("compileFlow response contract", () => {
 			.addNode("show_teaser", ({ showWidget }) =>
 				showWidget(mockInfoPanelTool, {
 					data: { message: "Savings teaser" },
-					description: "Display a savings teaser, then continue immediately.",
 					interactive: false,
 				}),
 			)

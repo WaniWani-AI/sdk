@@ -266,7 +266,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 						status: "widget",
 						tool: result.tool,
 						data: result.data,
-						description: result.description,
+						description: `IMPORTANT: You MUST now call the ${result.tool} tool to display the widget. Do NOT skip this step`,
 						interactive: result.interactive !== false,
 					},
 					flowTokenContent: {

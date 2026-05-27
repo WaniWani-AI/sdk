@@ -118,14 +118,13 @@ showWidget(tool, config)
 | `tool` | `RegisteredTool \| string` | yes | The display tool (from `createTool()`) or its id as a string |
 | `data` | `Record<string, unknown>` | yes | Data to pass to the display tool |
 | `field` | `FieldPaths<TState>` | no | State field this widget fills. Enables auto-skip when already in state. Supports dot-paths for nested state. |
-| `description` | `string` | no | Description for the AI (what the widget does, what user should do) |
+| `description` | `string` | no | **Deprecated.** Ignored by the engine — `showWidget` now emits a standardized instruction telling the AI to call the widget tool. Return any per-widget description from the widget tool's own response instead. |
 | `interactive` | `boolean` | no | Set to `false` for display-only widgets that auto-advance. Defaults to `true`. |
 
 ```ts
 .addNode("show_pricing", ({ state, showWidget }) =>
   showWidget(showPricing, {
     data: { postalCode: state.postalCode!, sqm: Number(state.sqm) },
-    description: "User must pick a plan.",
     field: "selectedPlan",
   })
 )
