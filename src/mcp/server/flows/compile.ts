@@ -287,6 +287,16 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
+			if (!flowState.step) {
+				return {
+					content: {
+						status: "error" as const,
+						error:
+							'This flow has already completed. Use action "start" to begin a new flow.',
+					},
+				};
+			}
+
 			if (!args.stateUpdates || Object.keys(args.stateUpdates).length === 0) {
 				return {
 					content: {
@@ -367,36 +377,35 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 		const result = await handleToolCall(args, sessionId, _meta, waniwani);
 
-		// Persist flow state under session ID
-		if (sessionId) {
-			if (result.flowTokenContent && result.content.status !== "complete") {
-				try {
-					await store.set(sessionId, result.flowTokenContent);
-				} catch (err) {
-					const msg = err instanceof Error ? err.message : String(err);
-					const errorContent = [
-						{
-							type: "text" as const,
-							text: JSON.stringify(
-								{
-									status: "error",
-									error: `Flow state failed to persist (session "${sessionId}"): ${msg}`,
-								},
-								null,
-								2,
-							),
-						},
-					];
-					return {
-						content: errorContent,
-						_meta,
-						isError: true,
-					};
-				}
-			} else if (result.content.status === "complete") {
-				// Clean up — flow is done, remove stale state so a subsequent
-				// "continue" returns "not found" instead of a confusing step error.
-				await store.delete(sessionId);
+		// Persist flow state under session ID. On completion we store the final
+		// `{ state }` (no `step`) so customers can read the final state until
+		// the KV TTL expires; a stale `continue` falls into the "already
+		// completed" branch at the loader since `step` is undefined.
+		// TODO: expose a `deleteOnComplete` compile option for customers who
+		// want the prior behavior (drop the session as soon as END is reached).
+		if (sessionId && result.flowTokenContent) {
+			try {
+				await store.set(sessionId, result.flowTokenContent);
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				const errorContent = [
+					{
+						type: "text" as const,
+						text: JSON.stringify(
+							{
+								status: "error",
+								error: `Flow state failed to persist (session "${sessionId}"): ${msg}`,
+							},
+							null,
+							2,
+						),
+					},
+				];
+				return {
+					content: errorContent,
+					_meta,
+					isError: true,
+				};
 			}
 		}
 

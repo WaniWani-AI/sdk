@@ -221,7 +221,9 @@ describe("compileFlow response contract", () => {
 		const parsed = parsePayload(result);
 
 		expect(parsed).toMatchObject({ status: "complete" });
-		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
+		const finalStored = await store.get(TEST_SESSION_ID);
+		expect(finalStored?.state).toBeDefined();
+		expect(finalStored?.step).toBeUndefined();
 	});
 
 	test("multi-question interrupt loops with unanswered questions when user answers partially", async () => {
@@ -310,7 +312,9 @@ describe("compileFlow response contract", () => {
 		const p4 = parsePayload(r4);
 
 		expect(p4.status).toBe("complete");
-		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
+		const finalStored = await store.get(TEST_SESSION_ID);
+		expect(finalStored?.state).toBeDefined();
+		expect(finalStored?.step).toBeUndefined();
 	});
 
 	test("multi-question interrupt completes when all questions answered at once", async () => {
@@ -746,7 +750,9 @@ describe("validate on interrupt", () => {
 		const p2 = parsePayload(r2);
 
 		expect(p2.status).toBe("complete");
-		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
+		const finalStored = await store.get(TEST_SESSION_ID);
+		expect(finalStored?.state).toBeDefined();
+		expect(finalStored?.step).toBeUndefined();
 	});
 
 	test("validate returning void advances without enrichment", async () => {
@@ -789,7 +795,9 @@ describe("validate on interrupt", () => {
 		const p2 = parsePayload(r2);
 
 		expect(p2.status).toBe("complete");
-		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
+		const finalStored = await store.get(TEST_SESSION_ID);
+		expect(finalStored?.state).toBeDefined();
+		expect(finalStored?.step).toBeUndefined();
 	});
 
 	test("validate throwing re-asks with error message and clears field", async () => {
@@ -1072,7 +1080,9 @@ describe("nested object state", () => {
 		const parsed = parsePayload(result);
 
 		expect(parsed.status).toBe("complete");
-		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
+		const finalStored = await store.get(TEST_SESSION_ID);
+		expect(finalStored?.state).toBeDefined();
+		expect(finalStored?.step).toBeUndefined();
 	});
 
 	test("partial nested answers re-ask remaining sub-fields", async () => {
@@ -1192,7 +1202,9 @@ describe("nested object state", () => {
 		const p3 = parsePayload(r3);
 
 		expect(p3.status).toBe("complete");
-		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
+		const finalStored = await store.get(TEST_SESSION_ID);
+		expect(finalStored?.state).toBeDefined();
+		expect(finalStored?.step).toBeUndefined();
 	});
 
 	test("nested field validation runs and enriches state", async () => {
@@ -1240,7 +1252,9 @@ describe("nested object state", () => {
 		const p2 = parsePayload(r2);
 
 		expect(p2.status).toBe("complete");
-		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
+		const finalStored = await store.get(TEST_SESSION_ID);
+		expect(finalStored?.state).toBeDefined();
+		expect(finalStored?.step).toBeUndefined();
 	});
 
 	test("nested validation error clears only the sub-field", async () => {
@@ -1395,7 +1409,9 @@ describe("nested object state", () => {
 		const p3 = parsePayload(r3);
 
 		expect(p3.status).toBe("complete");
-		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
+		const finalStored = await store.get(TEST_SESSION_ID);
+		expect(finalStored?.state).toBeDefined();
+		expect(finalStored?.step).toBeUndefined();
 	});
 
 	test("mixed dot-key and nested sibling in continue (dot first)", async () => {
@@ -1769,8 +1785,10 @@ describe("reset action", () => {
 			TEST_EXTRA,
 		);
 
-		// Store should be cleaned up
-		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
+		// Final state is persisted (no step) so reset detects "already completed"
+		const finalStored = await store.get(TEST_SESSION_ID);
+		expect(finalStored?.state).toBeDefined();
+		expect(finalStored?.step).toBeUndefined();
 
 		// Reset should fail
 		const result = (await handler?.(
@@ -1780,7 +1798,7 @@ describe("reset action", () => {
 		const parsed = parsePayload(result);
 
 		expect(parsed.status).toBe("error");
-		expect(parsed.error).toContain("not found");
+		expect(parsed.error).toContain("already completed");
 	});
 
 	test("reset preserves partial progress on current multi-question interrupt", async () => {
@@ -2054,8 +2072,10 @@ describe("auto-generated sessionId for sessionless clients", () => {
 			noSessionExtra(),
 		);
 
-		// State should be cleaned up
-		expect(await store.get(sessionId)).toEqual(null);
+		// Final state is persisted (no step → stale continue falls into "already completed")
+		const finalStored = await store.get(sessionId);
+		expect(finalStored?.state).toBeDefined();
+		expect(finalStored?.step).toBeUndefined();
 	});
 
 	test("each start generates a unique sessionId", async () => {
