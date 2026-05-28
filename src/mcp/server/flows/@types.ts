@@ -62,7 +62,7 @@ export type WidgetSignal = {
 	/** The id of the display tool to delegate rendering to */
 	tool: string;
 	/** Data to pass to the display tool */
-	data: Record<string, unknown>;
+	data?: Record<string, unknown>;
 	/**
 	 * Whether the user is expected to interact with the widget before the flow continues.
 	 * Defaults to true. Set to false for informational widgets that should render and then
@@ -118,25 +118,49 @@ export function interrupt(
 	};
 }
 
+type ShowWidgetConfig = {
+	data?: Record<string, unknown>;
+	/**
+	 * @deprecated REMOVED. The engine now emits a standardized instruction telling
+	 * the AI to call the widget tool. Return any per-widget description from the
+	 * widget tool's own response instead. Typed as `never` so passing it is a
+	 * compile-time error; the runtime check below catches JS callers as a safety net.
+	 */
+	description?: never;
+	interactive?: boolean;
+	field?: string;
+};
+
 /**
  * Create a widget signal — pauses the flow and delegates rendering to a display tool.
  * Used internally by the engine. Flow authors use the typed `showWidget` from the node context.
  */
 export function showWidget(
+	config: ShowWidgetConfig & { tool: RegisteredTool | string },
+): WidgetSignal;
+/**
+ * @deprecated Use the object form: `showWidget({ tool, data, field, interactive })`.
+ * The positional form will be removed in v0.13.0
+ */
+export function showWidget(
 	tool: RegisteredTool | string,
-	config: {
-		data: Record<string, unknown>;
-		/**
-		 * REMOVED — the engine now emits a standardized instruction telling the AI
-		 * to call the widget tool. Return any per-widget description from the widget
-		 * tool's own response instead. Typed as `never` so the field is a compile-
-		 * time error; the runtime check below catches JS callers as a safety net.
-		 */
-		description?: never;
-		interactive?: boolean;
-		field?: string;
-	},
+	config: ShowWidgetConfig,
+): WidgetSignal;
+export function showWidget(
+	toolOrConfig:
+		| RegisteredTool
+		| string
+		| (ShowWidgetConfig & { tool: RegisteredTool | string }),
+	maybeConfig?: ShowWidgetConfig,
 ): WidgetSignal {
+	const isObjectForm =
+		typeof toolOrConfig === "object" &&
+		toolOrConfig !== null &&
+		"tool" in toolOrConfig;
+	const tool = isObjectForm ? toolOrConfig.tool : toolOrConfig;
+	const config: ShowWidgetConfig = isObjectForm
+		? toolOrConfig
+		: (maybeConfig ?? {});
 	if ((config as { description?: unknown }).description !== undefined) {
 		const toolId = typeof tool === "string" ? tool : tool.id;
 		throw new Error(
@@ -146,10 +170,13 @@ export function showWidget(
 				`tool's own response instead.`,
 		);
 	}
+	const { data, interactive, field } = config;
 	return {
 		__type: WIDGET,
 		tool: typeof tool === "string" ? tool : tool.id,
-		...config,
+		...(data !== undefined ? { data } : {}),
+		...(interactive !== undefined ? { interactive } : {}),
+		...(field !== undefined ? { field } : {}),
 	};
 }
 
@@ -287,22 +314,36 @@ export type TypedInterrupt<TState> = (
 /**
  * Typed showWidget function — available on the node context.
  * The `field` parameter accepts field paths (flat or dot-path for nested state).
+ *
+ * Prefer the object form: `showWidget({ tool, data, field, interactive })`.
+ * The positional form `showWidget(tool, config)` is deprecated.
  */
-export type TypedShowWidget<TState> = (
-	tool: RegisteredTool | string,
-	config: {
-		data: Record<string, unknown>;
-		/**
-		 * REMOVED — the engine now emits a standardized instruction telling the AI
-		 * to call the widget tool. Return any per-widget description from the widget
-		 * tool's own response instead. Typed as `never` so passing it is a compile-
-		 * time error pointing authors at the new channel.
-		 */
-		description?: never;
-		interactive?: boolean;
-		field?: FieldPaths<TState>;
-	},
-) => WidgetSignal;
+export type TypedShowWidgetConfig<TState> = {
+	data?: Record<string, unknown>;
+	/**
+	 * @deprecated REMOVED. The engine now emits a standardized instruction telling
+	 * the AI to call the widget tool. Return any per-widget description from the
+	 * widget tool's own response instead. Typed as `never` so passing it is a
+	 * compile-time error pointing authors at the new channel.
+	 */
+	description?: never;
+	interactive?: boolean;
+	field?: FieldPaths<TState>;
+};
+
+export type TypedShowWidget<TState> = {
+	(
+		config: TypedShowWidgetConfig<TState> & { tool: RegisteredTool | string },
+	): WidgetSignal;
+	/**
+	 * @deprecated Use the object form: `showWidget({ tool, data, field, interactive })`.
+	 * The positional form will be removed in v0.13.0
+	 */
+	(
+		tool: RegisteredTool | string,
+		config: TypedShowWidgetConfig<TState>,
+	): WidgetSignal;
+};
 
 /**
  * Context object passed to node handlers.
@@ -547,7 +588,7 @@ export type FlowWidgetContent = {
 	/** Display tool to call */
 	tool: string;
 	/** Data to pass to the display tool */
-	data: Record<string, unknown>;
+	data?: Record<string, unknown>;
 	/**
 	 * Standardized instruction to the AI to call the widget tool. Auto-generated
 	 * by the engine from the tool id; the value previously passed via

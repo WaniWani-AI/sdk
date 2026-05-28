@@ -144,7 +144,8 @@ const flow = createFlow({
     interrupt({ question: "How many m² is your home?", field: "sqm" }),
   )
   .addNode("show_pricing", (state) =>
-    showWidget(showPricing, {
+    showWidget({
+      tool: showPricing,
       data: { postalCode: state.postalCode!, sqm: Number(state.sqm) },
       field: "selectedPlan",
     }),
@@ -202,7 +203,7 @@ const flow = createFlow({
 |---|---|
 | `interrupt({ question, field })` | Pause -> ask user -> resume with answer stored at `field` |
 | `interrupt({ question, field, context })` | Same, plus hidden guidance for the assistant |
-| `showWidget(displayTool, { data, field?, interactive? })` | Pause -> instruct AI to call display tool -> resume on continue |
+| `showWidget({ tool: displayTool, data?, field?, interactive? })` | Pause -> instruct AI to call display tool -> resume on continue |
 | `{ key: value, ... }` | Action node -> merge into state -> auto-advance |
 
 ## API

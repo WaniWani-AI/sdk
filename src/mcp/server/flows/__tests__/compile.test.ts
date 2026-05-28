@@ -553,6 +553,78 @@ describe("compileFlow response contract", () => {
 		});
 	});
 
+	test("accepts the object form showWidget({ tool, data, field })", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "widget_flow_object_form",
+			title: "Widget Flow (object form)",
+			description: "Collect via widget using the object-form showWidget",
+			state: {
+				plan: z.string().describe("Selected plan"),
+			},
+		})
+			.addNode("pick_plan", ({ showWidget }) =>
+				showWidget({
+					tool: "plan_picker",
+					data: { plans: ["starter", "pro"] },
+					field: "plan",
+				}),
+			)
+			.addEdge(START, "pick_plan")
+			.addEdge("pick_plan", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed).toMatchObject({
+			status: "widget",
+			tool: "plan_picker",
+			data: { plans: ["starter", "pro"] },
+		});
+	});
+
+	test("object-form showWidget works without data", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "widget_flow_no_data",
+			title: "Widget Flow (no data)",
+			description: "Object-form showWidget with no data field",
+			state: {
+				plan: z.string().describe("Selected plan"),
+			},
+		})
+			.addNode("pick_plan", ({ showWidget }) =>
+				showWidget({ tool: "plan_picker", field: "plan" }),
+			)
+			.addEdge(START, "pick_plan")
+			.addEdge("pick_plan", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const parsed = parsePayload(result);
+
+		expect(parsed).toMatchObject({
+			status: "widget",
+			tool: "plan_picker",
+		});
+		expect((parsed as { data?: unknown }).data).toBeUndefined();
+	});
+
 	test("returns an error when showWidget is called with the deprecated description field", async () => {
 		const store = new TestFlowStateStore();
 		const flow = createFlow({

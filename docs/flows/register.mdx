@@ -62,7 +62,7 @@ Both are equivalent.
 
 ## Registering widget display tools alongside flows
 
-When a flow uses `showWidget("name", ...)`, the named display tool must be registered on the same server. Use [Skybridge's](https://docs.skybridge.tech) `server.registerWidget(name, meta, schema, handler)` — it binds the widget name to the matching React component under `web/src/widgets/<name>.tsx` and emits the widget-rendering metadata that ChatGPT, Claude, and other MCP clients understand. You don't need to set `_meta.openai/outputTemplate` by hand.
+When a flow uses `showWidget({ tool: "name", ... })`, the named display tool must be registered on the same server. Use [Skybridge's](https://docs.skybridge.tech) `server.registerWidget(name, meta, schema, handler)` — it binds the widget name to the matching React component under `web/src/widgets/<name>.tsx` and emits the widget-rendering metadata that ChatGPT, Claude, and other MCP clients understand. You don't need to set `_meta.openai/outputTemplate` by hand.
 
 ```ts
 server

@@ -134,7 +134,7 @@ The `waniwani` property is a session-scoped `ScopedWaniWaniClient` for tracking 
 | Return value | Behavior |
 |---|---|
 | `interrupt({ ... })` | Pause, ask user one or more questions, resume with answers |
-| `showWidget(tool, { data, field? })` | Pause, instruct AI to call display tool, resume when user interacts |
+| `showWidget({ tool, data?, field? })` | Pause, instruct AI to call display tool, resume when user interacts |
 | `{ key: value, ... }` | Action node: merge into state, auto-advance to next node |
 
 ## Interrupt API
@@ -275,7 +275,8 @@ const flow = createFlow({
     interrupt({ postalCode: { question: "What's your postal code?" } })
   )
   .addNode("show_pricing", ({ state, showWidget }) =>
-    showWidget(showPricing, {
+    showWidget({
+      tool: showPricing,
       data: { postalCode: state.postalCode!, sqm: Number(state.sqm) },
       field: "selectedPlan",  // enables auto-skip when already filled
     })

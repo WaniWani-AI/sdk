@@ -299,10 +299,9 @@ FORMATTING: Write in flowing prose, not bullet points.`;
         displayBreed = parts.length > 0 ? `${parts.join(" & ")} Mix` : "Mixed breed";
       }
 
-      return showWidget("show_pet_summary", {
+      return showWidget({
+        tool: "show_pet_summary",
         field: "confirmed",
-        description:
-          "You MUST now call the show_pet_summary tool with the pet data to display the summary card. Write a short, excited message first, something like 'Here's what I've got for [petName], take a look!' Then immediately call show_pet_summary. The widget displays all the details, so do NOT repeat them in your text. After the widget renders, ask the user to confirm or let you know if anything needs fixing. If the user corrects anything, set confirmed to false and extract the correction. Only set confirmed to true when they explicitly say everything is correct.",
         data: {
           animalType: state.animalType,
           petName: state.petName,
@@ -343,8 +342,8 @@ FORMATTING: Write in flowing prose, not bullet points.`;
 
       return {
         quoteId: quote.id,
-        ...showWidget("show_pricing", {
-          description: `You MUST now call the show_pricing tool with the plans data to display the pricing cards. Write a brief intro, something like "Here are the plans available for [petName]!" Then immediately call show_pricing. COMPLIANCE: Do NOT recommend any plan. Only present factual differences. After the widget renders, let the user browse. If they want to adjust their deductible (options: 0, 250, 500, 750) or copay (options: 15%, 20%, 25%), set the new values and set pricingAction to "adjust". If they're happy, set pricingAction to "done".`,
+        ...showWidget({
+          tool: "show_pricing",
           data: {
             petName: state.petName,
             quoteId: quote.id,
@@ -382,7 +381,7 @@ FORMATTING: Write in flowing prose, not bullet points.`;
 
 ## Register the widget display tools
 
-`showWidget("show_pet_summary", ...)` and `showWidget("show_pricing", ...)` in the flow refer to widget names the model will call to render each card. Register them with [Skybridge's](https://docs.skybridge.tech) `registerWidget` — it binds the named widget to the matching React component under `web/src/widgets/` and handles all of the OpenAI/Claude render plumbing for you:
+`showWidget({ tool: "show_pet_summary", ... })` and `showWidget({ tool: "show_pricing", ... })` in the flow refer to widget names the model will call to render each card. Register them with [Skybridge's](https://docs.skybridge.tech) `registerWidget` — it binds the named widget to the matching React component under `web/src/widgets/` and handles all of the OpenAI/Claude render plumbing for you:
 
 ```ts server/src/app.ts
 import { McpServer } from "skybridge/server";
@@ -491,22 +490,19 @@ The widget itself lives at `web/src/widgets/show_pet_summary.tsx` (and `show_pri
   <Accordion title="How flows call widgets (the showWidget handoff)">
     Flows don't render widgets directly. Instead, `showWidget` creates a special interrupt that **instructs the LLM to call a separate display tool**. Here's the sequence:
 
-    1. The flow node calls `showWidget("show_pricing", { description, data })` and pauses.
-    2. The flow engine returns an interrupt to the LLM with the `description` you provided.
-    3. The LLM reads that description (which says "You MUST now call the `show_pricing` tool"), writes a short intro message, then calls the display tool.
+    1. The flow node calls `showWidget({ tool: "show_pricing", data })` and pauses.
+    2. The flow engine returns an interrupt to the LLM with a standardized instruction to call the named display tool.
+    3. The LLM writes a short intro message, then calls the display tool.
     4. The display tool renders the widget in the chat UI.
     5. After the user interacts with the widget, the LLM continues the flow with updated state.
 
-    The `description` is the key bridge. It's your instruction to the LLM about **what tool to call and how to frame it conversationally**. This is why it says things like "Write a brief intro, then immediately call show_pet_summary" rather than just describing what the widget does.
-
-    The `field` parameter tells the flow which state field the widget interaction resolves (e.g., `confirmed`). The `data` is passed directly to the widget component for rendering.
+    The `field` parameter tells the flow which state field the widget interaction resolves (e.g., `confirmed`). The `data` is passed directly to the widget component for rendering. Any per-widget AI guidance (conversational framing, compliance notes, etc.) belongs in the display tool's own response, not in `showWidget`.
 
     ```ts
-    // The flow pauses here and tells the LLM:
-    // "Call show_pet_summary with this data"
-    return showWidget("show_pet_summary", {
+    // The flow pauses here and tells the LLM to call show_pet_summary
+    return showWidget({
+      tool: "show_pet_summary",
       field: "confirmed",  // Which state field this resolves
-      description: "You MUST now call the show_pet_summary tool...",
       data: { petName, breed, ... },  // Passed to the widget
     });
     ```

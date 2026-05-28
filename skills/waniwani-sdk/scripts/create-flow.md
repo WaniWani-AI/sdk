@@ -106,7 +106,8 @@ Map each step to a node. There are three node types:
 ### Widget nodes (show UI)
 ```typescript
 .addNode("show_pricing", ({ state, showWidget }) =>
-  showWidget(pricingTool, {
+  showWidget({
+    tool: pricingTool,
     data: { plan: state.plan },
     field: "selectedPlan",
   })

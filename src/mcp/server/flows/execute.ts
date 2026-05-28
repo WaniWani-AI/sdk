@@ -285,7 +285,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 					content: {
 						status: "widget",
 						tool: result.tool,
-						data: result.data,
+						...(result.data !== undefined ? { data: result.data } : {}),
 						description: `IMPORTANT: You MUST now call the ${result.tool} tool to display the widget. Do NOT skip this step`,
 						interactive: result.interactive !== false,
 						...(widgetField ? { field: widgetField } : {}),

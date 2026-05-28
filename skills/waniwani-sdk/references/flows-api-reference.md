@@ -105,30 +105,32 @@ interrupt({
 })
 ```
 
-## showWidget(tool, config)
+## showWidget(config)
 
 Available on the handler context, not as a direct import. Pauses the flow and instructs the AI to call a display tool.
 
 ```ts
-showWidget(tool, config)
+showWidget({ tool, data?, field?, interactive? })
 ```
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `tool` | `RegisteredTool \| string` | yes | The display tool (from `createTool()`) or its id as a string |
-| `data` | `Record<string, unknown>` | yes | Data to pass to the display tool |
+| `data` | `Record<string, unknown>` | no | Data to pass to the display tool |
 | `field` | `FieldPaths<TState>` | no | State field this widget fills. Enables auto-skip when already in state. Supports dot-paths for nested state. |
-| `description` | `string` | no | **Deprecated.** Ignored by the engine — `showWidget` now emits a standardized instruction telling the AI to call the widget tool. Return any per-widget description from the widget tool's own response instead. |
 | `interactive` | `boolean` | no | Set to `false` for display-only widgets that auto-advance. Defaults to `true`. |
 
 ```ts
 .addNode("show_pricing", ({ state, showWidget }) =>
-  showWidget(showPricing, {
+  showWidget({
+    tool: showPricing,
     data: { postalCode: state.postalCode!, sqm: Number(state.sqm) },
     field: "selectedPlan",
   })
 )
 ```
+
+The positional form `showWidget(tool, config)` is **deprecated** but still supported for back-compat. Migrate to the object form for new code.
 
 ## FlowStore Interface
 

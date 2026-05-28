@@ -161,10 +161,10 @@ export const {flowName} = createFlow({
   )
   // ... additional nodes for each step
   .addNode("show_{widget}", ({ state, showWidget }) =>
-    showWidget({widgetTool}, {
+    showWidget({
+      tool: {widgetTool},
       data: { /* widget props from state */ },
       field: "{fieldToUpdate}",
-      description: "...",
     })
   )
   .addEdge(START, "welcome")

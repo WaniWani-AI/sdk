@@ -23,7 +23,7 @@ Read the entire flow source file. The flow is defined using the `createFlow` bui
 Parse the source code to identify:
 
 **Nodes** — Each `.addNode("name", ...)` call. Classify by what the handler returns:
-- **Widget node** — handler returns `showWidget(resource, { data })`. Look for `{ resource: ... }` in the node config (second arg).
+- **Widget node** — handler returns `showWidget({ tool, data })` (or the legacy positional form `showWidget(tool, { data })`). Look for `{ tool: ... }` (object form) or the second positional arg (legacy form).
 - **Interrupt node** — handler returns `interrupt({ question, field })`.
 - **Action node** — handler returns a plain object like `{}` or `{ key: value }`. These run silently and auto-advance.
 

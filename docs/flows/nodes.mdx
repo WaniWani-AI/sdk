@@ -109,22 +109,26 @@ See [Interrupts](/flows/interrupts) for multi-question interrupts, hidden contex
 
 ## Widget nodes
 
-A widget node returns `showWidget(tool, config)`. The engine returns `status: "widget"` pointing at a display tool (created with `createTool()`) and the flow pauses. When the user interacts, the host calls the flow back with `action: "continue"` and whatever values you want stored in `stateUpdates`.
+A widget node returns `showWidget({ tool, ... })`. The engine returns `status: "widget"` pointing at a display tool (created with `createTool()`) and the flow pauses. When the user interacts, the host calls the flow back with `action: "continue"` and whatever values you want stored in `stateUpdates`.
 
 ```ts
 .addNode({
   id: "show_pricing",
   run: ({ state, showWidget }) =>
-    showWidget("show_pricing", {
+    showWidget({
+      tool: "show_pricing",
       data: {
         postalCode: state.postalCode!,
         sqm: Number(state.squareMeters),
       },
-      description: "User must pick a plan.",
       field: "selectedPlan",
     }),
 })
 ```
+
+<Note>
+  The positional form `showWidget(tool, config)` is **deprecated** but still supported for back-compat. Migrate to the object form for new code.
+</Note>
 
 Setting `field` enables the same auto-skip behavior as interrupts: if `selectedPlan` is already filled when the flow reaches this node, the widget is skipped. Setting `interactive: false` makes the widget display-only and auto-advances after it renders.
 

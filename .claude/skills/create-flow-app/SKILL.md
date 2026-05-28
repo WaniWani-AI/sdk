@@ -53,13 +53,13 @@ If the user just wants something running locally, default to **option 1**. Menti
 |---|---|---|
 | Ask the user a question | `interrupt({ field: { question } })` | Pauses flow |
 | Run silent server work (API call, computation) | Plain object `{ field: value }` | Auto-advances |
-| Render a widget UI for selection | `showWidget(displayTool, { data, field })` | Pauses flow |
+| Render a widget UI for selection | `showWidget({ tool: displayTool, data, field })` | Pauses flow |
 
 `interrupt` and `showWidget` come from the handler's context:
 
 ```ts
 .addNode("ask", ({ interrupt }) => interrupt({ ... }))
-.addNode("show", (ctx) => showWidget(ctx.displayTool, { ... }))
+.addNode("show", ({ showWidget }) => showWidget({ tool: displayTool, data: { ... } }))
 ```
 
 Never import `interrupt` or `showWidget` directly.
