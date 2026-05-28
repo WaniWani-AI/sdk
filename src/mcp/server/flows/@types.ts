@@ -11,6 +11,7 @@ import type { ScopedWaniWaniClient } from "../scoped-client";
 import type { McpServer } from "../types";
 import type { FieldSchemaInfo } from "./field-schema";
 import type { FlowStore } from "./flow-store";
+import type { FlowOutputSchema } from "./output-schema";
 
 export type { FieldSchemaInfo };
 
@@ -514,6 +515,12 @@ export type RegisteredFlow = {
 		title: string;
 		description: string;
 		inputSchema: ZodRawShapeCompat;
+		/**
+		 * JSON Schema for the structured payload returned in every flow tool
+		 * call. Baked in so MCP clients render the flow protocol as a typed
+		 * contract instead of an opaque JSON string.
+		 */
+		outputSchema: FlowOutputSchema;
 		annotations?: {
 			readOnlyHint?: boolean;
 			idempotentHint?: boolean;

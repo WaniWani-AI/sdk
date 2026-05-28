@@ -20,6 +20,7 @@ import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
 import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
 import { extractFlowGraph } from "./graph-extract";
 import { deepMerge, expandDotPaths } from "./nested";
+import { flowOutputSchema } from "./output-schema";
 import { buildFlowProtocol } from "./protocol";
 import {
 	collectRedactedStateFields,
@@ -349,6 +350,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		title: config.title,
 		description: fullDescription,
 		inputSchema,
+		outputSchema: flowOutputSchema,
 		annotations: config.annotations,
 		...(redactedStateFields.length > 0 && {
 			_meta: {
@@ -432,6 +434,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 		return {
 			content,
+			structuredContent: contentObj as Record<string, unknown>,
 			_meta,
 			...(result.content.status === "error" ? { isError: true } : {}),
 		};

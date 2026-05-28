@@ -19,6 +19,9 @@ export { createFlow } from "./create-flow";
 // State store
 export type { FlowStore } from "./flow-store";
 export { WaniwaniFlowStore } from "./flow-store";
+// Output schema (baked into compiled flows; exported for tooling/typing)
+export type { FlowOutputSchema } from "./output-schema";
+export { flowOutputSchema } from "./output-schema";
 // Schema field redaction marker
 export { redacted } from "./redacted";
 // Builder
