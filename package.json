@@ -1,6 +1,6 @@
 {
   "name": "@waniwani/sdk",
-  "version": "0.12.5",
+  "version": "0.12.6",
   "description": "MCP distribution SDK. Build sales funnels, lead generation, booking, and quote apps on top of your MCP server. Event tracking, flows, widgets, knowledge base.",
   "type": "module",
   "exports": {
