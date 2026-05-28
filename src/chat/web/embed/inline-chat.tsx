@@ -69,6 +69,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 				body={Object.keys(body).length > 0 ? body : undefined}
 				appearance={config.appearance}
 				title={config.title}
+				hideHeader={config.hideHeader}
 				welcomeMessage={config.welcomeMessage}
 				placeholder={config.placeholder}
 				suggestions={

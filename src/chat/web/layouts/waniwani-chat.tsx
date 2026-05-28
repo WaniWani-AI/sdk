@@ -29,6 +29,11 @@ const READINESS_TIMEOUT_MS = 600;
 export interface WaniwaniChatOverrides {
 	/** Sticky header title. */
 	title?: string;
+	/**
+	 * Force-hide the sticky header. Useful when the host page already provides
+	 * its own chrome and a header would be redundant.
+	 */
+	hideHeader?: boolean;
 	/** Greeting shown before the first user message. */
 	welcomeMessage?: string;
 	/** Rich welcome screen (icon, title, suggestion cards). Takes precedence over `welcomeMessage`. */
@@ -131,6 +136,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				api: overrides?.api,
 				mcpServerUrl: overrides?.mcpServerUrl,
 				title: overrides?.title,
+				hideHeader: overrides?.hideHeader,
 				welcomeMessage: overrides?.welcomeMessage,
 				placeholder: overrides?.placeholder,
 				suggestions: overrides?.suggestions,
@@ -145,6 +151,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				overrides?.api,
 				overrides?.mcpServerUrl,
 				overrides?.title,
+				overrides?.hideHeader,
 				overrides?.welcomeMessage,
 				overrides?.placeholder,
 				overrides?.suggestions,
@@ -225,6 +232,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				body={Object.keys(body).length > 0 ? body : undefined}
 				appearance={config.appearance}
 				title={config.title}
+				hideHeader={config.hideHeader}
 				welcomeMessage={config.welcomeMessage}
 				welcome={overrides?.welcome}
 				placeholder={config.placeholder}

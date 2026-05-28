@@ -63,6 +63,12 @@ export interface EmbedConfig {
 	showToolCalls?: boolean;
 	/** Title shown in the chat header. Defaults to `"Assistant"`. */
 	title?: string;
+	/**
+	 * Force-hide the sticky header even when `title` or `enableThreadHistory`
+	 * would otherwise show it. Useful when the host page already provides its
+	 * own chrome. Surfaced as `data-hide-header` on the embed script tag.
+	 */
+	hideHeader?: boolean;
 	/** Welcome message shown before the first user message. */
 	welcomeMessage?: string;
 	/** Placeholder text for the input field. */
@@ -212,6 +218,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const enableThreadHistory = bool("data-enable-thread-history");
 	if (enableThreadHistory !== undefined) {
 		config.enableThreadHistory = enableThreadHistory;
+	}
+
+	const hideHeader = bool("data-hide-header");
+	if (hideHeader !== undefined) {
+		config.hideHeader = hideHeader;
 	}
 
 	const themeRaw = str("data-theme");

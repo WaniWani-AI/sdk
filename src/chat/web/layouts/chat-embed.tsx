@@ -64,6 +64,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			readOnly = false,
 			title,
 			headerActions,
+			hideHeader = false,
 			enableThreadHistory = false,
 			showToolCalls = true,
 			initializing = false,
@@ -325,7 +326,8 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			return () => window.removeEventListener(triggerEvent, handler);
 		}, [triggerEvent, engine.handleSubmit, focusInput]);
 
-		const showHeader = Boolean(title || enableThreadHistory || headerActions);
+		const showHeader =
+			!hideHeader && Boolean(title || enableThreadHistory || headerActions);
 
 		return (
 			<div

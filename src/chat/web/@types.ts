@@ -259,6 +259,12 @@ export interface ChatEmbedProps
 	/** Extra React node rendered in the sticky header, right of the title. */
 	headerActions?: React.ReactNode;
 	/**
+	 * Force-hide the sticky header even when `title`, `enableThreadHistory`,
+	 * or `headerActions` would otherwise show it. Useful when the host page
+	 * already provides its own chrome.
+	 */
+	hideHeader?: boolean;
+	/**
 	 * @internal
 	 * When `true`, the root renders at `opacity: 0` so the chrome doesn't
 	 * paint with stale defaults while the layout's remote config is still
