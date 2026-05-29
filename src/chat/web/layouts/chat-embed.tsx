@@ -146,6 +146,31 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 			}
 		}, []);
 
+		// Counteract iOS Safari / Android Chrome centering the focused input in
+		// the visual viewport, which clips the top of an embedded chat card.
+		const handleTextareaFocus = useCallback(() => {
+			if (typeof window === "undefined") {
+				return;
+			}
+			if (!window.matchMedia("(pointer: coarse)").matches) {
+				return;
+			}
+			window.setTimeout(() => {
+				const card = rootRef.current;
+				if (!card) {
+					return;
+				}
+				const vv = window.visualViewport;
+				const viewportH = vv?.height ?? window.innerHeight;
+				const viewportTop = vv?.offsetTop ?? 0;
+				const rect = card.getBoundingClientRect();
+				const delta = rect.bottom - (viewportTop + viewportH - 8);
+				if (Math.abs(delta) > 4) {
+					window.scrollBy({ top: delta, behavior: "smooth" });
+				}
+			}, 350);
+		}, []);
+
 		// Confine to the messages scroll container — `scrollIntoView` would
 		// also scroll ancestor scroll boxes (page, customer wrappers),
 		// jerking the layout every time a streamed token arrives.
@@ -459,6 +484,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 										{allowAttachments && <PromptInputAddAttachments />}
 										<PromptInputTextarea
 											onChange={engine.handleTextChange}
+											onFocus={handleTextareaFocus}
 											value={engine.text}
 											placeholder={animatedPlaceholder}
 											className="ww:min-h-0 ww:py-1 ww:px-0"
