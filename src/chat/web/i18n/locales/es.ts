@@ -13,9 +13,9 @@ export const es: Messages = {
 	},
 	reasoning: {
 		thinking: "Pensando…",
-		thoughtBrief: "Pensé durante unos segundos",
+		thoughtBrief: "Pensado durante unos segundos",
 		thoughtForSeconds: (count: number) =>
-			`Pensé durante ${count} segundo${count === 1 ? "" : "s"}`,
+			`Pensado durante ${count} segundo${count === 1 ? "" : "s"}`,
 	},
 	tool: {
 		copy: "Copiar",
@@ -29,7 +29,7 @@ export const es: Messages = {
 		fileFallback: "archivo",
 	},
 	threadMenu: {
-		newChat: "Nuevo chat",
+		newChat: "Nueva conversación",
 		threadHistory: "Historial",
 		deleteThread: "Eliminar conversación",
 		noPreviousChats: "Aún no hay conversaciones anteriores.",

@@ -1,6 +1,6 @@
 "use client";
 
-import { BrainIcon, ChevronDownIcon } from "lucide-react";
+import { BrainIcon } from "lucide-react";
 import type { HTMLAttributes, ReactNode } from "react";
 import {
 	createContext,
@@ -198,12 +198,6 @@ export const ReasoningTrigger = memo(
 					<>
 						<BrainIcon className="ww:size-4 ww:shrink-0" />
 						{resolvedGetThinkingMessage(isStreaming, duration)}
-						<ChevronDownIcon
-							className={cn(
-								"ww:size-4 ww:shrink-0 ww:transition-transform ww:duration-200",
-								isOpen && "ww:rotate-180",
-							)}
-						/>
 					</>
 				)}
 			</button>
