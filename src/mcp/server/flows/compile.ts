@@ -371,7 +371,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		// Auto-generate session ID for clients that don't provide one (e.g. Claude Code)
 		if (!sessionId && args.action === "start") {
 			sessionId = crypto.randomUUID();
-			// Set in _meta so tracking/scoped-client picks it up
+		}
+
+		// Bridge the resolved sessionId into _meta when the transport didn't
+		// supply one (auto-generated on start, or echoed back via args.sessionId
+		// on continue/reset). Without this, downstream tracking, scoped-client,
+		// and source detection see an empty _meta on every turn after start.
+		if (sessionId && !metaSessionId) {
 			_meta["waniwani/sessionId"] = sessionId;
 		}
 

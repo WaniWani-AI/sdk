@@ -118,21 +118,96 @@ const SOURCE_SESSION_KEYS = [
 	{ key: "openai/session", source: "chatgpt" },
 ] as const;
 
+/**
+ * Client identifiers advertised via MCP `initialize` → `clientInfo.name` that
+ * the SDK maps to a known source. Match is case-insensitive substring on the
+ * advertised name, so this catches "Claude", "Claude Code", "claude-ai", etc.
+ * without having to enumerate every surface.
+ */
+const CLIENT_INFO_NAME_SOURCES: ReadonlyArray<{
+	needle: string;
+	source: string;
+}> = [{ needle: "claude", source: "claude" }];
+
+export type ExtractSourceClientInfo = {
+	name?: string;
+	version?: string;
+};
+
 export function extractSource(
 	meta: Record<string, unknown> | undefined,
+	clientInfo?: ExtractSourceClientInfo,
 ): string | undefined {
-	if (!meta) {
+	if (meta) {
+		const explicit = meta["waniwani/source"];
+		if (typeof explicit === "string" && explicit.length > 0) {
+			return explicit;
+		}
+		for (const { key, source } of SOURCE_SESSION_KEYS) {
+			const value = meta[key];
+			if (typeof value === "string" && value.length > 0) {
+				return source;
+			}
+		}
+	}
+	// Fall back to MCP `initialize` clientInfo.name when no _meta key matches.
+	// Claude surfaces (Code, Desktop, claude.ai connector, Anthropic API MCP
+	// connector) don't expose a namespaced session id in _meta but do advertise
+	// themselves in the handshake. Per-MCP-session clientInfo is captured by the
+	// MCP transport and exposed via server.getClientVersion().
+	const name = clientInfo?.name;
+	if (typeof name === "string" && name.length > 0) {
+		const lower = name.toLowerCase();
+		for (const { needle, source } of CLIENT_INFO_NAME_SOURCES) {
+			if (lower.includes(needle)) {
+				return source;
+			}
+		}
+	}
+	return undefined;
+}
+
+/**
+ * HTTP request headers that identify a known caller when neither `_meta` nor
+ * `clientInfo` carries a source. This is the most robust Claude signal: every
+ * Claude surface sends `User-Agent: Claude-User` and `x-anthropic-client` on
+ * MCP HTTP requests, whereas the MCP transport carries no session id and the
+ * `initialize` `clientInfo` may not be surfaced on stateless deployments.
+ */
+function headerValue(
+	headers: Record<string, unknown>,
+	key: string,
+): string | undefined {
+	// HTTP header names are case-insensitive; the transport may preserve the
+	// original casing, so match the key case-insensitively rather than assuming
+	// it was lowercased.
+	const lowerKey = key.toLowerCase();
+	let raw = headers[key] ?? headers[lowerKey];
+	if (raw === undefined) {
+		for (const headerKey of Object.keys(headers)) {
+			if (headerKey.toLowerCase() === lowerKey) {
+				raw = headers[headerKey];
+				break;
+			}
+		}
+	}
+	const value = Array.isArray(raw) ? raw[0] : raw;
+	return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+export function extractSourceFromHeaders(
+	headers: Record<string, unknown> | undefined,
+): string | undefined {
+	if (!headers) {
 		return undefined;
 	}
-	const explicit = meta["waniwani/source"];
-	if (typeof explicit === "string" && explicit.length > 0) {
-		return explicit;
-	}
-	for (const { key, source } of SOURCE_SESSION_KEYS) {
-		const value = meta[key];
-		if (typeof value === "string" && value.length > 0) {
-			return source;
-		}
+	const userAgent = headerValue(headers, "user-agent");
+	const anthropicClient = headerValue(headers, "x-anthropic-client");
+	if (
+		(userAgent && /claude/i.test(userAgent)) ||
+		(anthropicClient && /claude|anthropic/i.test(anthropicClient))
+	) {
+		return "claude";
 	}
 	return undefined;
 }
