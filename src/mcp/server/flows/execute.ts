@@ -281,13 +281,20 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				const widgetFieldSchema = widgetField
 					? resolveFieldSchema(stateSchema, widgetField)
 					: undefined;
+				const interactive = result.interactive !== false;
 				return {
 					content: {
 						status: "widget",
 						tool: result.tool,
 						...(result.data !== undefined ? { data: result.data } : {}),
-						description: `IMPORTANT: You MUST now call the ${result.tool} tool to display the widget. Do NOT skip this step`,
-						interactive: result.interactive !== false,
+						// Non-interactive widgets are the most-skipped step: the model
+						// sees "display then continue" and jumps straight to continue,
+						// dropping the visible render. Spell out the order and the
+						// failure mode so the display call cannot be shortcut.
+						description: interactive
+							? `IMPORTANT: You MUST now call the ${result.tool} tool to display the widget. Do NOT skip this step`
+							: `IMPORTANT — two ordered steps. STEP 1: call the ${result.tool} tool RIGHT NOW to display this widget to the user. This renders UI the user must see — do NOT skip it and do NOT jump straight to action:"continue". STEP 2: ONLY AFTER ${result.tool} has been called, call this flow again with action:"continue".`,
+						interactive,
 						...(widgetField ? { field: widgetField } : {}),
 						...(widgetFieldSchema ? { fieldSchema: widgetFieldSchema } : {}),
 					},

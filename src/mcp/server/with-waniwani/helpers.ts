@@ -145,12 +145,30 @@ export function buildTrackInput(
 			? ((io.output as UnknownRecord)._meta as UnknownRecord)
 			: undefined;
 	const flowMeta = responseMeta?.[FLOW_META_KEY];
-	const mergedMeta =
+	const baseMeta =
 		flowMeta && meta
 			? { ...meta, [FLOW_META_KEY]: flowMeta }
 			: flowMeta
 				? { [FLOW_META_KEY]: flowMeta }
 				: meta;
+
+	// Correlate to the flow session when the host carried none in `_meta` but the
+	// caller forwarded a `sessionId` argument. On stateless hosts (Claude) widget
+	// tool calls thread the flow session id through the LLM as a tool arg, so
+	// without this their `tool.called` events would land in a sessionless bucket
+	// instead of the originating flow session. This only enriches the tracked
+	// event's meta — it does not touch `extra._meta`, so handler/flow behavior
+	// (e.g. the flow's sessionId-echo logic) is unaffected.
+	const argSessionId =
+		isRecord(io?.input) &&
+		typeof (io.input as UnknownRecord).sessionId === "string" &&
+		((io.input as UnknownRecord).sessionId as string).length > 0
+			? ((io.input as UnknownRecord).sessionId as string)
+			: undefined;
+	const mergedMeta =
+		argSessionId && !extractSessionId(baseMeta ?? undefined)
+			? { ...(baseMeta ?? {}), "waniwani/sessionId": argSessionId }
+			: baseMeta;
 
 	return {
 		event: "tool.called",
@@ -162,7 +180,7 @@ export function buildTrackInput(
 			...(output !== undefined && { output }),
 		},
 		meta: mergedMeta,
-		source: extractSource(meta),
+		source: extractSource(mergedMeta ?? meta, clientInfo),
 		metadata: {
 			...(options.metadata ?? {}),
 			...(clientInfo && { clientInfo }),
@@ -200,6 +218,7 @@ export async function injectWidgetConfig(
 	apiUrl: string,
 	extra?: unknown,
 	onError?: (error: Error) => void,
+	clientInfo?: { name?: string; version?: string },
 ): Promise<void> {
 	if (!isRecord(result)) {
 		return;
@@ -245,7 +264,7 @@ export async function injectWidgetConfig(
 		}
 	}
 
-	const source = extractSource(extractMeta(extra));
+	const source = extractSource(extractMeta(extra), clientInfo);
 	if (source && !waniwaniConfig.source) {
 		waniwaniConfig.source = source;
 	}

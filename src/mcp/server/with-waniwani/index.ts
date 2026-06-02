@@ -5,7 +5,11 @@ import type { FlowGraph } from "../flows/@types.js";
 import { REDACTED_STATE_UPDATE_FIELDS_META_KEY } from "../flows/redacted.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../types";
-import { extractSessionId } from "../utils.js";
+import {
+	extractSessionId,
+	extractSource,
+	extractSourceFromHeaders,
+} from "../utils.js";
 import { WidgetTokenCache } from "../widget-token.js";
 import type { FunnelSyncPayload } from "./funnel-sync.js";
 import { prepareFunnelSyncPayload } from "./funnel-sync.js";
@@ -184,6 +188,16 @@ function createWrappedHandler(
 		// Inject scoped client into extra so createTool/flows can surface it
 		const meta = extractMeta(extra) ?? {};
 
+		const clientInfo = (
+			server as {
+				server?: {
+					getClientVersion?: () =>
+						| { name: string; version: string }
+						| undefined;
+				};
+			}
+		).server?.getClientVersion?.();
+
 		// Bridge transport-level session ID into _meta when the host doesn't
 		// include one directly (e.g. Mcp-Session-Id HTTP header).
 		const existingSessionId = extractSessionId(meta);
@@ -191,6 +205,22 @@ function createWrappedHandler(
 			const transportSid = extractTransportSessionId(extra as UnknownRecord);
 			if (transportSid) {
 				meta["waniwani/sessionId"] = transportSid;
+				(extra as UnknownRecord)._meta = meta;
+			}
+		}
+
+		// Resolve and stamp the caller source into _meta once, so downstream
+		// consumers (flow nodes, nested tool handlers, tracking) can branch on
+		// `waniwani/source` without each re-deriving it from clientInfo/headers.
+		// Hosts like Claude carry no source in _meta and no transport session id;
+		// clientInfo (MCP initialize) and the request headers are the only signals.
+		if (!extractSource(meta) && isRecord(extra)) {
+			const headers = (extra as { requestInfo?: { headers?: unknown } })
+				.requestInfo?.headers as Record<string, unknown> | undefined;
+			const resolvedSource =
+				extractSource(meta, clientInfo) ?? extractSourceFromHeaders(headers);
+			if (resolvedSource) {
+				meta["waniwani/source"] = resolvedSource;
 				(extra as UnknownRecord)._meta = meta;
 			}
 		}
@@ -204,15 +234,6 @@ function createWrappedHandler(
 		}
 
 		const startTime = performance.now();
-		const clientInfo = (
-			server as {
-				server?: {
-					getClientVersion?: () =>
-						| { name: string; version: string }
-						| undefined;
-				};
-			}
-		).server?.getClientVersion?.();
 		try {
 			const result = await originalHandler(input, extra);
 			const durationMs = Math.round(performance.now() - startTime);
@@ -266,6 +287,7 @@ function createWrappedHandler(
 					tracker._config.apiUrl ?? DEFAULT_BASE_URL,
 					extra,
 					opts.onError,
+					clientInfo,
 				);
 				log(`tool "${toolName}" widget config injected`);
 			}

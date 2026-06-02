@@ -705,6 +705,11 @@ describe("compileFlow response contract", () => {
 			tool: "info_panel",
 			interactive: false,
 		});
+		// The display-only instruction must spell out the ordered "render first,
+		// then continue" sequence so the model can't shortcut straight to continue.
+		const description = (parsed as { description?: string }).description ?? "";
+		expect(description).toContain("call the info_panel tool RIGHT NOW");
+		expect(description).toContain('do NOT jump straight to action:"continue"');
 	});
 });
 
@@ -2099,6 +2104,97 @@ describe("auto-generated sessionId for sessionless clients", () => {
 		const id2 = parsePayload(r2).sessionId as string;
 
 		expect(id1).not.toBe(id2);
+	});
+
+	// Regression: WAN-XXX — downstream tracking, scoped-client, and source
+	// detection rely on _meta["waniwani/sessionId"] being present. The flow
+	// handler must bridge the resolved sessionId into _meta on every turn —
+	// not just on `start` — so events from continue/reset calls are correlated.
+	test("bridges auto-generated sessionId into response _meta on start", async () => {
+		const store = new TestFlowStateStore();
+		const flow = buildSimpleFlow(store);
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), noSessionExtra())) as Record<
+			string,
+			unknown
+		>;
+		const sessionId = parsePayload(result).sessionId as string;
+		const meta = result._meta as Record<string, unknown>;
+
+		expect(meta["waniwani/sessionId"]).toBe(sessionId);
+	});
+
+	test("bridges args.sessionId into response _meta on continue", async () => {
+		const store = new TestFlowStateStore();
+		const flow = buildSimpleFlow(store);
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const startResult = (await handler?.(
+			startInput(),
+			noSessionExtra(),
+		)) as Record<string, unknown>;
+		const sessionId = parsePayload(startResult).sessionId as string;
+
+		const continueResult = (await handler?.(
+			{ action: "continue", stateUpdates: { name: "Alice" }, sessionId },
+			noSessionExtra(),
+		)) as Record<string, unknown>;
+		const meta = continueResult._meta as Record<string, unknown>;
+
+		expect(meta["waniwani/sessionId"]).toBe(sessionId);
+	});
+
+	test("bridges args.sessionId into response _meta on reset", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "sessionless_reset_bridge_flow",
+			title: "Sessionless Reset Bridge Flow",
+			description: "Test reset _meta bridging.",
+			state: {
+				name: z.string().describe("Name"),
+				email: z.string().describe("Email"),
+			},
+		})
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addNode("ask_email", ({ interrupt }) =>
+				interrupt({ email: { question: "Email?" } }),
+			)
+			.addEdge(START, "ask_name")
+			.addEdge("ask_name", "ask_email")
+			.addEdge("ask_email", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const startResult = (await handler?.(
+			startInput(),
+			noSessionExtra(),
+		)) as Record<string, unknown>;
+		const sessionId = parsePayload(startResult).sessionId as string;
+
+		await handler?.(
+			{ action: "continue", stateUpdates: { name: "Alice" }, sessionId },
+			noSessionExtra(),
+		);
+
+		const resetResult = (await handler?.(
+			{ action: "reset", stateUpdates: { name: "Bob" }, sessionId },
+			noSessionExtra(),
+		)) as Record<string, unknown>;
+		const meta = resetResult._meta as Record<string, unknown>;
+
+		expect(meta["waniwani/sessionId"]).toBe(sessionId);
 	});
 });
 
