@@ -306,11 +306,20 @@ export function MessageList({
 								<MessageContent>
 									{fileParts.length > 0 && <Attachments files={fileParts} />}
 									{hasTextContent
-										? textParts.map((part, i) => (
-												<MessageResponse key={`${message.id}-${i}`}>
-													{part.type === "text" ? part.text : ""}
-												</MessageResponse>
-											))
+										? textParts.map((part, i) => {
+												const isStreamingPart =
+													isLastAssistant &&
+													status === "streaming" &&
+													i === textParts.length - 1;
+												return (
+													<MessageResponse
+														key={`${message.id}-${i}`}
+														isStreaming={isStreamingPart}
+													>
+														{part.type === "text" ? part.text : ""}
+													</MessageResponse>
+												);
+											})
 										: isLastAssistant && isLoading && <Loader />}
 								</MessageContent>
 							</div>

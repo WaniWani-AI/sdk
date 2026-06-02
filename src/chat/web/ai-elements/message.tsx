@@ -55,24 +55,29 @@ export const MessageContent = ({
 	</div>
 );
 
-export type MessageResponseProps = ComponentProps<typeof Streamdown>;
+export type MessageResponseProps = ComponentProps<typeof Streamdown> & {
+	isStreaming?: boolean;
+};
 
-const streamdownPlugins = { cjk, code };
+const streamdownPluginsFull = { cjk, code };
+const streamdownPluginsStreaming = { cjk };
 const defaultLinkSafety = { enabled: false } as const;
 
 export const MessageResponse = memo(
-	({ className, linkSafety, ...props }: MessageResponseProps) => (
+	({ className, linkSafety, isStreaming, ...props }: MessageResponseProps) => (
 		<Streamdown
 			className={cn(
 				"ww:size-full ww:[&>*:first-child]:mt-0 ww:[&>*:last-child]:mb-0",
 				className,
 			)}
 			linkSafety={linkSafety ?? defaultLinkSafety}
-			plugins={streamdownPlugins}
+			plugins={isStreaming ? streamdownPluginsStreaming : streamdownPluginsFull}
 			{...props}
 		/>
 	),
-	(prevProps, nextProps) => prevProps.children === nextProps.children,
+	(prevProps, nextProps) =>
+		prevProps.children === nextProps.children &&
+		prevProps.isStreaming === nextProps.isStreaming,
 );
 
 MessageResponse.displayName = "MessageResponse";
