@@ -46,9 +46,10 @@ export function WorkingIndicator({
 		<div
 			aria-live="polite"
 			className={cn(
-				"ww:flex ww:w-full ww:items-center ww:gap-2 ww:text-sm ww:text-muted-foreground",
+				"ww:mb-4 ww:flex ww:w-full ww:items-center ww:gap-2 ww:text-sm ww:text-muted-foreground",
 				className,
 			)}
+			style={{ animation: "ww-fade-in 0.2s ease-out" }}
 			{...props}
 		>
 			<ZapIcon className="ww:size-4 ww:shrink-0" />

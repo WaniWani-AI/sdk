@@ -223,6 +223,7 @@ export function Tool({
 			<div
 				className={cn("ww:mb-4 ww:w-full", className)}
 				data-state={open ? "open" : "closed"}
+				style={{ animation: "ww-fade-in 0.2s ease-out" }}
 				{...props}
 			>
 				{children}
@@ -259,11 +260,13 @@ export function ToolHeader({
 			{...props}
 		>
 			<BracesIcon className="ww:size-4 ww:shrink-0" />
-			{isRunning ? (
-				<Shimmer duration={1.6}>{label}</Shimmer>
-			) : (
-				<span className="ww:truncate">{label}</span>
-			)}
+			<span
+				key={isRunning ? "running" : "done"}
+				className="ww:truncate"
+				style={{ animation: "ww-fade-in 0.2s ease-out" }}
+			>
+				{isRunning ? <Shimmer duration={1.6}>{label}</Shimmer> : label}
+			</span>
 			<ChevronDownIcon
 				className={cn(
 					"ww:size-4 ww:shrink-0 ww:transition-transform ww:duration-200",
@@ -298,14 +301,17 @@ export function ToolIndicator({
 				"ww:mb-4 ww:flex ww:items-center ww:gap-2 ww:text-sm ww:text-muted-foreground",
 				className,
 			)}
+			style={{ animation: "ww-fade-in 0.2s ease-out" }}
 			{...props}
 		>
 			<BracesIcon className="ww:size-4 ww:shrink-0" />
-			{isRunning ? (
-				<Shimmer duration={1.6}>{label}</Shimmer>
-			) : (
-				<span className="ww:truncate">{label}</span>
-			)}
+			<span
+				key={isRunning ? "running" : "done"}
+				className="ww:truncate"
+				style={{ animation: "ww-fade-in 0.2s ease-out" }}
+			>
+				{isRunning ? <Shimmer duration={1.6}>{label}</Shimmer> : label}
+			</span>
 		</div>
 	);
 }

@@ -139,6 +139,7 @@ export const Reasoning = memo(
 				<div
 					className={cn("ww:mb-4 ww:flex ww:flex-col ww:gap-2", className)}
 					data-state={isOpen ? "open" : "closed"}
+					style={{ animation: "ww-fade-in 0.2s ease-out" }}
 					{...props}
 				>
 					{children}
@@ -197,7 +198,12 @@ export const ReasoningTrigger = memo(
 				{children ?? (
 					<>
 						<BrainIcon className="ww:size-4 ww:shrink-0" />
-						{getThinkingMessage(isStreaming, duration)}
+						<span
+							key={isStreaming ? "streaming" : `done-${duration ?? "?"}`}
+							style={{ animation: "ww-fade-in 0.2s ease-out" }}
+						>
+							{getThinkingMessage(isStreaming, duration)}
+						</span>
 						<ChevronDownIcon
 							className={cn(
 								"ww:size-4 ww:shrink-0 ww:transition-transform ww:duration-200",
