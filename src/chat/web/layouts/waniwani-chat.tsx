@@ -9,6 +9,7 @@ import {
 	loadCachedConfig,
 	saveCachedConfig,
 } from "../embed/remote-config";
+import type { Locale, MessageOverrides } from "../i18n";
 import { ChatEmbed } from "./chat-embed";
 
 /**
@@ -65,6 +66,17 @@ export interface WaniwaniChatOverrides {
 	 * String overrides the default wording; `false` hides it.
 	 */
 	disclaimer?: string | false;
+	/**
+	 * UI language for built-in labels. One of `"en"`, `"fr"`, `"es"`.
+	 * When omitted, the widget detects the locale from `<html lang>` /
+	 * `navigator.language` and falls back to English.
+	 */
+	locale?: Locale;
+	/**
+	 * Per-key overrides on top of the resolved locale catalog. Lets you
+	 * tweak individual built-in strings without contributing a full locale.
+	 */
+	messages?: MessageOverrides;
 }
 
 /**
@@ -144,6 +156,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				showToolCalls: overrides?.showToolCalls,
 				appearance: overrides?.appearance,
 				disclaimer: overrides?.disclaimer,
+				locale: overrides?.locale,
 			}),
 			[
 				token,
@@ -159,6 +172,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				overrides?.showToolCalls,
 				overrides?.appearance,
 				overrides?.disclaimer,
+				overrides?.locale,
 			],
 		);
 
@@ -243,6 +257,8 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				showToolCalls={config.showToolCalls}
 				disclaimer={config.disclaimer}
 				allowAttachments={overrides?.allowAttachments}
+				locale={config.locale}
+				messages={overrides?.messages}
 				className={className}
 				initializing={!ready}
 			/>

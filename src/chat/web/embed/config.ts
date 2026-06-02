@@ -3,6 +3,7 @@
 // ============================================================================
 
 import type { ChatTheme } from "../@types";
+import type { Locale } from "../i18n";
 
 /**
  * Built-in theme presets. `auto` follows the host's `prefers-color-scheme`
@@ -95,6 +96,13 @@ export interface EmbedConfig {
 	 * additionally pass `variables` to tweak individual colours.
 	 */
 	appearance?: ChatAppearance;
+	/**
+	 * UI language for built-in labels (placeholders, status text, buttons).
+	 * One of `"en"`, `"fr"`, `"es"`. When omitted, the widget detects the
+	 * locale from `<html lang>` / `navigator.language` and falls back to
+	 * English. Surfaced as `data-locale` on the embed script tag.
+	 */
+	locale?: Locale;
 }
 
 // ---------------------------------------------------------------------------
@@ -228,6 +236,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const themeRaw = str("data-theme");
 	if (themeRaw === "light" || themeRaw === "dark" || themeRaw === "auto") {
 		config.appearance = { theme: themeRaw };
+	}
+
+	const localeRaw = str("data-locale");
+	if (localeRaw === "en" || localeRaw === "fr" || localeRaw === "es") {
+		config.locale = localeRaw;
 	}
 
 	const disclaimerRaw = str("data-disclaimer");

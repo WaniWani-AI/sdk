@@ -27,6 +27,7 @@ import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
+import { I18nProvider, useTranslation } from "../i18n";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
@@ -50,13 +51,25 @@ import { Button } from "../ui/button";
  */
 export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 	function ChatEmbed(props, ref) {
+		const { locale, messages } = props;
+		return (
+			<I18nProvider locale={locale} messages={messages}>
+				<ChatEmbedInner {...props} ref={ref} />
+			</I18nProvider>
+		);
+	},
+);
+
+const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
+	function ChatEmbedInner(props, ref) {
+		const { t } = useTranslation();
 		const {
 			appearance,
 			className,
 			allowAttachments = false,
 			welcomeMessage,
 			welcome,
-			placeholder = "Ask me anything...",
+			placeholder = t.promptInput.placeholder,
 			triggerEvent = "triggerDemoRequest",
 			api,
 			mcp,
@@ -471,14 +484,6 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 								</PromptInput>
 								<div className="ww:pt-2 ww:pb-1 ww:flex ww:justify-center ww:items-center ww:gap-1.5">
 									<PoweredBy />
-									{disclaimer !== false && (
-										<span
-											aria-hidden
-											className="ww:text-[11px] ww:text-muted-foreground ww:opacity-70"
-										>
-											·
-										</span>
-									)}
 									<AiDisclaimer text={disclaimer} />
 								</div>
 							</div>

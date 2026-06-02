@@ -19,6 +19,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
 import { Button } from "../ui/button";
 import { Shimmer } from "./shimmer";
@@ -79,6 +80,7 @@ interface CopyButtonProps {
 
 /** Ghost button that copies `text` to clipboard, showing "Copied" for 2s. */
 function CopyButton({ text, className }: CopyButtonProps) {
+	const { t } = useTranslation();
 	const [copied, setCopied] = useState(false);
 	const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -120,12 +122,12 @@ function CopyButton({ text, className }: CopyButtonProps) {
 			{copied ? (
 				<>
 					<CheckIcon className="ww:size-3.5" />
-					<span>Copied</span>
+					<span>{t.tool.copied}</span>
 				</>
 			) : (
 				<>
 					<ClipboardCopyIcon className="ww:size-3.5" />
-					<span>Copy</span>
+					<span>{t.tool.copy}</span>
 				</>
 			)}
 		</Button>
@@ -401,6 +403,7 @@ export function ToolInput({
 	debug,
 	...props
 }: ToolInputProps) {
+	const { t } = useTranslation();
 	const filtered = useMemo(() => {
 		if (
 			!debug &&
@@ -417,7 +420,7 @@ export function ToolInput({
 	return (
 		<CollapsibleJSON
 			data={filtered}
-			label="Request"
+			label={t.tool.request}
 			className={className}
 			{...props}
 		/>
@@ -570,6 +573,7 @@ export function ToolOutput({
 	debug,
 	...props
 }: ToolOutputProps) {
+	const { t } = useTranslation();
 	const filtered = useMemo(() => {
 		if (
 			!debug &&
@@ -591,7 +595,7 @@ export function ToolOutput({
 		return (
 			<div className={cn("ww:space-y-2", className)} {...props}>
 				<h4 className="ww:text-xs ww:font-medium ww:uppercase ww:tracking-wide ww:text-muted-foreground">
-					Error
+					{t.tool.error}
 				</h4>
 				<div className="ww:rounded-lg ww:bg-destructive/10 ww:p-3 ww:text-xs ww:text-destructive">
 					{errorText}
@@ -603,7 +607,7 @@ export function ToolOutput({
 	return (
 		<CollapsibleJSON
 			data={filtered}
-			label="Response"
+			label={t.tool.response}
 			className={className}
 			{...props}
 		/>

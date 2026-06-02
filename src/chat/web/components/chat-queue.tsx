@@ -11,6 +11,7 @@ import {
 	QueueItemIndicator,
 } from "../ai-elements/queue";
 import type { QueuedMessage } from "../hooks/use-chat-engine";
+import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
 
 interface ChatQueueItemProps {
@@ -19,6 +20,7 @@ interface ChatQueueItemProps {
 }
 
 const ChatQueueItem = memo(({ message, onRemove }: ChatQueueItemProps) => {
+	const { t } = useTranslation();
 	const handleRemove = useCallback(
 		() => onRemove(message.id),
 		[onRemove, message.id],
@@ -27,9 +29,14 @@ const ChatQueueItem = memo(({ message, onRemove }: ChatQueueItemProps) => {
 	return (
 		<QueueItem>
 			<QueueItemIndicator />
-			<QueueItemContent>{message.text || "(attachment)"}</QueueItemContent>
+			<QueueItemContent>
+				{message.text || t.chatQueue.attachmentFallback}
+			</QueueItemContent>
 			<QueueItemActions>
-				<QueueItemAction aria-label="Remove from queue" onClick={handleRemove}>
+				<QueueItemAction
+					aria-label={t.chatQueue.removeFromQueue}
+					onClick={handleRemove}
+				>
 					<XIcon className="ww:size-3" />
 				</QueueItemAction>
 			</QueueItemActions>
@@ -50,6 +57,7 @@ export function ChatQueue({
 	onRemove,
 	className,
 }: ChatQueueProps) {
+	const { t } = useTranslation();
 	if (queuedMessages.length === 0) {
 		return null;
 	}
@@ -57,7 +65,7 @@ export function ChatQueue({
 	return (
 		<Queue className={cn("ww:border-t ww:border-border", className)}>
 			<div className="ww:text-[11px] ww:font-medium ww:text-muted-foreground ww:px-2">
-				{queuedMessages.length} queued
+				{t.chatQueue.queued(queuedMessages.length)}
 			</div>
 			<ul>
 				{queuedMessages.map((msg) => (

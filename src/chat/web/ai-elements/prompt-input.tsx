@@ -27,6 +27,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
 import { Button } from "../ui/button";
 
@@ -112,6 +113,7 @@ export const PromptInput = ({
 	children,
 	...props
 }: PromptInputProps) => {
+	const { t } = useTranslation();
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const formRef = useRef<HTMLFormElement | null>(null);
 	const [items, setItems] = useState<(FileUIPart & { id: string })[]>([]);
@@ -274,12 +276,12 @@ export const PromptInput = ({
 		<LocalAttachmentsContext.Provider value={attachmentsCtx}>
 			<input
 				accept={accept}
-				aria-label="Upload files"
+				aria-label={t.promptInput.uploadFiles}
 				className="ww:hidden"
 				multiple={multiple}
 				onChange={handleChange}
 				ref={inputRef}
-				title="Upload files"
+				title={t.promptInput.uploadFiles}
 				type="file"
 			/>
 			<form
@@ -359,11 +361,13 @@ export const PromptInputTextarea = ({
 	onChange,
 	onKeyDown,
 	className,
-	placeholder = "What would you like to know?",
+	placeholder,
 	...props
 }: PromptInputTextareaProps) => {
+	const { t } = useTranslation();
 	const attachments = usePromptInputAttachments();
 	const [isComposing, setIsComposing] = useState(false);
+	const resolvedPlaceholder = placeholder ?? t.promptInput.placeholder;
 
 	const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = useCallback(
 		(e) => {
@@ -445,7 +449,7 @@ export const PromptInputTextarea = ({
 			onCompositionStart={() => setIsComposing(true)}
 			onKeyDown={handleKeyDown}
 			onPaste={handlePaste}
-			placeholder={placeholder}
+			placeholder={resolvedPlaceholder}
 			onChange={onChange}
 			{...props}
 		/>
@@ -469,6 +473,7 @@ export const PromptInputSubmit = ({
 	children,
 	...props
 }: PromptInputSubmitProps) => {
+	const { t } = useTranslation();
 	const isGenerating = status === "submitted" || status === "streaming";
 
 	let Icon = <ArrowUpIcon className="ww:size-4" />;
@@ -492,7 +497,7 @@ export const PromptInputSubmit = ({
 
 	return (
 		<Button
-			aria-label={isGenerating ? "Stop" : "Submit"}
+			aria-label={isGenerating ? t.promptInput.stop : t.promptInput.submit}
 			className={cn(
 				"ww:bg-foreground ww:text-background ww:hover:bg-foreground ww:rounded-full",
 				className,
@@ -519,6 +524,7 @@ export const PromptInputAddAttachments = ({
 	children,
 	...props
 }: PromptInputAddAttachmentsProps) => {
+	const { t } = useTranslation();
 	const attachments = usePromptInputAttachments();
 	const hasFiles = attachments.files.length > 0;
 
@@ -530,7 +536,7 @@ export const PromptInputAddAttachments = ({
 				size="icon-sm"
 				type="button"
 				variant="ghost"
-				aria-label="Remove all attachments"
+				aria-label={t.promptInput.removeAttachments}
 				{...props}
 			>
 				<span className="ww:flex ww:size-5 ww:items-center ww:justify-center ww:rounded-full ww:bg-primary ww:text-[10px] ww:font-medium ww:text-primary-foreground ww:transition-opacity ww:group-hover:opacity-0">

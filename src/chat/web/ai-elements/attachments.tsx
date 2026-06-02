@@ -3,6 +3,7 @@
 import type { FileUIPart } from "ai";
 import { FileIcon } from "lucide-react";
 import type { HTMLAttributes } from "react";
+import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
 
 // ============================================================================
@@ -39,13 +40,14 @@ export const Attachments = ({
 // ============================================================================
 
 function AttachmentItem({ file }: { file: FileUIPart }) {
+	const { t } = useTranslation();
 	const isImage = file.mediaType?.startsWith("image/");
 
 	if (isImage && file.url) {
 		return (
 			<img
 				src={file.url}
-				alt={file.filename ?? "attachment"}
+				alt={file.filename ?? t.attachments.attachmentFallback}
 				className="ww:h-16 ww:max-w-32 ww:rounded ww:object-cover"
 			/>
 		);
@@ -54,7 +56,9 @@ function AttachmentItem({ file }: { file: FileUIPart }) {
 	return (
 		<span className="ww:inline-flex ww:items-center ww:gap-1.5 ww:rounded ww:bg-background/20 ww:px-2 ww:py-1 ww:text-xs">
 			<FileIcon className="ww:size-3 ww:shrink-0" />
-			<span className="ww:max-w-24 ww:truncate">{file.filename ?? "file"}</span>
+			<span className="ww:max-w-24 ww:truncate">
+				{file.filename ?? t.attachments.fileFallback}
+			</span>
 		</span>
 	);
 }

@@ -3,8 +3,11 @@
 // ============================================================================
 
 import type { ChatAppearance } from "./embed/config";
+import type { MessageOverrides } from "./i18n";
 
 export type { ChatAppearance, ThemePreset } from "./embed/config";
+export type { Locale } from "./i18n";
+export type { MessageOverrides };
 
 export interface ChatTheme {
 	/** Primary brand color (bubble, send button, user messages) */
@@ -172,6 +175,22 @@ export interface ChatBaseProps {
 	 * Pass a string to override the wording, or `false` to hide it entirely.
 	 */
 	disclaimer?: string | false;
+	/**
+	 * UI language for built-in labels (buttons, placeholders, status text).
+	 * Supports `"en"`, `"fr"`, `"es"`. When omitted, the widget detects the
+	 * locale from `<html lang>` and `navigator.language(s)`, falling back
+	 * to English.
+	 */
+	locale?: string;
+	/**
+	 * Per-key overrides on top of the resolved locale catalog. Use this to
+	 * tweak individual built-in strings without contributing a new locale.
+	 *
+	 * ```tsx
+	 * messages={{ promptInput: { placeholder: "Ask the agent…" } }}
+	 * ```
+	 */
+	messages?: MessageOverrides;
 }
 
 // ============================================================================

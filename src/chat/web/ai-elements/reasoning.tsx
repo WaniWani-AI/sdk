@@ -13,6 +13,7 @@ import {
 	useState,
 } from "react";
 import { Streamdown } from "streamdown";
+import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
 import { Shimmer } from "./shimmer";
 
@@ -154,32 +155,30 @@ export type ReasoningTriggerProps = HTMLAttributes<HTMLButtonElement> & {
 	getThinkingMessage?: (isStreaming: boolean, duration?: number) => ReactNode;
 };
 
-const defaultGetThinkingMessage = (
-	isStreaming: boolean,
-	duration?: number,
-): ReactNode => {
-	if (isStreaming || duration === 0) {
-		return <Shimmer duration={1.6}>Thinking…</Shimmer>;
-	}
-	if (duration === undefined) {
-		return <span>Thought for a few seconds</span>;
-	}
-	return (
-		<span>
-			Thought for {duration} second{duration === 1 ? "" : "s"}
-		</span>
-	);
-};
-
 export const ReasoningTrigger = memo(
 	({
 		className,
 		children,
-		getThinkingMessage = defaultGetThinkingMessage,
+		getThinkingMessage,
 		onClick,
 		...props
 	}: ReasoningTriggerProps) => {
+		const { t } = useTranslation();
 		const { isStreaming, isOpen, duration, setIsOpen } = useReasoning();
+		const defaultGetThinkingMessage = (
+			streaming: boolean,
+			dur?: number,
+		): ReactNode => {
+			if (streaming || dur === 0) {
+				return <Shimmer duration={1.6}>{t.reasoning.thinking}</Shimmer>;
+			}
+			if (dur === undefined) {
+				return <span>{t.reasoning.thoughtBrief}</span>;
+			}
+			return <span>{t.reasoning.thoughtForSeconds(dur)}</span>;
+		};
+		const resolvedGetThinkingMessage =
+			getThinkingMessage ?? defaultGetThinkingMessage;
 
 		return (
 			<button
@@ -198,7 +197,7 @@ export const ReasoningTrigger = memo(
 				{children ?? (
 					<>
 						<BrainIcon className="ww:size-4 ww:shrink-0" />
-						{getThinkingMessage(isStreaming, duration)}
+						{resolvedGetThinkingMessage(isStreaming, duration)}
 						<ChevronDownIcon
 							className={cn(
 								"ww:size-4 ww:shrink-0 ww:transition-transform ww:duration-200",

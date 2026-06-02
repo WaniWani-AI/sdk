@@ -77,6 +77,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 				}
 				enableThreadHistory={config.enableThreadHistory}
 				showToolCalls={config.showToolCalls}
+				locale={config.locale}
 				initializing={!ready}
 			/>
 		);
