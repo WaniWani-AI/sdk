@@ -427,7 +427,6 @@ export function useChatEngine(props: ChatBaseProps) {
 	const { messages, sendMessage, setMessages, status } = useChat({
 		messages: props.initialMessages,
 		transport: transportRef.current,
-		experimental_throttle: 50,
 		onFinish({ message }) {
 			onResponseReceived?.();
 			if (pendingWaitRef.current) {

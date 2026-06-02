@@ -6,6 +6,7 @@ import type { UIMessage } from "ai";
 import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
 import { memo } from "react";
 import { Streamdown } from "streamdown";
+import { useSmoothStream } from "../hooks/use-smooth-stream";
 import { cn } from "../lib/utils";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
@@ -63,8 +64,18 @@ const streamdownPluginsFull = { cjk, code };
 const streamdownPluginsStreaming = { cjk };
 const defaultLinkSafety = { enabled: false } as const;
 
-export const MessageResponse = memo(
-	({ className, linkSafety, isStreaming, ...props }: MessageResponseProps) => (
+function MessageResponseImpl({
+	className,
+	linkSafety,
+	isStreaming,
+	children,
+	...props
+}: MessageResponseProps) {
+	const fullText = typeof children === "string" ? children : "";
+	const smoothed = useSmoothStream(fullText, Boolean(isStreaming));
+	const rendered = typeof children === "string" ? smoothed : children;
+
+	return (
 		<Streamdown
 			className={cn(
 				"ww:size-full ww:[&>*:first-child]:mt-0 ww:[&>*:last-child]:mb-0",
@@ -73,8 +84,14 @@ export const MessageResponse = memo(
 			linkSafety={linkSafety ?? defaultLinkSafety}
 			plugins={isStreaming ? streamdownPluginsStreaming : streamdownPluginsFull}
 			{...props}
-		/>
-	),
+		>
+			{rendered}
+		</Streamdown>
+	);
+}
+
+export const MessageResponse = memo(
+	MessageResponseImpl,
 	(prevProps, nextProps) =>
 		prevProps.children === nextProps.children &&
 		prevProps.isStreaming === nextProps.isStreaming,
