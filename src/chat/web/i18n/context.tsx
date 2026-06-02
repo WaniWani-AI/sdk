@@ -62,14 +62,16 @@ export function I18nProvider({
 	locale,
 	messages,
 }: I18nProviderProps) {
-	const [resolved, setResolved] = useState<Locale>(() => {
-		if (typeof window === "undefined") {
-			return locale && isLocaleString(locale)
-				? (locale as Locale)
-				: DEFAULT_LOCALE;
-		}
-		return detectLocale(locale);
-	});
+	// Initial state must be deterministic across server and client to avoid
+	// hydration mismatches — calling `detectLocale()` (which reads
+	// `navigator.language`) during the initializer would diverge from the
+	// server's render. We pick the explicit prop or the default at mount,
+	// then resolve the real locale in the effect below once the tree has
+	// hydrated. Costs one re-render and a brief flash of English on
+	// auto-detected loads; the alternative is a hard hydration error.
+	const initial: Locale =
+		locale && isLocaleString(locale) ? (locale as Locale) : DEFAULT_LOCALE;
+	const [resolved, setResolved] = useState<Locale>(initial);
 
 	useEffect(() => {
 		setResolved(detectLocale(locale));
