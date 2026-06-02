@@ -13,9 +13,9 @@ export const fr: Messages = {
 	},
 	reasoning: {
 		thinking: "Réflexion…",
-		thoughtBrief: "Réflexion de quelques secondes",
+		thoughtBrief: "Réflexion pendant quelques secondes",
 		thoughtForSeconds: (count: number) =>
-			`Réflexion de ${count} seconde${count === 1 ? "" : "s"}`,
+			`Réflexion pendant ${count} seconde${count === 1 ? "" : "s"}`,
 	},
 	tool: {
 		copy: "Copier",
@@ -39,7 +39,7 @@ export const fr: Messages = {
 	chatQueue: {
 		attachmentFallback: "(pièce jointe)",
 		removeFromQueue: "Retirer de la file",
-		queued: (count: number) => `${count} en file${count === 1 ? "" : ""}`,
+		queued: (count: number) => `${count} en attente`,
 	},
 	poweredBy: {
 		label: "Agent IA propulsé par",
