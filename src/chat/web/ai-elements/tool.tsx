@@ -21,6 +21,7 @@ import {
 } from "react";
 import { cn } from "../lib/utils";
 import { Button } from "../ui/button";
+import { Shimmer } from "./shimmer";
 
 /**
  * Produces an abbreviated single-line JSON preview for collapsed display.
@@ -235,7 +236,7 @@ export type ToolHeaderProps = HTMLAttributes<HTMLButtonElement> & {
 	state: ToolUIPart["state"];
 };
 
-/** Clickable header that toggles the tool accordion. Shows a `{≡}` icon, title, and chevron. */
+/** Clickable header that toggles the tool accordion. Matches the Reasoning trigger style: muted text with a shimmering label while the tool is running. */
 export function ToolHeader({
 	className,
 	title,
@@ -244,28 +245,28 @@ export function ToolHeader({
 }: ToolHeaderProps) {
 	const { open, toggle } = useContext(ToolOpenContext);
 	const isRunning = state === "input-available" || state === "input-streaming";
+	const label = title ?? "";
 
 	return (
 		<button
 			type="button"
 			onClick={toggle}
 			className={cn(
-				"ww:flex ww:w-full ww:items-center ww:justify-between ww:gap-3 ww:py-1.5",
+				"ww:flex ww:w-full ww:items-center ww:gap-2 ww:text-sm ww:text-muted-foreground ww:transition-colors ww:hover:text-foreground",
 				className,
 			)}
 			aria-expanded={open}
 			{...props}
 		>
-			<div className="ww:flex ww:min-w-0 ww:items-center ww:gap-2">
-				<BracesIcon className="ww:size-4 ww:shrink-0 ww:text-muted-foreground" />
-				<span className="ww:truncate ww:text-sm ww:font-medium">{title}</span>
-				{isRunning && (
-					<span className="ww:size-2 ww:shrink-0 ww:rounded-full ww:bg-primary ww:animate-pulse" />
-				)}
-			</div>
+			<BracesIcon className="ww:size-4 ww:shrink-0" />
+			{isRunning ? (
+				<Shimmer duration={1.6}>{label}</Shimmer>
+			) : (
+				<span className="ww:truncate">{label}</span>
+			)}
 			<ChevronDownIcon
 				className={cn(
-					"ww:size-4 ww:shrink-0 ww:text-muted-foreground ww:transition-transform ww:duration-200",
+					"ww:size-4 ww:shrink-0 ww:transition-transform ww:duration-200",
 					open && "ww:rotate-180",
 				)}
 			/>
@@ -280,10 +281,8 @@ export type ToolIndicatorProps = HTMLAttributes<HTMLDivElement> & {
 
 /**
  * Compact, non-interactive replacement for {@link ToolHeader} +
- * {@link ToolContent}. Shows just the tool title in muted text, with a
- * pulsing dot while the tool is still running — enough for the user to
- * know the agent is doing something without implying there are
- * request/response details to expand.
+ * {@link ToolContent}. Matches the Reasoning trigger style: muted text
+ * with a shimmering label while the tool is running.
  */
 export function ToolIndicator({
 	className,
@@ -292,17 +291,20 @@ export function ToolIndicator({
 	...props
 }: ToolIndicatorProps) {
 	const isRunning = state === "input-available" || state === "input-streaming";
+	const label = title ?? "";
 	return (
 		<div
 			className={cn(
-				"ww:mb-4 ww:flex ww:items-center ww:gap-2 ww:py-1.5 ww:text-sm ww:text-muted-foreground ww:italic",
+				"ww:mb-4 ww:flex ww:items-center ww:gap-2 ww:text-sm ww:text-muted-foreground",
 				className,
 			)}
 			{...props}
 		>
-			<span className="ww:truncate">{title}</span>
-			{isRunning && (
-				<span className="ww:size-2 ww:shrink-0 ww:rounded-full ww:bg-primary ww:animate-pulse" />
+			<BracesIcon className="ww:size-4 ww:shrink-0" />
+			{isRunning ? (
+				<Shimmer duration={1.6}>{label}</Shimmer>
+			) : (
+				<span className="ww:truncate">{label}</span>
 			)}
 		</div>
 	);
