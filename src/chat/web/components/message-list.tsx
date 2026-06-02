@@ -10,7 +10,11 @@ import {
 	MessageContent,
 	MessageResponse,
 } from "../ai-elements/message";
-import { Reasoning } from "../ai-elements/reasoning";
+import {
+	Reasoning,
+	ReasoningContent,
+	ReasoningTrigger,
+} from "../ai-elements/reasoning";
 import {
 	derivePhase,
 	ThinkingIndicator,
@@ -173,8 +177,11 @@ export function MessageList({
 							reasoningParts.map((part, i) => (
 								<Reasoning
 									key={`reasoning-${message.id}-${i}`}
-									text={part.text}
-								/>
+									isStreaming={part.state === "streaming"}
+								>
+									<ReasoningTrigger />
+									<ReasoningContent>{part.text}</ReasoningContent>
+								</Reasoning>
 							))}
 						{toolParts.map((part) => {
 							const output = "output" in part ? part.output : undefined;

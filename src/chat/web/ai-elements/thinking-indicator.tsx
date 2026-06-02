@@ -3,6 +3,7 @@
 import type { ChatStatus, ToolUIPart, UIMessage } from "ai";
 import type { HTMLAttributes } from "react";
 import { cn } from "../lib/utils";
+import { Shimmer } from "./shimmer";
 
 export type ThinkingPhase = { kind: "thinking" } | null;
 
@@ -98,22 +99,9 @@ export function ThinkingIndicator({
 			className={cn("ww:flex ww:items-center ww:py-1", className)}
 			{...props}
 		>
-			<span
-				data-waniwani-thinking
-				className="ww:text-sm ww:italic"
-				style={{
-					backgroundImage:
-						"linear-gradient(90deg, var(--ww-color-muted-foreground) 0%, var(--ww-color-muted-foreground) 35%, var(--ww-color-foreground) 50%, var(--ww-color-muted-foreground) 65%, var(--ww-color-muted-foreground) 100%)",
-					backgroundSize: "200% 100%",
-					WebkitBackgroundClip: "text",
-					backgroundClip: "text",
-					color: "transparent",
-					animation:
-						"ww-shimmer 1.8s linear infinite, ww-fade-in 0.2s ease-out",
-				}}
-			>
+			<Shimmer className="ww:text-sm" duration={1.6}>
 				Thinking…
-			</span>
+			</Shimmer>
 		</div>
 	);
 }

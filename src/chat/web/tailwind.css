@@ -44,7 +44,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-	[data-waniwani-chat] [data-waniwani-thinking] {
+	[data-waniwani-chat] [data-waniwani-shimmer] {
 		animation: none !important;
 		color: var(--ww-color-muted-foreground) !important;
 	}
