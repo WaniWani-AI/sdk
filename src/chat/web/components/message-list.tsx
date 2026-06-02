@@ -16,10 +16,6 @@ import {
 	ReasoningTrigger,
 } from "../ai-elements/reasoning";
 import {
-	derivePhase,
-	ThinkingIndicator,
-} from "../ai-elements/thinking-indicator";
-import {
 	resolveWidgetAutoHeight,
 	resolveWidgetResourceUri,
 	Tool,
@@ -126,7 +122,6 @@ export function MessageList({
 	const hasMessages = messages.length > 0;
 
 	const isFullscreenActive = fullscreenToolCallId != null;
-	const phase = isFullscreenActive ? null : derivePhase(messages, status);
 
 	return (
 		<>
@@ -335,11 +330,6 @@ export function MessageList({
 					</Message>
 				);
 			})}
-			{phase && (
-				<Message from="assistant">
-					<ThinkingIndicator phase={phase} />
-				</Message>
-			)}
 		</>
 	);
 }
