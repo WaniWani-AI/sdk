@@ -62,7 +62,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 
 const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 	function ChatEmbedInner(props, ref) {
-		const { t } = useTranslation();
+		const { t, ready: localeReady } = useTranslation();
 		const {
 			appearance,
 			className,
@@ -342,19 +342,25 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		const showHeader =
 			!hideHeader && Boolean(title || enableThreadHistory || headerActions);
 
+		// Hold opacity 0 until both the remote-config (caller-driven
+		// `initializing`) and the i18n auto-detect effect have settled.
+		// Prevents a one-frame flash of English chrome before the catalog
+		// swaps to the visitor's locale on SSR pages.
+		const masked = initializing || !localeReady;
+
 		return (
 			<div
 				ref={rootRef}
 				style={{
 					...cssVars,
 					maxHeight: "inherit",
-					opacity: initializing ? 0 : 1,
+					opacity: masked ? 0 : 1,
 					transition: "opacity 220ms ease-out",
 				}}
 				data-waniwani-chat=""
 				data-waniwani-layout="embed"
 				data-color-scheme={preset === "auto" ? "auto" : undefined}
-				{...(initializing ? { "data-waniwani-initializing": "" } : {})}
+				{...(masked ? { "data-waniwani-initializing": "" } : {})}
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className={cn(
 					"ww:relative ww:w-full ww:h-full ww:flex ww:flex-col ww:bg-background ww:text-foreground ww:font-[family-name:var(--ww-font)] ww:overflow-hidden",

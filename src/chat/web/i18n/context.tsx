@@ -24,6 +24,15 @@ export type MessageOverrides = DeepPartial<Messages>;
 interface I18nContextValue {
 	locale: Locale;
 	t: Messages;
+	/**
+	 * `true` once the locale has been resolved against the runtime
+	 * (`navigator.language` / `<html lang>`). Always `true` when an
+	 * explicit `locale` was passed to the provider, or on the no-provider
+	 * fallback path. Consumers can mask their UI (opacity 0) while this is
+	 * `false` to avoid showing a flash of the default-locale catalog before
+	 * the post-mount detection effect runs.
+	 */
+	ready: boolean;
 }
 
 const I18nContext = createContext<I18nContextValue | null>(null);
@@ -67,14 +76,17 @@ export function I18nProvider({
 	// `navigator.language`) during the initializer would diverge from the
 	// server's render. We pick the explicit prop or the default at mount,
 	// then resolve the real locale in the effect below once the tree has
-	// hydrated. Costs one re-render and a brief flash of English on
-	// auto-detected loads; the alternative is a hard hydration error.
-	const initial: Locale =
-		locale && isLocaleString(locale) ? (locale as Locale) : DEFAULT_LOCALE;
+	// hydrated. `ready` lets consumers (ChatEmbed) mask their UI during
+	// the detection window so users don't see a flash of English chrome
+	// before the catalog swaps.
+	const explicit = Boolean(locale && isLocaleString(locale));
+	const initial: Locale = explicit ? (locale as Locale) : DEFAULT_LOCALE;
 	const [resolved, setResolved] = useState<Locale>(initial);
+	const [ready, setReady] = useState<boolean>(explicit);
 
 	useEffect(() => {
 		setResolved(detectLocale(locale));
+		setReady(true);
 	}, [locale]);
 
 	const value = useMemo<I18nContextValue>(() => {
@@ -82,8 +94,9 @@ export function I18nProvider({
 		return {
 			locale: resolved,
 			t: mergeMessages(catalog, messages),
+			ready,
 		};
-	}, [resolved, messages]);
+	}, [resolved, messages, ready]);
 
 	return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
@@ -103,5 +116,5 @@ export function useTranslation(): I18nContextValue {
 	if (ctx) {
 		return ctx;
 	}
-	return { locale: DEFAULT_LOCALE, t: en };
+	return { locale: DEFAULT_LOCALE, t: en, ready: true };
 }
