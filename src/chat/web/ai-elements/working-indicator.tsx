@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChatStatus, UIMessage } from "ai";
-import { SparklesIcon } from "lucide-react";
+import { ZapIcon } from "lucide-react";
 import type { HTMLAttributes } from "react";
 import { cn } from "../lib/utils";
 import { Shimmer } from "./shimmer";
@@ -51,8 +51,8 @@ export function WorkingIndicator({
 			)}
 			{...props}
 		>
-			<SparklesIcon className="ww:size-4 ww:shrink-0" />
-			<Shimmer duration={1.6}>Working…</Shimmer>
+			<ZapIcon className="ww:size-4 ww:shrink-0" />
+			<Shimmer duration={1.6}>On it…</Shimmer>
 		</div>
 	);
 }
