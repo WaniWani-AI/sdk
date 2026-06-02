@@ -34,6 +34,22 @@
 	}
 }
 
+@keyframes ww-shimmer {
+	from {
+		background-position: 200% 0;
+	}
+	to {
+		background-position: -200% 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-waniwani-chat] [data-waniwani-thinking] {
+		animation: none !important;
+		color: var(--ww-color-muted-foreground) !important;
+	}
+}
+
 @theme reference {
 	--color-background: #ffffff;
 	--color-foreground: #1f2937;

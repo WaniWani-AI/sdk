@@ -5,13 +5,16 @@ import type { ModelContextUpdate } from "../../../shared/model-context";
 
 import type { WelcomeConfig } from "../@types";
 import { Attachments } from "../ai-elements/attachments";
-import { Loader } from "../ai-elements/loader";
 import {
 	Message,
 	MessageContent,
 	MessageResponse,
 } from "../ai-elements/message";
 import { Reasoning } from "../ai-elements/reasoning";
+import {
+	derivePhase,
+	ThinkingIndicator,
+} from "../ai-elements/thinking-indicator";
 import {
 	resolveWidgetAutoHeight,
 	resolveWidgetResourceUri,
@@ -115,13 +118,11 @@ export function MessageList({
 	showToolCalls = true,
 	toolDefinitions,
 }: MessageListProps) {
-	const isLoading = status === "submitted" || status === "streaming";
 	const lastMessage = messages[messages.length - 1];
 	const hasMessages = messages.length > 0;
-	const showLoaderBubble =
-		isLoading && (!hasMessages || lastMessage.role === "user");
 
 	const isFullscreenActive = fullscreenToolCallId != null;
+	const phase = isFullscreenActive ? null : derivePhase(messages, status);
 
 	return (
 		<>
@@ -320,18 +321,16 @@ export function MessageList({
 													</MessageResponse>
 												);
 											})
-										: isLastAssistant && isLoading && <Loader />}
+										: null}
 								</MessageContent>
 							</div>
 						)}
 					</Message>
 				);
 			})}
-			{!isFullscreenActive && showLoaderBubble && (
+			{phase && (
 				<Message from="assistant">
-					<MessageContent>
-						<Loader />
-					</MessageContent>
+					<ThinkingIndicator phase={phase} />
 				</Message>
 			)}
 		</>
