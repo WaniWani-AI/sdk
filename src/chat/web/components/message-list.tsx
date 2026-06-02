@@ -15,6 +15,7 @@ import {
 	ReasoningContent,
 	ReasoningTrigger,
 } from "../ai-elements/reasoning";
+import { Shimmer } from "../ai-elements/shimmer";
 import {
 	resolveWidgetAutoHeight,
 	resolveWidgetResourceUri,
@@ -122,6 +123,13 @@ export function MessageList({
 	const hasMessages = messages.length > 0;
 
 	const isFullscreenActive = fullscreenToolCallId != null;
+	const isLoading = status === "submitted" || status === "streaming";
+	const lastAssistantHasNoParts =
+		lastMessage?.role === "assistant" && lastMessage.parts.length === 0;
+	const showThinking =
+		!isFullscreenActive &&
+		isLoading &&
+		(!hasMessages || lastMessage.role === "user" || lastAssistantHasNoParts);
 
 	return (
 		<>
@@ -330,6 +338,13 @@ export function MessageList({
 					</Message>
 				);
 			})}
+			{showThinking && (
+				<div aria-live="polite" className="ww:flex ww:items-center ww:py-1">
+					<Shimmer className="ww:text-sm" duration={1.6}>
+						Thinking…
+					</Shimmer>
+				</div>
+			)}
 		</>
 	);
 }
