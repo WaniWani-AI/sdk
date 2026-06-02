@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { extractSource } from "../utils";
+import { extractSource, extractSourceFromHeaders } from "../utils";
 
 describe("extractSource", () => {
 	it("returns undefined for missing meta", () => {
@@ -82,5 +82,74 @@ describe("extractSource", () => {
 				"openai/sessionId": "",
 			}),
 		).toBeUndefined();
+	});
+
+	// Claude surfaces don't expose a namespaced session id in _meta but do
+	// advertise themselves via clientInfo.name in the MCP `initialize`
+	// handshake. Match is case-insensitive substring so "Claude",
+	// "Claude Code", "claude-ai", etc. all resolve to "claude".
+	describe("clientInfo fallback", () => {
+		it("derives claude from clientInfo.name when _meta has no source key", () => {
+			expect(extractSource({}, { name: "Claude Code" })).toBe("claude");
+			expect(extractSource(undefined, { name: "Claude" })).toBe("claude");
+			expect(extractSource({}, { name: "claude-ai" })).toBe("claude");
+			expect(extractSource({}, { name: "CLAUDE" })).toBe("claude");
+		});
+
+		it("returns undefined for unknown clientInfo.name", () => {
+			expect(extractSource({}, { name: "some-other-client" })).toBeUndefined();
+			expect(extractSource({}, { name: "" })).toBeUndefined();
+			expect(extractSource({}, {})).toBeUndefined();
+		});
+
+		it("_meta source keys win over clientInfo.name", () => {
+			expect(
+				extractSource({ "openai/sessionId": "v1/abc" }, { name: "Claude" }),
+			).toBe("chatgpt");
+			expect(
+				extractSource({ "waniwani/source": "playground" }, { name: "Claude" }),
+			).toBe("playground");
+		});
+	});
+});
+
+describe("extractSourceFromHeaders", () => {
+	it("returns undefined for missing headers", () => {
+		expect(extractSourceFromHeaders(undefined)).toBeUndefined();
+		expect(extractSourceFromHeaders({})).toBeUndefined();
+	});
+
+	// Claude HTTP requests carry these signals when neither _meta nor
+	// clientInfo resolves (e.g. stateless deployments). This mirrors
+	// skybridge's own `user-agent === "Claude-User"` check.
+	it("derives claude from the Claude-User user-agent", () => {
+		expect(extractSourceFromHeaders({ "user-agent": "Claude-User" })).toBe(
+			"claude",
+		);
+	});
+
+	it("derives claude from the x-anthropic-client header", () => {
+		expect(extractSourceFromHeaders({ "x-anthropic-client": "ClaudeAI" })).toBe(
+			"claude",
+		);
+	});
+
+	it("matches case-insensitively and normalizes header casing", () => {
+		expect(extractSourceFromHeaders({ "User-Agent": "claude-user/1.0" })).toBe(
+			"claude",
+		);
+	});
+
+	it("handles array-valued headers", () => {
+		expect(extractSourceFromHeaders({ "user-agent": ["Claude-User"] })).toBe(
+			"claude",
+		);
+	});
+
+	it("returns undefined for non-Claude user agents", () => {
+		expect(
+			extractSourceFromHeaders({ "user-agent": "Mozilla/5.0" }),
+		).toBeUndefined();
+		expect(extractSourceFromHeaders({ "user-agent": "" })).toBeUndefined();
 	});
 });

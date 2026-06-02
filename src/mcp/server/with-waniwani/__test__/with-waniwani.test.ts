@@ -203,6 +203,103 @@ describe("withWaniwani", () => {
 		});
 	});
 
+	test("stamps resolved source into _meta from request headers (Claude)", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra = {
+			_meta: {},
+			requestInfo: { headers: { "user-agent": "Claude-User" } },
+		} as Record<string, unknown>;
+		await handler?.({}, extra);
+
+		// Stamped into the live request _meta so flow nodes / nested handlers see it.
+		expect((extra._meta as Record<string, unknown>)["waniwani/source"]).toBe(
+			"claude",
+		);
+		// And carried through to the tracked event source.
+		expect(tracked[0]?.source).toBe("claude");
+	});
+
+	test("does not override an explicit _meta source with header detection", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra = {
+			_meta: { "openai/sessionId": "v1/abc" },
+			requestInfo: { headers: { "user-agent": "Claude-User" } },
+		} as Record<string, unknown>;
+		await handler?.({}, extra);
+
+		// openai session resolves to chatgpt; the header fallback must not run.
+		expect(
+			(extra._meta as Record<string, unknown>)["waniwani/source"],
+		).toBeUndefined();
+		expect(tracked[0]?.source).toBe("chatgpt");
+	});
+
+	test("correlates the tracked event to a sessionId tool argument when _meta has none", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("show_widget", { description: "Widget" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra = { _meta: {} } as Record<string, unknown>;
+		await handler?.({ sessionId: "flow-session-9" }, extra);
+
+		// Tracked event is correlated to the forwarded session id...
+		expect(
+			(tracked[0]?.meta as Record<string, unknown>)["waniwani/sessionId"],
+		).toBe("flow-session-9");
+		// ...without mutating the live request _meta the handler/flow observed.
+		expect(
+			(extra._meta as Record<string, unknown>)["waniwani/sessionId"],
+		).toBeUndefined();
+	});
+
+	test("does not override an existing _meta session with the sessionId argument", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("show_widget", { description: "Widget" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{ sessionId: "arg-session" },
+			{ _meta: { "openai/sessionId": "v1/transport" } },
+		);
+
+		expect(
+			(tracked[0]?.meta as Record<string, unknown>)["openai/sessionId"],
+		).toBe("v1/transport");
+		expect(
+			(tracked[0]?.meta as Record<string, unknown>)["waniwani/sessionId"],
+		).toBeUndefined();
+	});
+
 	test("flushes after tool call when flushAfterToolCall is set", async () => {
 		const mock = mockClient();
 		const srv = mockServer();
