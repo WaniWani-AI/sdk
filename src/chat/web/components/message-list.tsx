@@ -1,7 +1,6 @@
 "use client";
 
 import type { ChatStatus, ReasoningUIPart, ToolUIPart, UIMessage } from "ai";
-import { SparklesIcon } from "lucide-react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import type { WelcomeConfig } from "../@types";
 import { Attachments } from "../ai-elements/attachments";
@@ -15,7 +14,6 @@ import {
 	ReasoningContent,
 	ReasoningTrigger,
 } from "../ai-elements/reasoning";
-import { Shimmer } from "../ai-elements/shimmer";
 import {
 	resolveWidgetAutoHeight,
 	resolveWidgetResourceUri,
@@ -27,6 +25,10 @@ import {
 	ToolInput,
 	ToolOutput,
 } from "../ai-elements/tool";
+import {
+	shouldShowWorkingIndicator,
+	WorkingIndicator,
+} from "../ai-elements/working-indicator";
 import type { McpAppDisplayMode } from "./mcp-app-frame";
 import { McpAppFrame } from "./mcp-app-frame";
 import { WelcomeScreen } from "./welcome-screen";
@@ -123,13 +125,8 @@ export function MessageList({
 	const hasMessages = messages.length > 0;
 
 	const isFullscreenActive = fullscreenToolCallId != null;
-	const isLoading = status === "submitted" || status === "streaming";
-	const lastAssistantHasNoParts =
-		lastMessage?.role === "assistant" && lastMessage.parts.length === 0;
-	const showThinking =
-		!isFullscreenActive &&
-		isLoading &&
-		(!hasMessages || lastMessage.role === "user" || lastAssistantHasNoParts);
+	const showWorking =
+		!isFullscreenActive && shouldShowWorkingIndicator(messages, status);
 
 	return (
 		<>
@@ -338,15 +335,7 @@ export function MessageList({
 					</Message>
 				);
 			})}
-			{showThinking && (
-				<div
-					aria-live="polite"
-					className="ww:flex ww:w-full ww:items-center ww:gap-2 ww:text-sm ww:text-muted-foreground"
-				>
-					<SparklesIcon className="ww:size-4 ww:shrink-0" />
-					<Shimmer duration={1.6}>Working…</Shimmer>
-				</div>
-			)}
+			{showWorking && <WorkingIndicator />}
 		</>
 	);
 }
