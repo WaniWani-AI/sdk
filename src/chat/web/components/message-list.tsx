@@ -26,6 +26,7 @@ import {
 	ToolOutput,
 } from "../ai-elements/tool";
 import {
+	hasVisibleParts,
 	shouldShowWorkingIndicator,
 	WorkingIndicator,
 } from "../ai-elements/working-indicator";
@@ -168,6 +169,15 @@ export function MessageList({
 
 				// Hide messages that don't contain the fullscreen widget
 				if (isFullscreenActive && !containsFullscreenTool) {
+					return <div key={message.id} style={{ display: "none" }} />;
+				}
+
+				// Skip rendering an empty <Message> wrapper for an assistant
+				// message that has only invisible parts (e.g. step-start, which
+				// the AI SDK seeds before the first tool/text/reasoning chunk).
+				// Otherwise an empty bubble briefly appears on top of the
+				// WorkingIndicator before the real content lands.
+				if (message.role === "assistant" && !hasVisibleParts(message)) {
 					return <div key={message.id} style={{ display: "none" }} />;
 				}
 

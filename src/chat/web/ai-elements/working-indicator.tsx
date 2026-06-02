@@ -7,8 +7,28 @@ import { cn } from "../lib/utils";
 import { Shimmer } from "./shimmer";
 
 /**
+ * True when a UIMessage part renders something visible to the user (text,
+ * reasoning, file, or tool). The AI SDK seeds assistant messages with a
+ * non-visual `step-start` part before the first real chunk, so naive
+ * "has any part" checks would treat that as content.
+ */
+export function isVisiblePart(part: UIMessage["parts"][number]): boolean {
+	return (
+		part.type === "text" ||
+		part.type === "reasoning" ||
+		part.type === "file" ||
+		"toolCallId" in part
+	);
+}
+
+/** True when a message has at least one {@link isVisiblePart}. */
+export function hasVisibleParts(message: UIMessage): boolean {
+	return message.parts.some(isVisiblePart);
+}
+
+/**
  * Returns true when the chat is loading but the assistant has not yet
- * produced any *visible* content (text, reasoning, file, or tool part).
+ * produced any visible content.
  */
 export function shouldShowWorkingIndicator(
 	messages: UIMessage[],
@@ -21,14 +41,7 @@ export function shouldShowWorkingIndicator(
 	if (!last || last.role !== "assistant") {
 		return true;
 	}
-	const hasVisible = last.parts.some(
-		(p) =>
-			p.type === "text" ||
-			p.type === "reasoning" ||
-			p.type === "file" ||
-			"toolCallId" in p,
-	);
-	return !hasVisible;
+	return !hasVisibleParts(last);
 }
 
 export type WorkingIndicatorProps = HTMLAttributes<HTMLDivElement>;

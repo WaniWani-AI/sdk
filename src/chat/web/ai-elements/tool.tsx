@@ -260,11 +260,7 @@ export function ToolHeader({
 			{...props}
 		>
 			<BracesIcon className="ww:size-4 ww:shrink-0" />
-			<span
-				key={isRunning ? "running" : "done"}
-				className="ww:truncate"
-				style={{ animation: "ww-fade-in 0.2s ease-out" }}
-			>
+			<span className="ww:truncate">
 				{isRunning ? <Shimmer duration={1.6}>{label}</Shimmer> : label}
 			</span>
 			<ChevronDownIcon
@@ -305,11 +301,7 @@ export function ToolIndicator({
 			{...props}
 		>
 			<BracesIcon className="ww:size-4 ww:shrink-0" />
-			<span
-				key={isRunning ? "running" : "done"}
-				className="ww:truncate"
-				style={{ animation: "ww-fade-in 0.2s ease-out" }}
-			>
+			<span className="ww:truncate">
 				{isRunning ? <Shimmer duration={1.6}>{label}</Shimmer> : label}
 			</span>
 		</div>

@@ -198,12 +198,7 @@ export const ReasoningTrigger = memo(
 				{children ?? (
 					<>
 						<BrainIcon className="ww:size-4 ww:shrink-0" />
-						<span
-							key={isStreaming ? "streaming" : `done-${duration ?? "?"}`}
-							style={{ animation: "ww-fade-in 0.2s ease-out" }}
-						>
-							{getThinkingMessage(isStreaming, duration)}
-						</span>
+						{getThinkingMessage(isStreaming, duration)}
 						<ChevronDownIcon
 							className={cn(
 								"ww:size-4 ww:shrink-0 ww:transition-transform ww:duration-200",
