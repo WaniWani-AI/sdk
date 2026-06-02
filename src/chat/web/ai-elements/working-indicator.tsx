@@ -3,6 +3,7 @@
 import type { ChatStatus, UIMessage } from "ai";
 import { ZapIcon } from "lucide-react";
 import type { HTMLAttributes } from "react";
+import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
 import { Shimmer } from "./shimmer";
 
@@ -55,6 +56,7 @@ export function WorkingIndicator({
 	className,
 	...props
 }: WorkingIndicatorProps) {
+	const { t } = useTranslation();
 	return (
 		<div
 			aria-live="polite"
@@ -66,7 +68,7 @@ export function WorkingIndicator({
 			{...props}
 		>
 			<ZapIcon className="ww:size-4 ww:shrink-0" />
-			<Shimmer duration={1.6}>On it…</Shimmer>
+			<Shimmer duration={1.6}>{t.workingIndicator.default}</Shimmer>
 		</div>
 	);
 }

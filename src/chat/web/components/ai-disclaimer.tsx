@@ -1,6 +1,6 @@
 "use client";
 
-const DEFAULT_TEXT = "can make mistakes";
+import { useTranslation } from "../i18n";
 
 /**
  * Short notice rendered under the chat input warning users that responses
@@ -9,12 +9,13 @@ const DEFAULT_TEXT = "can make mistakes";
  * custom string to override the wording.
  */
 export function AiDisclaimer({ text }: { text?: string | false }) {
+	const { t } = useTranslation();
 	if (text === false) {
 		return null;
 	}
 	return (
 		<span className="ww:text-[11px] ww:text-muted-foreground ww:opacity-70">
-			{text || DEFAULT_TEXT}
+			{text || t.aiDisclaimer.default}
 		</span>
 	);
 }

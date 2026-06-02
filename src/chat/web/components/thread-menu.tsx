@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { formatRelativeTime, useTranslation } from "../i18n";
 import type { StoredThread } from "../lib/thread-store";
 
 interface ThreadMenuProps {
@@ -13,26 +14,7 @@ interface ThreadMenuProps {
 
 const VISIBLE_THREAD_LIMIT = 20;
 
-function formatRelative(iso: string): string {
-	const then = Date.parse(iso);
-	if (Number.isNaN(then)) {
-		return "";
-	}
-	const diff = Date.now() - then;
-	if (diff < 60_000) {
-		return "just now";
-	}
-	if (diff < 60 * 60_000) {
-		return `${Math.floor(diff / 60_000)}m ago`;
-	}
-	if (diff < 24 * 60 * 60_000) {
-		return `${Math.floor(diff / (60 * 60_000))}h ago`;
-	}
-	const days = Math.floor(diff / (24 * 60 * 60_000));
-	return `${days}d ago`;
-}
-
-function PlusIcon() {
+function PlusIcon({ label }: { label: string }) {
 	return (
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
@@ -45,16 +27,16 @@ function PlusIcon() {
 			strokeLinecap="round"
 			strokeLinejoin="round"
 			role="img"
-			aria-label="New chat"
+			aria-label={label}
 		>
-			<title>New chat</title>
+			<title>{label}</title>
 			<line x1="12" y1="5" x2="12" y2="19" />
 			<line x1="5" y1="12" x2="19" y2="12" />
 		</svg>
 	);
 }
 
-function HistoryIcon() {
+function HistoryIcon({ label }: { label: string }) {
 	return (
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
@@ -67,9 +49,9 @@ function HistoryIcon() {
 			strokeLinecap="round"
 			strokeLinejoin="round"
 			role="img"
-			aria-label="Thread history"
+			aria-label={label}
 		>
-			<title>Thread history</title>
+			<title>{label}</title>
 			<path d="M3 12a9 9 0 1 0 3-6.7" />
 			<polyline points="3 4 3 9 8 9" />
 			<line x1="12" y1="7" x2="12" y2="12" />
@@ -78,7 +60,7 @@ function HistoryIcon() {
 	);
 }
 
-function TrashIcon() {
+function TrashIcon({ label }: { label: string }) {
 	return (
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
@@ -91,9 +73,9 @@ function TrashIcon() {
 			strokeLinecap="round"
 			strokeLinejoin="round"
 			role="img"
-			aria-label="Delete thread"
+			aria-label={label}
 		>
-			<title>Delete thread</title>
+			<title>{label}</title>
 			<polyline points="3 6 5 6 21 6" />
 			<path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" />
 			<path d="M10 11v6" />
@@ -109,6 +91,7 @@ export function ThreadMenu({
 	onSelectThread,
 	onDeleteThread,
 }: ThreadMenuProps) {
+	const { locale, t } = useTranslation();
 	const [open, setOpen] = useState(false);
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -147,21 +130,21 @@ export function ThreadMenu({
 			<button
 				type="button"
 				onClick={onNewThread}
-				title="New chat"
-				aria-label="New chat"
+				title={t.threadMenu.newChat}
+				aria-label={t.threadMenu.newChat}
 				className="ww:p-1.5 ww:rounded-md ww:text-muted-foreground hover:ww:text-foreground hover:ww:bg-foreground/5 ww:transition-colors ww:cursor-pointer"
 			>
-				<PlusIcon />
+				<PlusIcon label={t.threadMenu.newChat} />
 			</button>
 			<button
 				type="button"
 				onClick={() => setOpen((v) => !v)}
-				title="Thread history"
-				aria-label="Thread history"
+				title={t.threadMenu.threadHistory}
+				aria-label={t.threadMenu.threadHistory}
 				aria-expanded={open}
 				className="ww:p-1.5 ww:rounded-md ww:text-muted-foreground hover:ww:text-foreground hover:ww:bg-foreground/5 ww:transition-colors ww:cursor-pointer"
 			>
-				<HistoryIcon />
+				<HistoryIcon label={t.threadMenu.threadHistory} />
 			</button>
 			{open && (
 				<div
@@ -170,11 +153,12 @@ export function ThreadMenu({
 				>
 					{visible.length === 0 && (
 						<div className="ww:px-3 ww:py-3 ww:text-xs ww:text-muted-foreground">
-							No previous chats yet.
+							{t.threadMenu.noPreviousChats}
 						</div>
 					)}
 					{visible.map((thread) => {
 						const isActive = thread.threadId === activeThreadId;
+						const updatedAtMs = Date.parse(thread.updatedAt);
 						return (
 							<div
 								key={thread.threadId}
@@ -194,7 +178,9 @@ export function ThreadMenu({
 										{thread.title}
 									</div>
 									<div className="ww:text-[10px] ww:text-muted-foreground">
-										{formatRelative(thread.updatedAt)}
+										{Number.isNaN(updatedAtMs)
+											? ""
+											: formatRelativeTime(updatedAtMs, locale)}
 									</div>
 								</button>
 								<button
@@ -203,18 +189,18 @@ export function ThreadMenu({
 										e.stopPropagation();
 										onDeleteThread(thread.threadId);
 									}}
-									title="Delete thread"
-									aria-label="Delete thread"
+									title={t.threadMenu.deleteThread}
+									aria-label={t.threadMenu.deleteThread}
 									className="ww:p-1 ww:rounded ww:text-muted-foreground hover:ww:text-foreground hover:ww:bg-foreground/10 ww:transition-colors ww:cursor-pointer"
 								>
-									<TrashIcon />
+									<TrashIcon label={t.threadMenu.deleteThread} />
 								</button>
 							</div>
 						);
 					})}
 					{hidden > 0 && (
 						<div className="ww:px-3 ww:py-2 ww:text-[10px] ww:text-muted-foreground ww:border-t ww:border-border">
-							{hidden} older thread{hidden === 1 ? "" : "s"} hidden
+							{t.threadMenu.hiddenThreads(hidden)}
 						</div>
 					)}
 				</div>

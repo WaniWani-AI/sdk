@@ -85,8 +85,42 @@ The dashboard owns the agent's display and behavior config. Use `overrides` only
 | `appearance` | `ChatAppearance` | Theme preset + per-property overrides — see [Theming the chat widget](#theming-the-chat-widget) |
 | `api` | `string` | Chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat` |
 | `mcpServerUrl` | `string` | Override the MCP server URL (rare) |
+| `locale` | `"en" \| "fr" \| "es"` | UI language for built-in labels. Auto-detected from `<html lang>` / `navigator.language` when omitted; falls back to English |
+| `messages` | `MessageOverrides` | Per-key overrides on top of the resolved locale catalog — see [Languages](#languages) |
 
 Overrides win over dashboard config when both are set.
+
+### Languages
+
+Built-in widget strings (input placeholder, "Thinking…", "Copy"/"Copied", thread menu, "AI can make mistakes", etc.) ship translated to English, French, and Spanish. The widget detects the active locale from `<html lang>`, then `navigator.language` / `navigator.languages`, falling back to English when none match. Region tags fall back to the language prefix (`fr-CA` → `fr`).
+
+Pin the language explicitly:
+
+```tsx
+<WaniwaniChat
+  token="wwp_..."
+  overrides={{ locale: "fr" }}
+/>
+```
+
+Override individual strings without contributing a full locale (useful for one-off brand voice tweaks):
+
+```tsx
+<WaniwaniChat
+  token="wwp_..."
+  overrides={{
+    locale: "en",
+    messages: {
+      promptInput: { placeholder: "Ask the agent…" },
+      aiDisclaimer: { default: "may occasionally err" },
+    },
+  }}
+/>
+```
+
+For the `<script>` embed, use `data-locale="fr|es|en"` — see the script tag options table.
+
+Dashboard-configurable strings (`title`, `welcomeMessage`, `placeholder`, `suggestions`, `disclaimer`) are still authored once per agent — they always win over the locale catalog when set.
 
 ### Imperative handle
 
@@ -178,6 +212,7 @@ Bound the chat by sizing `[data-waniwani-embed]` (or an ancestor) with `height`,
 | `data-show-tool-calls` | No | `"true"`/`"false"` — toggle tool call panels |
 | `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |
 | `data-theme` | No | `"light"` (default), `"dark"`, or `"auto"` (follow `prefers-color-scheme`) |
+| `data-locale` | No | `"en"`, `"fr"`, or `"es"`. Auto-detects from `<html lang>` / `navigator.language` when omitted |
 
 For finer-grained colour, radius, or font overrides, set CSS variables on the container — see [Theming the chat widget](#theming-the-chat-widget).
 

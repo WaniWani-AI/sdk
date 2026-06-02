@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslation } from "../i18n";
+
 const LOGO_URL = "https://app.waniwani.ai/assets/waniwani-logo.svg";
 const HREF = "https://waniwani.ai";
 
@@ -9,6 +11,7 @@ const HREF = "https://waniwani.ai";
  * the WaniWani site.
  */
 export function PoweredBy() {
+	const { t } = useTranslation();
 	return (
 		<a
 			href={HREF}
@@ -16,7 +19,7 @@ export function PoweredBy() {
 			rel="noopener noreferrer"
 			className="ww:flex ww:items-center ww:gap-1.5 ww:text-[11px] ww:text-muted-foreground ww:opacity-70 hover:ww:opacity-100 ww:transition-opacity"
 		>
-			<span>AI agent powered by</span>
+			<span>{t.poweredBy.label}</span>
 			<img
 				src={LOGO_URL}
 				alt="WaniWani"

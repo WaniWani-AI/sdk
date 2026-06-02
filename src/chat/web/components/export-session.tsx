@@ -2,6 +2,7 @@
 
 import type { UIMessage } from "@ai-sdk/react";
 import { useState } from "react";
+import { useTranslation } from "../i18n";
 
 interface ExportSessionButtonProps {
 	messages: UIMessage[];
@@ -14,6 +15,7 @@ export function ExportSessionButton({
 	evalEnabled,
 	api = "/api/waniwani",
 }: ExportSessionButtonProps) {
+	const { t } = useTranslation();
 	const [saving, setSaving] = useState(false);
 	const [feedback, setFeedback] = useState<"saved" | "error" | null>(null);
 
@@ -51,19 +53,19 @@ export function ExportSessionButton({
 	}
 
 	const label = saving
-		? "saving..."
+		? t.exportSession.saving
 		: feedback === "saved"
-			? "saved"
+			? t.exportSession.saved
 			: feedback === "error"
-				? "error"
-				: "export";
+				? t.exportSession.error
+				: t.exportSession.export;
 
 	return (
 		<button
 			type="button"
 			onClick={handleExport}
 			disabled={saving}
-			title="Save scenario to WaniWani"
+			title={t.exportSession.tooltip}
 			className="ww:ml-auto ww:text-[10px] ww:font-mono ww:uppercase ww:tracking-wider ww:text-muted-foreground hover:ww:text-foreground ww:cursor-pointer ww:transition-colors ww:disabled:opacity-40"
 		>
 			{label}
