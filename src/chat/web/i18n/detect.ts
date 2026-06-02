@@ -2,10 +2,15 @@ import { DEFAULT_LOCALE, isSupportedLocale, type Locale } from "./types";
 
 /**
  * Resolve the active locale. Precedence:
- *   explicit prop > `<html lang>` > `navigator.language(s)` > `'en'`.
+ *   explicit prop > `navigator.language(s)` > `<html lang>` > `'en'`.
  *
- * Region tags fall back to the language prefix (e.g. `fr-CA` → `fr`).
- * SSR-safe: returns the fallback when `navigator`/`document` are absent.
+ * Visitor preference wins over the host page's declared language so a
+ * Spanish-speaking visitor on an `<html lang="en">` site sees Spanish
+ * chrome — matches how chat widgets (Intercom, Drift) behave.
+ *
+ * Region tags fall back to the language prefix (e.g. `fr-CA` → `fr`,
+ * `es-ES` → `es`). SSR-safe: returns the fallback when `navigator` /
+ * `document` are absent.
  */
 export function detectLocale(explicit?: string): Locale {
 	if (explicit && isSupportedLocale(explicit)) {
@@ -20,19 +25,19 @@ export function detectLocale(explicit?: string): Locale {
 
 	const candidates: string[] = [];
 
-	if (typeof document !== "undefined") {
-		const htmlLang = document.documentElement.getAttribute("lang");
-		if (htmlLang) {
-			candidates.push(htmlLang);
-		}
-	}
-
 	if (typeof navigator !== "undefined") {
 		if (navigator.language) {
 			candidates.push(navigator.language);
 		}
 		if (navigator.languages) {
 			candidates.push(...navigator.languages);
+		}
+	}
+
+	if (typeof document !== "undefined") {
+		const htmlLang = document.documentElement.getAttribute("lang");
+		if (htmlLang) {
+			candidates.push(htmlLang);
 		}
 	}
 
