@@ -1,8 +1,8 @@
 "use client";
 
 import type { ChatStatus, ReasoningUIPart, ToolUIPart, UIMessage } from "ai";
+import { SparklesIcon } from "lucide-react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
-
 import type { WelcomeConfig } from "../@types";
 import { Attachments } from "../ai-elements/attachments";
 import {
@@ -339,10 +339,12 @@ export function MessageList({
 				);
 			})}
 			{showThinking && (
-				<div aria-live="polite" className="ww:flex ww:items-center ww:py-1">
-					<Shimmer className="ww:text-sm" duration={1.6}>
-						Thinking…
-					</Shimmer>
+				<div
+					aria-live="polite"
+					className="ww:flex ww:w-full ww:items-center ww:gap-2 ww:text-sm ww:text-muted-foreground"
+				>
+					<SparklesIcon className="ww:size-4 ww:shrink-0" />
+					<Shimmer duration={1.6}>Working…</Shimmer>
 				</div>
 			)}
 		</>
