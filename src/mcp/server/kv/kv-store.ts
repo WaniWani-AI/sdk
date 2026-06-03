@@ -96,8 +96,6 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 		const payload = encKey
 			? await encryptValue(value as Record<string, unknown>, encKey)
 			: value;
-		// `ttlSeconds: undefined` is dropped by JSON.stringify, so the server
-		// falls back to its default retention window when no TTL is given.
 		await this.request("/api/mcp/redis/set", {
 			key,
 			value: payload,
