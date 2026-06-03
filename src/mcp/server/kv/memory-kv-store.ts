@@ -7,7 +7,7 @@
  * `WANIWANI_API_KEY` to use the hosted store.
  */
 
-import type { KvStore } from "./kv-store";
+import type { KvStore, KvStoreSetOptions } from "./kv-store";
 
 export class MemoryKvStore<T = Record<string, unknown>> implements KvStore<T> {
 	private readonly map = new Map<string, T>();
@@ -16,7 +16,13 @@ export class MemoryKvStore<T = Record<string, unknown>> implements KvStore<T> {
 		return this.map.get(key) ?? null;
 	}
 
-	async set(key: string, value: T): Promise<void> {
+	// In-memory storage has no expiry; `options` (e.g. `ttlSeconds`) is accepted
+	// for parity with WaniwaniKvStore but ignored.
+	async set(
+		key: string,
+		value: T,
+		_options?: KvStoreSetOptions,
+	): Promise<void> {
 		this.map.set(key, value);
 	}
 
