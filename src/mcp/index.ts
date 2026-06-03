@@ -28,7 +28,7 @@ export {
 	StateGraph,
 } from "./server/flows";
 // Generic key-value store — OSS interface, free-tier hosted impl
-export type { KvStore } from "./server/kv";
+export type { KvStore, KvStoreSetOptions } from "./server/kv";
 export { MemoryKvStore, WaniwaniKvStore } from "./server/kv";
 // Scoped client — free tier (used inside withWaniwani-wrapped tools)
 export type { ScopedWaniWaniClient } from "./server/scoped-client";

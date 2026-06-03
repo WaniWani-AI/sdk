@@ -17,9 +17,18 @@ import { decryptValue, encryptValue, isEncryptedEnvelope } from "./crypto";
 // Interface
 // ============================================================================
 
+export interface KvStoreSetOptions {
+	/**
+	 * Time-to-live in seconds, mirroring Redis `SET ... EX`. When omitted the
+	 * server applies its default retention window. The value is kept until it
+	 * expires, however far in the future.
+	 */
+	ttlSeconds?: number;
+}
+
 export interface KvStore<T = Record<string, unknown>> {
 	get(key: string): Promise<T | null>;
-	set(key: string, value: T): Promise<void>;
+	set(key: string, value: T, options?: KvStoreSetOptions): Promise<void>;
 	delete(key: string): Promise<void>;
 }
 
@@ -74,7 +83,7 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 		return data as T;
 	}
 
-	async set(key: string, value: T): Promise<void> {
+	async set(key: string, value: T, options?: KvStoreSetOptions): Promise<void> {
 		if (!this.apiKey) {
 			throw new Error(
 				"[WaniWani KV] No API key configured. Set WANIWANI_API_KEY env var.",
@@ -87,7 +96,11 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 		const payload = encKey
 			? await encryptValue(value as Record<string, unknown>, encKey)
 			: value;
-		await this.request("/api/mcp/redis/set", { key, value: payload });
+		await this.request("/api/mcp/redis/set", {
+			key,
+			value: payload,
+			ttlSeconds: options?.ttlSeconds,
+		});
 	}
 
 	async delete(key: string): Promise<void> {

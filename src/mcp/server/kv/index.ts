@@ -2,6 +2,6 @@
 
 export type { EncryptedEnvelope } from "./crypto";
 export { isEncryptedEnvelope } from "./crypto";
-export type { KvStore } from "./kv-store";
+export type { KvStore, KvStoreSetOptions } from "./kv-store";
 export { WaniwaniKvStore } from "./kv-store";
 export { MemoryKvStore } from "./memory-kv-store";

@@ -5,7 +5,7 @@
  * Config comes from env vars (WANIWANI_API_KEY, WANIWANI_API_URL).
  */
 
-import { WaniwaniKvStore } from "../kv";
+import { type KvStoreSetOptions, WaniwaniKvStore } from "../kv";
 import type { FlowTokenContent } from "./@types";
 
 // ============================================================================
@@ -14,7 +14,11 @@ import type { FlowTokenContent } from "./@types";
 
 export interface FlowStore {
 	get(key: string): Promise<FlowTokenContent | null>;
-	set(key: string, value: FlowTokenContent): Promise<void>;
+	set(
+		key: string,
+		value: FlowTokenContent,
+		options?: KvStoreSetOptions,
+	): Promise<void>;
 	delete(key: string): Promise<void>;
 }
 
@@ -29,8 +33,12 @@ export class WaniwaniFlowStore implements FlowStore {
 		return this.store.get(key);
 	}
 
-	set(key: string, value: FlowTokenContent): Promise<void> {
-		return this.store.set(key, value);
+	set(
+		key: string,
+		value: FlowTokenContent,
+		options?: KvStoreSetOptions,
+	): Promise<void> {
+		return this.store.set(key, value, options);
 	}
 
 	delete(key: string): Promise<void> {
