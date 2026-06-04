@@ -30,6 +30,21 @@ function mockClient() {
 				}),
 				search: async () => [],
 				sources: async () => [],
+				versions: () => Promise.resolve([]),
+				rollback: () =>
+					Promise.resolve({
+						activated: {
+							id: "",
+							source: "",
+							isActive: true,
+							origin: "sdk-ingest" as const,
+							createdAt: "",
+							chunkCount: 0,
+						},
+					}),
+				reactivate: () => Promise.resolve({ reactivated: true, source: "" }),
+				diff: () =>
+					Promise.resolve({ chunks: { versionA: [], versionB: [] }, diff: "" }),
 			},
 			_config: {
 				apiUrl: "https://test.waniwani.ai",

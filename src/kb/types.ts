@@ -42,6 +42,34 @@ export interface KbSource {
 	chunkCount: number;
 	/** ISO timestamp of when the source was first ingested */
 	createdAt: string;
+	/** Whether this source version is currently active */
+	isActive: boolean;
+}
+
+export interface KbVersion {
+	id: string;
+	source: string;
+	isActive: boolean;
+	origin: "sdk-ingest" | "app-editor" | "transfer";
+	createdAt: string;
+	chunkCount: number;
+}
+
+export interface KbVersionDiff {
+	chunks: {
+		versionA: Array<{ heading: string; content: string }>;
+		versionB: Array<{ heading: string; content: string }>;
+	};
+	diff: string;
+}
+
+export interface KbRollbackResult {
+	activated: KbVersion;
+}
+
+export interface KbReactivateResult {
+	reactivated: boolean;
+	source: string;
 }
 
 /** KB client for server-side knowledge base operations */
@@ -59,4 +87,9 @@ export interface KbClient {
 
 	/** List all sources in the knowledge base */
 	sources(): Promise<KbSource[]>;
+
+	versions(source: string): Promise<KbVersion[]>;
+	rollback(versionId: string): Promise<KbRollbackResult>;
+	reactivate(source: string): Promise<KbReactivateResult>;
+	diff(versionA: string, versionB: string): Promise<KbVersionDiff>;
 }

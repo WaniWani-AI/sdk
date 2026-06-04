@@ -6,8 +6,12 @@ import type {
 	KbClient,
 	KbIngestFile,
 	KbIngestResult,
+	KbReactivateResult,
+	KbRollbackResult,
 	KbSearchOptions,
 	KbSource,
+	KbVersion,
+	KbVersionDiff,
 	SearchResult,
 } from "./types.js";
 
@@ -76,6 +80,42 @@ export function createKbClient(config: InternalConfig): KbClient {
 
 		async sources(): Promise<KbSource[]> {
 			return request<KbSource[]>("GET", "/api/mcp/kb/sources");
+		},
+
+		async versions(source: string): Promise<KbVersion[]> {
+			const params = new URLSearchParams({ source });
+			return request<KbVersion[]>(
+				"GET",
+				`/api/mcp/kb/versions?${params.toString()}`,
+			);
+		},
+
+		async rollback(versionId: string): Promise<KbRollbackResult> {
+			return request<KbRollbackResult>(
+				"POST",
+				"/api/mcp/kb/versions/rollback",
+				{
+					versionId,
+				},
+			);
+		},
+
+		async reactivate(source: string): Promise<KbReactivateResult> {
+			return request<KbReactivateResult>(
+				"POST",
+				"/api/mcp/kb/versions/reactivate",
+				{
+					source,
+				},
+			);
+		},
+
+		async diff(versionA: string, versionB: string): Promise<KbVersionDiff> {
+			const params = new URLSearchParams({ versionA, versionB });
+			return request<KbVersionDiff>(
+				"GET",
+				`/api/mcp/kb/versions/diff?${params.toString()}`,
+			);
 		},
 	};
 }
