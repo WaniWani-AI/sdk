@@ -145,26 +145,24 @@ export function MessageList({
 				))}
 			{messages.map((message) => {
 				const textParts = message.parts.filter((p) => p.type === "text");
-				const reasoningParts = message.parts.filter(
-					(p): p is ReasoningUIPart => p.type === "reasoning",
-				);
 				const fileParts = message.parts.filter((p) => p.type === "file");
-				const toolParts = message.parts.filter(
-					(
-						p,
-					): p is typeof p & {
-						toolCallId: string;
-						toolName: string;
-						state: ToolUIPart["state"];
-						input: unknown;
-						title?: string;
-					} => "toolCallId" in p,
-				);
+				type ToolPart = ToolUIPart & {
+					toolCallId: string;
+					toolName: string;
+					input: unknown;
+					title?: string;
+				};
+				type InlinePart = ReasoningUIPart | ToolPart;
+				const inlineParts = message.parts.filter((p): p is InlinePart => {
+					return p.type === "reasoning" || "toolCallId" in p;
+				});
 				const isLastAssistant =
 					message === lastMessage && message.role === "assistant";
 				const hasTextContent = textParts.length > 0;
 				const containsFullscreenTool = isFullscreenActive
-					? toolParts.some((p) => p.toolCallId === fullscreenToolCallId)
+					? inlineParts.some(
+							(p) => "toolCallId" in p && p.toolCallId === fullscreenToolCallId,
+						)
 					: false;
 
 				// Hide messages that don't contain the fullscreen widget
@@ -183,17 +181,21 @@ export function MessageList({
 
 				return (
 					<Message from={message.role} key={message.id}>
-						{!containsFullscreenTool &&
-							reasoningParts.map((part, i) => (
-								<Reasoning
-									key={`reasoning-${message.id}-${i}`}
-									isStreaming={part.state === "streaming"}
-								>
-									<ReasoningTrigger />
-									<ReasoningContent>{part.text}</ReasoningContent>
-								</Reasoning>
-							))}
-						{toolParts.map((part) => {
+						{inlineParts.map((part, i) => {
+							if (part.type === "reasoning") {
+								if (containsFullscreenTool) {
+									return null;
+								}
+								return (
+									<Reasoning
+										key={`reasoning-${message.id}-${i}`}
+										isStreaming={part.state === "streaming"}
+									>
+										<ReasoningTrigger />
+										<ReasoningContent>{part.text}</ReasoningContent>
+									</Reasoning>
+								);
+							}
 							const output = "output" in part ? part.output : undefined;
 							const resourceUri = resolveWidgetResourceUri(
 								part.toolName,
