@@ -190,12 +190,16 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 				get messages() {
 					return engine.messages;
 				},
+				get sessionId() {
+					return engine.sessionId;
+				},
 			}),
 			[
 				engine.handleSubmit,
 				engine.sendMessageAndWait,
 				engine.reset,
 				engine.messages,
+				engine.sessionId,
 				focusInput,
 			],
 		);

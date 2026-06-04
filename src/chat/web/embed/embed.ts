@@ -46,6 +46,8 @@ declare global {
 				focus: () => void;
 				/** Snapshot of the current chat messages. Empty until mounted. */
 				getMessages: () => UIMessage[];
+				/** Session ID for event correlation. Undefined until the first message. */
+				getSessionId: () => string | undefined;
 			};
 		};
 	}
@@ -62,6 +64,7 @@ interface EmbedInstance {
 	reset: () => void;
 	focus: () => void;
 	getMessages: () => UIMessage[];
+	getSessionId: () => string | undefined;
 }
 
 let currentInstance: EmbedInstance | null = null;
@@ -330,6 +333,7 @@ function mountInline(
 		reset: () => inlineRef.current?.chat?.reset(),
 		focus: () => inlineRef.current?.chat?.focus(),
 		getMessages: () => inlineRef.current?.chat?.messages ?? [],
+		getSessionId: () => inlineRef.current?.chat?.sessionId,
 	};
 }
 
@@ -381,6 +385,7 @@ window.WaniWani.chat = {
 	reset: () => currentInstance?.reset(),
 	focus: () => currentInstance?.focus(),
 	getMessages: () => currentInstance?.getMessages() ?? [],
+	getSessionId: () => currentInstance?.getSessionId(),
 };
 
 // ---------------------------------------------------------------------------
