@@ -316,4 +316,6 @@ export interface ChatHandle {
 	focus: () => void;
 	/** Current chat messages */
 	messages: import("ai").UIMessage[];
+	/** Session ID used for event correlation. Available after the first message. */
+	sessionId: string | undefined;
 }
