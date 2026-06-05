@@ -54,7 +54,6 @@ interface McpAppsResourceMeta {
 			frameDomains?: string[];
 			redirectDomains?: string[];
 		};
-		domain?: string;
 		prefersBorder?: boolean;
 	};
 }
@@ -62,7 +61,6 @@ interface McpAppsResourceMeta {
 export function buildMcpAppsResourceMeta(config: {
 	description?: string;
 	prefersBorder?: boolean;
-	widgetDomain?: string;
 	widgetCSP?: WidgetCSP;
 }): McpAppsResourceMeta {
 	const csp = config.widgetCSP
@@ -74,10 +72,16 @@ export function buildMcpAppsResourceMeta(config: {
 			}
 		: undefined;
 
+	// NOTE: we intentionally do NOT emit `ui.domain` here. Claude's MCP Apps
+	// host validates `ui.domain` against the format "{hash}.claudemcpcontent.com"
+	// and rejects any other value (e.g. a self-hosted widget origin) with:
+	//   Invalid ui.domain format: expected "{hash}.claudemcpcontent.com", got "<our domain>".
+	// The widget origin is already conveyed via the CSP domains above, so the
+	// field is redundant for MCP Apps. The OpenAI Apps SDK path keeps its own
+	// `openai/widgetDomain` (see buildOpenAIResourceMeta), which OpenAI accepts.
 	return {
 		ui: {
 			...(csp && { csp }),
-			...(config.widgetDomain && { domain: config.widgetDomain }),
 			...(config.prefersBorder !== undefined && {
 				prefersBorder: config.prefersBorder,
 			}),
