@@ -58,4 +58,10 @@ export const fr: Messages = {
 		failedToLoad: "Échec du chargement du widget",
 		retry: "Réessayer",
 	},
+	launcher: {
+		prompt: "Posez votre question…",
+		open: "Ouvrir le chat",
+		close: "Fermer le chat",
+		minimize: "Réduire",
+	},
 };

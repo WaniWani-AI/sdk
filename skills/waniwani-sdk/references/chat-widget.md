@@ -154,9 +154,12 @@ function App() {
 
 ## `<script>` embed (non-React)
 
-Self-contained IIFE bundle with React bundled. Drop a `<script>` tag on any website to inline a chat into an element on your page. Uses Shadow DOM for CSS isolation.
+Self-contained IIFE bundle with React bundled. Drop a `<script>` tag on any website to add a chat. Uses Shadow DOM for CSS isolation.
 
-The embed mounts inline only — there is no floating bubble or popover panel. The chat sizes itself via a `height: 100%; max-height: inherit` CSS chain that crosses the shadow boundary, so setting `height` or `max-height` on `[data-waniwani-embed]` (or any ancestor in the chain) bounds the chat. Inside, header and input are pinned while only the messages list scrolls.
+Two render modes, chosen with `data-mode`:
+
+- **`inline`** (default) — mounts the chat into a `[data-waniwani-embed]` element. **You don't have to add that element** — if the page has none, the embed creates one and inserts it immediately in front of the `<script>` tag, so the bare snippet works as-is. A container the embed creates is presented as a **centered, rounded card** (≈448px wide, 500px tall, with a subtle border + shadow); a container **you** place keeps its own layout (full width unless you size it). See [Sizing the inline embed](#sizing-the-inline-embed).
+- **`floating`** — docks a thin chat input at the bottom of the screen that reveals starter suggestions on idle, then slides the full chat up from the bottom on the first message (card on desktop, full-screen on mobile). No marker element needed. See [Floating mode](#floating-mode).
 
 ### Prerequisites
 
@@ -166,36 +169,47 @@ No MCP app changes needed — the embed talks to the WaniWani API directly.
 
 ### Script tag (declarative)
 
-Place a marker element where the chat should mount; the script auto-mounts into the first `[data-waniwani-embed]` on the page:
+The simplest possible snippet — no markup, no CSS — mounts an inline chat where the `<script>` sits, rendered as a centered, rounded card (≈448px wide × 500px tall):
 
 ```html
-<div data-waniwani-embed></div>
-
 <script
   src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
   defer
   data-token="wwp_..."
   data-title="Support"
+  data-theme="light"
   data-welcome-message="Hi! How can I help?"
-  data-primary-color="#6366f1"
 ></script>
 ```
 
-Bound the chat by sizing `[data-waniwani-embed]` (or an ancestor) with `height`, `max-height`, or flex/grid sizing. The chat fits within that bound and scrolls internally — no need to add `overflow: auto` yourself.
+To control *where* the chat mounts (and to size it yourself), place a `[data-waniwani-embed]` element on the page; the script mounts into the first one it finds instead of creating its own.
 
 ```html
-<!-- max-height bound -->
-<div data-waniwani-embed style="max-height: 600px;"></div>
-
-<!-- definite height -->
-<div data-waniwani-embed style="height: 600px;"></div>
-
-<!-- flex-column item -->
-<div style="display: flex; flex-direction: column; height: 100vh;">
-  <header>…</header>
-  <div data-waniwani-embed style="flex: 1; min-height: 0;"></div>
-</div>
+<div data-waniwani-embed></div>
+<script src="…/embed.js" defer data-token="wwp_..."></script>
 ```
+
+### Sizing the inline embed
+
+The inline container defaults to `height: 500px`. The default is applied with a `:where()` rule (specificity 0), so **any** of these overrides wins:
+
+```html
+<!-- Per-embed, no CSS: data-height accepts any CSS length (a bare number = px) -->
+<script src="…/embed.js" defer data-token="wwp_..." data-height="500px"></script>
+```
+
+```css
+/* A definite height */
+[data-waniwani-embed] { height: 80vh; }
+
+/* Shrink-to-content, capped — opt out of the fixed height with `auto` */
+[data-waniwani-embed] { height: auto; max-height: 600px; }
+
+/* Fill a flex column */
+[data-waniwani-embed] { height: auto; flex: 1; min-height: 0; }
+```
+
+The chat fits within whatever bound you set and scrolls internally — no need to add `overflow: auto` yourself. Inside, the header and input are pinned while only the messages list scrolls.
 
 ### Script tag options
 
@@ -213,8 +227,35 @@ Bound the chat by sizing `[data-waniwani-embed]` (or an ancestor) with `height`,
 | `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |
 | `data-theme` | No | `"light"` (default), `"dark"`, or `"auto"` (follow `prefers-color-scheme`) |
 | `data-locale` | No | `"en"`, `"fr"`, or `"es"`. Auto-detects from `<html lang>` / `navigator.language` when omitted |
+| `data-mode` | No | `"inline"` (default) or `"floating"` — see [Floating mode](#floating-mode) |
+| `data-height` | No | Inline only. Default container height — any CSS length (`"500px"`, `"80vh"`) or a bare number (px). Defaults to `500px` |
+| `data-position` | No | Floating only. `"bottom-center"` (default), `"bottom-right"`, or `"bottom-left"` |
+| `data-launcher-text` | No | Floating only. Overrides the docked input's placeholder. Defaults to the agent's configured input placeholder (typed out), then a localized "Ask anything…" |
 
 For finer-grained colour, radius, or font overrides, set CSS variables on the container — see [Theming the chat widget](#theming-the-chat-widget).
+
+### Floating mode
+
+Set `data-mode="floating"` for a docked, progressively-revealing chat (no `[data-waniwani-embed]` element needed — the surface is appended to `<body>` and overlays the page without blocking it). It has three states:
+
+1. **Docked input** — on load, only a thin input bar sits at the bottom of the screen (not a launcher button). The page stays fully usable.
+2. **Suggestions** — after a short idle delay it auto-expands to show the agent's starter suggestions as tappable CTAs above the input, with a "−" to collapse. (Skipped when the agent has no suggestions.)
+3. **Full chat** — the moment the visitor sends a message (typed or a suggestion), the full chat panel slides up from the bottom: a card on desktop, full-screen on mobile. The header "−" collapses back to the docked input.
+
+```html
+<script
+  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
+  defer
+  data-token="wwp_..."
+  data-mode="floating"
+  data-position="bottom-center"
+  data-launcher-text="Ask anything"
+  data-title="Support"
+  data-theme="auto"
+></script>
+```
+
+The docked input types out the agent's configured input placeholder (set `data-launcher-text` to override it); the starter suggestions come from the agent's dashboard config (or `data-suggestions`). Once the conversation has started, focusing the dock re-opens the full chat (with history) instead of re-showing the suggestions. The dock and panel inherit the theme, so `data-theme` and any `--ww-primary` override apply. Drive it from JS with `window.WaniWani.chat.open()` / `.close()` / `.toggle()`; `sendMessage` / `focus` open the full panel automatically.
 
 ### Programmatic init + ref API
 
@@ -256,10 +297,11 @@ The IIFE exposes the same imperative methods as the React ref, both globally and
 |--------|-------------|
 | `init(options?)` | Mount the chat (only on `window.WaniWani.chat`) |
 | `destroy()` | Unmount the chat |
-| `sendMessage(text)` | Submit a user message |
+| `open()` / `close()` / `toggle()` | Floating mode: open/close/toggle the panel. No-op in inline mode |
+| `sendMessage(text)` | Submit a user message (opens the panel in floating mode) |
 | `sendMessageAndWait(text)` | Submit and resolve with the final assistant message |
 | `reset()` | Clear all messages |
-| `focus()` | Focus the chat input |
+| `focus()` | Focus the chat input (opens the panel in floating mode) |
 | `getMessages()` | Snapshot of current `UIMessage[]` |
 
 Pre-mount, write methods no-op silently and read methods return `undefined` / `[]`. Pick whichever feels right — call them globally (`window.WaniWani.chat.sendMessage(...)`) when you don't have the instance handle, or on the instance when you do.
@@ -337,41 +379,75 @@ Set the preset via `data-theme` on the script tag, or via `appearance.theme` on 
 
 `auto` follows the OS / browser dark-mode setting at runtime — no reload needed when the user flips it.
 
-#### Chrome defaults (only when `data-theme` is set)
+#### Container defaults (inline mode)
 
-When you opt into a preset on the embed script, the bundle injects a low-specificity rule on `[data-waniwani-embed]` so the container looks like a card without any extra CSS from you:
+The inline embed injects these low-specificity rules on `[data-waniwani-embed]`:
 
 ```css
-:where([data-waniwani-embed]) {
-  min-height: 500px;
-  max-height: 100vh;
+/* Always — so a bare snippet is bounded out of the box */
+:where([data-waniwani-embed]) { height: 500px; }
+
+/* Only when `data-theme` is set — the card look on YOUR container */
+:where([data-waniwani-embed]) { border-radius: 16px; overflow: hidden; }
+
+/* Only on a container the embed AUTO-CREATES (no markup on the page) */
+:where([data-waniwani-embed][data-waniwani-auto]) {
+  width: 100%;
+  max-width: 28rem;        /* centered card, not full-width */
+  margin-inline: auto;
   border-radius: 16px;
   overflow: hidden;
+  border: 1px solid var(--ww-border, rgba(0, 0, 0, 0.1));
+  box-shadow: var(--ww-shadow, 0 10px 30px rgba(0, 0, 0, 0.08));
 }
 ```
 
-It's wrapped in `:where()` (specificity `0,0,0`), so **any** normal rule targeting `[data-waniwani-embed]` wins. Examples:
+The card styling only applies to a container the embed creates for you — when you place your own `[data-waniwani-embed]`, the embed leaves its width/shape alone.
+
+##### Restyle the auto-created card — no markup required
+
+You don't need to add a `[data-waniwani-embed]` element to restyle the card. The container the embed creates lives in your page's light DOM with the `data-waniwani-embed` attribute, so your own page CSS targets it directly. All the embed defaults are `:where()` (specificity 0), so any normal rule wins:
+
+```html
+<style>
+  [data-waniwani-embed] {
+    /* size & shape — plain CSS on the container */
+    height: 600px;
+    max-width: 32rem;     /* default ≈28rem; use `none` for full width */
+    border-radius: 20px;
+
+    /* colors — `--ww-*` variables pierce the chat's shadow DOM */
+    --ww-bg: #111827;
+    --ww-text: #e5e7eb;
+    --ww-primary: #22d3ee;
+    --ww-border: #334155;
+  }
+</style>
+<script src="…/embed.js" defer data-token="wwp_..."></script>
+```
+
+- **Size & shape** (`height`, `max-width`, `border-radius`, `border`, `box-shadow`, `margin`) — set them as normal CSS properties on `[data-waniwani-embed]`.
+- **Colors, radius, fonts inside the chat** — set any `--ww-*` variable (see [CSS variable overrides](#2-css-variable-overrides) for the full list). These inherit through the Shadow DOM, so you can set them on `[data-waniwani-embed]`, or globally on `:root` / `body` to theme every embed on the page at once.
+
+Place your own `[data-waniwani-embed]` element only when you want to control *where* the chat mounts or drop it into an existing layout (a flex/grid cell, a sidebar, etc.).
+
+Both are wrapped in `:where()` (specificity `0,0,0`), so **any** normal rule targeting `[data-waniwani-embed]` wins. Examples:
 
 ```css
 /* Smaller card */
-[data-waniwani-embed] {
-  height: 300px;
-  min-height: 0;       /* opt out of the 500px floor */
-}
+[data-waniwani-embed] { height: 300px; }
+
+/* Shrink-to-content, capped — opt out of the fixed height */
+[data-waniwani-embed] { height: auto; max-height: 600px; }
 
 /* Rectangular, no clipping */
-[data-waniwani-embed] {
-  border-radius: 0;
-}
+[data-waniwani-embed] { border-radius: 0; }
 
 /* Inside a flex column where the chat should shrink with the parent */
-[data-waniwani-embed] {
-  flex: 1;
-  min-height: 0;
-}
+[data-waniwani-embed] { height: auto; flex: 1; min-height: 0; }
 ```
 
-Don't want any defaults at all? Leave `data-theme` off — the embed mounts into your container untouched, the way it did before this feature existed.
+Leave `data-theme` off and the container keeps its square shape (no rounding) — only the 500px default height is applied, which you can override as above.
 
 #### 2. CSS variable overrides
 

@@ -130,6 +130,88 @@ describe("resolveConfig — enableThreadHistory", () => {
 	});
 });
 
+describe("resolveConfig — render mode", () => {
+	test("mode defaults to undefined (inline at consumption)", () => {
+		const config = resolveConfig({ token: "tok" });
+		expect(config.mode).toBeUndefined();
+	});
+
+	test("programmatic floating mode is preserved", () => {
+		const config = resolveConfig({ token: "tok", mode: "floating" });
+		expect(config.mode).toBe("floating");
+	});
+
+	test("position and launcherText pass through", () => {
+		const config = resolveConfig({
+			token: "tok",
+			mode: "floating",
+			position: "bottom-left",
+			launcherText: "Chat with us",
+		});
+		expect(config.position).toBe("bottom-left");
+		expect(config.launcherText).toBe("Chat with us");
+	});
+
+	test("height passes through", () => {
+		const config = resolveConfig({ token: "tok", height: "80vh" });
+		expect(config.height).toBe("80vh");
+	});
+});
+
+describe("parseConfigFromScript — render mode attrs", () => {
+	async function parseWithAttrs(
+		attrs: Record<string, string>,
+	): Promise<Record<string, unknown>> {
+		const { parseConfigFromScript } = await import(
+			`../config?t=${Date.now()}-${Math.random()}`
+		);
+		const fakeScript = {
+			getAttribute(name: string) {
+				return name in attrs ? attrs[name] : null;
+			},
+		};
+		const prevDocument = g.document;
+		const prevHtmlScriptElement = g.HTMLScriptElement;
+		g.HTMLScriptElement = class {};
+		Object.setPrototypeOf(fakeScript, g.HTMLScriptElement.prototype);
+		g.document = { currentScript: fakeScript, querySelectorAll: () => [] };
+		try {
+			return parseConfigFromScript();
+		} finally {
+			g.document = prevDocument;
+			g.HTMLScriptElement = prevHtmlScriptElement;
+		}
+	}
+
+	test("data-mode=floating parses", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-mode": "floating",
+		});
+		expect(cfg.mode).toBe("floating");
+	});
+
+	test("invalid data-mode is ignored", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-mode": "popover",
+		});
+		expect(cfg.mode).toBeUndefined();
+	});
+
+	test("data-position, data-height, data-launcher-text parse", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-position": "bottom-left",
+			"data-height": "500px",
+			"data-launcher-text": "Need help?",
+		});
+		expect(cfg.position).toBe("bottom-left");
+		expect(cfg.height).toBe("500px");
+		expect(cfg.launcherText).toBe("Need help?");
+	});
+});
+
 describe("resolveConfig — validation", () => {
 	test("throws when token missing", () => {
 		expect(() => resolveConfig({})).toThrow("Missing required config: `token`");
