@@ -193,6 +193,9 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 				get sessionId() {
 					return engine.sessionId;
 				},
+				get isThreadHistoryReady() {
+					return engine.isThreadHistoryReady;
+				},
 			}),
 			[
 				engine.handleSubmit,
@@ -200,6 +203,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 				engine.reset,
 				engine.messages,
 				engine.sessionId,
+				engine.isThreadHistoryReady,
 				focusInput,
 			],
 		);

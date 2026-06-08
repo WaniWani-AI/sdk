@@ -113,22 +113,39 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// panel — matches the inline embed's default (themeable via --ww-shadow).
 		const cardShadow = "var(--ww-shadow, 0 10px 30px rgba(0, 0, 0, 0.08))";
 
+		// A conversation exists, OR a persisted one is about to. With thread
+		// history on, `messages` is briefly empty while IndexedDB hydrates the
+		// active thread — treat that window as "has conversation" so we don't
+		// flash starter CTAs over a thread that's loading.
+		const hasOrPendingConversation = useCallback(() => {
+			const chat = chatRef.current;
+			if (!chat) {
+				return false;
+			}
+			if (chat.messages.length > 0) {
+				return true;
+			}
+			return (
+				config.enableThreadHistory === true &&
+				chat.isThreadHistoryReady === false
+			);
+		}, [config.enableThreadHistory]);
+
 		// Auto-expand to surface the CTAs once, after an idle delay — only if
 		// there are suggestions, the visitor hasn't engaged, and no
-		// conversation exists yet (suggestions are starter prompts; once the
-		// chat has messages they no longer make sense).
+		// conversation exists (or is loading). Suggestions are starter prompts;
+		// once the chat has (or will have) messages they no longer make sense.
 		useEffect(() => {
 			if (suggestions.length === 0) {
 				return;
 			}
 			const id = setTimeout(() => {
-				const hasMessages = (chatRef.current?.messages.length ?? 0) > 0;
-				if (!interactedRef.current && !hasMessages) {
+				if (!interactedRef.current && !hasOrPendingConversation()) {
 					setPhase((p) => (p === "input" ? "expanded" : p));
 				}
 			}, AUTO_EXPAND_DELAY_MS);
 			return () => clearTimeout(id);
-		}, [suggestions.length]);
+		}, [suggestions.length, hasOrPendingConversation]);
 
 		const openWith = useCallback((text: string) => {
 			interactedRef.current = true;
@@ -178,17 +195,18 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 
 		const onComposerFocus = useCallback(() => {
 			interactedRef.current = true;
-			// Once the conversation has started, the visitor has history they
-			// can't see while minimized — refocusing the dock should reopen the
-			// full chat, not re-offer the starter CTAs. Move focus into the
-			// chat input once the panel is visible so typing continues smoothly.
-			if ((chatRef.current?.messages.length ?? 0) > 0) {
+			// Once a conversation exists (or a persisted one is loading), the
+			// visitor has history they can't see while minimized — refocusing the
+			// dock should reopen the full chat, not re-offer the starter CTAs.
+			// Move focus into the chat input once the panel is visible so typing
+			// continues smoothly.
+			if (hasOrPendingConversation()) {
 				setPhase("open");
 				setTimeout(() => chatRef.current?.focus(), 0);
 			} else if (suggestions.length > 0) {
 				setPhase((p) => (p === "input" ? "expanded" : p));
 			}
-		}, [suggestions.length]);
+		}, [suggestions.length, hasOrPendingConversation]);
 
 		const body: Record<string, unknown> = {};
 		if (config.mcpServerUrl) {

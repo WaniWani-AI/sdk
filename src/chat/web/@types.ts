@@ -318,4 +318,11 @@ export interface ChatHandle {
 	messages: import("ai").UIMessage[];
 	/** Session ID used for event correlation. Available after the first message. */
 	sessionId: string | undefined;
+	/**
+	 * `true` once persisted thread history has finished loading from storage
+	 * (always `true` when thread history is disabled). `false` only during the
+	 * brief async hydration window, so callers can avoid treating an
+	 * not-yet-loaded thread as an empty conversation.
+	 */
+	isThreadHistoryReady: boolean;
 }
