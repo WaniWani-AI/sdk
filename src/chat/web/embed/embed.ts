@@ -399,6 +399,12 @@ function mountInline(
 			reactRoot = null;
 			hostElement?.remove();
 			hostElement = null;
+			// Remove the container too, but only if WE created it — leave any
+			// author-placed `[data-waniwani-embed]` element in the page so
+			// `destroy()` doesn't strip the host's own markup.
+			if (container.hasAttribute(AUTO_MARKER_ATTR)) {
+				container.remove();
+			}
 			currentInstance = null;
 		},
 		// Inline mode has no panel to open — these are no-ops so the public

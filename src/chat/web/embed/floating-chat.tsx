@@ -338,7 +338,11 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 						appearance={config.appearance}
 						title={config.title}
 						headerActions={closeButton}
-						hideHeader={config.hideHeader}
+						// Force the header on in floating mode: the minimize control
+						// lives in `headerActions`, so honoring `hideHeader` here would
+						// leave an opened (full-screen on mobile) panel with no in-UI
+						// way back to the dock. The panel is its own chrome anyway.
+						hideHeader={false}
 						welcomeMessage={config.welcomeMessage}
 						placeholder={config.placeholder}
 						suggestions={
