@@ -177,25 +177,42 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			}
 		}, [focusNonce, phase]);
 
-		const openWith = useCallback((text: string) => {
+		// Any explicit engagement — open, close, collapse, toggle, focus, send —
+		// stops the idle auto-expand. Otherwise a pending timer could re-surface
+		// the starter CTAs after the visitor has already dismissed them (e.g.
+		// collapsing the tray, or `open()`/`close()` without sending).
+		const openPanel = useCallback(() => {
 			interactedRef.current = true;
 			setPhase("open");
-			const trimmed = text.trim();
-			if (trimmed) {
-				chatRef.current?.sendMessage(trimmed);
-			}
 		}, []);
+		const collapse = useCallback(() => {
+			interactedRef.current = true;
+			setPhase("input");
+		}, []);
+
+		const openWith = useCallback(
+			(text: string) => {
+				openPanel();
+				const trimmed = text.trim();
+				if (trimmed) {
+					chatRef.current?.sendMessage(trimmed);
+				}
+			},
+			[openPanel],
+		);
 
 		useImperativeHandle(
 			ref,
 			() => ({
-				open: () => setPhase("open"),
-				close: () => setPhase("input"),
-				toggle: () => setPhase((p) => (p === "open" ? "input" : "open")),
+				open: () => openPanel(),
+				close: () => collapse(),
+				toggle: () => {
+					interactedRef.current = true;
+					setPhase((p) => (p === "open" ? "input" : "open"));
+				},
 				sendMessage: (text: string) => openWith(text),
 				sendMessageAndWait: async (text: string) => {
-					interactedRef.current = true;
-					setPhase("open");
+					openPanel();
 					const chat = chatRef.current;
 					if (!chat) {
 						return undefined;
@@ -207,13 +224,13 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 					// Docs contract: in floating mode `focus()` opens the panel (like
 					// `sendMessage`). The focus effect lands the chat input once the
 					// panel has committed/painted.
-					setPhase("open");
+					openPanel();
 					setFocusNonce((n) => n + 1);
 				},
 				getMessages: () => chatRef.current?.messages ?? [],
 				getSessionId: () => chatRef.current?.sessionId,
 			}),
-			[openWith],
+			[openWith, openPanel, collapse],
 		);
 
 		const submitComposer = useCallback(() => {
@@ -264,7 +281,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		const closeButton = (
 			<button
 				type="button"
-				onClick={() => setPhase("input")}
+				onClick={collapse}
 				aria-label={t.launcher.close}
 				className="ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground"
 			>
@@ -306,7 +323,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 							<div className="ww:flex ww:justify-end">
 								<button
 									type="button"
-									onClick={() => setPhase("input")}
+									onClick={collapse}
 									aria-label={t.launcher.minimize}
 									className="ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-full ww:bg-background/80 ww:text-muted-foreground ww:shadow ww:backdrop-blur ww:transition-colors hover:ww:text-foreground"
 								>
