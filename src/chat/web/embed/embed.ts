@@ -10,7 +10,13 @@ import type { UIMessage } from "ai";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import type { EmbedConfig } from "./config";
-import { parseConfigFromScript, resolveConfig } from "./config";
+import {
+	DEFAULT_EMBED_HEIGHT,
+	findScriptTag,
+	parseConfigFromScript,
+	resolveConfig,
+} from "./config";
+import { FloatingChat, type FloatingChatHandle } from "./floating-chat";
 import { InlineChat, type InlineChatHandle } from "./inline-chat";
 
 // ---------------------------------------------------------------------------
@@ -29,9 +35,16 @@ declare global {
 			chat?: {
 				init: (options?: Partial<EmbedConfig>) => EmbedInstance;
 				destroy: () => void;
+				/** Open the floating panel. No-op in inline mode. */
+				open: () => void;
+				/** Close the floating panel. No-op in inline mode. */
+				close: () => void;
+				/** Toggle the floating panel. No-op in inline mode. */
+				toggle: () => void;
 				/**
 				 * Submit a user message to the chat. No-op if the embed has not
-				 * mounted yet or the inner layout has not attached.
+				 * mounted yet or the inner layout has not attached. In floating
+				 * mode this also opens the panel.
 				 */
 				sendMessage: (text: string) => void;
 				/**
@@ -59,6 +72,9 @@ declare global {
 
 interface EmbedInstance {
 	destroy: () => void;
+	open: () => void;
+	close: () => void;
+	toggle: () => void;
 	sendMessage: (text: string) => void;
 	sendMessageAndWait: (text: string) => Promise<UIMessage | undefined>;
 	reset: () => void;
@@ -77,18 +93,28 @@ let containerResizeObserver: ResizeObserver | null = null;
 // with normal CSS specificity.
 // ---------------------------------------------------------------------------
 
+const SIZING_STYLE_ID = "waniwani-chat-sizing";
 const STRUCTURAL_STYLE_ID = "waniwani-chat-defaults";
 const CHROME_STYLE_ID = "waniwani-chat-chrome";
+const AUTO_CARD_STYLE_ID = "waniwani-chat-auto-card";
 
-// Structural defaults — applied only when a preset is chosen. Without one,
+// Sizing default — always injected for inline embeds so a bare
+// `<div data-waniwani-embed>` (or the one we auto-create) is bounded out of
+// the box instead of growing with content. `:where()` keeps specificity at
+// 0, so *any* author rule wins: `[data-waniwani-embed]{height:400px}`,
+// `max-height`, a flex/grid track, or `height:auto` to go fully fluid.
+// `data-height` sets it explicitly via an inline style (see `mountInline`).
+const SIZING_DEFAULTS_CSS = `:where([data-waniwani-embed]){height:${DEFAULT_EMBED_HEIGHT}}`;
+
+// Card-shape defaults — applied only when a preset is chosen. Without one,
 // we touch nothing on the customer's container so they keep their own
-// sizing and shape. `:where()` keeps specificity at 0 so any normal
-// customer selector wins (e.g. `min-height: 0` to opt out of the floor).
+// shape. `:where()` keeps specificity at 0 so any normal customer selector
+// wins (e.g. `border-radius: 0` to opt out of the rounding).
 // No `background` here on purpose: the inner chat draws its own background
 // via `--ww-color-background`, which switches with the active preset
 // (light/dark/auto). Setting a light background here would show through
 // any rounded-corner gap in dark mode.
-const STRUCTURAL_DEFAULTS_CSS = `:where([data-waniwani-embed]){min-height:500px;max-height:100vh;border-radius:16px;overflow:hidden}`;
+const STRUCTURAL_DEFAULTS_CSS = `:where([data-waniwani-embed]){border-radius:16px;overflow:hidden}`;
 
 // Chrome defaults (border, shadow). Always injected because the vars
 // default to no-op values — invisible until the customer passes
@@ -97,6 +123,16 @@ const STRUCTURAL_DEFAULTS_CSS = `:where([data-waniwani-embed]){min-height:500px;
 // Lives on the container (not the chat root) because the container's
 // `overflow:hidden` would clip a shadow drawn inside.
 const CONTAINER_CHROME_CSS = `:where([data-waniwani-embed]){border-style:solid;border-width:var(--ww-border-width,0);border-color:var(--ww-border,transparent);box-shadow:var(--ww-shadow,none)}`;
+
+// Card defaults for the container *we* auto-create (marked `data-waniwani-auto`).
+// When the customer placed their own `[data-waniwani-embed]`, we respect their
+// layout — but a container we inject has no styling of its own, and a bare
+// block div would stretch full-width. So we present it as a centered, rounded
+// card with a subtle border + shadow. Injected after `CONTAINER_CHROME_CSS`
+// so its (equal-specificity) `:where()` border/shadow win, while still using
+// the same `--ww-*` vars so customer `appearance.variables` override them.
+// `:where()` => any author rule targeting `[data-waniwani-embed]` still wins.
+const AUTO_CARD_CSS = `:where([data-waniwani-embed][data-waniwani-auto]){width:100%;max-width:28rem;margin-inline:auto;border-radius:16px;overflow:hidden;border-style:solid;border-width:var(--ww-border-width,1px);border-color:var(--ww-border,rgba(0,0,0,0.1));box-shadow:var(--ww-shadow,0 10px 30px rgba(0,0,0,0.08))}`;
 
 function ensureStyle(id: string, css: string): void {
 	if (typeof document === "undefined" || document.getElementById(id)) {
@@ -186,18 +222,48 @@ function injectStyles(shadowRoot: ShadowRoot, config: EmbedConfig): void {
 // ---------------------------------------------------------------------------
 
 const INLINE_MARKER_ATTR = "data-waniwani-embed";
+// Marks a container we created (vs. one the customer placed). Drives the
+// centered-card defaults so an auto-injected container doesn't render as a
+// bare full-width block.
+const AUTO_MARKER_ATTR = "data-waniwani-auto";
+
+// Find the inline mount target, creating one if the page has none. A bare
+// snippet (just the `<script>` tag, no markup) then works out of the box:
+// we insert `<div data-waniwani-embed>` immediately before the script so the
+// chat mounts where the tag sits. Falls back to `document.body` when the
+// script lives in `<head>` (a div there would never render) or can't be
+// located.
+function ensureInlineContainer(scriptEl: HTMLScriptElement | null): Element {
+	const existing = document.querySelector(`[${INLINE_MARKER_ATTR}]`);
+	if (existing) {
+		return existing;
+	}
+	const container = document.createElement("div");
+	container.setAttribute(INLINE_MARKER_ATTR, "");
+	// Tag it as ours so `AUTO_CARD_CSS` applies (centered rounded card).
+	container.setAttribute(AUTO_MARKER_ATTR, "");
+	const inHead = scriptEl ? !!document.head?.contains(scriptEl) : false;
+	if (scriptEl?.parentNode && !inHead) {
+		scriptEl.parentNode.insertBefore(container, scriptEl);
+	} else {
+		document.body.appendChild(container);
+	}
+	return container;
+}
+
+// Normalize a `data-height` value: a bare number is treated as pixels,
+// any other CSS length (`"80vh"`, `"600px"`, …) is passed through.
+function normalizeHeight(value: string): string {
+	return /^\d+$/.test(value.trim()) ? `${value.trim()}px` : value.trim();
+}
 
 function mountInline(
 	config: EmbedConfig,
 	programmatic: Partial<EmbedConfig> | undefined,
 	scriptConfig: Partial<EmbedConfig> | undefined,
+	scriptEl: HTMLScriptElement | null,
 ): EmbedInstance {
-	const container = document.querySelector(`[${INLINE_MARKER_ATTR}]`);
-	if (!container) {
-		throw new Error(
-			`[WaniWani] No inline mount target. Place \`<div ${INLINE_MARKER_ATTR}></div>\` in your page.`,
-		);
-	}
+	const container = ensureInlineContainer(scriptEl);
 
 	// Size the chat against the customer's container in two complementary
 	// ways:
@@ -224,16 +290,29 @@ function mountInline(
 	//      parent's bound, the parent's content-box shrinks to fit, and
 	//      mirroring that would lock the host at its current size.
 
-	// Container chrome (`min-height`, `max-height`, `border-radius`,
-	// `overflow`) is opt-in via `data-theme` / `appearance.theme`. Without
-	// a preset, we touch nothing on the customer's container — they bring
-	// their own sizing and shape, same as before this option existed.
-	// When opted in, the rule is wrapped in `:where()` so any customer
+	// A default height so the embed is bounded out of the box (see
+	// `SIZING_DEFAULTS_CSS`). `:where()` => any author CSS wins; `data-height`
+	// sets it explicitly via an inline style, which beats the `:where()`
+	// default without `!important`.
+	ensureStyle(SIZING_STYLE_ID, SIZING_DEFAULTS_CSS);
+	if (config.height && container instanceof HTMLElement) {
+		container.style.height = normalizeHeight(config.height);
+	}
+
+	// Card shape (`border-radius`, `overflow`) is opt-in via `data-theme` /
+	// `appearance.theme`. Without a preset, we leave the container's shape
+	// alone. When opted in, the rule is wrapped in `:where()` so any customer
 	// override on `[data-waniwani-embed]` still wins.
 	if (config.appearance?.theme) {
 		ensureStyle(STRUCTURAL_STYLE_ID, STRUCTURAL_DEFAULTS_CSS);
 	}
 	ensureStyle(CHROME_STYLE_ID, CONTAINER_CHROME_CSS);
+	// A container we created presents as a centered rounded card. Injected
+	// after the chrome rule so its border/shadow defaults win (both `:where()`,
+	// equal specificity → source order decides).
+	if (container.hasAttribute(AUTO_MARKER_ATTR)) {
+		ensureStyle(AUTO_CARD_STYLE_ID, AUTO_CARD_CSS);
+	}
 	applyContainerAppearance(container, config);
 
 	hostElement = document.createElement("div");
@@ -241,8 +320,8 @@ function mountInline(
 	// Structural sizing only. `min-height: 0` is the flex-shrink unblocker:
 	// when the customer's container is a flex column, this lets the host
 	// (and the chat inside it) shrink below content size instead of
-	// expanding the parent. The visible floor (500px) lives on the
-	// container itself, not here.
+	// expanding the parent. The default height (500px) lives on the
+	// container itself (see `SIZING_DEFAULTS_CSS`), not here.
 	hostElement.style.cssText =
 		"width:100%;height:100%;max-height:inherit;" +
 		"display:flex;flex-direction:column;flex:1 1 auto;min-height:0;";
@@ -320,8 +399,19 @@ function mountInline(
 			reactRoot = null;
 			hostElement?.remove();
 			hostElement = null;
+			// Remove the container too, but only if WE created it — leave any
+			// author-placed `[data-waniwani-embed]` element in the page so
+			// `destroy()` doesn't strip the host's own markup.
+			if (container.hasAttribute(AUTO_MARKER_ATTR)) {
+				container.remove();
+			}
 			currentInstance = null;
 		},
+		// Inline mode has no panel to open — these are no-ops so the public
+		// API is uniform across modes.
+		open: () => {},
+		close: () => {},
+		toggle: () => {},
 		sendMessage: (text: string) => inlineRef.current?.chat?.sendMessage(text),
 		sendMessageAndWait: async (text: string) => {
 			const chat = inlineRef.current?.chat;
@@ -338,6 +428,68 @@ function mountInline(
 }
 
 // ---------------------------------------------------------------------------
+// Mount — floating
+// ---------------------------------------------------------------------------
+
+function mountFloating(
+	config: EmbedConfig,
+	programmatic: Partial<EmbedConfig> | undefined,
+	scriptConfig: Partial<EmbedConfig> | undefined,
+): EmbedInstance {
+	// A viewport-sized, click-through overlay appended to <body>. The launcher
+	// and panel inside set `pointer-events: auto`, so the host page stays
+	// interactive everywhere else. No `[data-waniwani-embed]` element needed.
+	hostElement = document.createElement("div");
+	hostElement.id = "waniwani-chat-embed";
+	hostElement.style.cssText =
+		"position:fixed;inset:0;z-index:2147483000;pointer-events:none;";
+	document.body.appendChild(hostElement);
+
+	const shadowRoot = hostElement.attachShadow({ mode: "open" });
+	injectStyles(shadowRoot, config);
+
+	const mountContainer = document.createElement("div");
+	mountContainer.className = "ww:contents";
+	shadowRoot.appendChild(mountContainer);
+
+	const floatingRef = React.createRef<FloatingChatHandle>();
+
+	reactRoot = ReactDOM.createRoot(mountContainer);
+	reactRoot.render(
+		React.createElement(FloatingChat, {
+			ref: floatingRef,
+			config,
+			programmatic,
+			scriptConfig,
+		}),
+	);
+
+	return {
+		destroy: () => {
+			reactRoot?.unmount();
+			reactRoot = null;
+			hostElement?.remove();
+			hostElement = null;
+			currentInstance = null;
+		},
+		open: () => floatingRef.current?.open(),
+		close: () => floatingRef.current?.close(),
+		toggle: () => floatingRef.current?.toggle(),
+		sendMessage: (text: string) => floatingRef.current?.sendMessage(text),
+		sendMessageAndWait: async (text: string) => {
+			if (!floatingRef.current) {
+				return undefined;
+			}
+			return floatingRef.current.sendMessageAndWait(text);
+		},
+		reset: () => floatingRef.current?.reset(),
+		focus: () => floatingRef.current?.focus(),
+		getMessages: () => floatingRef.current?.getMessages() ?? [],
+		getSessionId: () => floatingRef.current?.getSessionId(),
+	};
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -349,13 +501,18 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 		return currentInstance;
 	}
 
-	// Parse `data-*` once synchronously — `document.currentScript` is only
-	// valid during script execution, so we must capture it here and thread
-	// the result through to useRemoteEmbedConfig.
+	// Parse `data-*` and capture the script element once synchronously —
+	// `document.currentScript` is only valid during script execution, so we
+	// must grab both here and thread them through (the element is needed to
+	// auto-create an inline container in front of it).
+	const scriptEl = findScriptTag();
 	const scriptConfig = parseConfigFromScript();
 	const config = resolveConfig(options, undefined, scriptConfig);
 
-	currentInstance = mountInline(config, options, scriptConfig);
+	currentInstance =
+		config.mode === "floating"
+			? mountFloating(config, options, scriptConfig)
+			: mountInline(config, options, scriptConfig, scriptEl);
 
 	return currentInstance;
 }
@@ -375,6 +532,9 @@ window.WaniWani = window.WaniWani || {};
 window.WaniWani.chat = {
 	init,
 	destroy,
+	open: () => currentInstance?.open(),
+	close: () => currentInstance?.close(),
+	toggle: () => currentInstance?.toggle(),
 	sendMessage: (text: string) => currentInstance?.sendMessage(text),
 	sendMessageAndWait: async (text: string) => {
 		if (!currentInstance) {

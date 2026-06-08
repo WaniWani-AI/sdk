@@ -103,7 +103,45 @@ export interface EmbedConfig {
 	 * English. Surfaced as `data-locale` on the embed script tag.
 	 */
 	locale?: Locale;
+	/**
+	 * How the widget renders.
+	 *
+	 * - `"inline"` (default) mounts the chat into a `[data-waniwani-embed]`
+	 *   element on the page. If none exists, one is created and inserted in
+	 *   front of the embed `<script>` tag, so a bare snippet works with no
+	 *   markup changes.
+	 * - `"floating"` renders a launcher pill anchored to a corner that opens
+	 *   the chat in a panel — a fixed-size panel on desktop, full-screen on
+	 *   mobile. No `[data-waniwani-embed]` element is needed.
+	 *
+	 * Surfaced as `data-mode` on the embed script tag.
+	 */
+	mode?: "inline" | "floating";
+	/**
+	 * Where the floating dock (input bar) and the expanded chat panel anchor
+	 * along the bottom edge. Only applies when `mode` is `"floating"`.
+	 * Defaults to `"bottom-center"` (the rose.ai-style centered dock).
+	 * Surfaced as `data-position`.
+	 */
+	position?: "bottom-center" | "bottom-right" | "bottom-left";
+	/**
+	 * Default height for the inline embed container. Any CSS length
+	 * (`"500px"`, `"80vh"`, …) or a bare number (treated as `px`). Applied to
+	 * the `[data-waniwani-embed]` container unless you size it yourself in
+	 * CSS. Defaults to `500px`. Ignored in `floating` mode. Surfaced as
+	 * `data-height`.
+	 */
+	height?: string;
+	/**
+	 * Text shown on the floating launcher pill (e.g. `"Ask anything…"`).
+	 * Only applies when `mode` is `"floating"`. Defaults to a localized
+	 * prompt. Surfaced as `data-launcher-text`.
+	 */
+	launcherText?: string;
 }
+
+/** Fallback height applied to an inline embed container with no author sizing. */
+export const DEFAULT_EMBED_HEIGHT = "500px";
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -119,7 +157,7 @@ const DEFAULTS = {
 // Script tag detection
 // ---------------------------------------------------------------------------
 
-function findScriptTag(): HTMLScriptElement | null {
+export function findScriptTag(): HTMLScriptElement | null {
 	if (typeof document === "undefined") {
 		return null;
 	}
@@ -241,6 +279,30 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const localeRaw = str("data-locale");
 	if (localeRaw === "en" || localeRaw === "fr" || localeRaw === "es") {
 		config.locale = localeRaw;
+	}
+
+	const modeRaw = str("data-mode");
+	if (modeRaw === "inline" || modeRaw === "floating") {
+		config.mode = modeRaw;
+	}
+
+	const positionRaw = str("data-position");
+	if (
+		positionRaw === "bottom-center" ||
+		positionRaw === "bottom-right" ||
+		positionRaw === "bottom-left"
+	) {
+		config.position = positionRaw;
+	}
+
+	const height = str("data-height");
+	if (height) {
+		config.height = height;
+	}
+
+	const launcherText = str("data-launcher-text");
+	if (launcherText) {
+		config.launcherText = launcherText;
 	}
 
 	const disclaimerRaw = str("data-disclaimer");

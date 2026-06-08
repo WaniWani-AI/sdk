@@ -449,6 +449,81 @@ export function useChatEngine(props: ChatBaseProps) {
 		messagesRef.current = messages;
 	}, [messages]);
 
+	// Hydrate persisted history when it's enabled *after* mount — commonly via
+	// the remote embed config (the dashboard toggle, not a data-attr/prop). The
+	// mount effect above ran while history was off and skipped loading, and
+	// never re-runs, so a returning visitor's thread would otherwise never
+	// appear. Handle the off→on transition here.
+	//
+	// Only hydrate into an empty chat: never clobber a conversation the visitor
+	// started while history was off (those messages live in this same engine).
+	// Mirrors the mount effect's load (epoch- and cancel-guarded). Runs once —
+	// the ref starts `true` when history was already on at mount (handled there).
+	const lateHydratedHistoryRef = useRef(enableThreadHistory);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: react to the enableThreadHistory transition only
+	useEffect(() => {
+		if (!enableThreadHistory || lateHydratedHistoryRef.current) {
+			return;
+		}
+		lateHydratedHistoryRef.current = true;
+		if (messagesRef.current.length > 0) {
+			return;
+		}
+		let cancelled = false;
+		const epoch = switchEpochRef.current;
+		setIsThreadHistoryReady(false);
+		(async () => {
+			try {
+				let ctx = visitorContextRef.current;
+				if (!ctx) {
+					try {
+						ctx = await collectVisitorContext();
+						visitorContextRef.current = ctx;
+					} catch {
+						// Best-effort — silently ignore failures
+					}
+				}
+				const memoryUserId = ctx?.memoryUserId;
+				if (!memoryUserId || cancelled || epoch !== switchEpochRef.current) {
+					if (!cancelled) {
+						setIsThreadHistoryReady(true);
+					}
+					return;
+				}
+				const targetId =
+					controlledThreadId ?? (await getActiveThreadId(memoryUserId));
+				if (cancelled || epoch !== switchEpochRef.current) {
+					return;
+				}
+				if (targetId) {
+					const stored = await loadThread(targetId);
+					if (cancelled || epoch !== switchEpochRef.current) {
+						return;
+					}
+					if (stored && stored.memoryUserId === memoryUserId) {
+						activeThreadIdRef.current = stored.threadId;
+						setActiveThreadIdState(stored.threadId);
+						threadCreatedAtRef.current = stored.createdAt;
+						threadTitleRef.current = stored.title;
+						if (stored.sessionId) {
+							sessionIdRef.current = stored.sessionId;
+							setSessionIdState(stored.sessionId);
+						}
+						setMessages(stored.messages);
+					}
+				}
+				await refreshThreads();
+			} finally {
+				if (!cancelled) {
+					setIsThreadHistoryReady(true);
+				}
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [enableThreadHistory]);
+
 	// Resolve sendMessageAndWait only after React has committed the messages
 	// state update. `onFinish` fires before the re-render, so resolving there
 	// would expose stale `messages` to the caller.

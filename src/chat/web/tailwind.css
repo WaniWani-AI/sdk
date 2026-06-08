@@ -72,6 +72,46 @@
 	--font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+/* ─── Floating embed: dock ⇄ panel enter/exit ──────────────────────────
+   The docked input and the expanded chat panel cross-fade + slide. On exit
+   `visibility` is delayed by the transition duration so the fade/slide can
+   play before the element leaves the a11y tree + hit-testing; on enter it
+   flips immediately so the motion is visible. Transform/opacity are driven
+   here (not via utilities) so the two states animate symmetrically.
+   ───────────────────────────────────────────────────────────────────── */
+[data-waniwani-floating] {
+	transition: opacity 0.28s ease, transform 0.28s ease,
+		visibility 0s linear 0.28s;
+}
+[data-waniwani-floating][data-state="shown"] {
+	visibility: visible;
+	opacity: 1;
+	transform: translateY(0);
+	/* The shadow host overlay is `pointer-events: none`; the shown dock/panel
+	   must opt back in or real clicks pass straight through to the page. */
+	pointer-events: auto;
+	transition: opacity 0.28s ease, transform 0.28s ease, visibility 0s;
+}
+[data-waniwani-floating][data-state="hidden"] {
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+}
+[data-waniwani-floating="dock"][data-state="hidden"] {
+	transform: translateY(0.5rem);
+}
+[data-waniwani-floating="panel"][data-state="hidden"] {
+	transform: translateY(2rem);
+}
+@media (prefers-reduced-motion: reduce) {
+	[data-waniwani-floating] {
+		transition: visibility 0s linear 0.01s;
+	}
+	[data-waniwani-floating][data-state="shown"] {
+		transition: visibility 0s;
+	}
+}
+
 [data-waniwani-chat] *::-webkit-scrollbar {
 	width: 8px;
 }

@@ -59,6 +59,12 @@ export interface Messages {
 		failedToLoad: string;
 		retry: string;
 	};
+	launcher: {
+		prompt: string;
+		open: string;
+		close: string;
+		minimize: string;
+	};
 }
 
 export const en: Messages = {
@@ -118,5 +124,11 @@ export const en: Messages = {
 	widgetErrorBoundary: {
 		failedToLoad: "Widget failed to load",
 		retry: "Retry",
+	},
+	launcher: {
+		prompt: "Ask anything…",
+		open: "Open chat",
+		close: "Close chat",
+		minimize: "Minimize",
 	},
 };
