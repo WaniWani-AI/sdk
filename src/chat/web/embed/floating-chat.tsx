@@ -89,6 +89,11 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		const [composerText, setComposerText] = useState("");
 		// Once the visitor touches the dock we stop the idle auto-expand.
 		const interactedRef = useRef(false);
+		// Bumped to request focusing the chat input once the panel has opened.
+		// A textarea inside a still-hidden panel can't take focus, and React
+		// commits the open state after our handlers return, so we focus from an
+		// effect (below) rather than synchronously / via rAF.
+		const [focusNonce, setFocusNonce] = useState(0);
 
 		const preset = config.appearance?.theme;
 		const userVars = config.appearance?.variables;
@@ -132,20 +137,45 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		}, [config.enableThreadHistory]);
 
 		// Auto-expand to surface the CTAs once, after an idle delay — only if
-		// there are suggestions, the visitor hasn't engaged, and no
-		// conversation exists (or is loading). Suggestions are starter prompts;
-		// once the chat has (or will have) messages they no longer make sense.
+		// there are suggestions, the visitor hasn't engaged, and no conversation
+		// exists. If a persisted thread is still hydrating when the timer fires,
+		// re-check shortly rather than giving up: the engine always resolves
+		// `isThreadHistoryReady`, so this settles — expanding for an empty thread,
+		// staying collapsed for a real one.
 		useEffect(() => {
 			if (suggestions.length === 0) {
 				return;
 			}
-			const id = setTimeout(() => {
-				if (!interactedRef.current && !hasOrPendingConversation()) {
-					setPhase((p) => (p === "input" ? "expanded" : p));
+			let timer: ReturnType<typeof setTimeout>;
+			const tryExpand = () => {
+				if (interactedRef.current) {
+					return;
 				}
-			}, AUTO_EXPAND_DELAY_MS);
-			return () => clearTimeout(id);
-		}, [suggestions.length, hasOrPendingConversation]);
+				const chat = chatRef.current;
+				if ((chat?.messages.length ?? 0) > 0) {
+					return;
+				}
+				const historyPending =
+					config.enableThreadHistory === true &&
+					chat?.isThreadHistoryReady === false;
+				if (historyPending) {
+					timer = setTimeout(tryExpand, 300);
+					return;
+				}
+				setPhase((p) => (p === "input" ? "expanded" : p));
+			};
+			timer = setTimeout(tryExpand, AUTO_EXPAND_DELAY_MS);
+			return () => clearTimeout(timer);
+		}, [suggestions.length, config.enableThreadHistory]);
+
+		// Focus the chat input after the panel has opened. Runs post-commit, so
+		// the (previously hidden) textarea is in layout and can take focus.
+		// Skipped on the initial render (`focusNonce === 0`).
+		useEffect(() => {
+			if (focusNonce > 0 && phase === "open") {
+				chatRef.current?.focus();
+			}
+		}, [focusNonce, phase]);
 
 		const openWith = useCallback((text: string) => {
 			interactedRef.current = true;
@@ -174,16 +204,16 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				},
 				reset: () => chatRef.current?.reset(),
 				focus: () => {
-					if (phase === "open") {
-						chatRef.current?.focus();
-					} else {
-						composerInputRef.current?.focus();
-					}
+					// Docs contract: in floating mode `focus()` opens the panel (like
+					// `sendMessage`). The focus effect lands the chat input once the
+					// panel has committed/painted.
+					setPhase("open");
+					setFocusNonce((n) => n + 1);
 				},
 				getMessages: () => chatRef.current?.messages ?? [],
 				getSessionId: () => chatRef.current?.sessionId,
 			}),
-			[openWith, phase],
+			[openWith],
 		);
 
 		const submitComposer = useCallback(() => {
@@ -202,7 +232,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			// continues smoothly.
 			if (hasOrPendingConversation()) {
 				setPhase("open");
-				setTimeout(() => chatRef.current?.focus(), 0);
+				setFocusNonce((n) => n + 1);
 			} else if (suggestions.length > 0) {
 				setPhase((p) => (p === "input" ? "expanded" : p));
 			}
