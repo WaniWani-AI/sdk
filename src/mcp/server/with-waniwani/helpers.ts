@@ -1,4 +1,5 @@
 import type {
+	CallableTrack,
 	ToolCalledProperties,
 	TrackInput,
 } from "../../../tracking/index.js";
@@ -11,8 +12,12 @@ type UnknownRecord = Record<string, unknown>;
 
 export type WaniwaniTracker = Pick<
 	WaniWaniClient,
-	"flush" | "track" | "identify" | "kb" | "_config"
->;
+	"flush" | "identify" | "kb" | "_config"
+> & {
+	// with-waniwani only emits generic events, so a custom tracker need only
+	// provide the callable `track` — not the flat `track.*` revenue helpers.
+	track: CallableTrack;
+};
 
 const SESSION_ID_KEY = "waniwani/sessionId";
 const GEO_LOCATION_KEY = "waniwani/geoLocation";
@@ -190,7 +195,7 @@ export function buildTrackInput(
 }
 
 export async function safeTrack(
-	tracker: Pick<WaniWaniClient, "track">,
+	tracker: { track: CallableTrack },
 	input: TrackInput,
 	onError?: (error: Error) => void,
 ): Promise<void> {
