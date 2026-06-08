@@ -374,7 +374,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			>
 				{showHeader && (
 					<div
-						className="ww:shrink-0 ww:flex ww:items-center ww:gap-2 ww:px-6 ww:py-3 ww:border-b ww:border-border"
+						className="ww:shrink-0 ww:flex ww:items-center ww:gap-2 ww:pl-4 ww:pr-3 ww:py-3 ww:border-b ww:border-border"
 						style={{
 							backgroundColor: "var(--ww-color-card-header)",
 							color: "var(--ww-color-card-header-foreground)",
