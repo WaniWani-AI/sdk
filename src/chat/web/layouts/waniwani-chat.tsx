@@ -239,11 +239,6 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 
 		return (
 			<ChatEmbed
-				// Remount if thread history flips on after the remote-config merge
-				// (commonly enabled in the dashboard, not via props). The engine
-				// hydrates persisted threads only at mount, so a fresh mount is what
-				// loads a returning visitor's history.
-				key={config.enableThreadHistory ? "th-on" : "th-off"}
 				ref={ref}
 				api={config.api ?? DEFAULT_API}
 				headers={{ Authorization: `Bearer ${config.token}` }}

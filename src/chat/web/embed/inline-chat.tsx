@@ -62,11 +62,6 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 
 		return (
 			<ChatEmbed
-				// Remount if thread history flips on after the remote-config merge
-				// (commonly enabled in the dashboard, not via a data-attr). The
-				// engine hydrates persisted threads only at mount, so a fresh mount
-				// is what loads a returning visitor's history.
-				key={config.enableThreadHistory ? "th-on" : "th-off"}
 				ref={chatRef}
 				api={config.api ?? ""}
 				headers={{ Authorization: `Bearer ${config.token}` }}

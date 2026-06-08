@@ -315,9 +315,6 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				get sessionId() {
 					return engine.sessionId;
 				},
-				get isThreadHistoryReady() {
-					return engine.isThreadHistoryReady;
-				},
 			}),
 			[
 				engine.handleSubmit,
@@ -325,7 +322,6 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				engine.reset,
 				engine.messages,
 				engine.sessionId,
-				engine.isThreadHistoryReady,
 				focusInput,
 			],
 		);

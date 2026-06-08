@@ -118,55 +118,25 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// panel — matches the inline embed's default (themeable via --ww-shadow).
 		const cardShadow = "var(--ww-shadow, 0 10px 30px rgba(0, 0, 0, 0.08))";
 
-		// A conversation exists, OR a persisted one is about to. With thread
-		// history on, `messages` is briefly empty while IndexedDB hydrates the
-		// active thread — treat that window as "has conversation" so we don't
-		// flash starter CTAs over a thread that's loading.
-		const hasOrPendingConversation = useCallback(() => {
-			const chat = chatRef.current;
-			if (!chat) {
-				return false;
-			}
-			if (chat.messages.length > 0) {
-				return true;
-			}
-			return (
-				config.enableThreadHistory === true &&
-				chat.isThreadHistoryReady === false
-			);
-		}, [config.enableThreadHistory]);
-
 		// Auto-expand to surface the CTAs once, after an idle delay — only if
-		// there are suggestions, the visitor hasn't engaged, and no conversation
-		// exists. If a persisted thread is still hydrating when the timer fires,
-		// re-check shortly rather than giving up: the engine always resolves
-		// `isThreadHistoryReady`, so this settles — expanding for an empty thread,
-		// staying collapsed for a real one.
+		// there are suggestions, the visitor hasn't engaged, and there's no
+		// conversation. Persisted thread history loads from IndexedDB in well
+		// under this delay, so by the time the timer fires `messages` already
+		// reflects a returning visitor's thread.
 		useEffect(() => {
 			if (suggestions.length === 0) {
 				return;
 			}
-			let timer: ReturnType<typeof setTimeout>;
-			const tryExpand = () => {
-				if (interactedRef.current) {
-					return;
+			const id = setTimeout(() => {
+				if (
+					!interactedRef.current &&
+					(chatRef.current?.messages.length ?? 0) === 0
+				) {
+					setPhase((p) => (p === "input" ? "expanded" : p));
 				}
-				const chat = chatRef.current;
-				if ((chat?.messages.length ?? 0) > 0) {
-					return;
-				}
-				const historyPending =
-					config.enableThreadHistory === true &&
-					chat?.isThreadHistoryReady === false;
-				if (historyPending) {
-					timer = setTimeout(tryExpand, 300);
-					return;
-				}
-				setPhase((p) => (p === "input" ? "expanded" : p));
-			};
-			timer = setTimeout(tryExpand, AUTO_EXPAND_DELAY_MS);
-			return () => clearTimeout(timer);
-		}, [suggestions.length, config.enableThreadHistory]);
+			}, AUTO_EXPAND_DELAY_MS);
+			return () => clearTimeout(id);
+		}, [suggestions.length]);
 
 		// Focus the chat input after the panel has opened. Runs post-commit, so
 		// the (previously hidden) textarea is in layout and can take focus.
@@ -242,18 +212,17 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 
 		const onComposerFocus = useCallback(() => {
 			interactedRef.current = true;
-			// Once a conversation exists (or a persisted one is loading), the
-			// visitor has history they can't see while minimized — refocusing the
-			// dock should reopen the full chat, not re-offer the starter CTAs.
-			// Move focus into the chat input once the panel is visible so typing
-			// continues smoothly.
-			if (hasOrPendingConversation()) {
+			// Once a conversation exists, the visitor has history they can't see
+			// while minimized — refocusing the dock reopens the full chat rather
+			// than re-offering the starter CTAs. Focusing the chat input happens
+			// in the focus effect, once the panel is painted.
+			if ((chatRef.current?.messages.length ?? 0) > 0) {
 				setPhase("open");
 				setFocusNonce((n) => n + 1);
 			} else if (suggestions.length > 0) {
 				setPhase((p) => (p === "input" ? "expanded" : p));
 			}
-		}, [suggestions.length, hasOrPendingConversation]);
+		}, [suggestions.length]);
 
 		const body: Record<string, unknown> = {};
 		if (config.mcpServerUrl) {
@@ -395,12 +364,6 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 					)}
 				>
 					<ChatEmbed
-						// Remount if thread history flips on after the remote-config
-						// merge (it's commonly enabled in the dashboard, not via a
-						// data-attr). The engine hydrates persisted threads only at
-						// mount, so a fresh mount is what loads a returning visitor's
-						// history. Flips at most once, early, while the panel is hidden.
-						key={config.enableThreadHistory ? "th-on" : "th-off"}
 						ref={chatRef}
 						api={config.api ?? ""}
 						headers={{ Authorization: `Bearer ${config.token}` }}
