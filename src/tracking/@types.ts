@@ -20,7 +20,13 @@ export type EventType =
 	| "widget_scroll"
 	| "widget_form_field"
 	| "widget_form_submit"
-	| "user.identified";
+	| "user.identified"
+	// Revenue taxonomy (WAN-387) — typed first-class revenue events.
+	| "price_shown"
+	| "prices_compared"
+	| "option_selected"
+	| "lead"
+	| "converted";
 
 // ============================================
 // Event Properties
@@ -43,6 +49,44 @@ export interface LinkClickedProperties {
 export interface PurchaseCompletedProperties {
 	amount?: number;
 	currency?: string;
+}
+
+// ============================================
+// Revenue Taxonomy Properties (WAN-387)
+// ============================================
+
+export interface PriceShownProperties {
+	amount: number;
+	currency: string;
+	itemId?: string;
+	label?: string;
+}
+
+export interface ComparedPriceOption {
+	id: string;
+	amount: number;
+	currency: string;
+}
+
+export interface PricesComparedProperties {
+	options: ComparedPriceOption[];
+}
+
+export interface OptionSelectedProperties {
+	id: string;
+	amount: number;
+	currency: string;
+}
+
+export interface LeadProperties {
+	source?: string;
+}
+
+export interface ConvertedProperties {
+	amount: number;
+	currency: string;
+	/** When the conversion actually happened — for backdated off-platform sales. */
+	occurredAt?: string;
 }
 
 // ============================================
@@ -100,7 +144,24 @@ export type TrackEvent =
 			event: "purchase.completed";
 			properties?: PurchaseCompletedProperties;
 	  } & BaseTrackEvent)
-	| ({ event: "user.identified" } & BaseTrackEvent);
+	| ({ event: "user.identified" } & BaseTrackEvent)
+	| ({
+			event: "price_shown";
+			properties?: PriceShownProperties;
+	  } & BaseTrackEvent)
+	| ({
+			event: "prices_compared";
+			properties?: PricesComparedProperties;
+	  } & BaseTrackEvent)
+	| ({
+			event: "option_selected";
+			properties?: OptionSelectedProperties;
+	  } & BaseTrackEvent)
+	| ({ event: "lead"; properties?: LeadProperties } & BaseTrackEvent)
+	| ({
+			event: "converted";
+			properties?: ConvertedProperties;
+	  } & BaseTrackEvent);
 
 /**
  * Legacy tracking shape supported for existing integrations.
@@ -121,6 +182,72 @@ export interface LegacyTrackEvent extends TrackingContext {
  * Public track input accepted by `client.track()`.
  */
 export type TrackInput = TrackEvent | LegacyTrackEvent;
+
+// ============================================
+// Revenue Helper Inputs (WAN-386)
+// ============================================
+
+// Each helper input is its typed properties plus the shared tracking context
+// (sessionId / externalUserId / meta / …). At least one identity field
+// (sessionId or externalUserId, possibly derived from `meta`) must be present —
+// the ingest API rejects events without one.
+
+export interface RevenuePriceShownInput
+	extends TrackingContext,
+		PriceShownProperties {}
+
+export interface RevenuePricesComparedInput
+	extends TrackingContext,
+		PricesComparedProperties {}
+
+export interface RevenueOptionSelectedInput
+	extends TrackingContext,
+		OptionSelectedProperties {}
+
+/**
+ * Input for `track.lead()`. `source` is the lead's acquisition source
+ * (the `lead` event property, e.g. "newsletter") — on this helper it shadows
+ * the envelope `source` from the tracking context. To set a custom envelope
+ * source on a lead, use the generic `track({ event: "lead", … })`.
+ */
+export interface RevenueLeadInput extends TrackingContext, LeadProperties {}
+
+export interface RevenueConvertedInput
+	extends TrackingContext,
+		ConvertedProperties {}
+
+/**
+ * Revenue-oriented helpers, flat on `client.track.*` (e.g.
+ * `client.track.priceShown()`, `client.track.converted()`). Decoupled from
+ * product primitives — each maps to a typed first-class revenue event.
+ */
+export interface RevenueTrackingApi {
+	priceShown: (input: RevenuePriceShownInput) => Promise<{ eventId: string }>;
+	pricesCompared: (
+		input: RevenuePricesComparedInput,
+	) => Promise<{ eventId: string }>;
+	optionSelected: (
+		input: RevenueOptionSelectedInput,
+	) => Promise<{ eventId: string }>;
+	lead: (input?: RevenueLeadInput) => Promise<{ eventId: string }>;
+	converted: (input: RevenueConvertedInput) => Promise<{ eventId: string }>;
+}
+
+/**
+ * The callable form of `track` — emit one event, without the flat revenue
+ * helpers. What internal code and custom/injected trackers need; lets them
+ * avoid implementing the revenue methods.
+ */
+export type CallableTrack = (event: TrackInput) => Promise<{ eventId: string }>;
+
+/**
+ * `client.track` — callable for generic events (`track(event)`), with the
+ * revenue helpers attached flat: `track.priceShown()`, `track.lead()`,
+ * `track.converted()`, etc.
+ */
+export interface TrackFn extends RevenueTrackingApi {
+	(event: TrackInput): Promise<{ eventId: string }>;
+}
 
 // ============================================
 // Runtime Config
@@ -174,8 +301,11 @@ export interface TrackingClient {
 	/**
 	 * Track an event using modern or legacy input shape.
 	 * Returns a deterministic event id immediately after enqueue.
+	 *
+	 * Also exposes the revenue helpers flat: `client.track.priceShown()`,
+	 * `client.track.lead()`, `client.track.converted()`, etc.
 	 */
-	track: (event: TrackInput) => Promise<{ eventId: string }>;
+	track: TrackFn;
 	/**
 	 * Flush all currently buffered events.
 	 */

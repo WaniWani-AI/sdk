@@ -2,22 +2,38 @@
 
 import type { InternalConfig } from "../types.js";
 import type {
+	TrackFn,
 	TrackInput,
 	TrackingClient,
 	TrackingShutdownOptions,
 } from "./@types.js";
 import { mapTrackEventToV2 } from "./mapper.js";
+import { createRevenueApi } from "./revenue.js";
 import { createV2BatchTransport } from "./transport.js";
 
 // Re-export types
 export type {
+	CallableTrack,
+	ComparedPriceOption,
+	ConvertedProperties,
 	EventType,
+	LeadProperties,
 	LegacyTrackEvent,
 	LinkClickedProperties,
+	OptionSelectedProperties,
+	PriceShownProperties,
+	PricesComparedProperties,
 	PurchaseCompletedProperties,
 	QuoteSucceededProperties,
+	RevenueConvertedInput,
+	RevenueLeadInput,
+	RevenueOptionSelectedInput,
+	RevenuePriceShownInput,
+	RevenuePricesComparedInput,
+	RevenueTrackingApi,
 	ToolCalledProperties,
 	TrackEvent,
+	TrackFn,
 	TrackInput,
 	TrackingClient,
 	TrackingConfig,
@@ -59,6 +75,31 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 			})
 		: undefined;
 
+	// Single enqueue path shared by track(), track.* revenue helpers, and identify().
+	function emit(event: TrackInput): { eventId: string } {
+		requireApiKey();
+		const mappedEvent = mapTrackEventToV2(event);
+		// Identity is required server-side (sessionId or externalUserId, possibly
+		// derived from meta). Warn early — without it the ingest API rejects the
+		// event even though enqueue returns an id here.
+		if (
+			!mappedEvent.correlation.sessionId &&
+			!mappedEvent.correlation.externalUserId
+		) {
+			console.warn(
+				`[waniwani] event "${mappedEvent.name}" has no sessionId or externalUserId; ` +
+					"the ingest API requires one and will reject it.",
+			);
+		}
+		transport?.enqueue(mappedEvent);
+		return { eventId: mappedEvent.id };
+	}
+
+	const trackOnce = async (event: TrackInput): Promise<{ eventId: string }> =>
+		emit(event);
+	// Revenue helpers attach flat onto `track` (track.priceShown(), …).
+	const track: TrackFn = Object.assign(trackOnce, createRevenueApi(trackOnce));
+
 	const client: TrackingClient = {
 		async identify(
 			userId: string,
@@ -75,12 +116,7 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 			transport?.enqueue(mappedEvent);
 			return { eventId: mappedEvent.id };
 		},
-		async track(event: TrackInput): Promise<{ eventId: string }> {
-			requireApiKey();
-			const mappedEvent = mapTrackEventToV2(event);
-			transport?.enqueue(mappedEvent);
-			return { eventId: mappedEvent.id };
-		},
+		track,
 		async flush(): Promise<void> {
 			requireApiKey();
 			await transport?.flush();

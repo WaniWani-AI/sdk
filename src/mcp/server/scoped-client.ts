@@ -1,5 +1,11 @@
 import type { KbClient } from "../../kb/types.js";
-import type { TrackInput, TrackingClient } from "../../tracking/@types.js";
+import type {
+	CallableTrack,
+	TrackFn,
+	TrackInput,
+	TrackingClient,
+} from "../../tracking/@types.js";
+import { createRevenueApi } from "../../tracking/revenue.js";
 
 /**
  * Well-known key used to attach the scoped client to the MCP `extra` object.
@@ -14,8 +20,12 @@ export const SCOPED_CLIENT_KEY = "waniwani/client";
  * when the server is wrapped with `withWaniwani()`.
  */
 export interface ScopedWaniWaniClient {
-	/** Track an event — request meta is automatically merged. */
-	track(event: TrackInput): Promise<{ eventId: string }>;
+	/**
+	 * Track an event — request meta is automatically merged. Also exposes the
+	 * revenue helpers flat (`track.priceShown()`, `track.converted()`, …), which
+	 * inherit the same scoped meta (so identity is carried from the request).
+	 */
+	track: TrackFn;
 	/** Identify a user — request meta is automatically merged. */
 	identify(
 		userId: string,
@@ -43,17 +53,17 @@ export function extractScopedClient(
 }
 
 export function createScopedClient(
-	base: Pick<TrackingClient, "track" | "identify"> & { readonly kb: KbClient },
+	base: { track: CallableTrack; identify: TrackingClient["identify"] } & {
+		readonly kb: KbClient;
+	},
 	meta: Record<string, unknown>,
 	config?: { apiUrl?: string; apiKey?: string },
 ): ScopedWaniWaniClient {
+	const trackOnce = (event: TrackInput): Promise<{ eventId: string }> =>
+		base.track({ ...event, meta: { ...meta, ...event.meta } });
+
 	return {
-		track(event) {
-			return base.track({
-				...event,
-				meta: { ...meta, ...event.meta },
-			});
-		},
+		track: Object.assign(trackOnce, createRevenueApi(trackOnce)),
 		identify(userId, properties) {
 			return base.identify(userId, properties, meta);
 		},
