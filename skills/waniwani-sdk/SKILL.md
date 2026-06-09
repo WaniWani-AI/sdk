@@ -81,8 +81,8 @@ Get a free key at [app.waniwani.ai](https://app.waniwani.ai). See [setup.md](ref
 
 | Export | Purpose | Tier | Reference |
 |---|---|---|---|
-| `@waniwani/sdk` | `waniwani()` client, `WaniWaniError` | Free tier | [setup.md](references/setup.md) |
-| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md) |
+| `@waniwani/sdk` | `waniwani()` client, `track.*` event helpers, `WaniWaniError` | Free tier | [setup.md](references/setup.md), [events.md](references/events.md) |
+| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md), [events.md](references/events.md) |
 | `@waniwani/sdk/mcp/react` | `useWaniwani` standalone tracking hook | OSS + Free tier | (rest of this entry point is legacy) |
 | `@waniwani/sdk/chat` | `ChatEmbed`, themes | Free tier | [chat-widget.md](references/chat-widget.md) |
 | `@waniwani/sdk/chat/embed.js` | Self-contained `<script>` install for any website | Free tier | [chat-widget.md](references/chat-widget.md) |
@@ -108,7 +108,7 @@ If no `{ store }` is passed and `WANIWANI_API_KEY` is not set, `.compile()` thro
 Adds hosted features on top of the OSS flow engine.
 
 - **Hosted flow state** — `WaniwaniKvStore` used by default when no `{ store }` is passed.
-- **Event tracking** — `waniwani().track()` for custom events, `withWaniwani(server)` for auto-tracking every tool call.
+- **Event tracking** — a typed, revenue-first funnel taxonomy (`lead` → `price_shown` / `prices_compared` / `option_selected` → `converted`) via flat `track.*` helpers; `withWaniwani(server)` auto-captures `session.started` + `tool.called`. Off-platform conversions correlate by `externalUserId`. See [events.md](references/events.md).
 - **Knowledge base** — `createKbClient()` for ingest/search.
 - **Funnel analytics** — flow graphs auto-sync to the dashboard.
 - **Chat widget** — `ChatEmbed` talks directly to `app.waniwani.ai`.
@@ -131,6 +131,7 @@ The following are still exported for back-compat with existing customer MCPs but
 | Plug in a Redis / Upstash / Cloudflare KV / DynamoDB backend | [kv-store.md](references/kv-store.md) |
 | Deploy a pure OSS production MCP server | [self-hosting.md](references/self-hosting.md) |
 | Add a free-tier API key and unlock tracking + dashboard | [setup.md](references/setup.md) |
+| Track events and build a revenue funnel (lead → price → converted), incl. off-platform conversions | [events.md](references/events.md) |
 | Use the flow API in detail (nodes, edges, interrupts, widgets) | [flows-api-reference.md](references/flows-api-reference.md) |
 | Add knowledge-base search | [knowledge-base.md](references/knowledge-base.md) |
 | Embed the chat widget on a website | [chat-widget.md](references/chat-widget.md) |

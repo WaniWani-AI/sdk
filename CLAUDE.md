@@ -125,6 +125,7 @@ Target SDK **users**, not SDK developers.
 | Source area | Reference file |
 |---|---|
 | `src/mcp/server/flows/` | `references/flows.md` + `flows-api-reference.md` |
+| `src/tracking/` + `src/mcp/server/scoped-client.ts` | `references/events.md` (NEW) |
 | `src/mcp/server/kv/` | `references/kv-store.md` (NEW) |
 | Self-hosting | `references/self-hosting.md` (NEW) |
 | `src/kb/` | `references/knowledge-base.md` |
