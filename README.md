@@ -1,9 +1,22 @@
+<div align="center">
+
 # @waniwani/sdk
 
-[![npm](https://img.shields.io/npm/v/@waniwani/sdk.svg)](https://www.npmjs.com/package/@waniwani/sdk)
-[![license](https://img.shields.io/npm/l/@waniwani/sdk.svg)](./LICENSE)
+**The open-source TypeScript SDK for MCP funnels** — multi-step conversational flows (sales, lead generation, booking, quotes) that run as a single MCP tool inside ChatGPT, Claude, Cursor, and any MCP-capable client.
 
-The open-source TypeScript SDK for **MCP funnels**: multi-step conversational flows (sales, lead generation, booking, quotes) that run as a single MCP tool inside ChatGPT, Claude, Cursor, and any MCP-capable client. One typed state graph compiles to one MCP tool. MIT, bring your own store, optional hosted Platform via one env var.
+[![npm version](https://img.shields.io/npm/v/@waniwani/sdk?labelColor=333333&color=666666)](https://www.npmjs.com/package/@waniwani/sdk)
+[![npm downloads](https://img.shields.io/npm/dm/@waniwani/sdk?labelColor=333333&color=666666)](https://www.npmjs.com/package/@waniwani/sdk)
+[![last commit](https://img.shields.io/github/last-commit/WaniWani-AI/sdk?labelColor=333333&color=666666)](https://github.com/WaniWani-AI/sdk/commits)
+[![commit activity](https://img.shields.io/github/commit-activity/m/WaniWani-AI/sdk?labelColor=333333&color=666666)](https://github.com/WaniWani-AI/sdk/pulse)
+[![stars](https://img.shields.io/github/stars/WaniWani-AI/sdk?labelColor=333333&color=666666)](https://github.com/WaniWani-AI/sdk/stargazers)
+[![license](https://img.shields.io/npm/l/@waniwani/sdk?labelColor=333333&color=666666)](./LICENSE)
+[![follow @waniwani_ai](https://img.shields.io/badge/follow-%40waniwani__ai-333333?logo=x&logoColor=white&labelColor=333333&color=666666)](https://x.com/waniwani_ai)
+
+[**Docs**](https://docs.waniwani.ai) · [**Website**](https://waniwani.ai) · [**Dashboard**](https://app.waniwani.ai) · [**CLI**](https://www.npmjs.com/package/@waniwani/cli) · [**Issues**](https://github.com/WaniWani-AI/sdk/issues)
+
+</div>
+
+One typed state graph compiles to one MCP tool. MIT, bring your own store, optional hosted Platform via one env var.
 
 Forked from production MCPs we shipped for paying customers (insurance quoting, pet care, lead capture, booking), and open-sourced once the shape stabilized.
 
@@ -131,6 +144,10 @@ Full docs at **[docs.waniwani.ai](https://docs.waniwani.ai)**. Same source as [`
 - **Website:** [waniwani.ai](https://waniwani.ai)
 - **Dashboard:** [app.waniwani.ai](https://app.waniwani.ai)
 - **Issues:** [github.com/WaniWani-AI/sdk/issues](https://github.com/WaniWani-AI/sdk/issues)
+
+## Security
+
+Found a vulnerability? Please report it privately — see [SECURITY.md](./SECURITY.md). Do not open a public issue for security reports.
 
 ## License
 
