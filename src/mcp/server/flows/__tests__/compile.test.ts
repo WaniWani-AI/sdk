@@ -65,6 +65,23 @@ function parsePayload(result: Record<string, unknown>) {
 	return JSON.parse(content[0]?.text ?? "") as Record<string, unknown>;
 }
 
+/** Assert the flow meta carries the expected visit ids, each stamped with a valid timestamp. */
+function expectNodesVisited(
+	meta: Record<string, unknown>,
+	flowId: string,
+	nodeIds: string[],
+) {
+	const flowMeta = meta[FLOW_META_KEY] as {
+		flowId: string;
+		nodesVisited: Array<{ id: string; at: string }>;
+	};
+	expect(flowMeta.flowId).toBe(flowId);
+	expect(flowMeta.nodesVisited.map((v) => v.id)).toEqual(nodeIds);
+	for (const visit of flowMeta.nodesVisited) {
+		expect(Number.isNaN(Date.parse(visit.at))).toBe(false);
+	}
+}
+
 describe("compileFlow response contract", () => {
 	test("returns an error when start is missing intent", async () => {
 		const store = new TestFlowStateStore();
@@ -2230,10 +2247,7 @@ describe("nodesVisited flow path tracking", () => {
 		>;
 		const meta = result._meta as Record<string, unknown>;
 
-		expect(meta[FLOW_META_KEY]).toEqual({
-			flowId: "nodes_visited_flow",
-			nodesVisited: ["ask_name"],
-		});
+		expectNodesVisited(meta, "nodes_visited_flow", ["ask_name"]);
 	});
 
 	test("action nodes traversed before interrupt are included in nodesVisited", async () => {
@@ -2266,10 +2280,55 @@ describe("nodesVisited flow path tracking", () => {
 		>;
 		const meta = result._meta as Record<string, unknown>;
 
-		expect(meta[FLOW_META_KEY]).toEqual({
-			flowId: "action_then_interrupt",
-			nodesVisited: ["compute", "ask_name"],
-		});
+		expectNodesVisited(meta, "action_then_interrupt", ["compute", "ask_name"]);
+	});
+
+	test("visit timestamps are non-decreasing in traversal order", async () => {
+		const store = new TestFlowStateStore();
+		const flow = createFlow({
+			id: "visit_timestamps_flow",
+			title: "Visit Timestamps",
+			description: "Test per-node visit timestamps.",
+			state: {
+				a: z.string().describe("A"),
+				b: z.string().describe("B"),
+				name: z.string().describe("Name"),
+			},
+		})
+			.addNode("first", async () => {
+				await new Promise((resolve) => setTimeout(resolve, 5));
+				return { a: "done" };
+			})
+			.addNode("second", () => ({ b: "done" }))
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addEdge(START, "first")
+			.addEdge("first", "second")
+			.addEdge("second", "ask_name")
+			.addEdge("ask_name", END)
+			.compile({ store });
+
+		const { server, registered } = mockServer();
+		await flow.register(server);
+		const handler = registered[0]?.[2];
+
+		const result = (await handler?.(startInput(), TEST_EXTRA)) as Record<
+			string,
+			unknown
+		>;
+		const meta = result._meta as Record<string, unknown>;
+		const flowMeta = meta[FLOW_META_KEY] as {
+			nodesVisited: Array<{ id: string; at: string }>;
+		};
+
+		const times = flowMeta.nodesVisited.map((v) => Date.parse(v.at));
+		expect(times).toHaveLength(3);
+		for (let i = 1; i < times.length; i++) {
+			expect(times[i]).toBeGreaterThanOrEqual(times[i - 1] ?? 0);
+		}
+		// The first node's handler sleeps, so the second visit is strictly later.
+		expect(times[1]).toBeGreaterThan(times[0] ?? 0);
 	});
 
 	test("completed flow includes all traversed nodes in nodesVisited", async () => {
@@ -2308,10 +2367,7 @@ describe("nodesVisited flow path tracking", () => {
 		const meta2 = r2._meta as Record<string, unknown>;
 
 		// Continue traverses ask_name (re-executes) then advances to ask_email
-		expect(meta2[FLOW_META_KEY]).toEqual({
-			flowId: "full_path_flow",
-			nodesVisited: ["ask_name", "ask_email"],
-		});
+		expectNodesVisited(meta2, "full_path_flow", ["ask_name", "ask_email"]);
 
 		// Answer email → complete
 		const r3 = (await handler?.(
@@ -2320,10 +2376,7 @@ describe("nodesVisited flow path tracking", () => {
 		)) as Record<string, unknown>;
 		const meta3 = r3._meta as Record<string, unknown>;
 
-		expect(meta3[FLOW_META_KEY]).toEqual({
-			flowId: "full_path_flow",
-			nodesVisited: ["ask_email"],
-		});
+		expectNodesVisited(meta3, "full_path_flow", ["ask_email"]);
 	});
 
 	test("hideFromFunnel nodes are excluded from nodesVisited", async () => {
@@ -2359,10 +2412,7 @@ describe("nodesVisited flow path tracking", () => {
 		>;
 		const meta = result._meta as Record<string, unknown>;
 
-		expect(meta[FLOW_META_KEY]).toEqual({
-			flowId: "hidden_node_flow",
-			nodesVisited: ["ask_name"],
-		});
+		expectNodesVisited(meta, "hidden_node_flow", ["ask_name"]);
 	});
 });
 
@@ -2403,10 +2453,7 @@ describe("addNode object form", () => {
 		>;
 		const meta = result._meta as Record<string, unknown>;
 
-		expect(meta[FLOW_META_KEY]).toEqual({
-			flowId: "object_form_flow",
-			nodesVisited: ["ask_name"],
-		});
+		expectNodesVisited(meta, "object_form_flow", ["ask_name"]);
 	});
 
 	test("object form without label defaults label to id", () => {
