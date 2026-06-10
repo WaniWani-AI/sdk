@@ -113,7 +113,7 @@ Adds hosted features on top of the OSS flow engine.
 - **Funnel analytics** — flow graphs auto-sync to the dashboard.
 - **Chat widget** — `ChatEmbed` talks directly to `app.waniwani.ai`.
 
-`withWaniwani(server)` is safe to call with or without an API key — tracking silently no-ops when no key is set, but session-ID bridging and widget metadata forwarding still happen.
+`withWaniwani(server)` is safe to call with or without an API key — its auto-captured `tool.called` events are internally guarded, and session-ID bridging and widget metadata forwarding still happen. Your own tracking calls are **not** guarded: `client.track.*`, `identify()`, and the scoped `context.waniwani` throw `WANIWANI_API_KEY is not set` when no key is configured, so guard them in code paths that must also run keyless. See [events.md](references/events.md).
 
 ### Legacy
 
