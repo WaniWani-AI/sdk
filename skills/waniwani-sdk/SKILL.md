@@ -108,7 +108,7 @@ If no `{ store }` is passed and `WANIWANI_API_KEY` is not set, `.compile()` thro
 Adds hosted features on top of the OSS flow engine.
 
 - **Hosted flow state** — `WaniwaniKvStore` used by default when no `{ store }` is passed.
-- **Event tracking** — a typed, revenue-first funnel taxonomy (`lead` → `price_shown` / `prices_compared` / `option_selected` → `converted`) via flat `track.*` helpers; `withWaniwani(server)` auto-captures `session.started` + `tool.called`. Off-platform conversions correlate by `externalUserId`. See [events.md](references/events.md).
+- **Event tracking** — a typed, revenue-first funnel taxonomy (`lead` → `price_shown` / `prices_compared` / `option_selected` → `converted`) via flat `track.*` helpers; `withWaniwani(server)` auto-captures `tool.called`. Off-platform conversions correlate by `externalUserId`. See [events.md](references/events.md).
 - **Knowledge base** — `createKbClient()` for ingest/search.
 - **Funnel analytics** — flow graphs auto-sync to the dashboard.
 - **Chat widget** — `ChatEmbed` talks directly to `app.waniwani.ai`.

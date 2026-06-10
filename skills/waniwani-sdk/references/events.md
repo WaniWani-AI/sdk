@@ -12,8 +12,10 @@ revenue without per-customer configuration. Use the typed helpers; reach for raw
 `track({ event })` only for the events the taxonomy already names.
 
 **Tier:** event tracking is a **free-tier** feature — it needs `WANIWANI_API_KEY`.
-Without a key, every tracking call silently no-ops (by design, so OSS code stays
-runnable). See [setup.md](setup.md) to get a key.
+Calling `track.*` or `identify()` without a key **throws** (`WANIWANI_API_KEY is not
+set`) — if a code path must also run keyless, guard the call. `withWaniwani(server)`
+itself is safe to call without a key: its own auto-capture is internally guarded and
+session-metadata bridging still works. See [setup.md](setup.md) to get a key.
 
 ## The funnel model: start → steps → conversion
 
@@ -23,7 +25,7 @@ Think of instrumentation as three stages. Emit at least the **start** and the
 | Funnel stage | Emit | Helper / source | When |
 |---|---|---|---|
 | **Start** | `lead` | `track.lead({ source })` | User enters the funnel with intent (asked for a quote, started a flow). |
-| (start, auto) | `session.started`, `tool.called` | `withWaniwani(server)` | Auto-captured for every session and tool call — no code. |
+| (start, auto) | `tool.called` | `withWaniwani(server)` | Auto-captured for every tool call — no code. |
 | **Step** | `price_shown` | `track.priceShown({ amount, currency })` | You showed the user a price. |
 | **Step** | `prices_compared` | `track.pricesCompared({ options })` | You showed two or more options side by side. |
 | **Step** | `option_selected` | `track.optionSelected({ id, amount, currency })` | The user picked one of those options. |
@@ -70,7 +72,7 @@ const quoteFlow = createFlow({ /* … */ })
   // …
   .compile();
 
-withWaniwani(server); // auto-captures session.started + tool.called, injects context.waniwani
+withWaniwani(server); // auto-captures tool.called, injects context.waniwani
 ```
 
 **2. Top-level client — anywhere (server startup, your backend, scripts).** Create one
@@ -118,9 +120,11 @@ callable form `client.track({ event, properties })`: `session.started`, `tool.ca
 await client.track({ event: "quote.succeeded", properties: { amount: 120, currency: "EUR" }, externalUserId: "user_123" });
 ```
 
-- **Auto-capture:** `withWaniwani(server)` emits `session.started` and `tool.called`
-  for you — that's your funnel "start" with zero instrumentation. It's safe to call
-  with or without an API key (it no-ops tracking but still bridges session metadata).
+- **Auto-capture:** `withWaniwani(server)` emits `tool.called` for every tool
+  invocation — a zero-instrumentation activity trail under your funnel. Wrapping the
+  server is safe without an API key (its auto-capture is internally guarded and
+  session metadata still bridges) — but your own `track.*` calls still throw keyless;
+  see the tier note above.
 - **Identify:** `client.identify(userId, properties?)` attaches a stable external
   identity to the session — useful right before an off-platform conversion so the later
   `converted` can be joined by `externalUserId`.
@@ -137,7 +141,9 @@ with no live MCP session. To close that loop:
 
 ```ts
 // In your backend webhook, when the deal closes:
-await waniwani().track.converted({
+import { client } from "./lib/waniwani"; // the singleton created above
+
+await client.track.converted({
   amount: 85,
   currency: "EUR",
   externalUserId: "user_123",      // same id seen during the funnel — this is the join key
@@ -210,14 +216,14 @@ export const quoteFlow = createFlow({
   .addEdge("show_quote", END)
   .compile();
 
-withWaniwani(server); // auto session.started + tool.called; injects context.waniwani
+withWaniwani(server); // auto-captures tool.called; injects context.waniwani
 ```
 
 ```ts
 // Elsewhere — your billing webhook, when the policy is actually purchased:
-import { waniwani } from "@waniwani/sdk";
+import { client } from "./lib/waniwani"; // one waniwani() client, created once
 
-await waniwani().track.converted({
+await client.track.converted({
   amount: 85,
   currency: "EUR",
   externalUserId: "ada@acme.com", // the email we identified during the flow
@@ -236,8 +242,9 @@ await waniwani().track.converted({
 - **Looking for a `step()` helper or sending a custom event name** — the taxonomy is a
   closed, typed set. Model funnel steps with `price_shown` / `prices_compared` /
   `option_selected`; emit `lead` at the start and `converted` at the end.
-- **Tracking calls do nothing** — no `WANIWANI_API_KEY` is set, so tracking no-ops by
-  design. Set the key (see [setup.md](setup.md)) to start sending events.
+- **Tracking call throws "WANIWANI_API_KEY is not set"** — tracking is free-tier; set
+  the key (see [setup.md](setup.md)). If a code path must also run keyless, guard the
+  call — inside a flow node an unguarded throw fails the whole tool call.
 - **Off-platform `converted` never attributes** — the `externalUserId` on the conversion
   must match an id seen during the funnel. Capture it (via `identify` or on the `lead`)
   before the user leaves.
