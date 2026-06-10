@@ -146,10 +146,34 @@ await waniwani().track.converted({
 ```
 
 If you can't run the SDK where the conversion happens, post to the public events route
-directly — `POST /api/v2/mcp/events` with `{ events: [ … ] }` (the old
-`/api/mcp/events/v2/batch` still works as an alias). It accepts a public key, widget
-JWT, `wwk_` token, or logged-in session. See [setup.md](setup.md) and
-[docs.waniwani.ai](https://docs.waniwani.ai) for the exact payload and auth.
+directly — `POST /api/v2/mcp/events` (the old `/api/mcp/events/v2/batch` still works as
+an alias). Auth is `Authorization: Bearer <token>` with an env public key (`wwp_…`,
+safe client-side, CORS enabled), a widget JWT, or the secret API key (`wwk_…`).
+
+The wire envelope is stricter than the SDK inputs — note where each field lives:
+`name` (not `event`), identity inside `correlation`, and `occurredAt` inside
+`properties`. `id` is the idempotency key.
+
+```json
+{
+  "sentAt": "2026-06-09T10:00:05Z",
+  "source": { "sdk": "acme-billing-webhook", "version": "1.0.0" },
+  "events": [
+    {
+      "id": "evt_a1b2c3",
+      "type": "mcp.event",
+      "name": "converted",
+      "source": "acme-billing-webhook",
+      "timestamp": "2026-06-09T10:00:05Z",
+      "correlation": { "externalUserId": "ada@acme.com" },
+      "properties": { "amount": 85, "currency": "EUR", "occurredAt": "2026-06-09T10:00:00Z" }
+    }
+  ]
+}
+```
+
+See [setup.md](setup.md) and [docs.waniwani.ai](https://docs.waniwani.ai) for full
+contract details (partial accept/reject semantics, response shape).
 
 ## Complete example
 
