@@ -7,6 +7,7 @@ import type {
 	MaybePromise,
 	NodeHandler,
 	NodeOptions,
+	NodeVisit,
 } from "./@types";
 import { END, interrupt, isInterrupt, isWidget, showWidget } from "./@types";
 import { resolveFieldSchema } from "./field-schema";
@@ -128,7 +129,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 ): Promise<ExecutionResult> {
 	let currentNode = startNodeName;
 	let state = { ...startState };
-	const nodesVisited: string[] = [];
+	const nodesVisited: NodeVisit[] = [];
 
 	// Safety limit to prevent infinite loops
 	const MAX_ITERATIONS = 50;
@@ -156,7 +157,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 		}
 
 		if (!nodeOptions?.get(currentNode)?.hideFromFunnel) {
-			nodesVisited.push(currentNode);
+			nodesVisited.push({ id: currentNode, at: new Date().toISOString() });
 		}
 
 		try {

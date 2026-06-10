@@ -626,9 +626,15 @@ export type FlowContent =
 	| FlowCompleteContent
 	| FlowErrorContent;
 
+/** A single node visit during flow execution. `at` is the ISO timestamp of when the node was entered. */
+export type NodeVisit = {
+	id: string;
+	at: string;
+};
+
 export type ExecutionResult = {
 	content: FlowContent;
 	flowTokenContent?: FlowTokenContent;
 	/** Nodes visited during this execution (excludes nodes with hideFromFunnel). */
-	nodesVisited?: string[];
+	nodesVisited?: NodeVisit[];
 };
