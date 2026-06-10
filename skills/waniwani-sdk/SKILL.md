@@ -1,6 +1,6 @@
 ---
 name: waniwani-sdk
-description: "MCP distribution SDK: build sales funnels, lead generation, booking flows, insurance quote flows, pricing quote flows, and any multi-step conversational MCP app with @waniwani/sdk. Open source createFlow engine (no API key required) with pluggable state backends (in-memory, Redis, Upstash, Cloudflare KV, DynamoDB, or hosted). Optional free tier adds event tracking, funnel analytics, knowledge base, and a chat widget. Trigger when the user wants to add an MCP funnel, sales funnel, lead gen flow, booking flow, quote flow, knowledge base / FAQ tool, or embedded chat to an MCP server."
+description: "MCP distribution SDK: build sales funnels, lead generation, booking flows, insurance quote flows, pricing quote flows, and any multi-step conversational MCP app with @waniwani/sdk. Open source createFlow engine (no API key required) with pluggable state backends (in-memory, Redis, Upstash, Cloudflare KV, DynamoDB, or hosted). Optional free tier adds a revenue-first event taxonomy (track leads, prices shown/compared, options selected, and conversions — including off-platform purchases), funnel analytics, knowledge base, and a chat widget. Trigger when the user wants to add an MCP funnel, sales funnel, lead gen flow, booking flow, quote flow, knowledge base / FAQ tool, or embedded chat to an MCP server — or to instrument tracking on a @waniwani/sdk app: emit or track events, record a conversion or revenue, attribute an off-platform purchase back to a lead, or measure where users drop off in a funnel."
 license: MIT
 metadata:
   author: WaniWani
@@ -81,8 +81,8 @@ Get a free key at [app.waniwani.ai](https://app.waniwani.ai). See [setup.md](ref
 
 | Export | Purpose | Tier | Reference |
 |---|---|---|---|
-| `@waniwani/sdk` | `waniwani()` client, `WaniWaniError` | Free tier | [setup.md](references/setup.md) |
-| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md) |
+| `@waniwani/sdk` | `waniwani()` client, `track.*` event helpers, `WaniWaniError` | Free tier | [setup.md](references/setup.md), [events.md](references/events.md) |
+| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md), [events.md](references/events.md) |
 | `@waniwani/sdk/mcp/react` | `useWaniwani` standalone tracking hook | OSS + Free tier | (rest of this entry point is legacy) |
 | `@waniwani/sdk/chat` | `ChatEmbed`, themes | Free tier | [chat-widget.md](references/chat-widget.md) |
 | `@waniwani/sdk/chat/embed.js` | Self-contained `<script>` install for any website | Free tier | [chat-widget.md](references/chat-widget.md) |
@@ -108,12 +108,12 @@ If no `{ store }` is passed and `WANIWANI_API_KEY` is not set, `.compile()` thro
 Adds hosted features on top of the OSS flow engine.
 
 - **Hosted flow state** — `WaniwaniKvStore` used by default when no `{ store }` is passed.
-- **Event tracking** — `waniwani().track()` for custom events, `withWaniwani(server)` for auto-tracking every tool call.
+- **Event tracking** — a typed, revenue-first funnel taxonomy (`lead` → `price_shown` / `prices_compared` / `option_selected` → `converted`) via flat `track.*` helpers; `withWaniwani(server)` auto-captures `tool.called`. Off-platform conversions correlate by `externalUserId`. See [events.md](references/events.md).
 - **Knowledge base** — `createKbClient()` for ingest/search.
 - **Funnel analytics** — flow graphs auto-sync to the dashboard.
 - **Chat widget** — `ChatEmbed` talks directly to `app.waniwani.ai`.
 
-`withWaniwani(server)` is safe to call with or without an API key — tracking silently no-ops when no key is set, but session-ID bridging and widget metadata forwarding still happen.
+`withWaniwani(server)` is safe to call with or without an API key — its auto-captured `tool.called` events are internally guarded, and session-ID bridging and widget metadata forwarding still happen. Your own tracking calls are **not** guarded: `client.track.*`, `identify()`, and the scoped `context.waniwani` throw `WANIWANI_API_KEY is not set` when no key is configured, so guard them in code paths that must also run keyless. See [events.md](references/events.md).
 
 ### Legacy
 
@@ -131,6 +131,7 @@ The following are still exported for back-compat with existing customer MCPs but
 | Plug in a Redis / Upstash / Cloudflare KV / DynamoDB backend | [kv-store.md](references/kv-store.md) |
 | Deploy a pure OSS production MCP server | [self-hosting.md](references/self-hosting.md) |
 | Add a free-tier API key and unlock tracking + dashboard | [setup.md](references/setup.md) |
+| Track events and build a revenue funnel (lead → price → converted), incl. off-platform conversions | [events.md](references/events.md) |
 | Use the flow API in detail (nodes, edges, interrupts, widgets) | [flows-api-reference.md](references/flows-api-reference.md) |
 | Add knowledge-base search | [knowledge-base.md](references/knowledge-base.md) |
 | Embed the chat widget on a website | [chat-widget.md](references/chat-widget.md) |

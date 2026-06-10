@@ -26,7 +26,7 @@ Same SDK, hosted features added when the key is present.
 - `WaniwaniChat` (hosted React chat — recommended), themes, `embed.js` (IIFE for non-React hosts), `styles.css` from `@waniwani/sdk/chat`
 - `ChatEmbed` from `@waniwani/sdk/chat` — bare-bones bring-your-own-backend primitive. Exposed but **not** the recommended path for new code; reach for it only when self-hosting the chat backend.
 
-`withWaniwani` is no-key-safe: it wraps tools and bridges session metadata even without an API key. Tracking calls silently no-op when no key is configured.
+`withWaniwani` is no-key-safe: it wraps tools and bridges session metadata even without an API key, and its own auto-captured `tool.called` events are internally guarded (`safeTrack`). User-initiated tracking calls are **not**: `client.track.*`, `identify()`, and the scoped client throw `WANIWANI_API_KEY is not set` when no key is configured.
 
 ### Legacy (preserved, undocumented, marked `@deprecated`)
 
@@ -125,6 +125,7 @@ Target SDK **users**, not SDK developers.
 | Source area | Reference file |
 |---|---|
 | `src/mcp/server/flows/` | `references/flows.md` + `flows-api-reference.md` |
+| `src/tracking/` + `src/mcp/server/scoped-client.ts` | `references/events.md` (NEW) |
 | `src/mcp/server/kv/` | `references/kv-store.md` (NEW) |
 | Self-hosting | `references/self-hosting.md` (NEW) |
 | `src/kb/` | `references/knowledge-base.md` |
