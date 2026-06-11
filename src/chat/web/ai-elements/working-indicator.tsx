@@ -30,10 +30,15 @@ export function hasVisibleParts(message: UIMessage): boolean {
 /**
  * Returns true when the chat is loading but the assistant has not yet
  * produced any visible content.
+ *
+ * Pass `ignoreToolParts` when tool calls render nothing (`showToolCalls:
+ * false`) — tool parts then don't count as visible content, so the
+ * indicator keeps showing while tools run instead of leaving a blank chat.
  */
 export function shouldShowWorkingIndicator(
 	messages: UIMessage[],
 	status: ChatStatus,
+	options?: { ignoreToolParts?: boolean },
 ): boolean {
 	if (status !== "submitted" && status !== "streaming") {
 		return false;
@@ -42,7 +47,10 @@ export function shouldShowWorkingIndicator(
 	if (!last || last.role !== "assistant") {
 		return true;
 	}
-	return !hasVisibleParts(last);
+	const visible = options?.ignoreToolParts
+		? last.parts.some((p) => isVisiblePart(p) && !("toolCallId" in p))
+		: hasVisibleParts(last);
+	return !visible;
 }
 
 export type WorkingIndicatorProps = HTMLAttributes<HTMLDivElement>;

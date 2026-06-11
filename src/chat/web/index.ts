@@ -15,6 +15,7 @@ export type {
 	ChatEmbedProps,
 	ChatHandle,
 	ChatTheme,
+	ShowToolCalls,
 	SuggestionsConfig,
 	ThemePreset,
 	WelcomeConfig,

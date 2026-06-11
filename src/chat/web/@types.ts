@@ -2,10 +2,14 @@
 // Chat Theme
 // ============================================================================
 
-import type { ChatAppearance } from "./embed/config";
+import type { ChatAppearance, ShowToolCalls } from "./embed/config";
 import type { MessageOverrides } from "./i18n";
 
-export type { ChatAppearance, ThemePreset } from "./embed/config";
+export type {
+	ChatAppearance,
+	ShowToolCalls,
+	ThemePreset,
+} from "./embed/config";
 export type { Locale } from "./i18n";
 export type { MessageOverrides };
 
@@ -143,13 +147,17 @@ export interface ChatBaseProps {
 	 */
 	debug?: boolean;
 	/**
-	 * Show tool call details (request/response panels). When `false`, each
-	 * tool call renders as a compact indicator so the user can still tell
-	 * the agent is doing something, but the JSON panels are hidden.
+	 * How tool calls are rendered in the chat.
+	 *
+	 * - `true` (default) — full request/response panels.
+	 * - `"titles-only"` — a compact text indicator with the tool title, no
+	 *   JSON panels.
+	 * - `false` — tool calls are hidden entirely; a generic working
+	 *   indicator shows while tools run.
+	 *
 	 * MCP App widgets attached to a tool call are always rendered.
-	 * Defaults to `true`.
 	 */
-	showToolCalls?: boolean;
+	showToolCalls?: ShowToolCalls;
 	/**
 	 * Skip fetching `/config` and `/tools` from the API on mount.
 	 * Use when the chat endpoint doesn't serve these routes (e.g. embed widgets
