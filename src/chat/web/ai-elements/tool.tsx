@@ -282,8 +282,9 @@ export type ToolIndicatorProps = HTMLAttributes<HTMLDivElement> & {
 
 /**
  * Compact, non-interactive replacement for {@link ToolHeader} +
- * {@link ToolContent}. Matches the Reasoning trigger style: muted text
- * with a shimmering label while the tool is running.
+ * {@link ToolContent}: just the tool title, no icon and no JSON panels
+ * (the `showToolCalls: "titles-only"` mode). Matches the Reasoning trigger
+ * style: muted text with a shimmering label while the tool is running.
  */
 export function ToolIndicator({
 	className,
@@ -302,7 +303,6 @@ export function ToolIndicator({
 			style={{ animation: "ww-fade-in 0.2s ease-out" }}
 			{...props}
 		>
-			<BracesIcon className="ww:size-4 ww:shrink-0" />
 			<span className="ww:truncate">
 				{isRunning ? <Shimmer duration={1.6}>{label}</Shimmer> : label}
 			</span>

@@ -30,6 +30,17 @@ export interface ChatAppearance {
 }
 
 /**
+ * Tool call rendering mode.
+ *
+ * - `true` (default) — full request/response panels.
+ * - `"titles-only"` — a compact text indicator with the tool title, no
+ *   JSON panels.
+ * - `false` — tool calls are hidden entirely; a generic working indicator
+ *   shows while tools run.
+ */
+export type ShowToolCalls = boolean | "titles-only";
+
+/**
  * Configuration for the embeddable chat widget.
  *
  * Resolution priority (later wins):
@@ -53,15 +64,13 @@ export interface EmbedConfig {
 	 */
 	channelId?: string;
 	/**
-	 * Show tool call details (request/response panels) in the chat.
-	 *
-	 * When `false`, each tool call still renders a compact indicator so the
-	 * user can tell the agent is doing something, but the JSON request and
-	 * response panels are hidden. Defaults to `true`.
+	 * How tool calls render in the chat: `true` (default) shows full
+	 * request/response panels, `"titles-only"` shows a compact indicator
+	 * with just the tool title, `false` hides tool calls entirely.
 	 *
 	 * Surfaced as `data-show-tool-calls` on the embed script tag.
 	 */
-	showToolCalls?: boolean;
+	showToolCalls?: ShowToolCalls;
 	/** Title shown in the chat header. Defaults to `"Assistant"`. */
 	title?: string;
 	/**
@@ -243,9 +252,14 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.channelId = channelId;
 	}
 
-	const showToolCalls = bool("data-show-tool-calls");
-	if (showToolCalls !== undefined) {
-		config.showToolCalls = showToolCalls;
+	const showToolCallsRaw = str("data-show-tool-calls")?.trim().toLowerCase();
+	if (showToolCallsRaw === "titles-only") {
+		config.showToolCalls = "titles-only";
+	} else {
+		const showToolCalls = bool("data-show-tool-calls");
+		if (showToolCalls !== undefined) {
+			config.showToolCalls = showToolCalls;
+		}
 	}
 
 	const css = str("data-css");

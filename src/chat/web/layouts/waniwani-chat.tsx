@@ -1,7 +1,12 @@
 "use client";
 
 import { forwardRef, useEffect, useMemo, useState } from "react";
-import type { ChatAppearance, ChatHandle, WelcomeConfig } from "../@types";
+import type {
+	ChatAppearance,
+	ChatHandle,
+	ShowToolCalls,
+	WelcomeConfig,
+} from "../@types";
 import type { EmbedConfig } from "../embed/config";
 import { resolveConfig } from "../embed/config";
 import {
@@ -45,8 +50,12 @@ export interface WaniwaniChatOverrides {
 	suggestions?: string[];
 	/** Persist conversations across reloads in IndexedDB. */
 	enableThreadHistory?: boolean;
-	/** Show tool call request/response panels. */
-	showToolCalls?: boolean;
+	/**
+	 * How tool calls render: `true` (default) shows full request/response
+	 * panels, `"titles-only"` shows a compact indicator with just the tool
+	 * title, `false` hides tool calls entirely.
+	 */
+	showToolCalls?: ShowToolCalls;
 	/** Enable file attachments in the input. */
 	allowAttachments?: boolean;
 	/**

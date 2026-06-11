@@ -2,7 +2,7 @@
 
 import type { ChatStatus, ReasoningUIPart, ToolUIPart, UIMessage } from "ai";
 import type { ModelContextUpdate } from "../../../shared/model-context";
-import type { WelcomeConfig } from "../@types";
+import type { ShowToolCalls, WelcomeConfig } from "../@types";
 import { Attachments } from "../ai-elements/attachments";
 import {
 	Message,
@@ -89,12 +89,13 @@ interface MessageListProps {
 	/** When true, show _meta in tool call inputs and outputs. */
 	debug?: boolean;
 	/**
-	 * Show tool call details (request/response panels). When `false`, render a
-	 * compact tool indicator instead so the user can still tell the agent is
-	 * doing something. MCP App widgets attached to a tool call are always
-	 * rendered regardless of this flag. Defaults to `true`.
+	 * How tool calls render: `true` (default) shows full request/response
+	 * panels, `"titles-only"` shows a compact indicator with just the tool
+	 * title, `false` hides tool calls entirely (the working indicator covers
+	 * the running state instead). MCP App widgets attached to a tool call are
+	 * always rendered regardless of this flag.
 	 */
-	showToolCalls?: boolean;
+	showToolCalls?: ShowToolCalls;
 	/**
 	 * Cached tool catalog keyed by tool name. Drives spec-canonical widget
 	 * resolution: if a tool's definition `_meta` carries a widget resource
@@ -127,7 +128,10 @@ export function MessageList({
 
 	const isFullscreenActive = fullscreenToolCallId != null;
 	const showWorking =
-		!isFullscreenActive && shouldShowWorkingIndicator(messages, status);
+		!isFullscreenActive &&
+		shouldShowWorkingIndicator(messages, status, {
+			ignoreToolParts: showToolCalls === false,
+		});
 
 	return (
 		<>
@@ -181,6 +185,28 @@ export function MessageList({
 					return <div key={message.id} style={{ display: "none" }} />;
 				}
 
+				// With tool calls fully hidden, an assistant message whose only
+				// visible parts are widget-less tool calls renders nothing —
+				// collapse it so it doesn't occupy a gap slot in the message
+				// column (and so the WorkingIndicator stays flush while running).
+				if (
+					showToolCalls === false &&
+					message.role === "assistant" &&
+					!hasTextContent &&
+					reasoningParts.length === 0 &&
+					fileParts.length === 0 &&
+					toolParts.every((p) => {
+						const output = "output" in p ? p.output : undefined;
+						return (
+							output === undefined ||
+							!resourceEndpoint ||
+							!resolveWidgetResourceUri(p.toolName, output, toolDefinitions)
+						);
+					})
+				) {
+					return <div key={message.id} style={{ display: "none" }} />;
+				}
+
 				return (
 					<Message from={message.role} key={message.id}>
 						{!containsFullscreenTool &&
@@ -207,6 +233,16 @@ export function MessageList({
 							);
 							const isFullscreen = part.toolCallId === fullscreenToolCallId;
 
+							// A fully hidden tool call with no widget renders nothing.
+							// Returning an empty wrapper instead would still occupy a
+							// gap slot in the message's flex column.
+							if (
+								showToolCalls === false &&
+								!(resourceUri && resourceEndpoint && output !== undefined)
+							) {
+								return null;
+							}
+
 							return (
 								<div
 									key={part.toolCallId}
@@ -224,33 +260,37 @@ export function MessageList({
 											: undefined
 									}
 								>
-									<div style={isFullscreen ? { display: "none" } : undefined}>
-										{showToolCalls ? (
-											<Tool>
-												<ToolHeader
+									{showToolCalls !== false && (
+										<div style={isFullscreen ? { display: "none" } : undefined}>
+											{showToolCalls === "titles-only" ? (
+												<ToolIndicator
 													title={part.title ?? formatToolName(part.toolName)}
 													state={part.state}
 												/>
-												<ToolContent>
-													<ToolInput input={part.input} debug={debug} />
-													{output !== undefined && (
-														<ToolOutput
-															output={output}
-															errorText={
-																"errorText" in part ? part.errorText : undefined
-															}
-															debug={debug}
-														/>
-													)}
-												</ToolContent>
-											</Tool>
-										) : (
-											<ToolIndicator
-												title={part.title ?? formatToolName(part.toolName)}
-												state={part.state}
-											/>
-										)}
-									</div>
+											) : (
+												<Tool>
+													<ToolHeader
+														title={part.title ?? formatToolName(part.toolName)}
+														state={part.state}
+													/>
+													<ToolContent>
+														<ToolInput input={part.input} debug={debug} />
+														{output !== undefined && (
+															<ToolOutput
+																output={output}
+																errorText={
+																	"errorText" in part
+																		? part.errorText
+																		: undefined
+																}
+																debug={debug}
+															/>
+														)}
+													</ToolContent>
+												</Tool>
+											)}
+										</div>
+									)}
 									{resourceUri && resourceEndpoint && output !== undefined && (
 										<WidgetErrorBoundary>
 											<McpAppFrame

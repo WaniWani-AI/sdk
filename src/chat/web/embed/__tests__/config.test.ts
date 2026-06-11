@@ -158,31 +158,31 @@ describe("resolveConfig — render mode", () => {
 	});
 });
 
-describe("parseConfigFromScript — render mode attrs", () => {
-	async function parseWithAttrs(
-		attrs: Record<string, string>,
-	): Promise<Record<string, unknown>> {
-		const { parseConfigFromScript } = await import(
-			`../config?t=${Date.now()}-${Math.random()}`
-		);
-		const fakeScript = {
-			getAttribute(name: string) {
-				return name in attrs ? attrs[name] : null;
-			},
-		};
-		const prevDocument = g.document;
-		const prevHtmlScriptElement = g.HTMLScriptElement;
-		g.HTMLScriptElement = class {};
-		Object.setPrototypeOf(fakeScript, g.HTMLScriptElement.prototype);
-		g.document = { currentScript: fakeScript, querySelectorAll: () => [] };
-		try {
-			return parseConfigFromScript();
-		} finally {
-			g.document = prevDocument;
-			g.HTMLScriptElement = prevHtmlScriptElement;
-		}
+async function parseWithAttrs(
+	attrs: Record<string, string>,
+): Promise<Record<string, unknown>> {
+	const { parseConfigFromScript } = await import(
+		`../config?t=${Date.now()}-${Math.random()}`
+	);
+	const fakeScript = {
+		getAttribute(name: string) {
+			return name in attrs ? attrs[name] : null;
+		},
+	};
+	const prevDocument = g.document;
+	const prevHtmlScriptElement = g.HTMLScriptElement;
+	g.HTMLScriptElement = class {};
+	Object.setPrototypeOf(fakeScript, g.HTMLScriptElement.prototype);
+	g.document = { currentScript: fakeScript, querySelectorAll: () => [] };
+	try {
+		return parseConfigFromScript();
+	} finally {
+		g.document = prevDocument;
+		g.HTMLScriptElement = prevHtmlScriptElement;
 	}
+}
 
+describe("parseConfigFromScript — render mode attrs", () => {
 	test("data-mode=floating parses", async () => {
 		const cfg = await parseWithAttrs({
 			"data-token": "tok",
@@ -209,6 +209,53 @@ describe("parseConfigFromScript — render mode attrs", () => {
 		expect(cfg.position).toBe("bottom-left");
 		expect(cfg.height).toBe("500px");
 		expect(cfg.launcherText).toBe("Need help?");
+	});
+});
+
+describe("parseConfigFromScript — data-show-tool-calls", () => {
+	test("undefined when unspecified — consumers default to full panels", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "tok" });
+		expect(cfg.showToolCalls).toBeUndefined();
+	});
+
+	test("'true' parses as true", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-show-tool-calls": "true",
+		});
+		expect(cfg.showToolCalls).toBe(true);
+	});
+
+	test("'false' parses as false", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-show-tool-calls": "false",
+		});
+		expect(cfg.showToolCalls).toBe(false);
+	});
+
+	test("'titles-only' parses as titles-only", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-show-tool-calls": "titles-only",
+		});
+		expect(cfg.showToolCalls).toBe("titles-only");
+	});
+
+	test("'titles-only' is case- and whitespace-insensitive", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-show-tool-calls": " Titles-Only ",
+		});
+		expect(cfg.showToolCalls).toBe("titles-only");
+	});
+
+	test("unrecognized value is ignored", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-show-tool-calls": "maybe",
+		});
+		expect(cfg.showToolCalls).toBeUndefined();
 	});
 });
 

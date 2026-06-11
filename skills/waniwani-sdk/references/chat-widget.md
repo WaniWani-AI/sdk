@@ -80,7 +80,7 @@ The dashboard owns the agent's display and behavior config. Use `overrides` only
 | `placeholder` | `string` | Input placeholder |
 | `suggestions` | `string[]` | Initial suggestion chips |
 | `enableThreadHistory` | `boolean` | Persist conversations across reloads in IndexedDB |
-| `showToolCalls` | `boolean` | Show tool call request/response panels |
+| `showToolCalls` | `boolean \| "titles-only"` | `true` (default) shows full request/response panels, `"titles-only"` shows just the tool title, `false` hides tool calls entirely |
 | `allowAttachments` | `boolean` | Enable file attachments in the input |
 | `appearance` | `ChatAppearance` | Theme preset + per-property overrides — see [Theming the chat widget](#theming-the-chat-widget) |
 | `api` | `string` | Chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat` |
@@ -223,7 +223,7 @@ The chat fits within whatever bound you set and scrolls internally — no need t
 | `data-placeholder` | No | Input field placeholder text |
 | `data-suggestions` | No | Comma-separated suggestion chips |
 | `data-enable-thread-history` | No | `"true"`/`"false"` — persist threads in IndexedDB, show thread menu in header |
-| `data-show-tool-calls` | No | `"true"`/`"false"` — toggle tool call panels |
+| `data-show-tool-calls` | No | `"true"` (default) shows full tool call panels, `"titles-only"` shows just the tool title, `"false"` hides tool calls entirely |
 | `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |
 | `data-theme` | No | `"light"` (default), `"dark"`, or `"auto"` (follow `prefers-color-scheme`) |
 | `data-locale` | No | `"en"`, `"fr"`, or `"es"`. Auto-detects from `<html lang>` / `navigator.language` when omitted |
