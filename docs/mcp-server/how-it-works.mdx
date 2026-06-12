@@ -39,9 +39,10 @@ Because `execute` runs real code, the model can chain, filter, and aggregate in 
 
 Operations run against your **active organization**:
 
-- It defaults to the same active organization you last used — the setting is shared with the dashboard.
+- When you first connect, it starts as the organization you last used in the dashboard.
 - `set_active_org` switches it, and the switch is enforced server-side: you can only activate organizations you belong to.
-- Because it's an account-level setting, switching here also switches it in the dashboard (and for any other connected client). Last writer wins.
+- The switch applies to **this connection only**. The dashboard and any other connected clients each keep their own active organization, so driving WaniWani from your AI client never silently moves your browser session — or vice versa.
+- It takes effect on your next call: the server invalidates the connection's current token and your client silently refreshes into the new organization.
 
 `whoami` always tells you where you currently stand.
 
@@ -52,8 +53,8 @@ When you connect, the consent screen itemizes the connection's permissions as OA
 | Scope | Grants |
 |---|---|
 | `orgs:read` / `orgs:write` | See your organizations and membership / invite members |
-| `mcp:read` / `mcp:write` | Read environments and analytics / create environments, create and rotate API keys |
-| `kb:read` / `kb:write` | Read / write the knowledge base |
+| `mcp:read` / `mcp:write` | Read environments and analytics / create environments and API keys |
+| `kb:read` / `kb:write` | Read / write the knowledge base *(operations not yet exposed through `execute`)* |
 
 Two properties worth knowing:
 
@@ -70,5 +71,5 @@ Two properties worth knowing:
 ## Limits worth knowing
 
 - The exposed operation surface is curated and grows over time — `search` is the source of truth, not this page.
-- The active organization is account-level, shared with the dashboard.
+- The active organization is per-connection: switching it here doesn't affect the dashboard or other connected clients, and switching in the dashboard doesn't affect this connection.
 - Long or heavy aggregations should be scoped (a date range, a single environment): `execute` snippets run within a bounded execution window.

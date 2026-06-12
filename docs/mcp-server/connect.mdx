@@ -89,11 +89,11 @@ Your client will call the server's `whoami` and `search` tools and report your a
   <Accordion title="Calls suddenly fail with an authentication error">
     Your token expired or was invalidated. Most clients refresh automatically; if yours doesn't, disconnect and reconnect the server (re-running the sign-in) to mint a fresh token.
   </Accordion>
-  <Accordion title='"You must be a member of the target org"'>
-    `set_active_org` only switches to organizations you belong to. Ask *"who am I?"* — the `whoami` tool lists the organizations you can act on and their ids.
+  <Accordion title="I can't switch to another organization (NOT_ORG_MEMBER)">
+    `set_active_org` only switches to organizations you belong to — the API rejects anything else with a `NOT_ORG_MEMBER` error. Ask *"who am I?"* — the `whoami` tool lists the organizations you can act on and their ids.
   </Accordion>
-  <Accordion title="My active organization changed in the dashboard too">
-    Expected. The active organization is a property of your account, shared between the dashboard and connected AI clients. Switching it in one place switches it everywhere.
+  <Accordion title="I switched organizations in the dashboard, but this connection still uses the old one">
+    Expected. Each connection carries its own active organization, independent of the dashboard — switching in one place doesn't switch the other. Ask the model to switch here too (it calls `set_active_org`), or check where you stand with *"who am I?"*.
   </Accordion>
   <Accordion title="The model says an operation doesn't exist">
     The available surface is curated and grows over time. Ask the model to run `search` again — it returns the live catalog with exact signatures. If what you need isn't there yet, tell us.
