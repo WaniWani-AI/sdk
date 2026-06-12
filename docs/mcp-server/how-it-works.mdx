@@ -1,0 +1,74 @@
+---
+title: How it works
+description: "Four tools, OAuth scopes, org context, and sandboxed execution: what happens between your prompt and the WaniWani API."
+keywords: ["WaniWani MCP tools", "whoami", "set_active_org", "search", "execute", "MCP OAuth scopes", "MCP security", "code mode"]
+---
+
+The server is deliberately small: four tools that compose, rather than one tool per API endpoint.
+
+## The four tools
+
+| Tool | What it does |
+|---|---|
+| `whoami` | Returns your identity: user id, granted permissions, the organizations you can act on, and which one is active. |
+| `set_active_org` | Switches your active organization for subsequent calls. Membership is enforced server-side. |
+| `search` | Lists the WaniWani API operations available to `execute`, with full TypeScript signatures — inputs *and* response shapes. Takes an optional keyword filter. |
+| `execute` | Runs a short piece of JavaScript in an isolated sandbox. The code calls operations as `api.<name>(input)` and returns a value. |
+
+## The loop
+
+A request like *"give me a digest of activity for the last 7 days"* plays out as:
+
+1. The model calls `search("analytics")` and reads the typed signatures.
+2. It writes a snippet and calls `execute`:
+
+   ```js
+   const envs = await api.listEnvironments();
+   // arguments elided — `search` returns the exact signatures
+   const summaries = await Promise.all(
+     envs.map((env) => api.getEnvironmentAnalytics(/* ... */)),
+   );
+   return summaries;
+   ```
+
+3. The returned data lands back in the conversation, and the model writes your digest.
+
+Because `execute` runs real code, the model can chain, filter, and aggregate in a single round trip instead of stitching together a dozen separate tool calls. Top-level `await` is supported, and whatever the snippet `return`s comes back as the tool result.
+
+## Org context
+
+Operations run against your **active organization**:
+
+- It defaults to the same active organization you last used — the setting is shared with the dashboard.
+- `set_active_org` switches it, and the switch is enforced server-side: you can only activate organizations you belong to.
+- Because it's an account-level setting, switching here also switches it in the dashboard (and for any other connected client). Last writer wins.
+
+`whoami` always tells you where you currently stand.
+
+## Permissions: scopes and consent
+
+When you connect, the consent screen itemizes the connection's permissions as OAuth scopes:
+
+| Scope | Grants |
+|---|---|
+| `orgs:read` / `orgs:write` | See your organizations and membership / invite members |
+| `mcp:read` / `mcp:write` | Read environments and analytics / create environments, create and rotate API keys |
+| `kb:read` / `kb:write` | Read / write the knowledge base |
+
+Two properties worth knowing:
+
+- **You only see what you're entitled to.** The consent screen narrows the list to your account's role — permissions reserved for WaniWani staff never appear for customer accounts.
+- **Scopes are enforced on every API call, server-side.** The MCP server doesn't get to be generous: each `api.*` operation is re-checked against your token's scopes and your org membership by the WaniWani API itself.
+
+## Security model
+
+- **OAuth 2.1, no API keys.** You sign in through `app.waniwani.ai` — the same login as the dashboard. The token your client receives is bound to this server specifically and to the scopes you approved.
+- **The sandbox never sees your token.** Code submitted through `execute` runs in an isolated sandbox that can reach only the curated `api.*` operations. Your credentials are attached to outbound API calls *outside* the sandbox — code running inside it has no way to read or exfiltrate them.
+- **Every call is your call.** All operations execute under your identity with your permissions. The connection can do nothing your account can't do in the dashboard.
+- **Stateless by design.** The server keeps no session state and stores no conversation content; each request is authenticated independently by your token. Disconnecting the server from your client severs its access.
+
+## Limits worth knowing
+
+- The exposed operation surface is curated and grows over time — `search` is the source of truth, not this page.
+- The active organization is account-level, shared with the dashboard.
+- Long or heavy aggregations should be scoped (a date range, a single environment): `execute` snippets run within a bounded execution window.

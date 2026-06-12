@@ -83,6 +83,14 @@ Optional. Adds tracking, knowledge base, chat widget, and hosted flow state to a
 - [Environment variables](https://docs.waniwani.ai/configuration/environment-variables): All env vars the SDK recognizes.
 - [Security](https://docs.waniwani.ai/configuration/security): Encryption at rest, key management, rotation.
 
+## WaniWani MCP server (drive the platform from your AI client)
+
+Connect Claude, Cursor, or ChatGPT to `https://mcp.waniwani.ai/mcp` (OAuth 2.1, no API keys) and operate the WaniWani platform conversationally: environments, API keys, analytics digests, session breakdowns. This is WaniWani's own hosted MCP server — distinct from the MCP funnel servers you build with the SDK.
+
+- [Overview](https://docs.waniwani.ai/mcp-server/overview): What the server is, example prompts, capability categories.
+- [Connect your AI client](https://docs.waniwani.ai/mcp-server/connect): Setup for claude.ai, Claude Code, Cursor, and ChatGPT; the OAuth sign-in flow; troubleshooting.
+- [How it works](https://docs.waniwani.ai/mcp-server/how-it-works): The four tools (`whoami`, `set_active_org`, `search`, `execute`), scopes & consent, sandboxed execution, the security model.
+
 ## Tracking & analytics (free tier)
 
 - [Tracking overview](https://docs.waniwani.ai/tracking/overview): Send events from your MCP server to the WaniWani dashboard.

@@ -137,6 +137,19 @@
         ]
       },
       {
+        "tab": "MCP Server",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "mcp-server/overview",
+              "mcp-server/connect",
+              "mcp-server/how-it-works"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Changelog",
         "groups": [
           {

@@ -1,0 +1,38 @@
+---
+title: WaniWani MCP server
+description: "Connect Claude, Cursor, or ChatGPT to the WaniWani platform and drive it from a conversation — environments, API keys, analytics digests, session breakdowns."
+keywords: ["WaniWani MCP server", "mcp.waniwani.ai", "remote MCP", "MCP connector", "WaniWani from Claude", "platform MCP"]
+---
+
+The WaniWani MCP server lets your AI client operate the WaniWani platform for you. Connect once to `https://mcp.waniwani.ai/mcp`, sign in with your WaniWani account, and ask for the things you would otherwise click through the dashboard for.
+
+<Note>
+This is **WaniWani's own MCP server** — the one that drives *the platform*. It is not the MCP funnel server you build with the SDK. Everywhere else in these docs, "your MCP server" means the one you ship to your users; this tab is about the one we host for you at `mcp.waniwani.ai`.
+</Note>
+
+## What you can ask it
+
+- "Give me a digest of activity across my environments for the last 7 days."
+- "Create a new environment called *staging* and hand me its API key."
+- "Which sessions hit production yesterday? Where did people drop off?"
+- "What sources are sending events to my production environment?"
+- "Rotate the production API key."
+- "Invite jane@acme.com to our organization."
+
+## What it can do
+
+| Category | Examples |
+|---|---|
+| **Environments & API keys** | List your environments, create one, create or rotate an environment's API key |
+| **Analytics & sessions** | Activity summaries over a date range, funnel flow breakdowns, per-session drill-downs, event sources |
+| **Organization** | Check who you're signed in as, switch your active org, invite a teammate |
+
+The surface grows over time, so this table stays deliberately coarse. The server's own `search` tool is the live catalog: once connected, ask *"what WaniWani operations are available?"* and your client will list every operation with its exact signature.
+
+## How you use it
+
+1. [Connect your client](/mcp-server/connect) — add the URL, sign in, approve the permissions. No API keys involved.
+2. Ask in plain language. The model discovers the right operations and calls them with your identity — every call is permission-checked server-side.
+3. Results come back into the conversation.
+
+Everything the connection can do is bounded by your own WaniWani account: your organizations, your role, the permissions you approved at sign-in. The mechanics are on [How it works](/mcp-server/how-it-works).
