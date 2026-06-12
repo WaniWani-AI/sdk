@@ -70,11 +70,12 @@ export interface EmailModule {
 	 * });
 	 *
 	 * @example
-	 * // Send with a saved template
+	 * // Send with a saved template — templateId is the template's UUID,
+	 * // available via "Copy template ID" in the dashboard.
 	 * await ctx.waniwani.modules.email.send({
 	 *   to: "user@example.com",
 	 *   subject: "Order Confirmation",
-	 *   templateId: "order-confirmation",
+	 *   templateId: "550e8400-e29b-41d4-a716-446655440000",
 	 *   variables: { orderId: "12345", customerName: "John" },
 	 * });
 	 */
@@ -130,6 +131,7 @@ export function createEmailModule(config: {
 					headers: {
 						"Content-Type": "application/json",
 						Authorization: `Bearer ${apiKey}`,
+						"X-WaniWani-SDK": "@waniwani/sdk",
 					},
 					body: JSON.stringify(body),
 				},
