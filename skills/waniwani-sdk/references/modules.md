@@ -42,6 +42,8 @@ await ctx.waniwani.modules.email.send({
 
 `replyTo` is optional on all variants. Template variables use `{{variableName}}` syntax in the template HTML and subject; values are HTML-escaped before substitution in the body.
 
+For template sends, the template's saved subject is used when set (with variable substitution applied), and the `subject` you pass is the fallback used when the template has no saved subject. The `subject` you pass is always used for `content` and `html` sends.
+
 ### Result
 
 ```ts
