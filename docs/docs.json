@@ -63,7 +63,8 @@
             "group": "Deployment",
             "pages": [
               "deployment/overview",
-              "deployment/self-hosting"
+              "deployment/self-hosting",
+              "deployment/claude-submission"
             ]
           },
           {

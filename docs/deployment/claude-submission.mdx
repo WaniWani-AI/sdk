@@ -1,0 +1,92 @@
+---
+title: Claude Submission
+description: "Submit your WaniWani-powered MCP app to the Claude Connectors Directory — render check, review criteria, and the submission form."
+keywords: ["Claude connectors directory", "MCP app submission", "claude.ai connector", "ui.domain", "claudemcpcontent", "MCP Apps"]
+---
+
+Once your MCP app is deployed, you can list it in the [Claude Connectors Directory](https://claude.com/docs/connectors/building/submission) so claude.ai users can connect it. This page covers the Claude-specific path. (For the ChatGPT App Store, see [Agent Skills → OpenAI App Submission](/guides/skills#openai-app-submission).)
+
+<Note>
+The fastest way to do this is the **`claude-submission` agent skill**, which drives the whole process — repo audit, render check, review-criteria audit, and the 6-page submission form — from inside Claude Code or Cursor.
+
+```bash
+npx skills add WaniWani-AI/sdk -s claude-submission -s local-mcp-claude
+```
+</Note>
+
+## Before you submit
+
+<Steps>
+  <Step title="Deploy to production">
+    The directory listing points at your **production** `https://…/mcp` URL. Have it deployed and reachable first (see [Deployment](/deployment/overview)).
+  </Step>
+  <Step title="Test locally in Claude Desktop">
+    Use the `local-mcp-claude` skill (or add an `mcp-remote` entry to `~/Library/Application Support/Claude/claude_desktop_config.json` by hand) to point Claude Desktop at your dev server, then exercise every tool and widget.
+  </Step>
+  <Step title="Confirm widgets render in Claude">
+    See [The `ui.domain` render check](#the-ui-domain-render-check) below.
+  </Step>
+  <Step title="Audit against Claude's review criteria">
+    See [Review criteria](#review-criteria). Reviewers functionally test every tool.
+  </Step>
+</Steps>
+
+## The `ui.domain` render check
+
+Claude rehosts each widget's HTML in a sandboxed iframe and validates its
+`Resource._meta.ui.domain` against a hash of your server URL:
+
+```
+ui.domain = sha256("<server-url>/mcp").hex.slice(0, 32) + ".claudemcpcontent.com"
+```
+
+If the value is wrong or missing, the widget frame mounts but never paints (Claude logs *"Invalid ui.domain format"*).
+
+**If you built on the [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-template)** (skybridge `registerWidget`), this is handled for you — the template's widget handler detects Claude and serves the correct hash automatically. Your job is to **verify**, not fix.
+
+<Warning>
+A plain `curl` of `resources/read` returns your **deploy host** (e.g. `https://your-app.example.com`), not the hash — and that is **not a bug**. The hash is only served when the request carries `user-agent: Claude-User`. Always include that header when verifying, or you'll chase a render bug that doesn't exist.
+</Warning>
+
+```bash
+URL="https://your-app.example.com"   # prod base, no trailing slash
+ID="your-widget"                     # the registerWidget name
+
+# Known-answer: what hash SHOULD the prod URL produce?
+node -e 'console.log(require("crypto").createHash("sha256").update(process.argv[1]+"/mcp").digest("hex").slice(0,32)+".claudemcpcontent.com")' "$URL"
+
+# What is the live server actually serving to Claude?
+curl -s -X POST "$URL/mcp" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'user-agent: Claude-User' \
+  -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"resources/read\",\"params\":{\"uri\":\"ui://widgets/ext-apps/$ID.html\"}}"
+```
+
+The two values must match. `curl` proves the protocol; the final confirmation is a human opening the connector in claude.ai and seeing the widget paint (claude.ai is behind Cloudflare Turnstile, so headless browsers can't reach it).
+
+<Note>
+If you're on the **legacy `createResource` path** (a Next.js app, not the template), `createResource` does not emit `ui.domain`, so the widget won't mount. Prefer migrating to the skybridge template; otherwise patch it app-side by wrapping the `text/html;profile=mcp-app` resource's read handler to set `_meta.ui.domain` to the hash. Leave the `text/html+skybridge` (ChatGPT) variant untouched. The `claude-submission` skill has the details.
+</Note>
+
+## Review criteria
+
+Anthropic reviewers functionally test your tools. The most common rejections:
+
+- **Read/write split.** One tool must not mix safe reads and unsafe writes. Split them, and set `readOnlyHint: true` on reads, `destructiveHint: true` on deletes/mutations.
+- **Tool descriptions describe function, not Claude's behavior.** Copy that instructs Claude ("you MUST call X", "always call this first", "never answer from memory") or routes to other tools gets the tool rejected. Aggressive ChatGPT-tuned routing language is the biggest portability trap — soften it to plain function descriptions. Grep your tool descriptions **and** any runtime response that injects instructions.
+- **`title` on every tool**, names ≤ 64 chars.
+- **Privacy policy URL** is mandatory and must be live and complete — a missing one is an immediate reject.
+- **Public documentation** with a **troubleshooting** section is required by publish date.
+- **Unsupported:** money/crypto transfers, AI-generated image/video/audio.
+
+## Submitting
+
+| You have… | Submit via |
+|---|---|
+| A Team/Enterprise org | In-app portal: `claude.ai/admin-settings/directory/submissions/new` |
+| No Team/Enterprise | Public Google Form: [`clau.de/mcp-directory-submission`](https://clau.de/mcp-directory-submission) |
+
+The public form is a 6-page Google Form that records the submitter's Google account email and ends with legal attestations the owner must personally accept. The `claude-submission` skill walks every page and captures the form's traps (the account-revert reset, checkbox minimums, favicon verification, Drive-link vs upload fields). You'll also need: an SVG logo, 3–5 screenshots (≥1000px, cropped to the widget, with paired prompts), and a `/favicon.ico` served at the server domain root.
+
+Track submission status at `claude.ai/admin-settings/directory/submissions`; escalate to `mcp-review@anthropic.com`.
