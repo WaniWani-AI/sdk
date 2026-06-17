@@ -23,6 +23,80 @@ This page tracks API changes that require code updates, organized by the version
 TypeScript will strike through deprecated signatures in your IDE. Hover for the replacement.
 </Tip>
 
+## Breaking changes at a glance
+
+| Change | Kind | Version | Auto-fixable |
+| --- | --- | --- | --- |
+| `addConditionalEdge(from, condition)` → `addConditionalEdge(from, to, condition)` | Signature change | 0.14.0 | Yes (codemod below) |
+
+<Note>
+When you bump `@waniwani/sdk` across a minor version (`0.x` minors can break), scan this page for every breaking change between your old and new version and apply the documented migration. Each one below is a mechanical rewrite an agent or codemod can apply in a single pass, followed by `bun run typecheck && bun test`.
+</Note>
+
+---
+
+## 0.14.0: `addConditionalEdge` declares its branch targets
+
+`addConditionalEdge` now takes the reachable nodes explicitly as the second argument: `addConditionalEdge(from, to, condition)`. The condition's return type is constrained to `to`, so a branch can never route to an undeclared node, and the flow graph used for funnel analytics and Mermaid diagrams is correct by construction.
+
+### Why
+
+Before 0.14.0, graph introspection discovered a conditional edge's targets by stringifying the condition function and scanning its source for node names. That heuristic was fragile: it broke under minification, missed dynamically-computed targets, and produced false positives when a node id appeared as a comparison value or in a comment — so funnel analytics could show the wrong branches. Declaring `to` removes the guesswork entirely.
+
+### Before
+
+```ts
+.addConditionalEdge("analyze_email", (state) =>
+  state.isCompanyEmail ? "done" : "ask_company",
+)
+```
+
+### After
+
+```ts
+.addConditionalEdge("analyze_email", ["done", "ask_company"], (state) =>
+  state.isCompanyEmail ? "done" : "ask_company",
+)
+```
+
+### Migration (codemod)
+
+For each `.addConditionalEdge(from, condition)` call, insert a second argument: an array of every node the condition can return (including `END` if it returns `END`). The simplest reliable source for that array is the set of literal node names returned by the condition body.
+
+1. Find every two-argument `.addConditionalEdge(` call.
+2. Read the condition body and collect every node name (string literal or `END`) it can return.
+3. Insert that list, deduplicated, as the new second argument — leaving the condition as the third.
+4. Run `bun run typecheck`. The compiler now flags any return value missing from `to`, so any over- or under-declared list surfaces immediately. Fix by aligning `to` with what the condition actually returns.
+
+```ts
+// Before
+.addConditionalEdge("route_country", (state) => {
+  if (state.country === "FR") return "fr_path";
+  if (state.country === "DE") return "de_path";
+  return "default_path";
+})
+
+// After
+.addConditionalEdge(
+  "route_country",
+  ["fr_path", "de_path", "default_path"],
+  (state) => {
+    if (state.country === "FR") return "fr_path";
+    if (state.country === "DE") return "de_path";
+    return "default_path";
+  },
+)
+```
+
+### Verifying
+
+```bash
+bun run typecheck   # condition return type is now checked against `to`
+bun test
+```
+
+If typecheck reports `Type '"x"' is not assignable to type '"a" | "b"'`, the condition returns a node missing from `to` — add it. If it reports an unused-looking target, the condition never returns it — safe to leave (over-declaration is allowed) or trim.
+
 ---
 
 ## 0.12.0: Legacy reorganization

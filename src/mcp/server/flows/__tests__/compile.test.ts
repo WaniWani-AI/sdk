@@ -1619,8 +1619,10 @@ describe("reset action", () => {
 				interrupt({ euRegion: { question: "EU Region?" } }),
 			)
 			.addEdge(START, "ask_country")
-			.addConditionalEdge("ask_country", (state) =>
-				state.country === "US" ? "ask_us_state" : "ask_eu_region",
+			.addConditionalEdge(
+				"ask_country",
+				["ask_us_state", "ask_eu_region"],
+				(state) => (state.country === "US" ? "ask_us_state" : "ask_eu_region"),
 			)
 			.addEdge("ask_us_state", END)
 			.addEdge("ask_eu_region", END)

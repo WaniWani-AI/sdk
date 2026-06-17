@@ -232,7 +232,7 @@ Notes:
 
 ## Conditional Edges
 
-Route to different nodes based on state. `addConditionalEdge(from, condition)` takes a function that receives state and returns the name of the next node. TypeScript enforces the return type matches registered node names.
+Route to different nodes based on state. `addConditionalEdge(from, to, condition)` takes the list of reachable nodes (`to`) and a function that returns which one to go to next. The condition's return type is constrained to `to`, so it can only route to a declared node — and graph introspection (funnel analytics, Mermaid diagrams) reads `to` directly, correct by construction.
 
 ```ts
 // Action node sets a flag
@@ -243,8 +243,10 @@ Route to different nodes based on state. `addConditionalEdge(from, condition)` t
 
 // Conditional edge branches on that flag
 .addEdge("ask_email", "analyze_email")
-.addConditionalEdge("analyze_email", (state) =>
-  state.isCompanyEmail ? "done" : "ask_company"
+.addConditionalEdge(
+  "analyze_email",
+  ["done", "ask_company"],
+  (state) => (state.isCompanyEmail ? "done" : "ask_company"),
 )
 .addEdge("ask_company", "done")
 .addEdge("done", END)

@@ -129,10 +129,12 @@ Connect nodes with edges. Every flow needs:
 2. Edges between consecutive nodes
 3. `addEdge(lastNode, END)` -- exit point
 
-For branching:
+For branching (list reachable nodes in `to`; the condition can only return one of them):
 ```typescript
-.addConditionalEdge("analyze_email", (state) =>
-  state.isCompanyEmail ? "done" : "ask_company"
+.addConditionalEdge(
+  "analyze_email",
+  ["done", "ask_company"],
+  (state) => (state.isCompanyEmail ? "done" : "ask_company"),
 )
 ```
 

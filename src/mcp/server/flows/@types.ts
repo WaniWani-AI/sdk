@@ -384,7 +384,16 @@ export type ConditionFn<TState> = (
 
 export type Edge<TState> =
 	| { type: "direct"; to: string }
-	| { type: "conditional"; condition: ConditionFn<TState> };
+	| {
+			type: "conditional";
+			condition: ConditionFn<TState>;
+			/**
+			 * The branch targets declared on the edge. The condition can only return
+			 * one of these, so graph introspection (funnel sync, Mermaid output) reads
+			 * them directly — no source parsing, correct by construction.
+			 */
+			targets: string[];
+	  };
 
 export type NodeOptions = {
 	/** Human-readable label for this node (used in funnel visualization and Graphs). */

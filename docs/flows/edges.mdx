@@ -35,7 +35,9 @@ flow
 
 ## Conditional edges
 
-Use `.addConditionalEdge(from, condition)` when the next node depends on state. The condition function receives `Partial<TState>` and must return a node name (or `END`). It can be async.
+Use `.addConditionalEdge(from, to, condition)` when the next node depends on state. Declare every node the branch can reach in the `to` array, then `condition` receives `Partial<TState>` and returns which of those nodes to go to next. It can be async.
+
+The condition's return type is **constrained to `to`** — returning a node you did not list is a compile error. Because `to` is the declared set of targets, graph introspection (funnel analytics, Mermaid diagrams) reads it directly, so the graph stays correct even when the branch target is computed dynamically.
 
 ```ts
 flow
@@ -60,7 +62,7 @@ flow
   .addNode({ id: "done", run: () => ({ ready: true }) })
   .addEdge(START, "ask_email")
   .addEdge("ask_email", "analyze_email")
-  .addConditionalEdge("analyze_email", (state) =>
+  .addConditionalEdge("analyze_email", ["done", "ask_company"], (state) =>
     state.isCompanyEmail ? "done" : "ask_company",
   )
   .addEdge("ask_company", "done")
@@ -70,20 +72,24 @@ flow
 Async conditions work for branches that depend on external lookups:
 
 ```ts
-.addConditionalEdge("check_inventory", async (state) => {
-  const inStock = await inventoryService.check(state.sku!);
-  return inStock ? "confirm_order" : "offer_alternative";
-})
+.addConditionalEdge(
+  "check_inventory",
+  ["confirm_order", "offer_alternative"],
+  async (state) => {
+    const inStock = await inventoryService.check(state.sku!);
+    return inStock ? "confirm_order" : "offer_alternative";
+  },
+)
 ```
 
-The return type is checked against registered node names, so a typo in a branch target fails type-checking.
+The return type is checked against the `to` list, so a typo in a branch target — or a target you forgot to declare — fails type-checking.
 
 ## Reaching END
 
 When execution reaches `END`, the engine returns `status: "complete"` to the model and deletes the session's flow state so a stale `continue` call cannot resume it. Any node can point to `END`, directly or conditionally.
 
 ```ts
-.addConditionalEdge("review", (state) =>
+.addConditionalEdge("review", [END, "ask_corrections"], (state) =>
   state.approved ? END : "ask_corrections",
 )
 ```
@@ -105,7 +111,7 @@ A conditional edge that points back to an earlier node creates a loop. Useful fo
   }),
 })
 .addEdge("ask_item", "append")
-.addConditionalEdge("append", (state) =>
+.addConditionalEdge("append", ["finalize", "ask_item"], (state) =>
   state.item === "done" ? "finalize" : "ask_item",
 )
 ```
@@ -118,6 +124,8 @@ The engine enforces a hard cap of 50 iterations per tool call to prevent runaway
 
 - No edge exists from `START`.
 - A `START` edge or direct edge points at an undeclared node.
+- A conditional edge declares a `to` target that is not a registered node.
+- A conditional edge declares an empty `to` list.
 - A node has no outgoing edge.
 - An edge is declared `from` a non-existent node.
 
@@ -125,7 +133,7 @@ Errors surface immediately at startup, not at the first user interaction.
 
 ## Visualizing the graph
 
-Both the builder and the compiled flow expose `graph()`, which returns a Mermaid `flowchart TD` string. Conditional edges render as dashed arrows to a placeholder because branch targets are decided at runtime.
+Both the builder and the compiled flow expose `graph()`, which returns a Mermaid `flowchart TD` string. Conditional edges render one dashed arrow per declared `to` target.
 
 ```ts
 console.log(flow.graph());
@@ -141,7 +149,8 @@ flowchart TD
   __end__((End))
   __start__ --> ask_email
   ask_email --> analyze_email
-  analyze_email -.-> analyze_email_branch([?])
+  analyze_email -.-> done
+  analyze_email -.-> ask_company
   ask_company --> done
   done --> __end__
 ```

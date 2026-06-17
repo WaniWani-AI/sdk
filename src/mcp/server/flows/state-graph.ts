@@ -1,5 +1,6 @@
 import type {
 	AddNodeConfig,
+	ConditionFn,
 	Edge,
 	FlowConfig,
 	NodeHandler,
@@ -24,7 +25,9 @@ function buildMermaidGraph(
 		if (edge.type === "direct") {
 			lines.push(`  ${from} --> ${edge.to}`);
 		} else {
-			lines.push(`  ${from} -.-> ${from}_branch([?])`);
+			for (const target of edge.targets) {
+				lines.push(`  ${from} -.-> ${target}`);
+			}
 		}
 	}
 	return lines.join("\n");
@@ -146,26 +149,48 @@ export class StateGraph<
 	/**
 	 * Add a conditional edge from a node.
 	 *
-	 * The condition function receives current state and returns the name of the next node.
+	 * Declare every node the branch can lead to in `to`, then `condition`
+	 * receives the current state and returns which of those nodes to go to next.
+	 * The condition's return type is constrained to `to`, so it can never route
+	 * somewhere undeclared — and graph introspection (funnel sync, Mermaid
+	 * output, the platform's flow graph) reads `to` directly, correct by
+	 * construction.
+	 *
+	 * @example
+	 * ```ts
+	 * .addConditionalEdge(
+	 *   "analyze_email",
+	 *   ["done", "ask_company"],
+	 *   (state) => (state.isCompanyEmail ? "done" : "ask_company"),
+	 * )
+	 * ```
 	 */
-	addConditionalEdge(
+	addConditionalEdge<const TTo extends TNodes | typeof END>(
 		from: TNodes,
-		condition: (
-			state: Partial<TState>,
-		) => TNodes | typeof END | Promise<TNodes | typeof END>,
+		to: readonly TTo[],
+		condition: (state: Partial<TState>) => NoInfer<TTo> | Promise<NoInfer<TTo>>,
 	): this {
 		if (this.edges.has(from)) {
 			throw new Error(`Node "${from}" already has an outgoing edge.`);
 		}
-		this.edges.set(from, { type: "conditional", condition });
+		if (to.length === 0) {
+			throw new Error(
+				`Conditional edge from "${from}" must declare at least one target node in \`to\`.`,
+			);
+		}
+		this.edges.set(from, {
+			type: "conditional",
+			condition: condition as ConditionFn<TState>,
+			targets: [...to],
+		});
 		return this;
 	}
 
 	/**
 	 * Generate a Mermaid `flowchart TD` diagram of the graph.
 	 *
-	 * Direct edges use solid arrows. Conditional edges use a dashed arrow
-	 * to a placeholder since branch targets are determined at runtime.
+	 * Direct edges use solid arrows. Conditional edges render one dashed arrow
+	 * per declared target.
 	 *
 	 * @example
 	 * ```ts
@@ -238,6 +263,15 @@ export class StateGraph<
 				throw new Error(
 					`Edge from "${from}" references non-existent node: "${edge.to}"`,
 				);
+			}
+			if (edge.type === "conditional" && edge.targets) {
+				for (const target of edge.targets) {
+					if (target !== END && !this.nodes.has(target)) {
+						throw new Error(
+							`Conditional edge from "${from}" declares non-existent target: "${target}"`,
+						);
+					}
+				}
 			}
 		}
 

@@ -189,13 +189,20 @@ const flow = createFlow({
   .addNode("done", () => ({ ready: true }))
   .addEdge(START, "ask_email")
   .addEdge("ask_email", "analyze_email")
-  .addConditionalEdge("analyze_email", (state) =>
-    state.isCompanyEmail ? "done" : "ask_company",
+  .addConditionalEdge(
+    "analyze_email",
+    ["done", "ask_company"],
+    (state) => (state.isCompanyEmail ? "done" : "ask_company"),
   )
   .addEdge("ask_company", "done")
   .addEdge("done", END)
   .compile();
 ```
+
+Declare every node the branch can reach in the `to` array. The condition's
+return type is constrained to that list, so it can never route somewhere
+undeclared, and graph introspection (funnel analytics, Mermaid diagrams) reads
+`to` directly — correct by construction, with no source parsing.
 
 ## Node types summary
 
@@ -225,5 +232,5 @@ Config fields:
 - `.addNode(name, handler)`
 - `.addNode(name, { field? }, handler)`
 - `.addEdge(from, to)`
-- `.addConditionalEdge(from, condition)`
+- `.addConditionalEdge(from, to, condition)`
 - `.compile()`

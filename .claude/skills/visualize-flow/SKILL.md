@@ -29,10 +29,7 @@ Parse the source code to identify:
 
 **Direct edges** — Each `.addEdge(from, to)` call. `START` and `END` are sentinel constants (`"__start__"` and `"__end__"`).
 
-**Conditional edges** — Each `.addConditionalEdge("from", (state) => { ... })` call. Read the condition function body to extract:
-- Which state fields are checked (e.g., `state.country === "FR"`)
-- Which node names are returned for each condition
-- The default/fallback return
+**Conditional edges** — Each `.addConditionalEdge("from", ["target_a", "target_b"], (state) => { ... })` call. The second argument lists the branch targets verbatim — use it directly. Read the condition body only if you also want to label which state values lead to which target (e.g., `state.country === "FR"`).
 
 ### 3. Generate Mermaid diagram
 

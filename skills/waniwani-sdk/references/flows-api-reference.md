@@ -37,9 +37,9 @@ All methods return `this` for chaining (except `compile` and `graph`).
 |--------|-----------|-------------|
 | `addNode` | `(name: string, handler: NodeHandler<TState>)` | Add a node. Handler receives `{ state, meta, interrupt, showWidget, waniwani }`. Return `interrupt(...)`, `showWidget(...)`, or a plain object. |
 | `addEdge` | `(from: string, to: string)` | Static edge. `START` and `END` are valid values. |
-| `addConditionalEdge` | `(from: string, condition: (state) => string)` | Dynamic routing. `condition(state)` returns the next node name. TypeScript enforces the return type matches registered node names. |
+| `addConditionalEdge` | `(from: string, to: string[], condition: (state) => string)` | Dynamic routing. `to` lists every reachable node; `condition(state)` returns which one to go to next. TypeScript constrains the condition's return type to `to`, so it can only route to a declared node. Graph introspection reads `to` directly. |
 | `compile` | `(options?: { store?: FlowStore })` | Validate graph, return a `RegisteredFlow`. |
-| `graph` | `()` | Returns a Mermaid `flowchart TD` string. Also available on the compiled `RegisteredFlow`. Conditional edges render as dashed arrows. |
+| `graph` | `()` | Returns a Mermaid `flowchart TD` string. Also available on the compiled `RegisteredFlow`. Conditional edges render one dashed arrow per declared target. |
 
 ## interrupt(fields, config?)
 

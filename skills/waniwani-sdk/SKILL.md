@@ -135,6 +135,7 @@ The following are still exported for back-compat with existing customer MCPs but
 | Use the flow API in detail (nodes, edges, interrupts, widgets) | [flows-api-reference.md](references/flows-api-reference.md) |
 | Add knowledge-base search | [knowledge-base.md](references/knowledge-base.md) |
 | Embed the chat widget on a website | [chat-widget.md](references/chat-widget.md) |
+| Upgrade the SDK / fix a build that broke after a version bump | [upgrading.md](references/upgrading.md) |
 
 ## Guided playbooks
 
@@ -145,6 +146,10 @@ The following are still exported for back-compat with existing customer MCPs but
 | Tunnel the dev server for remote testing | [scripts/tunnel.md](scripts/tunnel.md) |
 
 When a playbook exists for the user's task, **follow the playbook step by step** instead of writing code directly. The playbooks include prerequisite checks, interactive design steps, and testing instructions.
+
+## Upgrading the SDK
+
+`@waniwani/sdk` is `0.x`, so **minor version bumps can break the public API**. Whenever you raise the SDK version in a project — editing `package.json`, running `bun add @waniwani/sdk@latest`, or fixing a build that started failing after an upgrade — do not treat it as a drop-in. Read the [changelog](https://docs.waniwani.ai/changelog) for every breaking change between the old and new version and **auto-apply the documented migration** (each one is a mechanical codemod), then run `bun run typecheck && bun test`. Full procedure in [upgrading.md](references/upgrading.md).
 
 ## Common mistakes
 
