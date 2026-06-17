@@ -81,6 +81,12 @@ interface RemoteConfigResponse {
 	placeholder: string | null;
 	suggestions: string[] | null;
 	enableThreadHistory?: boolean | null;
+	/**
+	 * Tool-call rendering mode from the channel config. Mapped to the
+	 * `showToolCalls` embed config: `full` → `true`, `hidden` → `false`,
+	 * `titles-only` → `"titles-only"`.
+	 */
+	toolCallDisplay?: "full" | "titles-only" | "hidden" | null;
 }
 
 /**
@@ -146,6 +152,13 @@ function remoteToConfigPartial(
 	}
 	if (typeof data.enableThreadHistory === "boolean") {
 		out.enableThreadHistory = data.enableThreadHistory;
+	}
+	if (data.toolCallDisplay === "full") {
+		out.showToolCalls = true;
+	} else if (data.toolCallDisplay === "titles-only") {
+		out.showToolCalls = "titles-only";
+	} else if (data.toolCallDisplay === "hidden") {
+		out.showToolCalls = false;
 	}
 	return out;
 }
