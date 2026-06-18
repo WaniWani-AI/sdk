@@ -518,15 +518,15 @@ window.WaniWani.chat.init({
 
 ### Event tracking
 
-When `apiKey` is provided (advanced `ChatEmbed` setups), the widget automatically tracks:
+`WaniwaniChat` and the `<script>` embed automatically emit one event on init:
 
-| Event | Trigger |
-|-------|---------|
-| `chat.opened` | Widget mounts |
-| `chat.message_sent` | User sends a message |
-| `chat.response_received` | Streaming response completes |
+| Event | Trigger | Identity |
+|-------|---------|----------|
+| `page.viewed` | Widget initializes on the host page (once per load) | Anonymous `visitorId` — **no session** |
 
-Tracking is fire-and-forget — failures never break the chat.
+This is the top of the funnel: it counts everyone who *landed* on a page where the widget is present, regardless of whether they ever open it or send a message. It is attributed to the anonymous `visitorId` (the backend maps it to `externalUserId`) and deliberately carries **no `sessionId`** — a session is only created when a conversation actually starts (on the first message). That separation is what lets the funnel compute "page views vs conversations started"; minting a session per page view would make the two equal and collapse the funnel. See [events.md](./events.md) for the event taxonomy and the anonymous-visitor identity model.
+
+The event goes to the same canonical ingest every other event uses (`POST /api/mcp/events/v2/batch`, the V2 batch envelope), authenticated with the same public `wwp_...` token the widget already uses for `/chat` and `/config` (no API key, no separate JWT in the browser). Tracking is fire-and-forget — failures never break the chat.
 
 ## `ChatEmbed` (advanced)
 

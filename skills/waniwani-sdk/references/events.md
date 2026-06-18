@@ -24,6 +24,7 @@ Think of instrumentation as three stages. Emit at least the **start** and the
 
 | Funnel stage | Emit | Helper / source | When |
 |---|---|---|---|
+| **Landing** | `page.viewed` | chat widget (auto) | A visitor lands on a page where the widget is present. Auto-emitted once on widget init — no code. Attributed to an anonymous `visitorId`, **not** a session. |
 | **Start** | `lead` | `track.lead({ source })` | User enters the funnel with intent (asked for a quote, started a flow). |
 | (start, auto) | `tool.called` | `withWaniwani(server)` | Auto-captured for every tool call — no code. |
 | **Step** | `price_shown` | `track.priceShown({ amount, currency })` | You showed the user a price. |
@@ -51,6 +52,32 @@ returns an id.
 - **From a top-level client or your own backend** → there is no request context, so you
   **must pass `externalUserId`** (or `sessionId`) yourself. This is exactly how an
   off-platform `converted` finds its original lead.
+- **From the chat widget at landing time** → there is no session yet (a session is only
+  created on the first message). The widget satisfies the identity rule with an anonymous
+  **`visitorId`** — a stable, property-derived id persisted in the browser — sent as the
+  event's `externalUserId`. This is what lets `page.viewed` count landings *before* any
+  conversation, and it is the funnel's denominator for "landed → started a conversation".
+  Treat `visitorId` as the anonymous device/visitor key (the equivalent of an analytics
+  "device id"), distinct from a `sessionId`: one visitor can land many times and may never
+  start a session.
+
+## Ingest authentication: which token goes where
+
+All events land at one endpoint — `POST /api/mcp/events/v2/batch` (the V2 batch envelope).
+That endpoint accepts **three** `Authorization: Bearer …` credentials, and picks the right
+one by prefix, so you almost never need to think about it:
+
+| Credential | Prefix | Who uses it | Browser-safe? |
+|---|---|---|---|
+| **Public key** | `wwp_…` | Browser clients that already have a public token — **the chat widget**, `<script>` embed | Yes — env-scoped, CORS-safe |
+| **Secret API key** | `wwk_…` | Server-side SDK / your backend | No — server only |
+| **Widget JWT** | `eyJ…` | MCP-App widgets rendered inside tool responses, which have **no** public token (the JWT is minted server-side and injected into `_meta`) | Yes — short-lived |
+
+> **Don't reach for a widget JWT just because the client is a browser.** The JWT exists
+> only for the MCP-App case, where the embed has no public token. The chat widget already
+> holds a `wwp_` public token (it uses it for `/chat` and `/config`), so it sends events
+> with that same token — no JWT, and no bespoke per-event endpoint. The public key
+> resolves to an environment/org server-side exactly like the chat routes do.
 
 ## Getting a client
 

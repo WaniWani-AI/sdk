@@ -9,6 +9,7 @@
 import type { UIMessage } from "ai";
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { firePageView } from "../lib/page-view";
 import type { EmbedConfig } from "./config";
 import {
 	DEFAULT_EMBED_HEIGHT,
@@ -513,6 +514,17 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 		config.mode === "floating"
 			? mountFloating(config, options, scriptConfig)
 			: mountInline(config, options, scriptConfig, scriptEl);
+
+	// Top-of-funnel signal: the widget is present on the page, regardless of
+	// whether the user ever opens it. Fire-and-forget; guarded to fire once.
+	if (config.api) {
+		void firePageView({
+			api: config.api,
+			token: config.token,
+			channelId: config.channelId,
+			mode: config.mode === "floating" ? "floating" : "inline",
+		});
+	}
 
 	return currentInstance;
 }
