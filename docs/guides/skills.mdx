@@ -6,12 +6,15 @@ keywords: ["WaniWani skill", "Claude Code skill", "Cursor skill", "agent skill i
 
 The WaniWani SDK is available as an [agent skill](https://agentskills.io) for Claude Code, Cursor, GitHub Copilot, and 20+ other AI coding agents. Once installed, your agent knows how to integrate the SDK without you having to explain the API.
 
-<Columns cols={2}>
+<Columns cols={3}>
   <Card title="WaniWani SDK" icon="code" href="#waniwani-sdk">
     Tracking, flows, widgets, knowledge base, and chat components.
   </Card>
   <Card title="OpenAI Submission" icon="file-check" href="#openai-app-submission">
     Generate Tool Justification and Test Cases for the ChatGPT App Store.
+  </Card>
+  <Card title="Claude Submission" icon="file-check" href="#claude-app-submission">
+    Drive the Claude Connectors Directory submission end-to-end.
   </Card>
 </Columns>
 
@@ -59,6 +62,28 @@ The generated file includes:
 
 1. **Tool Justification** -- annotations (Read Only, Open World, Destructive) with justifications for every tool
 2. **Test Cases** -- positive and negative test scenarios for OpenAI reviewers
+
+## Claude App Submission
+
+When submitting your MCP server to the [Claude Connectors Directory](https://claude.com/docs/connectors/building/submission), the `claude-submission` skill drives the whole process: it audits your repo into a copy-paste cheat sheet, verifies your widgets emit the correct `ui.domain` for Claude, checks tool descriptions against Claude's review criteria, and walks the 6-page submission form. A companion `local-mcp-claude` skill registers your dev server in Claude Desktop so you can test locally first.
+
+<CodeGroup>
+  ```bash npx
+  npx skills add WaniWani-AI/sdk -s claude-submission -s local-mcp-claude
+  ```
+
+  ```bash bunx
+  bunx skills add WaniWani-AI/sdk -s claude-submission -s local-mcp-claude
+  ```
+</CodeGroup>
+
+The skill captures hard-won gotchas, including:
+
+- **The `ui.domain` render check** -- Claude validates widget HTML against `sha256(<server-url>/mcp).claudemcpcontent.com`. Apps built on the skybridge template already emit this correctly; the skill shows you how to **verify it with the Claude user-agent** (a plain curl returns your deploy host and looks broken when it isn't).
+- **Review-criteria audit** -- the read/write tool split, and behavioral tool-description language that gets a tool rejected.
+- **The Google Form traps** -- the account-revert reset, checkbox minimum-N requirements, favicon verification, and which media fields take Drive links vs uploads.
+
+See the [Claude submission deployment guide](/deployment/claude-submission) for the full walkthrough.
 
 ## Learn more
 
