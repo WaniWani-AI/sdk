@@ -34,11 +34,13 @@ export function hasVisibleParts(message: UIMessage): boolean {
  * Pass `ignoreToolParts` when tool calls render nothing (`showToolCalls:
  * false`) — tool parts then don't count as visible content, so the
  * indicator keeps showing while tools run instead of leaving a blank chat.
+ * Pass `ignoreReasoningParts` in that same hidden mode so a reasoning-only
+ * "thinking" phase (which is also suppressed) doesn't leave a blank chat.
  */
 export function shouldShowWorkingIndicator(
 	messages: UIMessage[],
 	status: ChatStatus,
-	options?: { ignoreToolParts?: boolean },
+	options?: { ignoreToolParts?: boolean; ignoreReasoningParts?: boolean },
 ): boolean {
 	if (status !== "submitted" && status !== "streaming") {
 		return false;
@@ -47,9 +49,18 @@ export function shouldShowWorkingIndicator(
 	if (!last || last.role !== "assistant") {
 		return true;
 	}
-	const visible = options?.ignoreToolParts
-		? last.parts.some((p) => isVisiblePart(p) && !("toolCallId" in p))
-		: hasVisibleParts(last);
+	const visible = last.parts.some((p) => {
+		if (!isVisiblePart(p)) {
+			return false;
+		}
+		if (options?.ignoreToolParts && "toolCallId" in p) {
+			return false;
+		}
+		if (options?.ignoreReasoningParts && p.type === "reasoning") {
+			return false;
+		}
+		return true;
+	});
 	return !visible;
 }
 

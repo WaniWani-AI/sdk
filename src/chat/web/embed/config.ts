@@ -30,13 +30,13 @@ export interface ChatAppearance {
 }
 
 /**
- * Tool call rendering mode.
+ * Tool-call activity rendering mode. Steps are grouped into one collapsible
+ * "chain of thought".
  *
- * - `true` (default) — full request/response panels.
- * - `"titles-only"` — a compact text indicator with the tool title, no
- *   JSON panels.
- * - `false` — tool calls are hidden entirely; a generic working indicator
- *   shows while tools run.
+ * - `true` (default) — each step expands to its request/response JSON.
+ * - `"titles-only"` — step labels only, no JSON.
+ * - `false` — the chain (and the reasoning trace) are hidden entirely; only
+ *   a generic working indicator shows while the agent works.
  */
 export type ShowToolCalls = boolean | "titles-only";
 
@@ -64,9 +64,10 @@ export interface EmbedConfig {
 	 */
 	channelId?: string;
 	/**
-	 * How tool calls render in the chat: `true` (default) shows full
-	 * request/response panels, `"titles-only"` shows a compact indicator
-	 * with just the tool title, `false` hides tool calls entirely.
+	 * How tool-call activity renders, grouped into one collapsible chain:
+	 * `true` (default) makes each step expandable to its request/response
+	 * JSON, `"titles-only"` shows step labels only, `false` hides the chain
+	 * and the reasoning trace entirely.
 	 *
 	 * Surfaced as `data-show-tool-calls` on the embed script tag.
 	 */

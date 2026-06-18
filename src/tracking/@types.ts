@@ -6,6 +6,7 @@
 
 export type EventType =
 	| "session.started"
+	| "page.viewed"
 	| "tool.called"
 	| "quote.requested"
 	| "quote.succeeded"
@@ -31,6 +32,28 @@ export type EventType =
 // ============================================
 // Event Properties
 // ============================================
+
+/**
+ * Properties for `page.viewed` — emitted once when the chat widget initializes
+ * on a host page (the top of the funnel). Attributed to the anonymous
+ * `visitorId` (mapped to `externalUserId`), never to a session: a page view
+ * must not create a session, otherwise sessions would equal page views and the
+ * "landed → started a conversation" funnel collapses.
+ */
+export interface PageViewedProperties {
+	/** Full URL of the host page the widget loaded on. */
+	url?: string;
+	/** Referrer of the host page, if any. */
+	referrer?: string;
+	/** Embed mode the widget initialized in. */
+	mode?: "inline" | "floating";
+	/** Resolved device type from the visitor context. */
+	deviceType?: "mobile" | "tablet" | "desktop";
+	/** Primary browser language (BCP-47). */
+	language?: string;
+	/** IANA timezone of the visitor. */
+	timezone?: string;
+}
 
 export interface ToolCalledProperties {
 	name?: string;
@@ -126,6 +149,10 @@ interface BaseTrackEvent extends TrackingContext {
 
 export type TrackEvent =
 	| ({ event: "session.started" } & BaseTrackEvent)
+	| ({
+			event: "page.viewed";
+			properties?: PageViewedProperties;
+	  } & BaseTrackEvent)
 	| ({
 			event: "tool.called";
 			properties?: ToolCalledProperties;

@@ -80,7 +80,7 @@ The dashboard owns the agent's display and behavior config. Use `overrides` only
 | `placeholder` | `string` | Input placeholder |
 | `suggestions` | `string[]` | Initial suggestion chips |
 | `enableThreadHistory` | `boolean` | Persist conversations across reloads in IndexedDB |
-| `showToolCalls` | `boolean \| "titles-only"` | `true` (default) shows full request/response panels, `"titles-only"` shows just the tool title, `false` hides tool calls entirely |
+| `showToolCalls` | `boolean \| "titles-only"` | How the agent's tool-call activity renders, grouped into one collapsible "chain of thought". `true` (default) — each step expandable to its request/response JSON. `"titles-only"` — step labels only, no JSON. `false` — hides the chain entirely (including the reasoning trace); only the generic "On it…" indicator shows while the agent works. MCP App widgets always render regardless. |
 | `allowAttachments` | `boolean` | Enable file attachments in the input |
 | `appearance` | `ChatAppearance` | Theme preset + per-property overrides — see [Theming the chat widget](#theming-the-chat-widget) |
 | `api` | `string` | Chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat` |
@@ -223,7 +223,7 @@ The chat fits within whatever bound you set and scrolls internally — no need t
 | `data-placeholder` | No | Input field placeholder text |
 | `data-suggestions` | No | Comma-separated suggestion chips |
 | `data-enable-thread-history` | No | `"true"`/`"false"` — persist threads in IndexedDB, show thread menu in header |
-| `data-show-tool-calls` | No | `"true"` (default) shows full tool call panels, `"titles-only"` shows just the tool title, `"false"` hides tool calls entirely |
+| `data-show-tool-calls` | No | Tool-call activity rendering (grouped into one collapsible chain). `"true"` (default) — steps expandable to request/response JSON. `"titles-only"` — step labels only. `"false"` — hides the chain and the reasoning trace; only the "On it…" indicator shows |
 | `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |
 | `data-theme` | No | `"light"` (default), `"dark"`, or `"auto"` (follow `prefers-color-scheme`) |
 | `data-locale` | No | `"en"`, `"fr"`, or `"es"`. Auto-detects from `<html lang>` / `navigator.language` when omitted |
@@ -518,15 +518,15 @@ window.WaniWani.chat.init({
 
 ### Event tracking
 
-When `apiKey` is provided (advanced `ChatEmbed` setups), the widget automatically tracks:
+`WaniwaniChat` and the `<script>` embed automatically emit one event on init:
 
-| Event | Trigger |
-|-------|---------|
-| `chat.opened` | Widget mounts |
-| `chat.message_sent` | User sends a message |
-| `chat.response_received` | Streaming response completes |
+| Event | Trigger | Identity |
+|-------|---------|----------|
+| `page.viewed` | Widget initializes on the host page (once per load) | Anonymous `visitorId` — **no session** |
 
-Tracking is fire-and-forget — failures never break the chat.
+This is the top of the funnel: it counts everyone who *landed* on a page where the widget is present, regardless of whether they ever open it or send a message. It is attributed to the anonymous `visitorId` (the backend maps it to `externalUserId`) and deliberately carries **no `sessionId`** — a session is only created when a conversation actually starts (on the first message). That separation is what lets the funnel compute "page views vs conversations started"; minting a session per page view would make the two equal and collapse the funnel. See [events.md](./events.md) for the event taxonomy and the anonymous-visitor identity model.
+
+The event goes to the same canonical ingest every other event uses (`POST /api/mcp/events/v2/batch`, the V2 batch envelope), authenticated with the same public `wwp_...` token the widget already uses for `/chat` and `/config` (no API key, no separate JWT in the browser). Tracking is fire-and-forget — failures never break the chat.
 
 ## `ChatEmbed` (advanced)
 

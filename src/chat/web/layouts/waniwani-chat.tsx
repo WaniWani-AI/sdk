@@ -15,6 +15,7 @@ import {
 	saveCachedConfig,
 } from "../embed/remote-config";
 import type { Locale, MessageOverrides } from "../i18n";
+import { firePageView } from "../lib/page-view";
 import { ChatEmbed } from "./chat-embed";
 
 /**
@@ -231,6 +232,21 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				controller.abort();
 				clearTimeout(safety);
 			};
+		}, [resolvedApi, token, channelId]);
+
+		// Top-of-funnel signal: fire once when the component mounts (the host
+		// page rendered the widget), independent of whether a conversation
+		// ever starts. Guarded inside `firePageView` to fire at most once.
+		useEffect(() => {
+			if (!token) {
+				return;
+			}
+			void firePageView({
+				api: resolvedApi,
+				token,
+				channelId,
+				mode: "inline",
+			});
 		}, [resolvedApi, token, channelId]);
 
 		const config = useMemo(
