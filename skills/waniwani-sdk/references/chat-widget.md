@@ -87,6 +87,7 @@ The dashboard owns the agent's display and behavior config. Use `overrides` only
 | `mcpServerUrl` | `string` | Override the MCP server URL (rare) |
 | `locale` | `"en" \| "fr" \| "es"` | UI language for built-in labels. Auto-detected from `<html lang>` / `navigator.language` when omitted; falls back to English |
 | `messages` | `MessageOverrides` | Per-key overrides on top of the resolved locale catalog — see [Languages](#languages) |
+| `disablePageView` | `boolean` | Opt out of the top-of-funnel `page.viewed` event fired once on mount. Defaults to `false`. Set `true` on surfaces where a page view is noise — an already-authenticated app shell, an internal tool, a preview — so it doesn't pollute the funnel. See [Tracked events](#event-tracking) |
 
 Overrides win over dashboard config when both are set.
 
@@ -231,6 +232,7 @@ The chat fits within whatever bound you set and scrolls internally — no need t
 | `data-height` | No | Inline only. Default container height — any CSS length (`"500px"`, `"80vh"`) or a bare number (px). Defaults to `500px` |
 | `data-position` | No | Floating only. `"bottom-center"` (default), `"bottom-right"`, or `"bottom-left"` |
 | `data-launcher-text` | No | Floating only. Overrides the docked input's placeholder. Defaults to the agent's configured input placeholder (typed out), then a localized "Ask anything…" |
+| `data-disable-page-view` | No | `"true"` (or a bare attribute) opts out of the top-of-funnel `page.viewed` event fired once on init. Use on surfaces where a page view is noise. See [Tracked events](#event-tracking) |
 
 For finer-grained colour, radius, or font overrides, set CSS variables on the container — see [Theming the chat widget](#theming-the-chat-widget).
 
@@ -527,6 +529,8 @@ window.WaniWani.chat.init({
 This is the top of the funnel: it counts everyone who *landed* on a page where the widget is present, regardless of whether they ever open it or send a message. It is attributed to the anonymous `visitorId` (the backend maps it to `externalUserId`) and deliberately carries **no `sessionId`** — a session is only created when a conversation actually starts (on the first message). That separation is what lets the funnel compute "page views vs conversations started"; minting a session per page view would make the two equal and collapse the funnel. See [events.md](./events.md) for the event taxonomy and the anonymous-visitor identity model.
 
 The event goes to the same canonical ingest every other event uses (`POST /api/mcp/events/v2/batch`, the V2 batch envelope), authenticated with the same public `wwp_...` token the widget already uses for `/chat` and `/config` (no API key, no separate JWT in the browser). Tracking is fire-and-forget — failures never break the chat.
+
+**Opting out.** On surfaces where a page view is meaningless — an already-authenticated app shell, an internal tool, a staging preview — suppress the event so it doesn't inflate the customer's funnel. Set `overrides={{ disablePageView: true }}` on `<WaniwaniChat>`, or `data-disable-page-view="true"` (a bare `data-disable-page-view` works too) on the `<script>` embed. The rest of the widget is unaffected; only the `page.viewed` event is skipped.
 
 ## `ChatEmbed` (advanced)
 

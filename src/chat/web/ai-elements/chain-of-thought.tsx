@@ -1,7 +1,12 @@
 "use client";
 
 import type { ToolUIPart } from "ai";
-import { BracesIcon, ChevronDownIcon } from "lucide-react";
+import {
+	ChevronDownIcon,
+	ClockIcon,
+	type LucideIcon,
+	WrenchIcon,
+} from "lucide-react";
 import type { HTMLAttributes, ReactNode } from "react";
 import {
 	createContext,
@@ -13,6 +18,7 @@ import {
 	useState,
 } from "react";
 import { cn } from "../lib/utils";
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "./reasoning";
 import { Shimmer } from "./shimmer";
 
 const AUTO_CLOSE_DELAY = 1000;
@@ -52,10 +58,10 @@ export type ChainOfThoughtProps = HTMLAttributes<HTMLDivElement> & {
  *
  * ```tsx
  * <ChainOfThought isWorking={anyRunning}>
- *   <ChainOfThoughtHeader count={steps.length} />
+ *   <ChainOfThoughtHeader label="Canopy offer" />
  *   <ChainOfThoughtContent>
- *     <ChainOfThoughtStep title="Getting you a quote" state="output-available" />
- *     <ChainOfThoughtStep title="Canopy offer" state="input-available" isLast />
+ *     <ChainOfThoughtStep icon={WrenchIcon} title="Getting you a quote" state="output-available" />
+ *     <ChainOfThoughtStep icon={WrenchIcon} title="Canopy offer" state="input-available" isLast />
  *   </ChainOfThoughtContent>
  * </ChainOfThought>
  * ```
@@ -141,7 +147,7 @@ export type ChainOfThoughtHeaderProps = HTMLAttributes<HTMLButtonElement> & {
  * title once everything's done — a contextual continuation of the
  * conversation, not a call to action (the chevron still expands for the
  * curious). Matches the {@link ToolHeader} / {@link ReasoningTrigger} style:
- * braces icon + muted text + chevron.
+ * wrench icon + muted text + chevron, left-aligned with the step icons below.
  */
 export function ChainOfThoughtHeader({
 	className,
@@ -165,7 +171,7 @@ export function ChainOfThoughtHeader({
 			)}
 			{...props}
 		>
-			<BracesIcon className="ww:size-4 ww:shrink-0" />
+			<WrenchIcon className="ww:size-4 ww:shrink-0" />
 			<span className="ww:truncate">{content}</span>
 			<ChevronDownIcon
 				className={cn(
@@ -205,10 +211,47 @@ export function ChainOfThoughtContent({
 	);
 }
 
+/** Shared timeline rail: an icon centered on the first text line, plus a
+ * vertical connector down to the next node (omitted on the last). Used by
+ * both {@link ChainOfThoughtStep} and {@link ChainOfThoughtReasoning} so all
+ * nodes share one continuous line. */
+function ChainOfThoughtRail({
+	icon: Icon,
+	isLast,
+	running,
+	error,
+}: {
+	icon: LucideIcon;
+	isLast?: boolean;
+	running?: boolean;
+	error?: boolean;
+}) {
+	return (
+		<div className="ww:flex ww:flex-col ww:items-center ww:self-stretch">
+			<span className="ww:flex ww:h-5 ww:items-center">
+				<Icon
+					className={cn(
+						"ww:size-4 ww:shrink-0",
+						error
+							? "ww:text-destructive"
+							: running
+								? "ww:animate-pulse ww:text-foreground"
+								: "ww:text-muted-foreground",
+					)}
+				/>
+			</span>
+			{!isLast && <span className="ww:w-px ww:flex-1 ww:bg-border" />}
+		</div>
+	);
+}
+
 export type ChainOfThoughtStepProps = HTMLAttributes<HTMLDivElement> & {
+	/** Timeline icon for this step — e.g. a wrench for a tool call, a globe
+	 * for a search. Recolors to reflect running/error state. */
+	icon: LucideIcon;
 	title?: string;
 	state: ToolUIPart["state"];
-	/** When true, omits the connecting line below the dot (the timeline tail). */
+	/** When true, omits the connecting line below the icon (the timeline tail). */
 	isLast?: boolean;
 	/** Expandable detail (e.g. request/response JSON). When present the step
 	 * row becomes a toggle. Omit for label-only ("titles-only") steps. */
@@ -216,13 +259,14 @@ export type ChainOfThoughtStepProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 /**
- * A single step in the chain, rendered as a timeline node: a status dot with
- * a connecting line, plus the step title. While running the title shimmers.
- * If `children` are provided (full mode), the row toggles a collapsible panel
- * holding the tool request/response.
+ * A single step in the chain, rendered as a timeline node: an icon connected
+ * by a vertical line to the next step, plus the step title. While running the
+ * icon pulses and the title shimmers. If `children` are provided (full mode),
+ * the row toggles a collapsible panel holding the tool request/response.
  */
 export function ChainOfThoughtStep({
 	className,
+	icon: Icon,
 	title,
 	state,
 	isLast = false,
@@ -242,24 +286,16 @@ export function ChainOfThoughtStep({
 	);
 
 	return (
-		<div className={cn("ww:flex ww:gap-3", className)} {...props}>
-			{/* Timeline rail: dot + connecting line */}
-			<div className="ww:flex ww:flex-col ww:items-center ww:self-stretch">
-				<span
-					className={cn(
-						"ww:mt-[7px] ww:size-1.5 ww:shrink-0 ww:rounded-full",
-						isError
-							? "ww:bg-destructive"
-							: isRunning
-								? "ww:animate-pulse ww:bg-foreground"
-								: "ww:bg-muted-foreground",
-					)}
-				/>
-				{!isLast && <span className="ww:w-px ww:flex-1 ww:bg-border" />}
-			</div>
+		<div className={cn("ww:flex ww:gap-2", className)} {...props}>
+			<ChainOfThoughtRail
+				icon={Icon}
+				isLast={isLast}
+				running={isRunning}
+				error={isError}
+			/>
 
 			{/* Step body */}
-			<div className={cn("ww:min-w-0 ww:flex-1", !isLast && "ww:pb-2")}>
+			<div className={cn("ww:min-w-0 ww:flex-1", !isLast && "ww:pb-3")}>
 				{expandable ? (
 					<button
 						type="button"
@@ -297,6 +333,43 @@ export function ChainOfThoughtStep({
 						</div>
 					</div>
 				)}
+			</div>
+		</div>
+	);
+}
+
+export type ChainOfThoughtReasoningProps = {
+	/** Whether the reasoning is still streaming (drives shimmer + auto-open). */
+	isStreaming?: boolean;
+	/** Omits the connector tail when this is the last node in the chain. */
+	isLast?: boolean;
+	/** The reasoning text (markdown). */
+	children: string;
+};
+
+/**
+ * Reasoning rendered as a chain step: a clock icon on the shared timeline
+ * rail, with the {@link Reasoning} trigger ("Thought for X seconds") and its
+ * collapsible thinking text as the body. Lets the reasoning trace sit inline
+ * among the tool steps in chronological order, on one continuous line.
+ */
+export function ChainOfThoughtReasoning({
+	isStreaming = false,
+	isLast = false,
+	children,
+}: ChainOfThoughtReasoningProps) {
+	return (
+		<div className="ww:flex ww:gap-2">
+			<ChainOfThoughtRail
+				icon={ClockIcon}
+				isLast={isLast}
+				running={isStreaming}
+			/>
+			<div className={cn("ww:min-w-0 ww:flex-1", !isLast && "ww:pb-3")}>
+				<Reasoning isStreaming={isStreaming} className="ww:mb-0">
+					<ReasoningTrigger hideIcon />
+					<ReasoningContent>{children}</ReasoningContent>
+				</Reasoning>
 			</div>
 		</div>
 	);

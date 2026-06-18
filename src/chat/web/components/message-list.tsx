@@ -1,6 +1,7 @@
 "use client";
 
 import type { ChatStatus, ReasoningUIPart, ToolUIPart, UIMessage } from "ai";
+import { GlobeIcon, type LucideIcon, WrenchIcon } from "lucide-react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import type { ShowToolCalls, WelcomeConfig } from "../@types";
 import { Attachments } from "../ai-elements/attachments";
@@ -8,6 +9,7 @@ import {
 	ChainOfThought,
 	ChainOfThoughtContent,
 	ChainOfThoughtHeader,
+	ChainOfThoughtReasoning,
 	ChainOfThoughtStep,
 } from "../ai-elements/chain-of-thought";
 import {
@@ -23,7 +25,11 @@ import {
 import {
 	resolveWidgetAutoHeight,
 	resolveWidgetResourceUri,
+	Tool,
+	ToolContent,
 	type ToolDefinitionsMap,
+	ToolHeader,
+	ToolIndicator,
 	ToolInput,
 	ToolOutput,
 } from "../ai-elements/tool";
@@ -44,6 +50,14 @@ function formatToolName(name: string | undefined): string {
 	}
 
 	return name.replace(/[-_]/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+}
+
+/** Picks a timeline icon for a tool step: a globe for search-like tools, a
+ * wrench for everything else. */
+function pickStepIcon(name: string | undefined): LucideIcon {
+	return name && /search|find|lookup|query|web|browse|google/i.test(name)
+		? GlobeIcon
+		: WrenchIcon;
 }
 
 export interface FullscreenWidget {
@@ -91,12 +105,13 @@ interface MessageListProps {
 	/** When true, show _meta in tool call inputs and outputs. */
 	debug?: boolean;
 	/**
-	 * How tool-call activity renders, grouped into one collapsible chain:
-	 * `true` (default) makes each step expandable to its request/response
-	 * JSON, `"titles-only"` shows step labels only, `false` hides the chain
-	 * and the reasoning trace (the working indicator covers the running state
-	 * instead). MCP App widgets attached to a tool call are always rendered
-	 * regardless of this flag.
+	 * How tool-call activity renders. With 2+ tool calls they group into one
+	 * collapsible chain of thought (reasoning folds in at the top); a single
+	 * tool renders on its own. `true` (default) makes each step expandable to
+	 * its request/response JSON, `"titles-only"` shows step labels only,
+	 * `false` hides the chain and the reasoning trace (the working indicator
+	 * covers the running state instead). MCP App widgets attached to a tool
+	 * call are always rendered regardless of this flag.
 	 */
 	showToolCalls?: ShowToolCalls;
 	/**
@@ -168,12 +183,30 @@ export function MessageList({
 						title?: string;
 					} => "toolCallId" in p,
 				);
+				// Reasoning + tool parts in document order, so a `think → tool →
+				// think → tool` trace renders chronologically in the chain (not
+				// all reasoning first, then all tools).
+				const activityParts = message.parts.filter(
+					(p): p is ReasoningUIPart | (typeof toolParts)[number] =>
+						p.type === "reasoning" || "toolCallId" in p,
+				);
 				const isLastAssistant =
 					message === lastMessage && message.role === "assistant";
 				const hasTextContent = textParts.length > 0;
 				const containsFullscreenTool = isFullscreenActive
 					? toolParts.some((p) => p.toolCallId === fullscreenToolCallId)
 					: false;
+				const anyToolRunning = toolParts.some(
+					(p) => p.state === "input-available" || p.state === "input-streaming",
+				);
+				// The collapsible chain only kicks in at 2+ tool calls; a single
+				// tool renders on its own (a one-step chain would just duplicate
+				// the step under its header). When the chain shows, the reasoning
+				// trace folds into it.
+				const showChain =
+					showToolCalls !== false &&
+					!containsFullscreenTool &&
+					toolParts.length >= 2;
 
 				// Hide messages that don't contain the fullscreen widget
 				if (isFullscreenActive && !containsFullscreenTool) {
@@ -213,10 +246,12 @@ export function MessageList({
 
 				return (
 					<Message from={message.role} key={message.id}>
-						{/* Reasoning trace. Suppressed in `hidden` mode along with
-						    tool calls — only the generic "On it…" indicator shows. */}
+						{/* Reasoning trace. Folded into the chain when one is shown
+						    (2+ tools); rendered on its own otherwise. Suppressed
+						    entirely in `hidden` mode (only "On it…" shows). */}
 						{showToolCalls !== false &&
 							!containsFullscreenTool &&
+							!showChain &&
 							reasoningParts.map((part, i) => (
 								<Reasoning
 									key={`reasoning-${message.id}-${i}`}
@@ -226,64 +261,105 @@ export function MessageList({
 									<ReasoningContent>{part.text}</ReasoningContent>
 								</Reasoning>
 							))}
-						{/* Tool calls grouped into one collapsible chain. `full` makes
-						    each step expandable to its request/response JSON;
-						    `titles-only` shows label-only steps; `hidden` renders no
-						    chain (widgets below still render). */}
-						{showToolCalls !== false &&
-							!containsFullscreenTool &&
-							toolParts.length > 0 && (
-								<ChainOfThought
-									isWorking={toolParts.some(
-										(p) =>
-											p.state === "input-available" ||
-											p.state === "input-streaming",
-									)}
-								>
-									<ChainOfThoughtHeader
-										label={(() => {
-											const last = toolParts[toolParts.length - 1];
-											return last.title ?? formatToolName(last.toolName);
-										})()}
-									/>
-									<ChainOfThoughtContent>
-										{toolParts.map((part, i) => {
-											const title = part.title ?? formatToolName(part.toolName);
-											const isLast = i === toolParts.length - 1;
-											if (showToolCalls === "titles-only") {
-												return (
-													<ChainOfThoughtStep
-														key={part.toolCallId}
-														title={title}
-														state={part.state}
-														isLast={isLast}
-													/>
-												);
-											}
-											const output = "output" in part ? part.output : undefined;
+						{/* 2+ tool calls → one collapsible chain of thought. The
+						    reasoning trace folds in at the top, then each tool is a
+						    timeline step. `full` makes steps expand to their
+						    request/response JSON; `titles-only` shows label-only steps. */}
+						{showChain && (
+							<ChainOfThought
+								isWorking={
+									anyToolRunning ||
+									reasoningParts.some((p) => p.state === "streaming")
+								}
+							>
+								<ChainOfThoughtHeader
+									label={
+										toolParts[toolParts.length - 1].title ??
+										formatToolName(toolParts[toolParts.length - 1].toolName)
+									}
+								/>
+								<ChainOfThoughtContent>
+									{activityParts.map((part, i) => {
+										const isLast = i === activityParts.length - 1;
+										if (part.type === "reasoning") {
+											return (
+												<ChainOfThoughtReasoning
+													key={`reasoning-${message.id}-${i}`}
+													isStreaming={part.state === "streaming"}
+													isLast={isLast}
+												>
+													{part.text}
+												</ChainOfThoughtReasoning>
+											);
+										}
+										const title = part.title ?? formatToolName(part.toolName);
+										const icon = pickStepIcon(part.toolName);
+										if (showToolCalls === "titles-only") {
 											return (
 												<ChainOfThoughtStep
 													key={part.toolCallId}
+													icon={icon}
 													title={title}
 													state={part.state}
 													isLast={isLast}
-												>
-													<ToolInput input={part.input} debug={debug} />
-													{output !== undefined && (
-														<ToolOutput
-															output={output}
-															errorText={
-																"errorText" in part ? part.errorText : undefined
-															}
-															debug={debug}
-														/>
-													)}
-												</ChainOfThoughtStep>
+												/>
 											);
-										})}
-									</ChainOfThoughtContent>
-								</ChainOfThought>
-							)}
+										}
+										const output = "output" in part ? part.output : undefined;
+										return (
+											<ChainOfThoughtStep
+												key={part.toolCallId}
+												icon={icon}
+												title={title}
+												state={part.state}
+												isLast={isLast}
+											>
+												<ToolInput input={part.input} debug={debug} />
+												{output !== undefined && (
+													<ToolOutput
+														output={output}
+														errorText={
+															"errorText" in part ? part.errorText : undefined
+														}
+														debug={debug}
+													/>
+												)}
+											</ChainOfThoughtStep>
+										);
+									})}
+								</ChainOfThoughtContent>
+							</ChainOfThought>
+						)}
+						{/* Single tool call → render it directly (no chain wrapper,
+						    which would just duplicate the one step under a header). */}
+						{showToolCalls !== false &&
+							!containsFullscreenTool &&
+							toolParts.length === 1 &&
+							(() => {
+								const part = toolParts[0];
+								const title = part.title ?? formatToolName(part.toolName);
+								if (showToolCalls === "titles-only") {
+									return <ToolIndicator title={title} state={part.state} />;
+								}
+								const output = "output" in part ? part.output : undefined;
+								return (
+									<Tool>
+										<ToolHeader title={title} state={part.state} />
+										<ToolContent>
+											<ToolInput input={part.input} debug={debug} />
+											{output !== undefined && (
+												<ToolOutput
+													output={output}
+													errorText={
+														"errorText" in part ? part.errorText : undefined
+													}
+													debug={debug}
+												/>
+											)}
+										</ToolContent>
+									</Tool>
+								);
+							})()}
 						{toolParts.map((part) => {
 							const output = "output" in part ? part.output : undefined;
 							const resourceUri = resolveWidgetResourceUri(

@@ -24,7 +24,7 @@ Think of instrumentation as three stages. Emit at least the **start** and the
 
 | Funnel stage | Emit | Helper / source | When |
 |---|---|---|---|
-| **Landing** | `page.viewed` | chat widget (auto) | A visitor lands on a page where the widget is present. Auto-emitted once on widget init — no code. Attributed to an anonymous `visitorId`, **not** a session. |
+| **Landing** | `page.viewed` | chat widget (auto) | A visitor lands on a page where the widget is present. Auto-emitted once on widget init — no code. Attributed to an anonymous `visitorId`, **not** a session. Opt out per-surface with `disablePageView` / `data-disable-page-view` (see [chat-widget.md](./chat-widget.md#event-tracking)). |
 | **Start** | `lead` | `track.lead({ source })` | User enters the funnel with intent (asked for a quote, started a flow). |
 | (start, auto) | `tool.called` | `withWaniwani(server)` | Auto-captured for every tool call — no code. |
 | **Step** | `price_shown` | `track.priceShown({ amount, currency })` | You showed the user a price. |

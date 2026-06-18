@@ -1,6 +1,6 @@
 "use client";
 
-import { BrainIcon } from "lucide-react";
+import { ClockIcon } from "lucide-react";
 import type { HTMLAttributes, ReactNode } from "react";
 import {
 	createContext,
@@ -153,6 +153,9 @@ Reasoning.displayName = "Reasoning";
 
 export type ReasoningTriggerProps = HTMLAttributes<HTMLButtonElement> & {
 	getThinkingMessage?: (isStreaming: boolean, duration?: number) => ReactNode;
+	/** Omit the leading clock icon — used when an outer timeline rail already
+	 * provides the icon (e.g. inside a chain of thought). */
+	hideIcon?: boolean;
 };
 
 export const ReasoningTrigger = memo(
@@ -160,6 +163,7 @@ export const ReasoningTrigger = memo(
 		className,
 		children,
 		getThinkingMessage,
+		hideIcon = false,
 		onClick,
 		...props
 	}: ReasoningTriggerProps) => {
@@ -196,7 +200,7 @@ export const ReasoningTrigger = memo(
 			>
 				{children ?? (
 					<>
-						<BrainIcon className="ww:size-4 ww:shrink-0" />
+						{!hideIcon && <ClockIcon className="ww:size-4 ww:shrink-0" />}
 						{resolvedGetThinkingMessage(isStreaming, duration)}
 					</>
 				)}

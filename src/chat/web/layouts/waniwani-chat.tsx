@@ -87,6 +87,13 @@ export interface WaniwaniChatOverrides {
 	 * tweak individual built-in strings without contributing a full locale.
 	 */
 	messages?: MessageOverrides;
+	/**
+	 * Opt out of the top-of-funnel `page.viewed` event fired once on mount.
+	 * Defaults to `false` (the event fires). Set `true` on surfaces where a
+	 * page view is meaningless and would pollute the customer's funnel — an
+	 * already-authenticated app shell, an internal tool, a preview, etc.
+	 */
+	disablePageView?: boolean;
 }
 
 /**
@@ -237,8 +244,11 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 		// Top-of-funnel signal: fire once when the component mounts (the host
 		// page rendered the widget), independent of whether a conversation
 		// ever starts. Guarded inside `firePageView` to fire at most once.
+		// Skippable via `overrides.disablePageView` on surfaces where a landing
+		// event is noise.
+		const disablePageView = overrides?.disablePageView;
 		useEffect(() => {
-			if (!token) {
+			if (!token || disablePageView) {
 				return;
 			}
 			void firePageView({
@@ -247,7 +257,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				channelId,
 				mode: "inline",
 			});
-		}, [resolvedApi, token, channelId]);
+		}, [resolvedApi, token, channelId, disablePageView]);
 
 		const config = useMemo(
 			() => resolveConfig(programmatic, remote, undefined),

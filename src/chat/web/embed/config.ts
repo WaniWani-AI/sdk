@@ -148,6 +148,15 @@ export interface EmbedConfig {
 	 * prompt. Surfaced as `data-launcher-text`.
 	 */
 	launcherText?: string;
+	/**
+	 * Opt out of the top-of-funnel `page.viewed` event the widget fires once
+	 * on mount. Leave unset (or `false`) to keep the default landing-funnel
+	 * tracking; set `true` on surfaces where a page view is meaningless and
+	 * would pollute the customer's funnel (internal tools, previews, an
+	 * already-authenticated app shell, etc.). Surfaced as
+	 * `data-disable-page-view` on the embed script tag.
+	 */
+	disablePageView?: boolean;
 }
 
 /** Fallback height applied to an inline embed container with no author sizing. */
@@ -279,6 +288,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const enableThreadHistory = bool("data-enable-thread-history");
 	if (enableThreadHistory !== undefined) {
 		config.enableThreadHistory = enableThreadHistory;
+	}
+
+	const disablePageView = bool("data-disable-page-view");
+	if (disablePageView !== undefined) {
+		config.disablePageView = disablePageView;
 	}
 
 	const hideHeader = bool("data-hide-header");

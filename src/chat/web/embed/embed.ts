@@ -517,7 +517,9 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 
 	// Top-of-funnel signal: the widget is present on the page, regardless of
 	// whether the user ever opens it. Fire-and-forget; guarded to fire once.
-	if (config.api) {
+	// Skippable via `disablePageView` / `data-disable-page-view` on surfaces
+	// where a landing event is noise.
+	if (config.api && !config.disablePageView) {
 		void firePageView({
 			api: config.api,
 			token: config.token,

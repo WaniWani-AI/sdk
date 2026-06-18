@@ -212,6 +212,37 @@ describe("parseConfigFromScript — render mode attrs", () => {
 	});
 });
 
+describe("parseConfigFromScript — data-disable-page-view", () => {
+	test("undefined when unspecified — page view fires by default", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "tok" });
+		expect(cfg.disablePageView).toBeUndefined();
+	});
+
+	test("'true' opts out of the page view", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-disable-page-view": "true",
+		});
+		expect(cfg.disablePageView).toBe(true);
+	});
+
+	test("bare attribute (empty value) opts out", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-disable-page-view": "",
+		});
+		expect(cfg.disablePageView).toBe(true);
+	});
+
+	test("'false' keeps the page view", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-disable-page-view": "false",
+		});
+		expect(cfg.disablePageView).toBe(false);
+	});
+});
+
 describe("parseConfigFromScript — data-show-tool-calls", () => {
 	test("undefined when unspecified — consumers default to full panels", async () => {
 		const cfg = await parseWithAttrs({ "data-token": "tok" });
