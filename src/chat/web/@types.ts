@@ -147,13 +147,14 @@ export interface ChatBaseProps {
 	 */
 	debug?: boolean;
 	/**
-	 * How tool calls are rendered in the chat.
+	 * How the agent's tool-call activity renders. Steps are grouped into a
+	 * single collapsible "chain of thought" that auto-expands while the agent
+	 * works and collapses to a summary once it settles.
 	 *
-	 * - `true` (default) — full request/response panels.
-	 * - `"titles-only"` — a compact text indicator with the tool title, no
-	 *   JSON panels.
-	 * - `false` — tool calls are hidden entirely; a generic working
-	 *   indicator shows while tools run.
+	 * - `true` (default) — each step expands to its request/response JSON.
+	 * - `"titles-only"` — step labels only, no JSON.
+	 * - `false` — the chain is hidden entirely, along with the reasoning
+	 *   trace; only the generic "On it…" indicator shows while the agent works.
 	 *
 	 * MCP App widgets attached to a tool call are always rendered.
 	 */

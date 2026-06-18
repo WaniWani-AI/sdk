@@ -5,6 +5,12 @@ import type { ModelContextUpdate } from "../../../shared/model-context";
 import type { ShowToolCalls, WelcomeConfig } from "../@types";
 import { Attachments } from "../ai-elements/attachments";
 import {
+	ChainOfThought,
+	ChainOfThoughtContent,
+	ChainOfThoughtHeader,
+	ChainOfThoughtStep,
+} from "../ai-elements/chain-of-thought";
+import {
 	Message,
 	MessageContent,
 	MessageResponse,
@@ -17,11 +23,7 @@ import {
 import {
 	resolveWidgetAutoHeight,
 	resolveWidgetResourceUri,
-	Tool,
-	ToolContent,
 	type ToolDefinitionsMap,
-	ToolHeader,
-	ToolIndicator,
 	ToolInput,
 	ToolOutput,
 } from "../ai-elements/tool";
@@ -89,11 +91,12 @@ interface MessageListProps {
 	/** When true, show _meta in tool call inputs and outputs. */
 	debug?: boolean;
 	/**
-	 * How tool calls render: `true` (default) shows full request/response
-	 * panels, `"titles-only"` shows a compact indicator with just the tool
-	 * title, `false` hides tool calls entirely (the working indicator covers
-	 * the running state instead). MCP App widgets attached to a tool call are
-	 * always rendered regardless of this flag.
+	 * How tool-call activity renders, grouped into one collapsible chain:
+	 * `true` (default) makes each step expandable to its request/response
+	 * JSON, `"titles-only"` shows step labels only, `false` hides the chain
+	 * and the reasoning trace (the working indicator covers the running state
+	 * instead). MCP App widgets attached to a tool call are always rendered
+	 * regardless of this flag.
 	 */
 	showToolCalls?: ShowToolCalls;
 	/**
@@ -131,6 +134,7 @@ export function MessageList({
 		!isFullscreenActive &&
 		shouldShowWorkingIndicator(messages, status, {
 			ignoreToolParts: showToolCalls === false,
+			ignoreReasoningParts: showToolCalls === false,
 		});
 
 	return (
@@ -186,14 +190,14 @@ export function MessageList({
 				}
 
 				// With tool calls fully hidden, an assistant message whose only
-				// visible parts are widget-less tool calls renders nothing —
-				// collapse it so it doesn't occupy a gap slot in the message
-				// column (and so the WorkingIndicator stays flush while running).
+				// visible parts are widget-less tool calls (or reasoning, which
+				// hidden mode also suppresses) renders nothing — collapse it so
+				// it doesn't occupy a gap slot in the message column (and so the
+				// WorkingIndicator stays flush while running).
 				if (
 					showToolCalls === false &&
 					message.role === "assistant" &&
 					!hasTextContent &&
-					reasoningParts.length === 0 &&
 					fileParts.length === 0 &&
 					toolParts.every((p) => {
 						const output = "output" in p ? p.output : undefined;
@@ -209,7 +213,10 @@ export function MessageList({
 
 				return (
 					<Message from={message.role} key={message.id}>
-						{!containsFullscreenTool &&
+						{/* Reasoning trace. Suppressed in `hidden` mode along with
+						    tool calls — only the generic "On it…" indicator shows. */}
+						{showToolCalls !== false &&
+							!containsFullscreenTool &&
 							reasoningParts.map((part, i) => (
 								<Reasoning
 									key={`reasoning-${message.id}-${i}`}
@@ -219,6 +226,64 @@ export function MessageList({
 									<ReasoningContent>{part.text}</ReasoningContent>
 								</Reasoning>
 							))}
+						{/* Tool calls grouped into one collapsible chain. `full` makes
+						    each step expandable to its request/response JSON;
+						    `titles-only` shows label-only steps; `hidden` renders no
+						    chain (widgets below still render). */}
+						{showToolCalls !== false &&
+							!containsFullscreenTool &&
+							toolParts.length > 0 && (
+								<ChainOfThought
+									isWorking={toolParts.some(
+										(p) =>
+											p.state === "input-available" ||
+											p.state === "input-streaming",
+									)}
+								>
+									<ChainOfThoughtHeader
+										label={(() => {
+											const last = toolParts[toolParts.length - 1];
+											return last.title ?? formatToolName(last.toolName);
+										})()}
+									/>
+									<ChainOfThoughtContent>
+										{toolParts.map((part, i) => {
+											const title = part.title ?? formatToolName(part.toolName);
+											const isLast = i === toolParts.length - 1;
+											if (showToolCalls === "titles-only") {
+												return (
+													<ChainOfThoughtStep
+														key={part.toolCallId}
+														title={title}
+														state={part.state}
+														isLast={isLast}
+													/>
+												);
+											}
+											const output = "output" in part ? part.output : undefined;
+											return (
+												<ChainOfThoughtStep
+													key={part.toolCallId}
+													title={title}
+													state={part.state}
+													isLast={isLast}
+												>
+													<ToolInput input={part.input} debug={debug} />
+													{output !== undefined && (
+														<ToolOutput
+															output={output}
+															errorText={
+																"errorText" in part ? part.errorText : undefined
+															}
+															debug={debug}
+														/>
+													)}
+												</ChainOfThoughtStep>
+											);
+										})}
+									</ChainOfThoughtContent>
+								</ChainOfThought>
+							)}
 						{toolParts.map((part) => {
 							const output = "output" in part ? part.output : undefined;
 							const resourceUri = resolveWidgetResourceUri(
@@ -233,13 +298,12 @@ export function MessageList({
 							);
 							const isFullscreen = part.toolCallId === fullscreenToolCallId;
 
-							// A fully hidden tool call with no widget renders nothing.
-							// Returning an empty wrapper instead would still occupy a
-							// gap slot in the message's flex column.
-							if (
-								showToolCalls === false &&
-								!(resourceUri && resourceEndpoint && output !== undefined)
-							) {
+							// This map only renders MCP App widgets now (the textual
+							// tool display moved to the ChainOfThought above). A tool
+							// call with no widget renders nothing here — returning an
+							// empty wrapper would still occupy a gap slot in the
+							// message's flex column.
+							if (!(resourceUri && resourceEndpoint && output !== undefined)) {
 								return null;
 							}
 
@@ -260,37 +324,9 @@ export function MessageList({
 											: undefined
 									}
 								>
-									{showToolCalls !== false && (
-										<div style={isFullscreen ? { display: "none" } : undefined}>
-											{showToolCalls === "titles-only" ? (
-												<ToolIndicator
-													title={part.title ?? formatToolName(part.toolName)}
-													state={part.state}
-												/>
-											) : (
-												<Tool>
-													<ToolHeader
-														title={part.title ?? formatToolName(part.toolName)}
-														state={part.state}
-													/>
-													<ToolContent>
-														<ToolInput input={part.input} debug={debug} />
-														{output !== undefined && (
-															<ToolOutput
-																output={output}
-																errorText={
-																	"errorText" in part
-																		? part.errorText
-																		: undefined
-																}
-																debug={debug}
-															/>
-														)}
-													</ToolContent>
-												</Tool>
-											)}
-										</div>
-									)}
+									{/* Textual tool display now lives in the grouped
+									    ChainOfThought above; this map only renders the
+									    MCP App widget (iframe) for tool calls that carry one. */}
 									{resourceUri && resourceEndpoint && output !== undefined && (
 										<WidgetErrorBoundary>
 											<McpAppFrame
