@@ -2,7 +2,7 @@
  * Server-side API route handler for widget tracking events.
  *
  * Receives batched events from the `useWaniwani` React hook and forwards them
- * to the WaniWani backend using the server-side SDK.
+ * to the Waniwani backend using the server-side SDK.
  *
  * @example Next.js App Router
  * ```typescript
@@ -23,9 +23,9 @@ import type { WaniWaniConfig } from "../../types.js";
 import { waniwani } from "../../waniwani.js";
 
 export interface TrackingRouteOptions {
-	/** API key for the WaniWani backend. Defaults to WANIWANI_API_KEY env var. */
+	/** API key for the Waniwani backend. Defaults to WANIWANI_API_KEY env var. */
 	apiKey?: string;
-	/** Base URL for the WaniWani backend. Defaults to https://app.waniwani.ai. */
+	/** Base URL for the Waniwani backend. Defaults to https://app.waniwani.ai. */
 	apiUrl?: string;
 }
 
@@ -85,7 +85,7 @@ function mapWidgetEvent(ev: WidgetEventPayload): TrackInput {
 
 /**
  * Creates a POST handler that receives tracking events from `useWaniwani`
- * and forwards them to the WaniWani backend.
+ * and forwards them to the Waniwani backend.
  */
 export function createTrackingRoute(options?: TrackingRouteOptions) {
 	const config: WaniWaniConfig = {

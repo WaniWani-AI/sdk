@@ -130,7 +130,7 @@ export function applyIframePatches(): void {
 			// Rewrite *relative* same-origin requests to the widget's real
 			// `baseUrl`. Absolute URLs are left alone — they're the
 			// caller's explicit target (e.g. SDK transport posting to the
-			// WaniWani API on the same origin as the iframe).
+			// Waniwani API on the same origin as the iframe).
 			if (isRelativeString && url.origin === window.location.origin) {
 				const newUrl = new URL(baseUrl);
 				newUrl.pathname = url.pathname;

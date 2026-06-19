@@ -51,14 +51,14 @@ export type ShowToolCalls = boolean | "titles-only";
  * placeholder, suggestions) — system prompt and step budget stay server-side.
  */
 export interface EmbedConfig {
-	/** WaniWani chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
+	/** Waniwani chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
 	api?: string;
 	/** Public token (wwp_...) for authentication (required). */
 	token: string;
 	/** Override MCP server URL (optional — resolved from environment by default). */
 	mcpServerUrl?: string;
 	/**
-	 * Agent channel ID. Sent to the chat API so the WaniWani app routes the
+	 * Agent channel ID. Sent to the chat API so the Waniwani app routes the
 	 * conversation to the right agent. Surfaced as `data-channel-id` on the
 	 * embed script tag.
 	 */
@@ -398,8 +398,8 @@ export function resolveConfig(
 
 	if (!merged.token) {
 		throw new Error(
-			"[WaniWani] Missing required config: `token`. " +
-				"Set data-token on the script tag or pass it to WaniWani.chat.init().",
+			"[Waniwani] Missing required config: `token`. " +
+				"Set data-token on the script tag or pass it to Waniwani.chat.init().",
 		);
 	}
 

@@ -136,7 +136,7 @@ Each ticket should include:
 ## Creating Issues
 
 When creating issues, use:
-- `team`: "WaniWani" (or fetch from project)
+- `team`: "Waniwani" (or fetch from project)
 - `project`: The project name from $ARGUMENTS
 - `priority`: 2 (High) for foundational work, 3 (Normal) for features
 - `blocks`: Array of issue identifiers that this ticket blocks

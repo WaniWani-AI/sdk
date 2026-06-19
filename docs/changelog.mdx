@@ -1,7 +1,7 @@
 ---
 title: Changelog
-description: "Release notes for the WaniWani SDK, including breaking changes and deprecated APIs."
-keywords: ["WaniWani SDK changelog", "release notes", "SDK migration", "breaking changes"]
+description: "Release notes for the Waniwani SDK, including breaking changes and deprecated APIs."
+keywords: ["Waniwani SDK changelog", "release notes", "SDK migration", "breaking changes"]
 ---
 
 This page tracks API changes that require code updates, organized by the version that introduced them. Deprecations are safe to ignore short-term — the old shape keeps working until the removal version listed in the deprecation notice.
@@ -233,7 +233,7 @@ The first command should produce hits (those are the new paths). The remaining c
 
 ### `ChatCard` → `ChatEmbed`
 
-`ChatCard` is still exported but marked `@deprecated`. It wraps `ChatEmbed` with always-visible card chrome (header, border, fixed dimensions) and assumes the WaniWani-hosted backend.
+`ChatCard` is still exported but marked `@deprecated`. It wraps `ChatEmbed` with always-visible card chrome (header, border, fixed dimensions) and assumes the Waniwani-hosted backend.
 
 ```tsx
 // Before
@@ -258,11 +258,11 @@ import { ChatEmbed } from "@waniwani/sdk/chat";
 />
 ```
 
-`ChatEmbed` does not fetch `/config` or `/tool` against the WaniWani host — you point `api` at your own endpoint and (optionally) supply `mcp.resourceEndpoint` if your backend serves widget resources.
+`ChatEmbed` does not fetch `/config` or `/tool` against the Waniwani host — you point `api` at your own endpoint and (optionally) supply `mcp.resourceEndpoint` if your backend serves widget resources.
 
 ### `evals/*` removed
 
-The `src/evals/*` subtree (chat eval runner, scorers, reporter) was removed entirely. No re-export shim. If you imported `runChatEval`, `createScorer`, or any sibling from `@waniwani/sdk/evals`, the build will fail on upgrade — there is no equivalent in this release. Eval tooling has moved to the WaniWani platform and is no longer shipped in-SDK.
+The `src/evals/*` subtree (chat eval runner, scorers, reporter) was removed entirely. No re-export shim. If you imported `runChatEval`, `createScorer`, or any sibling from `@waniwani/sdk/evals`, the build will fail on upgrade — there is no equivalent in this release. Eval tooling has moved to the Waniwani platform and is no longer shipped in-SDK.
 
 ---
 

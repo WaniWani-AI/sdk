@@ -83,7 +83,7 @@ describe("createTrackingRoute", () => {
 		expect(body.accepted).toBe(1);
 	});
 
-	it("forwards events to the WaniWani backend", async () => {
+	it("forwards events to the Waniwani backend", async () => {
 		const handler = createTrackingRoute({
 			apiKey: "test-key",
 			apiUrl: "http://localhost:3000",

@@ -92,7 +92,7 @@ export function extractCorrelationId(
 
 /**
  * Number of user messages in the current chat session, as counted by the
- * WaniWani app before dispatching the MCP request. Useful for MCPs that
+ * Waniwani app before dispatching the MCP request. Useful for MCPs that
  * gate behavior on conversation length (e.g. compulsory email verification
  * after N turns) without each MCP having to track turn state itself.
  *

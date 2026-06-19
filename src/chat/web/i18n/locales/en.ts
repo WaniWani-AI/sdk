@@ -119,7 +119,7 @@ export const en: Messages = {
 		saved: "saved",
 		error: "error",
 		export: "export",
-		tooltip: "Save scenario to WaniWani",
+		tooltip: "Save scenario to Waniwani",
 	},
 	widgetErrorBoundary: {
 		failedToLoad: "Widget failed to load",

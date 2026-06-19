@@ -8,7 +8,7 @@ function isRecord(value: unknown): value is UnknownRecord {
 
 /**
  * Mark a Zod schema as PII — its value will be replaced with `"REDACTED"` in
- * any `tool.called` event payload sent to the WaniWani API. The handler still
+ * any `tool.called` event payload sent to the Waniwani API. The handler still
  * receives the original value; only the tracked copy is scrubbed.
  *
  * Apply at the end of the schema chain so the marker is attached to the final

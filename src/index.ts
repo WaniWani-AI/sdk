@@ -1,4 +1,4 @@
-// WaniWani SDK
+// Waniwani SDK
 
 // Error
 export { WaniWaniError } from "./error.js";

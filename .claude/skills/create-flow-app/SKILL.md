@@ -3,7 +3,7 @@ name: create-flow-app
 description: "Scaffold a new multi-step conversational flow with createFlow from @waniwani/sdk/mcp. Triggers when the user is inside this SDK repo and wants to add a new flow, replace legacy createTool/createResource patterns, or set up an MCP server using the open-source path (no API key required). Defaults to OSS-first: in-memory store for dev, adapter recipes for prod, API key as a one-line upgrade."
 license: MIT
 metadata:
-  author: WaniWani
+  author: Waniwani
 ---
 
 # Create a flow app

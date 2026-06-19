@@ -1,13 +1,13 @@
 ---
 name: knowledge-base
-description: Set up a knowledge base with search for an MCP project. Creates FAQ tool and ingestion script using the WaniWani KB API via @waniwani/sdk.
+description: Set up a knowledge base with search for an MCP project. Creates FAQ tool and ingestion script using the Waniwani KB API via @waniwani/sdk.
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
 # Set Up Knowledge Base
 
-Add semantic search over markdown documents to an MCP project using the WaniWani KB API (`client.kb`).
+Add semantic search over markdown documents to an MCP project using the Waniwani KB API (`client.kb`).
 
 ## Prerequisites
 
@@ -38,7 +38,7 @@ This is an example knowledge base entry. Replace this file with your own .md fil
 
 ## How does it work?
 
-Each .md file is split into chunks by H2 headings. The H1 title provides context for each chunk. Run `bun run kb:ingest` to upload your knowledge files to the WaniWani API.
+Each .md file is split into chunks by H2 headings. The H1 title provides context for each chunk. Run `bun run kb:ingest` to upload your knowledge files to the Waniwani API.
 ```
 
 ### 3. Create the ingestion script

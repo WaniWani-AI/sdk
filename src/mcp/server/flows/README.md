@@ -12,7 +12,7 @@ You define a state graph, compile it into a tool, and the engine advances it ste
 4. Interrupt nodes pause and ask a question.
 5. Widget nodes pause and delegate rendering to a display tool.
 
-State is stored server-side via the WaniWani API, keyed by the session ID from `_meta`. The model doesn't need to round-trip any token — state is recovered automatically on every call.
+State is stored server-side via the Waniwani API, keyed by the session ID from `_meta`. The model doesn't need to round-trip any token — state is recovered automatically on every call.
 
 ## Contract
 

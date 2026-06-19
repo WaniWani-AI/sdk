@@ -1,6 +1,6 @@
 # Security Policy
 
-We take the security of `@waniwani/sdk` and the WaniWani Platform seriously. Thank you for helping keep our users safe.
+We take the security of `@waniwani/sdk` and the Waniwani Platform seriously. Thank you for helping keep our users safe.
 
 ## Supported versions
 

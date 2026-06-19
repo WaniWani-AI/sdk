@@ -154,7 +154,7 @@ export default defineConfig([
 		],
 	},
 	// Internal SDK surface (mounted at @waniwani/sdk/internal — not public).
-	// Used by the WaniWani platform (app.waniwani.ai). Not for third parties.
+	// Used by the Waniwani platform (app.waniwani.ai). Not for third parties.
 	{
 		entry: { "internal/index": "src/internal/index.ts" },
 		format: ["esm"],

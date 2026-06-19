@@ -1,4 +1,4 @@
-// WaniWani SDK - Next.js Adapter Types
+// Waniwani SDK - Next.js Adapter Types
 
 import type { ChatOptions } from "../server/@types.js";
 
@@ -33,7 +33,7 @@ export interface NextJsHandlerOptions {
 export interface NextJsHandlerResult {
 	/** GET handler: routes sub-paths (e.g. /resource for MCP widget content) */
 	GET: (request: Request) => Promise<Response>;
-	/** POST handler: proxies chat messages to the WaniWani API */
+	/** POST handler: proxies chat messages to the Waniwani API */
 	POST: (request: Request) => Promise<Response>;
 	/** PATCH handler: routes updates (e.g. /scenarios/:id) */
 	PATCH: (request: Request) => Promise<Response>;

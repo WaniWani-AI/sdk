@@ -16,7 +16,7 @@ export type ToolHandlerContext = {
 	extra?: {
 		_meta?: Record<string, unknown>;
 	};
-	/** Session-scoped WaniWani client — available when the server is wrapped with withWaniwani() */
+	/** Session-scoped Waniwani client — available when the server is wrapped with withWaniwani() */
 	waniwani?: ScopedWaniWaniClient;
 };
 

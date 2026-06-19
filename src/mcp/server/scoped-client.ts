@@ -14,7 +14,7 @@ import { createRevenueApi } from "../../tracking/revenue.js";
 export const SCOPED_CLIENT_KEY = "waniwani/client";
 
 /**
- * A request-scoped WaniWani client with meta pre-attached.
+ * A request-scoped Waniwani client with meta pre-attached.
  *
  * Available as `context.waniwani` inside `createTool` handlers and flow nodes
  * when the server is wrapped with `withWaniwani()`.

@@ -89,9 +89,9 @@ export interface SuggestionsConfig {
 // ============================================================================
 
 export interface ChatBaseProps {
-	/** WaniWani project API key */
+	/** Waniwani project API key */
 	apiKey?: string;
-	/** Chat API endpoint URL. Defaults to WaniWani hosted endpoint */
+	/** Chat API endpoint URL. Defaults to Waniwani hosted endpoint */
 	api?: string;
 	/** Pre-loaded messages to display when the chat mounts. */
 	initialMessages?: import("ai").UIMessage[];
@@ -162,7 +162,7 @@ export interface ChatBaseProps {
 	/**
 	 * Skip fetching `/config` and `/tools` from the API on mount.
 	 * Use when the chat endpoint doesn't serve these routes (e.g. embed widgets
-	 * talking directly to the WaniWani app).
+	 * talking directly to the Waniwani app).
 	 * @internal
 	 */
 	skipRemoteConfig?: boolean;
@@ -235,7 +235,7 @@ export type CallToolHandler = (params: {
 
 /**
  * **Advanced / bare-bones primitive.** Most apps should use
- * `WaniwaniChat` instead — it wires up the hosted WaniWani backend
+ * `WaniwaniChat` instead — it wires up the hosted Waniwani backend
  * (`app.waniwani.ai`) from a single `wwp_...` token and applies the
  * dashboard's display config automatically.
  *
@@ -246,7 +246,7 @@ export type CallToolHandler = (params: {
  * Reach for it when:
  *
  * - You self-host the chat backend (Next.js/Express route, your own
- *   provider) and don't want WaniWani's hosted features.
+ *   provider) and don't want Waniwani's hosted features.
  * - You need full control over headers, body, and tool-call dispatch.
  *
  * The component fills its parent container (`width: 100%; height: 100%`)

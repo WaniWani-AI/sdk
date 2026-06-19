@@ -88,14 +88,14 @@ See [Why MCP funnels](https://docs.waniwani.ai/why-mcp-funnels) for the full arg
 ## How it compares
 
 - **vs the raw MCP SDK.** You would serialize state through the model on every turn. `createFlow` persists state server-side under the session id; the model carries nothing between calls.
-- **vs LangChain or LangGraph.** General-purpose agent graphs. WaniWani is funnel-shaped: interrupts, re-ask on validation, auto-skip pre-filled fields, widget delegation, typed state via Zod. See [vs LangGraph](https://docs.waniwani.ai/compare/vs-langgraph).
+- **vs LangChain or LangGraph.** General-purpose agent graphs. Waniwani is funnel-shaped: interrupts, re-ask on validation, auto-skip pre-filled fields, widget delegation, typed state via Zod. See [vs LangGraph](https://docs.waniwani.ai/compare/vs-langgraph).
 - **vs closed-source platform SDKs.** MIT. The flow engine has zero runtime dependency on `app.waniwani.ai`. The hosted Platform is opt-in via a single env var.
 
 ## Engine + optional Platform
 
 The flow engine is MIT and runs without an API key against any `get` / `set` / `delete` store (Redis, Upstash, Cloudflare KV, DynamoDB, Postgres, in-memory).
 
-Set `WANIWANI_API_KEY` to connect the [WaniWani Platform](https://docs.waniwani.ai/platform/overview):
+Set `WANIWANI_API_KEY` to connect the [Waniwani Platform](https://docs.waniwani.ai/platform/overview):
 
 - Hosted, encrypted-at-rest flow state. No infra to run.
 - Event tracking and funnel analytics.
@@ -119,7 +119,7 @@ git clone https://github.com/WaniWani-AI/mcp-distribution-template.git my-mcp-se
 
 ## CLI
 
-The companion [`@waniwani/cli`](https://www.npmjs.com/package/@waniwani/cli) wires a local repo to a WaniWani agent and runs your MCP server against the hosted playground in one command. Optional — the SDK works without it.
+The companion [`@waniwani/cli`](https://www.npmjs.com/package/@waniwani/cli) wires a local repo to a Waniwani agent and runs your MCP server against the hosted playground in one command. Optional — the SDK works without it.
 
 ```bash
 bun add -g @waniwani/cli
@@ -151,6 +151,6 @@ Found a vulnerability? Please report it privately — see [SECURITY.md](./SECURI
 
 ## License
 
-[MIT](./LICENSE) © WaniWani
+[MIT](./LICENSE) © Waniwani
 
-"WaniWani" is a trademark of WaniWani Inc. The license covers the code, not the name.
+"Waniwani" is a trademark of Waniwani Inc. The license covers the code, not the name.

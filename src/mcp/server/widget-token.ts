@@ -1,5 +1,5 @@
 /**
- * Widget token minting — fetches short-lived JWTs from the WaniWani backend
+ * Widget token minting — fetches short-lived JWTs from the Waniwani backend
  * so browser widgets can POST events directly.
  */
 

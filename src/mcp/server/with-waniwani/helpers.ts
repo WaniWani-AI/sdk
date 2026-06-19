@@ -286,7 +286,7 @@ export async function injectWidgetConfig(
  *
  * Forwarding these keys into every tool result makes widgets registered via
  * any MCP framework (skybridge, raw `@modelcontextprotocol/sdk`, etc.) render
- * in WaniWani chat without the handler having to set them manually.
+ * in Waniwani chat without the handler having to set them manually.
  *
  * Keys:
  * - `openai/outputTemplate` — OpenAI Apps SDK widget URI (ChatGPT).

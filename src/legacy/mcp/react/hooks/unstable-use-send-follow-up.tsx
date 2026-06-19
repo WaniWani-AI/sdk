@@ -138,7 +138,7 @@ export interface UnstableSendFollowUpWithGhostGuardResult {
  * on mount — if it sees a record set by a different `mountId` within
  * `ADVANCED_WINDOW_MS`, it collapses the iframe to 0×0.
  *
- * On every other host (WaniWani embed, MCP Apps, etc.) the hook is a
+ * On every other host (Waniwani embed, MCP Apps, etc.) the hook is a
  * pure pass-through: `sendFollowUp` is your function unchanged and
  * `Guard` is a transparent fragment.
  *

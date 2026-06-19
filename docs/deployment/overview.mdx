@@ -1,14 +1,14 @@
 ---
 title: Deployment
-description: "Run your WaniWani-powered MCP app on Managed Hosting or self-host it yourself (Docker, Alpic, Vercel)."
+description: "Run your Waniwani-powered MCP app on Managed Hosting or self-host it yourself (Docker, Alpic, Vercel)."
 keywords: ["deploy MCP", "MCP hosting", "Docker MCP", "Vercel MCP", "Alpic MCP", "managed hosting"]
 ---
 
-Where your MCP server runs is independent of whether you connect the [WaniWani Platform](/platform/overview). This page covers the two server-hosting options. The Platform layer (tracking, KB, chat, hosted state) works the same in both.
+Where your MCP server runs is independent of whether you connect the [Waniwani Platform](/platform/overview). This page covers the two server-hosting options. The Platform layer (tracking, KB, chat, hosted state) works the same in both.
 
 <CardGroup cols={2}>
   <Card title="Managed Hosting" icon="cloud" href="#managed-hosting">
-    WaniWani hosts your app. Provisioned, pre-configured, push to main and it deploys. Fastest path.
+    Waniwani hosts your app. Provisioned, pre-configured, push to main and it deploys. Fastest path.
   </Card>
   <Card title="Self-hosted" icon="server" href="#self-hosted-server">
     You host the app yourself. Docker, Alpic, or Vercel. Connect by giving us the MCP URL.
@@ -19,7 +19,7 @@ Both paths use the same [MCP Distribution Template](https://github.com/WaniWani-
 
 ## Managed Hosting
 
-When you create a managed project in the [WaniWani dashboard](https://app.waniwani.ai), we provision a copy of the distribution template fully wired up: API keys set, hosted URL assigned, everything ready. You don't configure anything.
+When you create a managed project in the [Waniwani dashboard](https://app.waniwani.ai), we provision a copy of the distribution template fully wired up: API keys set, hosted URL assigned, everything ready. You don't configure anything.
 
 Typical workflow:
 
@@ -80,13 +80,13 @@ vercel deploy
 
 From the template root. Set `WANIWANI_API_KEY` and any backend secrets in your Vercel project's environment variables.
 
-### Connect to WaniWani
+### Connect to Waniwani
 
-Once your app is deployed, copy its public MCP URL (the endpoint where MCP clients send `initialize` / `tools/call` requests). In the WaniWani dashboard, create a self-hosted project and paste that URL. WaniWani uses it as the entry point for chat requests, widget rendering, and analytics ingestion.
+Once your app is deployed, copy its public MCP URL (the endpoint where MCP clients send `initialize` / `tools/call` requests). In the Waniwani dashboard, create a self-hosted project and paste that URL. Waniwani uses it as the entry point for chat requests, widget rendering, and analytics ingestion.
 
 ### Advanced: bring your own session cache
 
-By default a self-hosted server uses `WaniwaniKvStore` for flow state when `WANIWANI_API_KEY` is set (encrypted at rest, hosted by WaniWani, no infra). That's the recommended setup.
+By default a self-hosted server uses `WaniwaniKvStore` for flow state when `WANIWANI_API_KEY` is set (encrypted at rest, hosted by Waniwani, no infra). That's the recommended setup.
 
 If you want zero dependency on `app.waniwani.ai` for state too, plug in your own `KvStore` adapter at `.compile()` time:
 
@@ -103,4 +103,4 @@ Your server, your state. You can still send tracking events to the Platform by c
 
 ## Platform features are orthogonal
 
-Tracking, KB, chat, funnel analytics, and hosted state are Platform features. They are independent of where your server lives and where your state lives. Both Managed Hosting and self-hosted servers emit events through `withWaniwani(server)` and `client.track()`, and both surface in the same WaniWani dashboard. See the [Platform overview](/platform/overview) for what's included and [Tracking](/tracking/overview) for the event pipeline.
+Tracking, KB, chat, funnel analytics, and hosted state are Platform features. They are independent of where your server lives and where your state lives. Both Managed Hosting and self-hosted servers emit events through `withWaniwani(server)` and `client.track()`, and both surface in the same Waniwani dashboard. See the [Platform overview](/platform/overview) for what's included and [Tracking](/tracking/overview) for the event pipeline.

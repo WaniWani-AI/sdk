@@ -503,7 +503,7 @@ function extractAutoHeightFromMeta(
  * Prefers the tool **definition**'s `_meta` (spec-canonical, matches how
  * stateful MCP hosts like Claude and MCP Jam work) and falls back to the
  * tool **result**'s `_meta` (legacy path for servers that echo widget
- * metadata into the result, e.g. WaniWani's own `createTool` or the
+ * metadata into the result, e.g. Waniwani's own `createTool` or the
  * `withWaniwani` compat shim).
  *
  * @param toolName - The tool name, used to look up definition metadata in

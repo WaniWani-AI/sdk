@@ -32,7 +32,7 @@ export class MCPAppsWidgetClient implements UnifiedWidgetClient {
 
 	constructor() {
 		this.app = new App(
-			{ name: "WaniWani Widget", version: "1.0.0" },
+			{ name: "Waniwani Widget", version: "1.0.0" },
 			{}, // capabilities
 			{ autoResize: false },
 		);

@@ -1,4 +1,4 @@
-// WaniWani SDK - Next.js Adapter
+// Waniwani SDK - Next.js Adapter
 
 import type { WaniWaniClient } from "../../../types.js";
 import { createApiHandler } from "../server/api-handler.js";
@@ -9,12 +9,12 @@ export type { NextJsHandlerOptions, NextJsHandlerResult } from "./@types.js";
 let deprecationWarned = false;
 
 /**
- * Create Next.js route handlers from a WaniWani client.
+ * Create Next.js route handlers from a Waniwani client.
  *
  * Returns `{ GET, POST }` for use with catch-all routes.
  * Mount at `app/api/waniwani/[[...path]]/route.ts`:
  *
- * - `POST /api/waniwani`              → chat (proxied to WaniWani API)
+ * - `POST /api/waniwani`              → chat (proxied to Waniwani API)
  * - `GET  /api/waniwani/resource?uri=…` → MCP resource content
  *
  * @deprecated The chat-server catch-all adapters are being phased out. The chat widget

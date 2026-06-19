@@ -1,5 +1,5 @@
 // Internal SDK surface, mounted at `@waniwani/sdk/internal`. NOT part of the
-// public API — this entry point exists for the WaniWani platform (the app at
+// public API — this entry point exists for the Waniwani platform (the app at
 // app.waniwani.ai) to reuse SDK primitives that are not appropriate for
 // third-party consumers.
 //

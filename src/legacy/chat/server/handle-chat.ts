@@ -1,4 +1,4 @@
-// Handle Chat - Proxies chat requests to the WaniWani API
+// Handle Chat - Proxies chat requests to the Waniwani API
 
 import { WaniWaniError } from "../../../error";
 import { createLogger } from "../../../utils/logger.js";
@@ -109,7 +109,7 @@ export function createChatRequestHandler(deps: ApiHandlerDeps) {
 				modelContext,
 			);
 
-			// 4. Forward to WaniWani API
+			// 4. Forward to Waniwani API
 			const upstreamUrl = `${apiUrl}/api/mcp/chat`;
 			log("forwarding to", upstreamUrl);
 			const clientUserAgent = request.headers.get("user-agent");

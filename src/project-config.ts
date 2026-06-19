@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * Project-level configuration for WaniWani MCP projects.
+ * Project-level configuration for Waniwani MCP projects.
  *
  * Mirrors the JSON Schema hosted at https://docs.waniwani.ai/waniwani.json.
  * The canonical config file is `waniwani.json` at the project root:
@@ -21,12 +21,12 @@ import { resolve } from "node:path";
 export interface WaniWaniProjectConfig {
 	/** URL of the JSON Schema for editor autocomplete. Ignored at runtime. */
 	$schema?: string;
-	/** WaniWani organization ID this project belongs to. */
+	/** Waniwani organization ID this project belongs to. */
 	orgId?: string;
-	/** WaniWani MCP project ID. */
+	/** Waniwani MCP project ID. */
 	projectId?: string;
 	/**
-	 * The base URL of the WaniWani API.
+	 * The base URL of the Waniwani API.
 	 * Defaults to `https://app.waniwani.ai`.
 	 */
 	apiUrl?: string;
@@ -90,7 +90,7 @@ export function resetProjectConfigCache(): void {
 const GLOBAL_KEY = "__waniwani_config__" as const;
 
 /**
- * Register a WaniWani project configuration on `globalThis`.
+ * Register a Waniwani project configuration on `globalThis`.
  *
  * @deprecated Create a `waniwani.json` at the project root instead. The SDK
  *   and CLI both auto-load that file — no `defineConfig` call required.

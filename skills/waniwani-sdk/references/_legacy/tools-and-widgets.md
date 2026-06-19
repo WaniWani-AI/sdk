@@ -109,7 +109,7 @@ isMCPApps();      // true if running inside Claude (MCP Apps)
 
 ## `createTrackingRoute(options?)`
 
-Creates a server-side API route that receives batched events from browser widgets (via `useWaniwani`) and forwards them to the WaniWani backend. Returns a web-standard `Request -> Response` handler compatible with Next.js App Router.
+Creates a server-side API route that receives batched events from browser widgets (via `useWaniwani`) and forwards them to the Waniwani backend. Returns a web-standard `Request -> Response` handler compatible with Next.js App Router.
 
 ```typescript
 import { createTrackingRoute } from "@waniwani/sdk/mcp";

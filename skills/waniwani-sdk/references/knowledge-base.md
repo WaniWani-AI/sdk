@@ -1,6 +1,6 @@
 # Knowledge Base (`@waniwani/sdk/kb`)
 
-The KB client is available as `client.kb` on the WaniWani client. It calls the server-side KB API -- no local embeddings or `ai` dependency needed.
+The KB client is available as `client.kb` on the Waniwani client. It calls the server-side KB API -- no local embeddings or `ai` dependency needed.
 
 ## Setup
 

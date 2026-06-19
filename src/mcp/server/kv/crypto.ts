@@ -2,7 +2,7 @@
  * AES-256-GCM encryption for KV store values.
  *
  * When `WANIWANI_ENCRYPTION_KEY` is set, values are encrypted before
- * being sent to the WaniWani API and decrypted on read. The server
+ * being sent to the Waniwani API and decrypted on read. The server
  * never sees plaintext flow state.
  *
  * Key format: base64-encoded 32-byte (256-bit) key.
@@ -54,7 +54,7 @@ async function importKey(keyBase64: string): Promise<CryptoKey> {
 	const raw = Buffer.from(keyBase64, "base64");
 	if (raw.length !== 32) {
 		throw new Error(
-			"[WaniWani KV] WANIWANI_ENCRYPTION_KEY must be a base64-encoded 32-byte (256-bit) key.",
+			"[Waniwani KV] WANIWANI_ENCRYPTION_KEY must be a base64-encoded 32-byte (256-bit) key.",
 		);
 	}
 
@@ -112,7 +112,7 @@ export async function decryptValue<T = Record<string, unknown>>(
 		);
 	} catch {
 		throw new Error(
-			"[WaniWani KV] Decryption failed. The encryption key may be incorrect or the data may be corrupted.",
+			"[Waniwani KV] Decryption failed. The encryption key may be incorrect or the data may be corrupted.",
 		);
 	}
 

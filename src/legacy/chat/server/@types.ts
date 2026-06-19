@@ -1,4 +1,4 @@
-// WaniWani SDK - Chat Server Types
+// Waniwani SDK - Chat Server Types
 
 import type { UIMessage } from "ai";
 import type { ModelContextUpdate } from "../../../shared/model-context";
@@ -80,7 +80,7 @@ export interface ChatOptions {
 	maxSteps?: number;
 
 	/**
-	 * Hook called before each request is forwarded to the WaniWani API.
+	 * Hook called before each request is forwarded to the Waniwani API.
 	 * - Return void to use defaults.
 	 * - Return an object to override messages, systemPrompt, or sessionId.
 	 * - Throw to reject the request (the error message is returned as JSON).
@@ -117,13 +117,13 @@ export interface ApiHandlerOptions {
 	source?: string;
 
 	/**
-	 * Your WaniWani API key.
+	 * Your Waniwani API key.
 	 * Defaults to process.env.WANIWANI_API_KEY.
 	 */
 	apiKey?: string;
 
 	/**
-	 * The base URL of the WaniWani API.
+	 * The base URL of the Waniwani API.
 	 * Defaults to https://app.waniwani.ai.
 	 */
 	apiUrl?: string;
@@ -140,7 +140,7 @@ export interface ApiHandlerOptions {
 	maxSteps?: number;
 
 	/**
-	 * Hook called before each request is forwarded to the WaniWani API.
+	 * Hook called before each request is forwarded to the Waniwani API.
 	 * - Return void to use defaults.
 	 * - Return an object to override messages, systemPrompt, or sessionId.
 	 * - Throw to reject the request (the error message is returned as JSON).
@@ -176,7 +176,7 @@ export interface ApiHandlerOptions {
 // ============================================================================
 
 export interface ApiHandler {
-	/** Proxies chat messages to the WaniWani API */
+	/** Proxies chat messages to the Waniwani API */
 	handleChat: (request: Request) => Promise<Response>;
 	/** Serves MCP resource content (HTML widgets) */
 	handleResource: (url: URL) => Promise<Response>;

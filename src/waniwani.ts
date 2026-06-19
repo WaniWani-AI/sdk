@@ -1,4 +1,4 @@
-// WaniWani SDK - Main Entry
+// Waniwani SDK - Main Entry
 
 import { createKbClient } from "./kb/client.js";
 import {
@@ -10,11 +10,11 @@ import { createTrackingClient } from "./tracking/index.js";
 import type { WaniWaniClient, WaniWaniConfig } from "./types.js";
 
 /**
- * Create a WaniWani SDK client
+ * Create a Waniwani SDK client
  *
  * @param config - Configuration options. When omitted, reads `waniwani.json`
  *   from the current working directory, then falls back to env vars.
- * @returns A fully typed WaniWani client
+ * @returns A fully typed Waniwani client
  *
  * @example
  * ```typescript

@@ -91,7 +91,7 @@ async function fetchToolDefinitions(
 	});
 	if (!response.ok) {
 		throw new Error(
-			`[WaniWani] Failed to fetch /tools: ${response.status} ${response.statusText}`,
+			`[Waniwani] Failed to fetch /tools: ${response.status} ${response.statusText}`,
 		);
 	}
 	const data = (await response.json()) as ToolsListResponse;
@@ -414,7 +414,7 @@ export function useChatEngine(props: ChatBaseProps) {
 			setToolDefinitionsRevision((r) => r + 1);
 		} catch (error) {
 			console.warn(
-				"[WaniWani] Failed to fetch tool definitions:",
+				"[Waniwani] Failed to fetch tool definitions:",
 				error instanceof Error ? error.message : error,
 			);
 		}
@@ -436,7 +436,7 @@ export function useChatEngine(props: ChatBaseProps) {
 			}
 		},
 		onError(error) {
-			console.warn("[WaniWani] Chat error:", error.message);
+			console.warn("[Waniwani] Chat error:", error.message);
 			if (pendingWaitRef.current) {
 				pendingWaitRef.current.reject(error);
 				pendingWaitRef.current = null;

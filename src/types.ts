@@ -1,4 +1,4 @@
-// WaniWani SDK - Core Types
+// Waniwani SDK - Core Types
 
 import type { KbClient } from "./kb/types.js";
 import type { TrackingClient, TrackingConfig } from "./tracking/@types.js";
@@ -18,7 +18,7 @@ export interface WaniWaniConfig {
 	 */
 	apiKey?: string;
 	/**
-	 * The base URL of the WaniWani API
+	 * The base URL of the Waniwani API
 	 *
 	 * Defaults to https://app.waniwani.ai
 	 */
@@ -34,7 +34,7 @@ export interface WaniWaniConfig {
 // ============================================================================
 
 /**
- * WaniWani SDK Client
+ * Waniwani SDK Client
  *
  * Extends with each module:
  * - TrackingClient: track(), flush(), shutdown()

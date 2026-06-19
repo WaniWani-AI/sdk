@@ -1,4 +1,4 @@
-// WaniWani SDK - Errors
+// Waniwani SDK - Errors
 
 export class WaniWaniError extends Error {
 	constructor(

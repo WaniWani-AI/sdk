@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://docs.waniwani.ai/waniwani.json",
-  "title": "WaniWani project configuration",
-  "description": "Project-level configuration for WaniWani MCP projects. Consumed by @waniwani/sdk at runtime and by @waniwani/cli for local dev, evals, and knowledge-base tooling.",
+  "title": "Waniwani project configuration",
+  "description": "Project-level configuration for Waniwani MCP projects. Consumed by @waniwani/sdk at runtime and by @waniwani/cli for local dev, evals, and knowledge-base tooling.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -12,16 +12,16 @@
     },
     "orgId": {
       "type": "string",
-      "description": "WaniWani organization ID this project belongs to. Written by `waniwani connect`."
+      "description": "Waniwani organization ID this project belongs to. Written by `waniwani connect`."
     },
     "projectId": {
       "type": "string",
-      "description": "WaniWani MCP project ID. Written by `waniwani connect`."
+      "description": "Waniwani MCP project ID. Written by `waniwani connect`."
     },
     "apiUrl": {
       "type": "string",
       "format": "uri",
-      "description": "Base URL of the WaniWani API. Defaults to https://app.waniwani.ai."
+      "description": "Base URL of the Waniwani API. Defaults to https://app.waniwani.ai."
     },
     "devPort": {
       "type": "integer",

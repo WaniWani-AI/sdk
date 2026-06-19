@@ -6,9 +6,9 @@ const LOGO_URL = "https://app.waniwani.ai/assets/waniwani-logo.svg";
 const HREF = "https://waniwani.ai";
 
 /**
- * Small "powered by WaniWani" link rendered under the chat input. Mirrors
+ * Small "powered by Waniwani" link rendered under the chat input. Mirrors
  * the attribution pattern of other embedded chat widgets and links back to
- * the WaniWani site.
+ * the Waniwani site.
  */
 export function PoweredBy() {
 	const { t } = useTranslation();
@@ -22,7 +22,7 @@ export function PoweredBy() {
 			<span>{t.poweredBy.label}</span>
 			<img
 				src={LOGO_URL}
-				alt="WaniWani"
+				alt="Waniwani"
 				width={72}
 				height={10}
 				data-waniwani-logo=""

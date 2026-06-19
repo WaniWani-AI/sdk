@@ -35,7 +35,7 @@ export class WidgetErrorBoundary extends Component<Props, State> {
 	}
 
 	componentDidCatch(error: Error) {
-		console.warn("[WaniWani] Widget failed to render:", error.message);
+		console.warn("[Waniwani] Widget failed to render:", error.message);
 	}
 
 	render() {
