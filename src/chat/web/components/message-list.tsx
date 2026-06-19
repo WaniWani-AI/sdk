@@ -199,14 +199,17 @@ export function MessageList({
 				const anyToolRunning = toolParts.some(
 					(p) => p.state === "input-available" || p.state === "input-streaming",
 				);
-				// The collapsible chain only kicks in at 2+ tool calls; a single
-				// tool renders on its own (a one-step chain would just duplicate
-				// the step under its header). When the chain shows, the reasoning
-				// trace folds into it.
+				// The collapsible chain kicks in once there are 2+ activity items
+				// (reasoning + tool calls) and at least one tool — e.g. a "thought
+				// for Xs" reasoning step followed by a tool call. A lone tool with
+				// no reasoning renders on its own (a one-step chain would just
+				// duplicate the step under its header); reasoning on its own stays
+				// a plain reasoning row.
 				const showChain =
 					showToolCalls !== false &&
 					!containsFullscreenTool &&
-					toolParts.length >= 2;
+					toolParts.length >= 1 &&
+					activityParts.length >= 2;
 
 				// Hide messages that don't contain the fullscreen widget
 				if (isFullscreenActive && !containsFullscreenTool) {
@@ -330,10 +333,12 @@ export function MessageList({
 								</ChainOfThoughtContent>
 							</ChainOfThought>
 						)}
-						{/* Single tool call → render it directly (no chain wrapper,
-						    which would just duplicate the one step under a header). */}
+						{/* Lone tool with no reasoning → render it directly (no chain
+						    wrapper, which would just duplicate the one step under a
+						    header). With reasoning present, the chain above handles it. */}
 						{showToolCalls !== false &&
 							!containsFullscreenTool &&
+							!showChain &&
 							toolParts.length === 1 &&
 							(() => {
 								const part = toolParts[0];
