@@ -2,12 +2,12 @@
 
 import type { ToolUIPart } from "ai";
 import {
-	BracesIcon,
 	CheckIcon,
 	ChevronDownIcon,
 	ChevronRightIcon,
 	ClipboardCopyIcon,
 	ServerIcon,
+	WrenchIcon,
 } from "lucide-react";
 import type { HTMLAttributes } from "react";
 import {
@@ -261,7 +261,7 @@ export function ToolHeader({
 			aria-expanded={open}
 			{...props}
 		>
-			<BracesIcon className="ww:size-4 ww:shrink-0" />
+			<WrenchIcon className="ww:size-4 ww:shrink-0" />
 			<span className="ww:truncate">
 				{isRunning ? <Shimmer duration={1.6}>{label}</Shimmer> : label}
 			</span>
