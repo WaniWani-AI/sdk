@@ -198,9 +198,6 @@ export function MessageList({
 				const containsFullscreenTool = isFullscreenActive
 					? toolParts.some((p) => p.toolCallId === fullscreenToolCallId)
 					: false;
-				const anyToolRunning = toolParts.some(
-					(p) => p.state === "input-available" || p.state === "input-streaming",
-				);
 				// The collapsible chain kicks in once there are 2+ activity items
 				// (reasoning + tool calls, in any combination): two tools, a
 				// reasoning step plus a tool, or even two reasoning steps. A single
@@ -270,9 +267,12 @@ export function MessageList({
 						    request/response JSON; `titles-only` shows label-only steps. */}
 						{showChain && (
 							<ChainOfThought
+								// Drive the header off the whole turn streaming (stable),
+								// not per-step running (which blips false between steps and
+								// makes the label flicker / settle early).
 								isWorking={
-									anyToolRunning ||
-									reasoningParts.some((p) => p.state === "streaming")
+									isLastAssistant &&
+									(status === "streaming" || status === "submitted")
 								}
 							>
 								<ChainOfThoughtHeader

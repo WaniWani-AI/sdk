@@ -17,11 +17,17 @@ import { Reasoning, ReasoningContent, ReasoningTrigger } from "./reasoning";
 import { Shimmer } from "./shimmer";
 
 const AUTO_CLOSE_DELAY = 1000;
+// Delay after the auto-close fires before swapping the header label, so the
+// text change trails the collapse animation instead of racing it (smoother).
+const SETTLE_AFTER_CLOSE = 240;
 
 interface ChainContextValue {
 	open: boolean;
 	setOpen: (open: boolean) => void;
 	isWorking: boolean;
+	/** Latches true only after the chain has finished its post-work collapse,
+	 * so the header label swaps after the thread closes — not mid-collapse. */
+	settled: boolean;
 }
 
 const ChainContext = createContext<ChainContextValue | null>(null);
@@ -87,12 +93,14 @@ export function ChainOfThought({
 
 	const wasWorkingRef = useRef(isWorking);
 	const [hasAutoClosed, setHasAutoClosed] = useState(false);
+	const [settled, setSettled] = useState(!isWorking);
 
 	// Auto-open whenever work (re)starts; allow a fresh auto-close after.
 	useEffect(() => {
 		if (isWorking) {
 			wasWorkingRef.current = true;
 			setHasAutoClosed(false);
+			setSettled(false);
 			if (!isControlled) {
 				setInternalOpen(true);
 			}
@@ -110,9 +118,21 @@ export function ChainOfThought({
 		}
 	}, [isWorking, isOpen, hasAutoClosed, setOpen]);
 
+	// Latch `settled` only after the close has had time to animate, so the
+	// header swaps to the done label *after* the thread collapses.
+	useEffect(() => {
+		if (wasWorkingRef.current && !isWorking && !settled) {
+			const timer = setTimeout(
+				() => setSettled(true),
+				AUTO_CLOSE_DELAY + SETTLE_AFTER_CLOSE,
+			);
+			return () => clearTimeout(timer);
+		}
+	}, [isWorking, settled]);
+
 	const contextValue = useMemo<ChainContextValue>(
-		() => ({ open: isOpen, setOpen, isWorking }),
-		[isOpen, setOpen, isWorking],
+		() => ({ open: isOpen, setOpen, isWorking, settled }),
+		[isOpen, setOpen, isWorking, settled],
 	);
 
 	return (
@@ -150,13 +170,18 @@ export function ChainOfThoughtHeader({
 	children,
 	...props
 }: ChainOfThoughtHeaderProps) {
-	const { open, setOpen, isWorking } = useChain();
+	const { open, setOpen, isWorking, settled } = useChain();
+	// Working label (shimmering while active, static while collapsing) until the
+	// chain has fully settled, then the done label. Keeps the text swap from
+	// racing the collapse.
 	const content =
 		children ??
-		(isWorking ? (
+		(settled ? (
+			label
+		) : isWorking ? (
 			<Shimmer duration={1.6}>{workingLabel ?? label ?? ""}</Shimmer>
 		) : (
-			label
+			(workingLabel ?? label)
 		));
 
 	return (
