@@ -38,6 +38,7 @@ import {
 	shouldShowWorkingIndicator,
 	WorkingIndicator,
 } from "../ai-elements/working-indicator";
+import { useTranslation } from "../i18n";
 import type { McpAppDisplayMode } from "./mcp-app-frame";
 import { McpAppFrame } from "./mcp-app-frame";
 import { WelcomeScreen } from "./welcome-screen";
@@ -141,6 +142,7 @@ export function MessageList({
 	showToolCalls = true,
 	toolDefinitions,
 }: MessageListProps) {
+	const { t } = useTranslation();
 	const lastMessage = messages[messages.length - 1];
 	const hasMessages = messages.length > 0;
 
@@ -200,15 +202,13 @@ export function MessageList({
 					(p) => p.state === "input-available" || p.state === "input-streaming",
 				);
 				// The collapsible chain kicks in once there are 2+ activity items
-				// (reasoning + tool calls) and at least one tool — e.g. a "thought
-				// for Xs" reasoning step followed by a tool call. A lone tool with
-				// no reasoning renders on its own (a one-step chain would just
-				// duplicate the step under its header); reasoning on its own stays
-				// a plain reasoning row.
+				// (reasoning + tool calls, in any combination): two tools, a
+				// reasoning step plus a tool, or even two reasoning steps. A single
+				// activity item (a lone tool, or a single reasoning row) renders on
+				// its own — a one-item chain would just duplicate it under a header.
 				const showChain =
 					showToolCalls !== false &&
 					!containsFullscreenTool &&
-					toolParts.length >= 1 &&
 					activityParts.length >= 2;
 
 				// Hide messages that don't contain the fullscreen widget
@@ -276,10 +276,8 @@ export function MessageList({
 								}
 							>
 								<ChainOfThoughtHeader
-									label={
-										toolParts[toolParts.length - 1].title ??
-										formatToolName(toolParts[toolParts.length - 1].toolName)
-									}
+									workingLabel={t.chainOfThought.working}
+									label={t.chainOfThought.done}
 								/>
 								<ChainOfThoughtContent>
 									{activityParts.map((part, i) => {

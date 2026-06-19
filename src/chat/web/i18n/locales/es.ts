@@ -17,6 +17,10 @@ export const es: Messages = {
 		thoughtForSeconds: (count: number) =>
 			`Pensado durante ${count} segundo${count === 1 ? "" : "s"}`,
 	},
+	chainOfThought: {
+		working: "Estoy en ello…",
+		done: "Pasos",
+	},
 	tool: {
 		copy: "Copiar",
 		copied: "Copiado",

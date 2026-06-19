@@ -1,12 +1,7 @@
 "use client";
 
 import type { ToolUIPart } from "ai";
-import {
-	ChevronDownIcon,
-	ClockIcon,
-	type LucideIcon,
-	WrenchIcon,
-} from "lucide-react";
+import { ChevronDownIcon, ClockIcon, type LucideIcon } from "lucide-react";
 import type { HTMLAttributes, ReactNode } from "react";
 import {
 	createContext,
@@ -135,30 +130,34 @@ export function ChainOfThought({
 }
 
 export type ChainOfThoughtHeaderProps = HTMLAttributes<HTMLButtonElement> & {
-	/** Label for the collapsed header — the title of the most recent step.
-	 * The header tracks the latest step so it reads as a live continuation of
-	 * the conversation rather than a generic summary. */
+	/** Generic header label for the settled chain (e.g. "Thought process").
+	 * Deliberately not a per-turn summary — just a stable label. */
 	label?: string;
+	/** Shimmering label while the chain is still working (e.g. "Working on it…").
+	 * Falls back to `label`. */
+	workingLabel?: string;
 };
 
 /**
- * Clickable header that toggles the chain. Mirrors the most recent step's
- * title: it shimmers while that step runs, then settles on the last step's
- * title once everything's done — a contextual continuation of the
- * conversation, not a call to action (the chevron still expands for the
- * curious). Matches the {@link ToolHeader} / {@link ReasoningTrigger} style:
- * wrench icon + muted text + chevron, left-aligned with the step icons below.
+ * Clickable header that toggles the chain. No leading icon — just the label
+ * and a trailing chevron, the cleaner Claude-style treatment. While the chain
+ * is working the label shimmers. The step icons live on the timeline below.
  */
 export function ChainOfThoughtHeader({
 	className,
 	label,
+	workingLabel,
 	children,
 	...props
 }: ChainOfThoughtHeaderProps) {
 	const { open, setOpen, isWorking } = useChain();
 	const content =
 		children ??
-		(isWorking ? <Shimmer duration={1.6}>{label ?? ""}</Shimmer> : label);
+		(isWorking ? (
+			<Shimmer duration={1.6}>{workingLabel ?? label ?? ""}</Shimmer>
+		) : (
+			label
+		));
 
 	return (
 		<button
@@ -166,12 +165,11 @@ export function ChainOfThoughtHeader({
 			onClick={() => setOpen(!open)}
 			aria-expanded={open}
 			className={cn(
-				"ww:flex ww:w-full ww:items-center ww:gap-2 ww:text-sm ww:text-muted-foreground ww:transition-colors ww:hover:text-foreground",
+				"ww:flex ww:w-full ww:items-center ww:gap-1.5 ww:text-sm ww:text-muted-foreground ww:transition-colors ww:hover:text-foreground",
 				className,
 			)}
 			{...props}
 		>
-			<WrenchIcon className="ww:size-4 ww:shrink-0" />
 			<span className="ww:truncate">{content}</span>
 			<ChevronDownIcon
 				className={cn(

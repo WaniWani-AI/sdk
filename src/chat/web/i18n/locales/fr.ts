@@ -17,6 +17,10 @@ export const fr: Messages = {
 		thoughtForSeconds: (count: number) =>
 			`Réflexion pendant ${count} seconde${count === 1 ? "" : "s"}`,
 	},
+	chainOfThought: {
+		working: "Je m'en occupe…",
+		done: "Étapes",
+	},
 	tool: {
 		copy: "Copier",
 		copied: "Copié",

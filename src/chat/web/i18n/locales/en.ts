@@ -19,6 +19,11 @@ export interface Messages {
 		thoughtBrief: string;
 		thoughtForSeconds: (count: number) => string;
 	};
+	/** Chain-of-thought header (no icon): a generic label per state. */
+	chainOfThought: {
+		working: string;
+		done: string;
+	};
 	tool: {
 		copy: string;
 		copied: string;
@@ -83,6 +88,10 @@ export const en: Messages = {
 		thoughtBrief: "Thought for a few seconds",
 		thoughtForSeconds: (count: number) =>
 			`Thought for ${count} second${count === 1 ? "" : "s"}`,
+	},
+	chainOfThought: {
+		working: "Working on it…",
+		done: "Steps",
 	},
 	tool: {
 		copy: "Copy",
