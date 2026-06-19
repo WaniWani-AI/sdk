@@ -91,7 +91,7 @@ export const en: Messages = {
 	},
 	chainOfThought: {
 		working: "Working on it…",
-		done: "Steps",
+		done: "Thought process",
 	},
 	tool: {
 		copy: "Copy",

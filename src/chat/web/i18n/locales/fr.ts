@@ -19,7 +19,7 @@ export const fr: Messages = {
 	},
 	chainOfThought: {
 		working: "Je m'en occupe…",
-		done: "Étapes",
+		done: "Raisonnement",
 	},
 	tool: {
 		copy: "Copier",
