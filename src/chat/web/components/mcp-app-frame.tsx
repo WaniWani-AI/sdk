@@ -273,7 +273,7 @@ export function McpAppFrame({
 					id,
 					result: {
 						protocolVersion: data.params?.protocolVersion ?? PROTOCOL_VERSION,
-						hostInfo: { name: "WaniWani Chat", version: "1.0.0" },
+						hostInfo: { name: "Waniwani Chat", version: "1.0.0" },
 						hostCapabilities: {
 							openLinks: {},
 							message: {

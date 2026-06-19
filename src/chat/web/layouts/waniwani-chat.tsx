@@ -26,7 +26,7 @@ import { ChatEmbed } from "./chat-embed";
 const READINESS_TIMEOUT_MS = 600;
 
 /**
- * Per-page overrides for `WaniwaniChat`. The WaniWani dashboard is the
+ * Per-page overrides for `WaniwaniChat`. The Waniwani dashboard is the
  * source of truth for the agent's display config; reach for these only
  * when you need a local tweak that doesn't justify cloning an agent.
  *
@@ -97,10 +97,10 @@ export interface WaniwaniChatOverrides {
 }
 
 /**
- * Hosted-tier WaniWani chat. The React counterpart to the `<script>` embed.
+ * Hosted-tier Waniwani chat. The React counterpart to the `<script>` embed.
  *
  * Configure the agent (title, welcome message, suggestions, theme, tool
- * behavior) in the WaniWani dashboard — the component fetches that config
+ * behavior) in the Waniwani dashboard — the component fetches that config
  * on mount. Pass a `wwp_...` token and the `channelId` of the agent, and
  * you're done.
  *
@@ -137,7 +137,7 @@ export interface WaniwaniChatOverrides {
  * ```
  */
 export interface WaniwaniChatProps {
-	/** Public token (`wwp_...`) from the WaniWani dashboard. */
+	/** Public token (`wwp_...`) from the Waniwani dashboard. */
 	token: string;
 	/** Agent channel ID — routes the conversation to the right agent. */
 	channelId?: string;
@@ -231,7 +231,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					setReady(true);
 				})
 				.catch((err) => {
-					console.error("[WaniWani] Remote config fetch failed:", err);
+					console.error("[Waniwani] Remote config fetch failed:", err);
 					setReady(true);
 				})
 				.finally(() => clearTimeout(safety));

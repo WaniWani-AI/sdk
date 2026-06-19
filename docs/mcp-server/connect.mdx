@@ -1,7 +1,7 @@
 ---
 title: Connect your AI client
-description: "Add the WaniWani MCP server to claude.ai, Claude Code, Cursor, or ChatGPT and sign in with your WaniWani account — no API keys."
-keywords: ["connect WaniWani MCP", "claude.ai connector", "Claude Code MCP", "Cursor MCP", "ChatGPT connector", "mcp.waniwani.ai", "MCP OAuth"]
+description: "Add the Waniwani MCP server to claude.ai, Claude Code, Cursor, or ChatGPT and sign in with your Waniwani account — no API keys."
+keywords: ["connect Waniwani MCP", "claude.ai connector", "Claude Code MCP", "Cursor MCP", "ChatGPT connector", "mcp.waniwani.ai", "MCP OAuth"]
 ---
 
 One URL works in every client:
@@ -10,14 +10,14 @@ One URL works in every client:
 https://mcp.waniwani.ai/mcp
 ```
 
-It's a remote MCP server (Streamable HTTP) that authenticates with OAuth 2.1. There is no API key to paste: you add the URL, your client opens a browser window, you sign in to WaniWani and approve the requested permissions. From then on the connection acts as *you* — same organizations, same role.
+It's a remote MCP server (Streamable HTTP) that authenticates with OAuth 2.1. There is no API key to paste: you add the URL, your client opens a browser window, you sign in to Waniwani and approve the requested permissions. From then on the connection acts as *you* — same organizations, same role.
 
 ## Claude (claude.ai and desktop)
 
 1. Open **Settings → Connectors**.
 2. Click **Add custom connector**.
 3. Enter `https://mcp.waniwani.ai/mcp` and confirm.
-4. A WaniWani sign-in window opens — sign in and approve the permissions.
+4. A Waniwani sign-in window opens — sign in and approve the permissions.
 
 On Team and Enterprise plans, an admin may need to enable custom connectors for your workspace first.
 
@@ -60,11 +60,11 @@ Client UIs change quickly. If a menu has moved, follow your client's own guide f
 ## What happens when you sign in
 
 <Steps>
-  <Step title="Your client discovers WaniWani">
+  <Step title="Your client discovers Waniwani">
     The client reads the server's metadata and learns that `app.waniwani.ai` handles sign-in. It registers itself automatically — no manual client IDs.
   </Step>
-  <Step title="You sign in to WaniWani">
-    The browser opens your usual WaniWani login. If you're already signed in, you go straight to consent.
+  <Step title="You sign in to Waniwani">
+    The browser opens your usual Waniwani login. If you're already signed in, you go straight to consent.
   </Step>
   <Step title="You approve the permissions">
     The consent screen itemizes exactly what the connection may do (read environments and analytics, create environments and keys, and so on). You only see permissions your account is entitled to.
@@ -76,7 +76,7 @@ Client UIs change quickly. If a menu has moved, follow your client's own guide f
 
 ## First thing to try
 
-> Who am I signed in to WaniWani as, and what can you do for me here?
+> Who am I signed in to Waniwani as, and what can you do for me here?
 
 Your client will call the server's `whoami` and `search` tools and report your account, your organizations, and the available operations. From there, ask for what you want in plain language — see [the overview](/mcp-server/overview) for example prompts.
 
@@ -84,7 +84,7 @@ Your client will call the server's `whoami` and `search` tools and report your a
 
 <AccordionGroup>
   <Accordion title="The consent screen shows fewer permissions than I expected">
-    That's by design. The permission list is narrowed to what your account is entitled to — for example, internal WaniWani staff permissions never appear for customer accounts. Approve what's shown; it's everything available to you.
+    That's by design. The permission list is narrowed to what your account is entitled to — for example, internal Waniwani staff permissions never appear for customer accounts. Approve what's shown; it's everything available to you.
   </Accordion>
   <Accordion title="Calls suddenly fail with an authentication error">
     Your token expired or was invalidated. Most clients refresh automatically; if yours doesn't, disconnect and reconnect the server (re-running the sign-in) to mint a fresh token.

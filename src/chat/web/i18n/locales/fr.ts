@@ -52,7 +52,7 @@ export const fr: Messages = {
 		saved: "enregistré",
 		error: "erreur",
 		export: "exporter",
-		tooltip: "Enregistrer le scénario dans WaniWani",
+		tooltip: "Enregistrer le scénario dans Waniwani",
 	},
 	widgetErrorBoundary: {
 		failedToLoad: "Échec du chargement du widget",

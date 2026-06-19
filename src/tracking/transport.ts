@@ -135,7 +135,7 @@ class BatchingV2Transport implements V2BatchTransport {
 	enqueue(event: V2EventEnvelope): void {
 		if (this.isStopped || this.isShuttingDown) {
 			this.logger.warn(
-				"[WaniWani] Tracking transport is stopped, dropping event %s",
+				"[Waniwani] Tracking transport is stopped, dropping event %s",
 				event.id,
 			);
 			return;
@@ -145,7 +145,7 @@ class BatchingV2Transport implements V2BatchTransport {
 			const dropCount = this.buffer.length - this.maxBufferSize + 1;
 			this.buffer.splice(0, dropCount);
 			this.logger.warn(
-				"[WaniWani] Tracking buffer overflow, dropped %d oldest event(s)",
+				"[Waniwani] Tracking buffer overflow, dropped %d oldest event(s)",
 				dropCount,
 			);
 		}
@@ -248,7 +248,7 @@ class BatchingV2Transport implements V2BatchTransport {
 					return;
 				case "permanent":
 					this.logger.error(
-						"[WaniWani] Dropping %d event(s) after permanent failure: %s",
+						"[Waniwani] Dropping %d event(s) after permanent failure: %s",
 						pendingBatch.length,
 						result.reason,
 					);
@@ -256,7 +256,7 @@ class BatchingV2Transport implements V2BatchTransport {
 				case "retryable":
 					if (attempt >= this.maxRetries) {
 						this.logger.error(
-							"[WaniWani] Dropping %d event(s) after retry exhaustion: %s",
+							"[Waniwani] Dropping %d event(s) after retry exhaustion: %s",
 							pendingBatch.length,
 							result.reason,
 						);
@@ -268,7 +268,7 @@ class BatchingV2Transport implements V2BatchTransport {
 				case "partial":
 					if (result.permanent.length > 0) {
 						this.logger.error(
-							"[WaniWani] Dropping %d event(s) rejected as permanent",
+							"[Waniwani] Dropping %d event(s) rejected as permanent",
 							result.permanent.length,
 						);
 					}
@@ -277,7 +277,7 @@ class BatchingV2Transport implements V2BatchTransport {
 					}
 					if (attempt >= this.maxRetries) {
 						this.logger.error(
-							"[WaniWani] Dropping %d retryable event(s) after retry exhaustion",
+							"[Waniwani] Dropping %d retryable event(s) after retry exhaustion",
 							result.retryable.length,
 						);
 						return;
@@ -397,7 +397,7 @@ class BatchingV2Transport implements V2BatchTransport {
 		const buffered = this.buffer.length;
 		this.buffer.splice(0, buffered);
 		this.logger.error(
-			"[WaniWani] Auth failure (HTTP %d). Stopping tracking transport and dropping %d queued event(s)",
+			"[Waniwani] Auth failure (HTTP %d). Stopping tracking transport and dropping %d queued event(s)",
 			status,
 			rejectedCount + buffered,
 		);

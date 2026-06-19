@@ -116,7 +116,7 @@ export async function fetchRemoteConfig(
 		if (!res.ok) {
 			return {};
 		}
-		// The WaniWani API wraps payloads in `{ success, message, data }`.
+		// The Waniwani API wraps payloads in `{ success, message, data }`.
 		// Accept either shape so we stay compatible with raw endpoints too.
 		const raw = (await res.json()) as
 			| RemoteConfigResponse
@@ -229,13 +229,13 @@ export function useRemoteEmbedConfig(
 						// `resolveConfig` throws if token is missing. Shouldn't happen
 						// here (initial resolve already validated), but swallow so a
 						// late failure doesn't become an unhandled rejection.
-						console.error("[WaniWani] Failed to apply remote config:", err);
+						console.error("[Waniwani] Failed to apply remote config:", err);
 					}
 				}
 				setReady(true);
 			})
 			.catch((err) => {
-				console.error("[WaniWani] Remote config fetch failed:", err);
+				console.error("[Waniwani] Remote config fetch failed:", err);
 				setReady(true);
 			})
 			.finally(() => clearTimeout(safety));

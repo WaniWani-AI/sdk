@@ -7,7 +7,7 @@ import type { WidgetEvent } from "./widget-transport";
 import { WidgetTransport } from "./widget-transport";
 
 /**
- * WaniWani widget config injected into tool response `_meta.waniwani`
+ * Waniwani widget config injected into tool response `_meta.waniwani`
  * by `withWaniwani` on the server side.
  */
 interface WaniwaniMeta {
@@ -26,7 +26,7 @@ interface WaniwaniConfig {
 
 interface BaseUseWaniwaniOptions {
 	/**
-	 * JWT widget token for authenticating directly with the WaniWani backend.
+	 * JWT widget token for authenticating directly with the Waniwani backend.
 	 * If omitted, the hook resolves from tool response metadata
 	 * (`toolResponseMetadata.waniwani` or `toolResponseMetadata._meta.waniwani`).
 	 */
@@ -142,7 +142,7 @@ function captureKeyOf(capture?: AutoCaptureToggles): string {
 }
 
 /**
- * Try to extract WaniWani config from the WidgetProvider context.
+ * Try to extract Waniwani config from the WidgetProvider context.
  * Returns the config from `toolResponseMetadata.waniwani` (or nested `_meta`) if available.
  */
 function resolveConfigFromContext(
@@ -311,7 +311,7 @@ function createState(
 }
 
 /**
- * React hook for WaniWani widget tracking.
+ * React hook for Waniwani widget tracking.
  *
  * Auto-captures DOM events (clicks, link clicks, errors, scrolls, form
  * interactions) and provides manual tracking methods. Returns a singleton

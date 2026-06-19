@@ -134,7 +134,7 @@ The positional form `showWidget(tool, config)` is **deprecated** but still suppo
 
 ## FlowStore Interface
 
-Interface for server-side flow state persistence. Implement this to use a custom store instead of the default WaniWani API store.
+Interface for server-side flow state persistence. Implement this to use a custom store instead of the default Waniwani API store.
 
 ```ts
 import type { FlowStore } from "@waniwani/sdk/mcp";

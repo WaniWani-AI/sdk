@@ -52,7 +52,7 @@ Patches Next.js so the app works correctly inside a cross-origin iframe (ChatGPT
 
 **What it patches:**
 - `history.pushState` / `replaceState` -- prevents cross-origin URL errors in sandboxed iframes
-- `window.fetch` -- rewrites *relative* same-origin requests to the widget's real `baseUrl` so relative `/api/...` calls don't 404. Absolute URLs (string with scheme, `URL`, `Request`) are left alone, so SDK transports can hit the WaniWani API even when it shares an origin with the iframe.
+- `window.fetch` -- rewrites *relative* same-origin requests to the widget's real `baseUrl` so relative `/api/...` calls don't 404. Absolute URLs (string with scheme, `URL`, `Request`) are left alone, so SDK transports can hit the Waniwani API even when it shares an origin with the iframe.
 - `<html>` attribute observer -- strips host-injected attributes while preserving `class`/`style`/`lang`
 
 ```tsx
@@ -131,7 +131,7 @@ export default function PricingWidget() {
 
 ## `useWaniwani` -- Automatic Event Tracking
 
-Auto-captures user interactions from widget UIs and provides manual tracking methods for custom events. Events are sent directly to the WaniWani backend using a JWT token injected by `withWaniwani` on the server side.
+Auto-captures user interactions from widget UIs and provides manual tracking methods for custom events. Events are sent directly to the Waniwani backend using a JWT token injected by `withWaniwani` on the server side.
 
 ```tsx
 import { useWaniwani } from "@waniwani/sdk/mcp/react";

@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "WaniWani SDK",
+  "name": "Waniwani SDK",
   "colors": {
     "primary": "#03d916",
     "light": "#5EFF73",
@@ -67,7 +67,7 @@
             ]
           },
           {
-            "group": "WaniWani Platform",
+            "group": "Waniwani Platform",
             "pages": [
               "platform/overview"
             ]
@@ -195,14 +195,14 @@
     "display": "header"
   },
   "search": {
-    "prompt": "Search the WaniWani SDK..."
+    "prompt": "Search the Waniwani SDK..."
   },
   "seo": {
     "indexing": "all",
     "metatags": {
       "og:type": "website",
-      "og:site_name": "WaniWani SDK",
-      "og:title": "WaniWani SDK — Build MCP funnels",
+      "og:site_name": "Waniwani SDK",
+      "og:title": "Waniwani SDK — Build MCP funnels",
       "og:description": "Open-source SDK for MCP funnels. Build sales funnels, lead generation, booking, and quote flows on top of any MCP server.",
       "twitter:card": "summary_large_image",
       "twitter:site": "@waniwani_ai"

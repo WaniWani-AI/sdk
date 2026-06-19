@@ -46,7 +46,7 @@ Nested under the `chat` key:
 
 ### `beforeRequest` Hook
 
-Called before each request is forwarded to the WaniWani API. Use it to override messages, inject a custom system prompt, or reject requests.
+Called before each request is forwarded to the Waniwani API. Use it to override messages, inject a custom system prompt, or reject requests.
 
 ```typescript
 chat: {
@@ -98,6 +98,6 @@ export const { GET, POST, PATCH, OPTIONS } = toNextJsHandler(wani, {
 ## Common Mistakes
 
 - **Wrong route path** -- Must be a catch-all: `app/api/waniwani/[[...path]]/route.ts`. A non-catch-all route will not handle sub-paths like `/resource`.
-- **Missing `source`** -- The `source` field is required. It identifies this chat instance in the WaniWani dashboard.
+- **Missing `source`** -- The `source` field is required. It identifies this chat instance in the Waniwani dashboard.
 - **Forgetting `maxDuration`** -- Chat responses stream and can take time. Set `export const maxDuration = 60` to avoid Vercel timeouts on longer conversations.
 - **Client created inline** -- Import the shared client from `lib/waniwani.ts` instead of calling `waniwani()` in the route file.

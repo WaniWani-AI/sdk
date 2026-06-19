@@ -1,7 +1,7 @@
 ---
 title: How it works
-description: "Four tools, OAuth scopes, org context, and sandboxed execution: what happens between your prompt and the WaniWani API."
-keywords: ["WaniWani MCP tools", "whoami", "set_active_org", "search", "execute", "MCP OAuth scopes", "MCP security", "code mode"]
+description: "Four tools, OAuth scopes, org context, and sandboxed execution: what happens between your prompt and the Waniwani API."
+keywords: ["Waniwani MCP tools", "whoami", "set_active_org", "search", "execute", "MCP OAuth scopes", "MCP security", "code mode"]
 ---
 
 The server is deliberately small: four tools that compose, rather than one tool per API endpoint.
@@ -12,7 +12,7 @@ The server is deliberately small: four tools that compose, rather than one tool 
 |---|---|
 | `whoami` | Returns your identity: user id, granted permissions, the organizations you can act on, and which one is active. |
 | `set_active_org` | Switches your active organization for subsequent calls. Membership is enforced server-side. |
-| `search` | Lists the WaniWani API operations available to `execute`, with full TypeScript signatures — inputs *and* response shapes. Takes an optional keyword filter. |
+| `search` | Lists the Waniwani API operations available to `execute`, with full TypeScript signatures — inputs *and* response shapes. Takes an optional keyword filter. |
 | `execute` | Runs a short piece of JavaScript in an isolated sandbox. The code calls operations as `api.<name>(input)` and returns a value. |
 
 ## The loop
@@ -41,7 +41,7 @@ Operations run against your **active organization**:
 
 - When you first connect, it starts as the organization you last used in the dashboard.
 - `set_active_org` switches it, and the switch is enforced server-side: you can only activate organizations you belong to.
-- The switch applies to **this connection only**. The dashboard and any other connected clients each keep their own active organization, so driving WaniWani from your AI client never silently moves your browser session — or vice versa.
+- The switch applies to **this connection only**. The dashboard and any other connected clients each keep their own active organization, so driving Waniwani from your AI client never silently moves your browser session — or vice versa.
 - It takes effect on your next call: the server invalidates the connection's current token and your client silently refreshes into the new organization.
 
 `whoami` always tells you where you currently stand.
@@ -58,8 +58,8 @@ When you connect, the consent screen itemizes the connection's permissions as OA
 
 Two properties worth knowing:
 
-- **You only see what you're entitled to.** The consent screen narrows the list to your account's role — permissions reserved for WaniWani staff never appear for customer accounts.
-- **Scopes are enforced on every API call, server-side.** The MCP server doesn't get to be generous: each `api.*` operation is re-checked against your token's scopes and your org membership by the WaniWani API itself.
+- **You only see what you're entitled to.** The consent screen narrows the list to your account's role — permissions reserved for Waniwani staff never appear for customer accounts.
+- **Scopes are enforced on every API call, server-side.** The MCP server doesn't get to be generous: each `api.*` operation is re-checked against your token's scopes and your org membership by the Waniwani API itself.
 
 ## Security model
 

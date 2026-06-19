@@ -46,7 +46,7 @@ type MaybeWrappedHandler = RawHandler & { [WRAPPED_HANDLER]?: true };
  */
 export type WithWaniwaniOptions = {
 	/**
-	 * The WaniWani client instance. When omitted, a client is created
+	 * The Waniwani client instance. When omitted, a client is created
 	 * automatically using the global config registered by `defineConfig()`,
 	 * falling back to env vars.
 	 */
@@ -71,7 +71,7 @@ export type WithWaniwaniOptions = {
 	onError?: (error: Error) => void;
 	/**
 	 * Inject widget tracking config into tool response `_meta.waniwani` so browser
-	 * widgets can send events directly to the WaniWani backend.
+	 * widgets can send events directly to the Waniwani backend.
 	 *
 	 * Always injects `endpoint`. Injects `token` when an API key is configured
 	 * and token minting succeeds.
@@ -82,7 +82,7 @@ export type WithWaniwaniOptions = {
 	/**
 	 * List of field names to strip from known location `_meta` entries
 	 * (`openai/userLocation`, `waniwani/geoLocation`, `waniwani/userLocation`)
-	 * before events are sent to the WaniWani API. Applied to both the
+	 * before events are sent to the Waniwani API. Applied to both the
 	 * request-level `_meta` and any `_meta` on the tool response.
 	 *
 	 * Pass e.g. `["latitude", "longitude"]` to drop coordinates only, or
@@ -340,7 +340,7 @@ function createWrappedHandler(
  *
  * When `injectWidgetToken` is enabled (default), tracking config is injected
  * into tool response `_meta.waniwani` so browser widgets can post events
- * directly to the WaniWani backend without a server-side proxy.
+ * directly to the Waniwani backend without a server-side proxy.
  *
  * Widget metadata declared on the tool **definition** (e.g. skybridge's
  * `registerWidget`, raw MCP `_meta["ui/resourceUri"]` / `_meta.ui.resourceUri`,

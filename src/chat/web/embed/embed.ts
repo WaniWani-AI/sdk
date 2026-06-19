@@ -1,5 +1,5 @@
 // ============================================================================
-// WaniWani Chat Embed — IIFE entry point
+// Waniwani Chat Embed — IIFE entry point
 //
 // Drop a <script> tag with `data-token` on any page; the chat mounts inside
 // the first `[data-waniwani-embed]` element on the page, rendered inside a
@@ -209,11 +209,11 @@ function injectStyles(shadowRoot: ShadowRoot, config: EmbedConfig): void {
 				shadowRoot.appendChild(link);
 			} else {
 				console.warn(
-					"[WaniWani] Custom CSS URL must use http or https protocol.",
+					"[Waniwani] Custom CSS URL must use http or https protocol.",
 				);
 			}
 		} catch {
-			console.warn("[WaniWani] Invalid custom CSS URL:", config.css);
+			console.warn("[Waniwani] Invalid custom CSS URL:", config.css);
 		}
 	}
 }
@@ -497,7 +497,7 @@ function mountFloating(
 function init(options?: Partial<EmbedConfig>): EmbedInstance {
 	if (currentInstance) {
 		console.warn(
-			"[WaniWani] Chat widget is already initialized. Call destroy() first to re-initialize.",
+			"[Waniwani] Chat widget is already initialized. Call destroy() first to re-initialize.",
 		);
 		return currentInstance;
 	}
@@ -575,7 +575,7 @@ function autoInit(): void {
 	try {
 		init();
 	} catch (err) {
-		console.error("[WaniWani] Auto-initialization failed:", err);
+		console.error("[Waniwani] Auto-initialization failed:", err);
 	}
 }
 

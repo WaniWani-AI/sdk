@@ -1,4 +1,4 @@
-// WaniWani SDK - Express Adapter
+// Waniwani SDK - Express Adapter
 
 import { Readable } from "node:stream";
 import type { WaniWaniClient } from "../../../types.js";
@@ -20,7 +20,7 @@ export type {
 } from "./@types.js";
 
 /**
- * Create Express middleware from a WaniWani client.
+ * Create Express middleware from a Waniwani client.
  *
  * Returns `{ get, post, patch, options }` — each is an Express-compatible
  * middleware (`(req, res, next) => void`). Mount on a router/path of your choice.

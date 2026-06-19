@@ -1,4 +1,4 @@
-// WaniWani SDK - Express Adapter Types
+// Waniwani SDK - Express Adapter Types
 
 import type { ChatOptions } from "../server/@types.js";
 
@@ -65,7 +65,7 @@ export interface ExpressLikeResponse {
 export interface ExpressJsHandlerResult {
 	/** GET handler: routes sub-paths (e.g. /resource for MCP widget content) */
 	get: ExpressMiddleware;
-	/** POST handler: proxies chat messages to the WaniWani API */
+	/** POST handler: proxies chat messages to the Waniwani API */
 	post: ExpressMiddleware;
 	/** PATCH handler: routes updates (e.g. /scenarios/:id) */
 	patch: ExpressMiddleware;

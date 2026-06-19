@@ -1,6 +1,6 @@
 # Initialize MCP Distribution
 
-Step-by-step playbook for initializing a new MCP distribution project from the WaniWani template. Gathers context about the user's business, brand, and use case, then scaffolds a production-ready conversational flow with widgets.
+Step-by-step playbook for initializing a new MCP distribution project from the Waniwani template. Gathers context about the user's business, brand, and use case, then scaffolds a production-ready conversational flow with widgets.
 
 ## Step 1: Gather Context (Interactive)
 
@@ -358,7 +358,7 @@ Test the flow:
 2. Trigger the flow by describing the use case naturally
 3. Walk through each step, verify widgets render correctly
 4. Check branding matches the user's website
-5. Verify the WaniWani dashboard receives events at [app.waniwani.ai](https://app.waniwani.ai)
+5. Verify the Waniwani dashboard receives events at [app.waniwani.ai](https://app.waniwani.ai)
 
 ## Step 10: Print Summary
 

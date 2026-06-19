@@ -1,7 +1,7 @@
 /**
  * Server-side flow state store.
  *
- * Flow state is stored via the WaniWani API, keyed by session ID.
+ * Flow state is stored via the Waniwani API, keyed by session ID.
  * Config comes from env vars (WANIWANI_API_KEY, WANIWANI_API_URL).
  */
 
@@ -23,7 +23,7 @@ export interface FlowStore {
 }
 
 // ============================================================================
-// WaniWani API implementation
+// Waniwani API implementation
 // ============================================================================
 
 export class WaniwaniFlowStore implements FlowStore {

@@ -61,7 +61,7 @@ Wherever you see `extra._meta` in these docs, substitute the equivalent for your
 
 ## The scoped client inside tools and flows
 
-When a server is wrapped with `withWaniwani(server)`, each tool invocation receives a request-scoped WaniWani client on `extra["waniwani/client"]`. The scoped client is also surfaced as `context.waniwani` inside `createTool` handlers and as `waniwani` inside flow nodes. Its `track()` and `identify()` methods merge the current request's `_meta` automatically, so you do not pass it yourself.
+When a server is wrapped with `withWaniwani(server)`, each tool invocation receives a request-scoped Waniwani client on `extra["waniwani/client"]`. The scoped client is also surfaced as `context.waniwani` inside `createTool` handlers and as `waniwani` inside flow nodes. Its `track()` and `identify()` methods merge the current request's `_meta` automatically, so you do not pass it yourself.
 
 ```ts
 import { createTool } from "@waniwani/sdk/mcp";
@@ -120,6 +120,6 @@ await wani.track({
 
 ## Session lifecycle
 
-The WaniWani backend emits `session.started` automatically the first time it sees a new `sessionId`. You do not send it yourself, and `session.started` in the SDK's `EventType` union exists only to type the ingestion envelope.
+The Waniwani backend emits `session.started` automatically the first time it sees a new `sessionId`. You do not send it yourself, and `session.started` in the SDK's `EventType` union exists only to type the ingestion envelope.
 
 Sessions do not have a hard close. The backend treats them as closed after an idle window. If the user comes back, they either resume the same session (within the window) or start a fresh one, depending on what the host client sends in `_meta`.

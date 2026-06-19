@@ -4,12 +4,12 @@ description: "Two pieces you can self-host independently: the MCP app and the KV
 keywords: ["self-host MCP", "self-host KV", "Docker deployment", "on-prem MCP"]
 ---
 
-A WaniWani deployment has **two pieces you can self-host independently**:
+A Waniwani deployment has **two pieces you can self-host independently**:
 
 1. **The MCP app** — the server that hosts your `createFlow` tools and serves MCP clients.
 2. **The KV store** — where flow state lives between tool calls.
 
-These are orthogonal. The most common setup is "self-host the MCP app, let WaniWani host the KV store" — your infra for the server, the [WaniWani Platform](/platform/overview) for state and dashboards. The next step is self-hosting the KV too, eliminating any outbound call to `app.waniwani.ai`.
+These are orthogonal. The most common setup is "self-host the MCP app, let Waniwani host the KV store" — your infra for the server, the [Waniwani Platform](/platform/overview) for state and dashboards. The next step is self-hosting the KV too, eliminating any outbound call to `app.waniwani.ai`.
 
 |  | KV on `WaniwaniKvStore` | KV self-hosted |
 |---|---|---|
@@ -54,9 +54,9 @@ When `.compile()` is called with no `store` and `WANIWANI_API_KEY` is set, the S
 
 Any platform that can run Node 18.17+ works: Vercel, Render, Railway, Fly.io, Cloudflare Workers, AWS Lambda, Google Cloud Run. See [Deployment overview](/deployment/overview) for the choice between this and Managed Hosting.
 
-### Register with WaniWani
+### Register with Waniwani
 
-In the [WaniWani dashboard](https://app.waniwani.ai), create a self-hosted project and paste your deployed MCP URL. WaniWani routes chat requests, widget rendering, and analytics ingestion through that URL.
+In the [Waniwani dashboard](https://app.waniwani.ai), create a self-hosted project and paste your deployed MCP URL. Waniwani routes chat requests, widget rendering, and analytics ingestion through that URL.
 
 ## 2. Self-host the KV store
 

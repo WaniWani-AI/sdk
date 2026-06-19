@@ -1,6 +1,6 @@
 # Chat Widget (`@waniwani/sdk/chat`)
 
-Embed a WaniWani-powered AI chat widget on any page. Two equivalent surfaces:
+Embed a Waniwani-powered AI chat widget on any page. Two equivalent surfaces:
 
 | | Use when |
 |---|---|
@@ -22,7 +22,7 @@ Peer dependencies: `react`, `react-dom`, `@ai-sdk/react`, `ai`. All other depend
 
 ## `<WaniwaniChat>` (React)
 
-Configure the agent (title, welcome message, suggestions, theme, tool behavior) in the WaniWani dashboard. The component fetches that config on mount — you just hand it a token and a channel ID.
+Configure the agent (title, welcome message, suggestions, theme, tool behavior) in the Waniwani dashboard. The component fetches that config on mount — you just hand it a token and a channel ID.
 
 ```tsx
 import { WaniwaniChat } from "@waniwani/sdk/chat";
@@ -164,9 +164,9 @@ Two render modes, chosen with `data-mode`:
 
 ### Prerequisites
 
-1. Generate an embed token in the WaniWani dashboard (Environment → Embed → Generate Token).
+1. Generate an embed token in the Waniwani dashboard (Environment → Embed → Generate Token).
 
-No MCP app changes needed — the embed talks to the WaniWani API directly.
+No MCP app changes needed — the embed talks to the Waniwani API directly.
 
 ### Script tag (declarative)
 
@@ -217,7 +217,7 @@ The chat fits within whatever bound you set and scrolls internally — no need t
 | Attribute | Required | Description |
 |-----------|----------|-------------|
 | `data-api` | No | Chat API URL (defaults to `https://app.waniwani.ai/api/mcp/chat`) |
-| `data-token` | Yes | Embed token (`wwp_...`) from WaniWani dashboard |
+| `data-token` | Yes | Embed token (`wwp_...`) from Waniwani dashboard |
 | `data-channel-id` | No | Agent channel ID — routes the conversation to the right agent |
 | `data-title` | No | Chat header title (default: `"Assistant"`) |
 | `data-welcome-message` | No | Greeting shown before first message |
@@ -310,11 +310,11 @@ Pre-mount, write methods no-op silently and read methods return `undefined` / `[
 
 ### How auth works
 
-The embed sends `Authorization: Bearer wwp_...` on every request directly to the WaniWani API. The token is verified server-side against the `embed_tokens` table. No customer MCP app changes needed — generate tokens in the dashboard, paste the `<script>` tag.
+The embed sends `Authorization: Bearer wwp_...` on every request directly to the Waniwani API. The token is verified server-side against the `embed_tokens` table. No customer MCP app changes needed — generate tokens in the dashboard, paste the `<script>` tag.
 
 ### Remote config
 
-On mount the widget (both React and script) fetches `GET {api}/config` with the embed token and merges the response into its settings. Configure the agent from the WaniWani dashboard (Environment → Embed Chat Config):
+On mount the widget (both React and script) fetches `GET {api}/config` with the embed token and merges the response into its settings. Configure the agent from the Waniwani dashboard (Environment → Embed Chat Config):
 
 | Server-only | Display-only |
 |---|---|
@@ -536,7 +536,7 @@ The event goes to the same canonical ingest every other event uses (`POST /api/m
 
 **Most apps should use `WaniwaniChat` or the `<script>` embed.** `ChatEmbed` is the bare-bones primitive underneath both of them: no token, no remote config, no defaults, no built-in MCP resource endpoint. You wire up `api`, `headers`, `body`, `theme`, and (optionally) `mcp` yourself.
 
-Reach for it when you self-host the chat backend (your own Next.js/Express route, your own provider) and don't want WaniWani's hosted features.
+Reach for it when you self-host the chat backend (your own Next.js/Express route, your own provider) and don't want Waniwani's hosted features.
 
 ```tsx
 import { ChatEmbed } from "@waniwani/sdk/chat";

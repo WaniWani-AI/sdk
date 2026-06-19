@@ -1,12 +1,12 @@
 ---
 name: visualize-flow
-description: Generate a Mermaid diagram from a WaniWani flow definition. Use when the user wants to visualize, diagram, or document a flow's structure and branching logic.
+description: Generate a Mermaid diagram from a Waniwani flow definition. Use when the user wants to visualize, diagram, or document a flow's structure and branching logic.
 allowed-tools: Read, Glob, Grep, Bash
 ---
 
 # Visualize Flow
 
-Generate a Mermaid flowchart diagram from a WaniWani SDK flow file.
+Generate a Mermaid flowchart diagram from a Waniwani SDK flow file.
 
 ## Arguments
 

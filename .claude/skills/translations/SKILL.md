@@ -1,12 +1,12 @@
 ---
 name: translations
-description: Add or update translations for pages and components in the WaniWani app. Use when the user wants to add translations, create translation files, internationalize a page, make text translatable, or update existing translations. Also use proactively when creating new pages or components with user-facing text.
+description: Add or update translations for pages and components in the Waniwani app. Use when the user wants to add translations, create translation files, internationalize a page, make text translatable, or update existing translations. Also use proactively when creating new pages or components with user-facing text.
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
-# WaniWani Translation System
+# Waniwani Translation System
 
-Automatically create and manage translations for pages and components using the WaniWani translation system.
+Automatically create and manage translations for pages and components using the Waniwani translation system.
 
 **📚 For real-world examples, see `examples.md` in this directory.**
 

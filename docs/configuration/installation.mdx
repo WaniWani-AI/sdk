@@ -15,7 +15,7 @@ keywords: ["install SDK", "bun add", "npm install", "@waniwani/sdk install"]
   </Card>
 </CardGroup>
 
-The SDK is open source and works without an API key. Set `WANIWANI_API_KEY` to connect the [WaniWani Platform](/platform/overview) and unlock hosted state, tracking, knowledge base, and the chat widget on top.
+The SDK is open source and works without an API key. Set `WANIWANI_API_KEY` to connect the [Waniwani Platform](/platform/overview) and unlock hosted state, tracking, knowledge base, and the chat widget on top.
 
 ---
 
@@ -63,7 +63,7 @@ The [MCP Distribution Template](https://github.com/WaniWani-AI/mcp-distribution-
   - [`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk)
   - [Skybridge](https://github.com/alpic-ai/skybridge) (Alpic)
   - [`@vercel/mcp-handler`](https://www.npmjs.com/package/@vercel/mcp-handler)
-- A WaniWani account at [app.waniwani.ai](https://app.waniwani.ai) — optional, only needed for [Platform](/platform/overview) features.
+- A Waniwani account at [app.waniwani.ai](https://app.waniwani.ai) — optional, only needed for [Platform](/platform/overview) features.
 
 `@modelcontextprotocol/sdk` and `zod` are peer dependencies. Install them in your project if you do not already have them.
 
@@ -145,7 +145,7 @@ withWaniwani(server);
 WANIWANI_API_KEY=wwk_...
 ```
 
-Every wrapped tool call now emits a `tool.called` event to your [WaniWani dashboard](https://app.waniwani.ai). Without an API key, the wrapper still bridges session IDs and forwards widget metadata but emits no events. Safe to wrap unconditionally. See [Wrap your server](/configuration/wrap-server) for all options.
+Every wrapped tool call now emits a `tool.called` event to your [Waniwani dashboard](https://app.waniwani.ai). Without an API key, the wrapper still bridges session IDs and forwards widget metadata but emits no events. Safe to wrap unconditionally. See [Wrap your server](/configuration/wrap-server) for all options.
 
 ## Create a Platform client
 

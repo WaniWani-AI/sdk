@@ -3,7 +3,7 @@
 /**
  * Lightweight client-side transport for widget event tracking.
  *
- * Sends events directly to the WaniWani backend V2 batch endpoint
+ * Sends events directly to the Waniwani backend V2 batch endpoint
  * using a short-lived JWT for authentication.
  * Falls back to `navigator.sendBeacon()` on page teardown.
  */

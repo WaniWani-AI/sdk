@@ -1,5 +1,5 @@
 /**
- * Generic key-value store backed by the WaniWani API.
+ * Generic key-value store backed by the Waniwani API.
  *
  * Values are stored as JSON objects (`Record<string, unknown>`) in the
  * `/api/mcp/redis/*` endpoints. Tenant isolation is handled by the API key.
@@ -33,7 +33,7 @@ export interface KvStore<T = Record<string, unknown>> {
 }
 
 // ============================================================================
-// WaniWani API implementation
+// Waniwani API implementation
 // ============================================================================
 
 const SDK_NAME = "@waniwani/sdk";
@@ -62,7 +62,7 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 	async get(key: string): Promise<T | null> {
 		if (!this.apiKey) {
 			throw new Error(
-				"[WaniWani KV] No API key configured. Set WANIWANI_API_KEY env var.",
+				"[Waniwani KV] No API key configured. Set WANIWANI_API_KEY env var.",
 			);
 		}
 		const data = await this.request<Record<string, unknown> | null>(
@@ -75,7 +75,7 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 		if (isEncryptedEnvelope(data)) {
 			if (!this.encryptionKey) {
 				throw new Error(
-					"[WaniWani KV] Encrypted data found but WANIWANI_ENCRYPTION_KEY is not set.",
+					"[Waniwani KV] Encrypted data found but WANIWANI_ENCRYPTION_KEY is not set.",
 				);
 			}
 			return decryptValue<T>(data, this.encryptionKey);
@@ -86,7 +86,7 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 	async set(key: string, value: T, options?: KvStoreSetOptions): Promise<void> {
 		if (!this.apiKey) {
 			throw new Error(
-				"[WaniWani KV] No API key configured. Set WANIWANI_API_KEY env var.",
+				"[Waniwani KV] No API key configured. Set WANIWANI_API_KEY env var.",
 			);
 		}
 		const encKey = this.encryptionKey;
@@ -110,7 +110,7 @@ export class WaniwaniKvStore<T = Record<string, unknown>>
 		try {
 			await this.request("/api/mcp/redis/delete", { key });
 		} catch (error) {
-			console.error("[WaniWani KV] delete failed for key:", key, error);
+			console.error("[Waniwani KV] delete failed for key:", key, error);
 		}
 	}
 

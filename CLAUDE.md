@@ -1,4 +1,4 @@
-# WaniWani SDK
+# Waniwani SDK
 
 SDK for [app.waniwani.ai](https://app.waniwani.ai) — open-source flow engine plus optional hosted tier for tracking, KB, and chat.
 
@@ -40,7 +40,7 @@ Still used by ~14 internal customer MCPs. Kept exported for back-compat. **Never
 
 ### Internal (not part of the public API)
 
-`@waniwani/sdk/internal` is a private entry point for the WaniWani platform (app.waniwani.ai) to reuse SDK primitives that should not be exposed to third-party consumers. **Never document these in user-facing docs. Never suggest them for new code outside the WaniWani monorepo.**
+`@waniwani/sdk/internal` is a private entry point for the Waniwani platform (app.waniwani.ai) to reuse SDK primitives that should not be exposed to third-party consumers. **Never document these in user-facing docs. Never suggest them for new code outside the Waniwani monorepo.**
 
 - `replayScenario`, `ConversationTurnResult`, `ConversationResult`, `EvalScenario`, `ChatResult`, `ToolCallTrace`, `TurnAssertion`, `EvalScenarioType` from `@waniwani/sdk/internal` — replay a recorded UIMessage conversation against an MCP-backed chat server. Used by the compliance/evals features in the app.
 

@@ -359,7 +359,7 @@ export type NodeContext<TState> = {
 	interrupt: TypedInterrupt<TState>;
 	/** Create a widget signal — pause and show a UI widget */
 	showWidget: TypedShowWidget<TState>;
-	/** Session-scoped WaniWani client — available when the server is wrapped with withWaniwani() */
+	/** Session-scoped Waniwani client — available when the server is wrapped with withWaniwani() */
 	waniwani?: ScopedWaniWaniClient;
 };
 

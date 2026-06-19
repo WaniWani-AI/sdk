@@ -104,7 +104,7 @@ The KV powers the flow engine only. The following live in a separate pipeline:
 
 - **Tracking events.** `tool.called`, `quote.succeeded`, etc. are emitted by `withWaniwani(server)` and `client.track()`, batched, and POSTed to the events endpoint. Independent of the KV store.
 - **Funnel analytics and dashboards.** Built from tracking events on the server side. Reading them never touches your KV.
-- **Knowledge base content.** Lives in WaniWani's hosted KB service, unrelated to flow state.
+- **Knowledge base content.** Lives in Waniwani's hosted KB service, unrelated to flow state.
 
 You can self-host the KV and still get hosted dashboards by also calling `withWaniwani(server)` with `WANIWANI_API_KEY` set. The two systems compose.
 
@@ -147,7 +147,7 @@ You can self-host the KV and still get hosted dashboards by also calling `withWa
   <Card title="Tool contract" icon="plug" href="/reference/flow-tool-contract">
     Wire-level reference for `FlowToolInput` and response statuses.
   </Card>
-  <Card title="WaniWani Platform" icon="layer-group" href="/platform/overview">
+  <Card title="Waniwani Platform" icon="layer-group" href="/platform/overview">
     What runs without an API key, what unlocks when you connect the Platform.
   </Card>
 </CardGroup>
