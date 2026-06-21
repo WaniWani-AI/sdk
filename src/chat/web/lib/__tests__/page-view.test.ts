@@ -56,6 +56,7 @@ describe("firePageView", () => {
 				token: "wwp_test",
 				channelId: "chan_1",
 				mode: "floating",
+				source: "acme-web",
 			});
 			expect(calls).toHaveLength(1);
 			const [call] = calls;
@@ -71,10 +72,11 @@ describe("firePageView", () => {
 			const [ev] = batch.events;
 			expect(ev.type).toBe("mcp.event");
 			expect(ev.name).toBe("page.viewed");
-			expect(ev.source).toBe("widget");
-			// Anonymous visitor is the identity; no session is ever minted.
-			expect(typeof ev.correlation.externalUserId).toBe("string");
-			expect(ev.correlation.externalUserId.length).toBeGreaterThan(0);
+			// Carries the channel's configured source, not a generic "widget".
+			expect(ev.source).toBe("acme-web");
+			// Anonymous device id is the identity; no session is ever minted.
+			expect(typeof ev.correlation.visitorId).toBe("string");
+			expect(ev.correlation.visitorId.length).toBeGreaterThan(0);
 			expect(ev.correlation.sessionId).toBeUndefined();
 			expect(ev.properties.channelId).toBe("chan_1");
 			expect(ev.properties.mode).toBe("floating");
@@ -90,6 +92,7 @@ describe("firePageView", () => {
 				api: "https://app.waniwani.ai/api/mcp/chat",
 				token: "wwp_test",
 				channelId: "chan_1",
+				source: "acme-web",
 			} as const;
 			await firePageView(opts);
 			await firePageView(opts);
@@ -100,13 +103,21 @@ describe("firePageView", () => {
 		}
 	});
 
-	test("is a no-op without an api or token", async () => {
+	test("is a no-op without an api, token, or source", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await firePageView({ api: "", token: "wwp_test" });
+			await firePageView({ api: "", token: "wwp_test", source: "acme-web" });
 			await firePageView({
 				api: "https://app.waniwani.ai/api/mcp/chat",
 				token: "",
+				source: "acme-web",
+			});
+			// No source resolved from /config — skip rather than fire a generic
+			// "widget" attribution.
+			await firePageView({
+				api: "https://app.waniwani.ai/api/mcp/chat",
+				token: "wwp_test",
+				channelId: "chan_1",
 			});
 			expect(calls).toHaveLength(0);
 		} finally {
@@ -129,6 +140,7 @@ describe("firePageView", () => {
 			const opts = {
 				api: "https://app.waniwani.ai/api/mcp/chat",
 				token: "wwp_test",
+				source: "acme-web",
 			} as const;
 			await firePageView(opts); // fails, guard rolled back
 			await firePageView(opts); // succeeds

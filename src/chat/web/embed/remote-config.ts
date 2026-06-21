@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { useEffect, useState } from "react";
+import { firePageView } from "../lib/page-view";
 import type { EmbedConfig } from "./config";
 import { resolveConfig } from "./config";
 
@@ -82,6 +83,13 @@ interface RemoteConfigResponse {
 	suggestions: string[] | null;
 	enableThreadHistory?: boolean | null;
 	/**
+	 * Channel-specific event source (e.g. the integration/source this channel
+	 * is attributed to). Stamped onto widget-originated events like
+	 * `page.viewed` so they attribute to the right source instead of a generic
+	 * `"widget"` literal.
+	 */
+	source?: string | null;
+	/**
 	 * Tool-call rendering mode from the channel config. Mapped to the
 	 * `showToolCalls` embed config: `full` → `true`, `hidden` → `false`,
 	 * `titles-only` → `"titles-only"`.
@@ -138,6 +146,9 @@ function remoteToConfigPartial(
 	data: RemoteConfigResponse,
 ): Partial<EmbedConfig> {
 	const out: Partial<EmbedConfig> = {};
+	if (data.source != null) {
+		out.source = data.source;
+	}
 	if (data.title != null) {
 		out.title = data.title;
 	}
@@ -205,11 +216,27 @@ export function useRemoteEmbedConfig(
 			setReady(true);
 			return;
 		}
+		// Top-of-funnel signal, fired once the channel's `/config` is in hand so
+		// the event carries the channel's source. Guarded once per page inside
+		// `firePageView`; skippable per surface via `disablePageView`.
+		const pageView = (source: string | undefined) => {
+			if (initialConfig.disablePageView) {
+				return;
+			}
+			void firePageView({
+				api,
+				token,
+				channelId,
+				mode: initialConfig.mode,
+				source,
+			});
+		};
 		const cached = loadCachedConfig(api, token, channelId);
 		if (cached) {
 			try {
 				setConfig(resolveConfig(programmatic, cached, scriptConfig));
 				setReady(true);
+				pageView(cached.source);
 			} catch {
 				// Fall through to the fetch path.
 			}
@@ -233,6 +260,7 @@ export function useRemoteEmbedConfig(
 					}
 				}
 				setReady(true);
+				pageView(remote.source);
 			})
 			.catch((err) => {
 				console.error("[Waniwani] Remote config fetch failed:", err);

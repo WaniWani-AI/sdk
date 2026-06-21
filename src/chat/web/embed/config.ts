@@ -64,6 +64,13 @@ export interface EmbedConfig {
 	 */
 	channelId?: string;
 	/**
+	 * Channel-specific event source. Comes from the remote `/config` response
+	 * (not author-set) and is stamped onto widget-originated events such as
+	 * `page.viewed` so they attribute to this channel's source rather than a
+	 * generic `"widget"` literal.
+	 */
+	source?: string;
+	/**
 	 * How tool-call activity renders, grouped into one collapsible chain:
 	 * `true` (default) makes each step expandable to its request/response
 	 * JSON, `"titles-only"` shows step labels only, `false` hides the chain
