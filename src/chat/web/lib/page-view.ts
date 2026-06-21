@@ -3,9 +3,9 @@
 //
 // This is the top of the conversion funnel: "X people landed where the widget
 // is" vs "Y started a conversation". It is attributed to the anonymous
-// `visitorId` (sent as `externalUserId`), and deliberately carries NO session —
-// a page view must not create a session, otherwise sessions would equal page
-// views and the funnel collapses.
+// `visitorId` (sent as `correlation.visitorId`), and deliberately carries NO
+// session — a page view must not create a session, otherwise sessions would
+// equal page views and the funnel collapses.
 //
 // It goes to the SAME canonical ingest every other event uses
 // (`POST /api/mcp/events/v2/batch`, the V2 batch envelope), authenticated with
@@ -25,6 +25,12 @@ export interface FirePageViewOptions {
 	channelId?: string;
 	/** Embed mode the widget initialized in. */
 	mode?: "inline" | "floating";
+	/**
+	 * Channel-specific event source from the resolved `/config`. Required for
+	 * the event to fire: without it the page view is skipped, so events always
+	 * attribute to a real channel source rather than a generic `"widget"`.
+	 */
+	source?: string;
 }
 
 // Fire-at-most-once per (api|token|channelId) for the lifetime of the page.
@@ -56,8 +62,8 @@ function eventsEndpoint(api: string): string {
  * tracking must never break the host page or the widget.
  */
 export async function firePageView(opts: FirePageViewOptions): Promise<void> {
-	const { api, token, channelId, mode } = opts;
-	if (typeof window === "undefined" || !api || !token) {
+	const { api, token, channelId, mode, source } = opts;
+	if (typeof window === "undefined" || !api || !token || !source) {
 		return;
 	}
 
@@ -73,7 +79,9 @@ export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 
 		// V2 batch envelope — identical shape to WidgetTransport's `buildV2Batch`,
 		// so this lands in the same ingest pipeline as every other event. The
-		// anonymous visitor is the identity; `correlation` carries no sessionId.
+		// anonymous device id is the identity (`correlation` carries no sessionId);
+		// the server stores it in its own `visitor_id` column, never PII-hashed,
+		// separate from the identified-user `externalUserId`.
 		const body = JSON.stringify({
 			sentAt: now,
 			source: { sdk: "@waniwani/sdk", version: "0.1.0" },
@@ -82,9 +90,9 @@ export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 					id: crypto.randomUUID(),
 					type: "mcp.event",
 					name: "page.viewed",
-					source: "widget",
+					source,
 					timestamp: now,
-					correlation: { externalUserId: ctx.visitorId },
+					correlation: { visitorId: ctx.visitorId },
 					properties: {
 						channelId,
 						mode,

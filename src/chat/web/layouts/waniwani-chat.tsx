@@ -207,15 +207,33 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 		const [remote, setRemote] = useState<Partial<EmbedConfig>>({});
 		const [ready, setReady] = useState<boolean>(false);
 
+		// Top-of-funnel signal, fired once the channel's `/config` resolves so
+		// the event carries the channel's source. Guarded once per page inside
+		// `firePageView`; skippable via `overrides.disablePageView` on surfaces
+		// where a landing event is noise.
+		const disablePageView = overrides?.disablePageView;
 		useEffect(() => {
 			if (!token) {
 				setReady(true);
 				return;
 			}
+			const pageView = (source: string | undefined) => {
+				if (disablePageView) {
+					return;
+				}
+				void firePageView({
+					api: resolvedApi,
+					token,
+					channelId,
+					mode: "inline",
+					source,
+				});
+			};
 			const cached = loadCachedConfig(resolvedApi, token, channelId);
 			if (cached) {
 				setRemote(cached);
 				setReady(true);
+				pageView(cached.source);
 			}
 			const controller = new AbortController();
 			const safety = setTimeout(() => setReady(true), READINESS_TIMEOUT_MS);
@@ -229,6 +247,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 						setRemote(r);
 					}
 					setReady(true);
+					pageView(r.source);
 				})
 				.catch((err) => {
 					console.error("[Waniwani] Remote config fetch failed:", err);
@@ -239,24 +258,6 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				controller.abort();
 				clearTimeout(safety);
 			};
-		}, [resolvedApi, token, channelId]);
-
-		// Top-of-funnel signal: fire once when the component mounts (the host
-		// page rendered the widget), independent of whether a conversation
-		// ever starts. Guarded inside `firePageView` to fire at most once.
-		// Skippable via `overrides.disablePageView` on surfaces where a landing
-		// event is noise.
-		const disablePageView = overrides?.disablePageView;
-		useEffect(() => {
-			if (!token || disablePageView) {
-				return;
-			}
-			void firePageView({
-				api: resolvedApi,
-				token,
-				channelId,
-				mode: "inline",
-			});
 		}, [resolvedApi, token, channelId, disablePageView]);
 
 		const config = useMemo(

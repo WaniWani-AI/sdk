@@ -329,6 +329,9 @@ export function useChatEngine(props: ChatBaseProps) {
 							: {};
 					resolvedBody.visitor = {
 						...existingVisitor,
+						// Anonymous device id — the server stamps it onto chat events'
+						// `visitor_id` so visits link a `page.viewed` to its conversation.
+						id: vc.visitorId,
 						client: {
 							...existingClient,
 							memoryUserId: vc.memoryUserId,
