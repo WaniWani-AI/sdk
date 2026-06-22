@@ -1,3 +1,4 @@
+import { loadProjectConfig } from "../../../project-config.js";
 import type { ToolCalledProperties } from "../../../tracking/index.js";
 import { createLogger } from "../../../utils/logger.js";
 import { waniwani } from "../../../waniwani.js";
@@ -228,6 +229,7 @@ function createWrappedHandler(
 		const scopedClient = createScopedClient(tracker, meta, {
 			apiUrl: tracker._config.apiUrl,
 			apiKey: tracker._config.apiKey,
+			projectId: loadProjectConfig()?.projectId,
 		});
 		if (isRecord(extra)) {
 			extra[SCOPED_CLIENT_KEY] = scopedClient;

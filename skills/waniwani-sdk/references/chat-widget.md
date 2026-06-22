@@ -152,6 +152,7 @@ function App() {
 | `reset()` | Clear all messages and start fresh |
 | `focus()` | Focus the chat input |
 | `messages` | Current chat messages (readonly `UIMessage[]`) |
+| `sessionId` | Session ID used for event correlation (`undefined` until the first message) |
 
 ## `<script>` embed (non-React)
 
@@ -305,6 +306,7 @@ The IIFE exposes the same imperative methods as the React ref, both globally and
 | `reset()` | Clear all messages |
 | `focus()` | Focus the chat input (opens the panel in floating mode) |
 | `getMessages()` | Snapshot of current `UIMessage[]` |
+| `getSessionId()` | Session ID used for event correlation (`undefined` until the first message) |
 
 Pre-mount, write methods no-op silently and read methods return `undefined` / `[]`. Pick whichever feels right — call them globally (`window.WaniWani.chat.sendMessage(...)`) when you don't have the instance handle, or on the instance when you do.
 
