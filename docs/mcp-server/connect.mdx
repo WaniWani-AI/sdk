@@ -1,16 +1,21 @@
 ---
 title: Connect your AI client
 description: "Add the Waniwani MCP server to claude.ai, Claude Code, Cursor, or ChatGPT and sign in with your Waniwani account — no API keys."
-keywords: ["connect Waniwani MCP", "claude.ai connector", "Claude Code MCP", "Cursor MCP", "ChatGPT connector", "mcp.waniwani.ai", "MCP OAuth"]
+keywords: ["connect Waniwani MCP", "claude.ai connector", "Claude Code MCP", "Cursor MCP", "ChatGPT connector", "mcp.waniwani.ai", "eu.mcp.waniwani.ai", "EU region", "data residency", "MCP OAuth"]
 ---
 
-One URL works in every client:
+Waniwani runs the MCP server in two regions. Add the URL for the region where your organization lives:
 
-```text
-https://mcp.waniwani.ai/mcp
-```
+| Region | MCP URL |
+| --- | --- |
+| US | `https://mcp.waniwani.ai/mcp` |
+| EU | `https://eu.mcp.waniwani.ai/mcp` |
 
 It's a remote MCP server (Streamable HTTP) that authenticates with OAuth 2.1. There is no API key to paste: you add the URL, your client opens a browser window, you sign in to Waniwani and approve the requested permissions. From then on the connection acts as *you* — same organizations, same role.
+
+<Note>
+Each region is an independent stack with its own data. Sign in on the endpoint that matches your **data residency** — the region you chose when you created your organization. The US endpoint won't show organizations that live in the EU, and vice versa. The examples below use the US URL; if your data is in the EU, swap in `https://eu.mcp.waniwani.ai/mcp`.
+</Note>
 
 ## Claude (claude.ai and desktop)
 
@@ -61,7 +66,7 @@ Client UIs change quickly. If a menu has moved, follow your client's own guide f
 
 <Steps>
   <Step title="Your client discovers Waniwani">
-    The client reads the server's metadata and learns that `app.waniwani.ai` handles sign-in. It registers itself automatically — no manual client IDs.
+    The client reads the server's metadata and learns which Waniwani stack handles sign-in for that region (`app.waniwani.ai` for US, `eu.app.waniwani.ai` for EU). It registers itself automatically — no manual client IDs.
   </Step>
   <Step title="You sign in to Waniwani">
     The browser opens your usual Waniwani login. If you're already signed in, you go straight to consent.

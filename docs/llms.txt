@@ -85,7 +85,7 @@ Optional. Adds tracking, knowledge base, chat widget, and hosted flow state to a
 
 ## WaniWani MCP server (drive the platform from your AI client)
 
-Connect Claude, Cursor, or ChatGPT to `https://mcp.waniwani.ai/mcp` (OAuth 2.1, no API keys) and operate the WaniWani platform conversationally: environments, API keys, analytics digests, session breakdowns. This is WaniWani's own hosted MCP server — distinct from the MCP funnel servers you build with the SDK.
+Connect Claude, Cursor, or ChatGPT to `https://mcp.waniwani.ai/mcp` (US) or `https://eu.mcp.waniwani.ai/mcp` (EU) — use the region your organization's data lives in — with OAuth 2.1 and no API keys, then operate the WaniWani platform conversationally: environments, API keys, analytics digests, session breakdowns. This is WaniWani's own hosted MCP server — distinct from the MCP funnel servers you build with the SDK.
 
 - [Overview](https://docs.waniwani.ai/mcp-server/overview): What the server is, example prompts, capability categories.
 - [Connect your AI client](https://docs.waniwani.ai/mcp-server/connect): Setup for claude.ai, Claude Code, Cursor, and ChatGPT; the OAuth sign-in flow; troubleshooting.
