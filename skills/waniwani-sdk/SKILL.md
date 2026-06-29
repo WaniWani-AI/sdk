@@ -121,7 +121,7 @@ The following are still exported for back-compat with existing customer MCPs but
 
 **Never recommend these for new code.** They will move to dedicated `@waniwani/sdk/legacy*` entry points in a future minor release. Existing apps using them keep working.
 
-`@waniwani/sdk/evals` has been removed entirely — see [legacy/evals](https://docs.waniwani.ai/legacy/evals).
+`@waniwani/sdk/evals` has been removed entirely — see the [changelog](https://docs.waniwani.ai/sdk/changelog).
 
 ## Reading guide
 
@@ -149,7 +149,7 @@ When a playbook exists for the user's task, **follow the playbook step by step**
 
 ## Upgrading the SDK
 
-`@waniwani/sdk` is `0.x`, so **minor version bumps can break the public API**. Whenever you raise the SDK version in a project — editing `package.json`, running `bun add @waniwani/sdk@latest`, or fixing a build that started failing after an upgrade — do not treat it as a drop-in. Read the [changelog](https://docs.waniwani.ai/changelog) for every breaking change between the old and new version and **auto-apply the documented migration** (each one is a mechanical codemod), then run `bun run typecheck && bun test`. Full procedure in [upgrading.md](references/upgrading.md).
+`@waniwani/sdk` is `0.x`, so **minor version bumps can break the public API**. Whenever you raise the SDK version in a project — editing `package.json`, running `bun add @waniwani/sdk@latest`, or fixing a build that started failing after an upgrade — do not treat it as a drop-in. Read the [changelog](https://docs.waniwani.ai/sdk/changelog) for every breaking change between the old and new version and **auto-apply the documented migration** (each one is a mechanical codemod), then run `bun run typecheck && bun test`. Full procedure in [upgrading.md](references/upgrading.md).
 
 ## Common mistakes
 

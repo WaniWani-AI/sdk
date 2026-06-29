@@ -5,7 +5,7 @@ The SDK is `0.x`, so **minor bumps can contain breaking changes**. Whenever you 
 ## Procedure (run on every minor bump)
 
 1. **Find the version delta.** Note the version you are coming from (the one in the lockfile / `package.json` before the bump) and the version you are moving to.
-2. **Read the changelog.** Open [docs.waniwani.ai/changelog](https://docs.waniwani.ai/changelog) (source: `docs/changelog.mdx`). Start at the **Breaking changes at a glance** table, then read every `## <version>:` section whose version is **greater than your old version and less than or equal to your new version**.
+2. **Read the changelog.** Open [docs.waniwani.ai/sdk/changelog](https://docs.waniwani.ai/sdk/changelog) (source: `sdk/changelog.mdx` in the docs repo). Start at the **Breaking changes at a glance** table, then read every `## <version>:` section whose version is **greater than your old version and less than or equal to your new version**.
 3. **Apply each breaking-change migration.** Every breaking change in the changelog ships with a before/after and a mechanical migration (often a codemod recipe). Apply them in version order. They are designed to be auto-applied by an agent in a single pass — do so without asking, then report what you changed.
 4. **Verify.** Run the project's checks:
    ```bash

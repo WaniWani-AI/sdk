@@ -83,19 +83,19 @@ The mapping from funnel to flow is direct:
 | Branching question | Conditional edge |
 | Lead data | Typed state (Zod) |
 
-See [Why MCP funnels](https://docs.waniwani.ai/why-mcp-funnels) for the full argument.
+See [Why MCP funnels](https://docs.waniwani.ai/sdk/why-mcp-funnels) for the full argument.
 
 ## How it compares
 
 - **vs the raw MCP SDK.** You would serialize state through the model on every turn. `createFlow` persists state server-side under the session id; the model carries nothing between calls.
-- **vs LangChain or LangGraph.** General-purpose agent graphs. Waniwani is funnel-shaped: interrupts, re-ask on validation, auto-skip pre-filled fields, widget delegation, typed state via Zod. See [vs LangGraph](https://docs.waniwani.ai/compare/vs-langgraph).
+- **vs LangChain or LangGraph.** General-purpose agent graphs. Waniwani is funnel-shaped: interrupts, re-ask on validation, auto-skip pre-filled fields, widget delegation, typed state via Zod. See [vs LangGraph](https://docs.waniwani.ai/sdk/compare/vs-langgraph).
 - **vs closed-source platform SDKs.** MIT. The flow engine has zero runtime dependency on `app.waniwani.ai`. The hosted Platform is opt-in via a single env var.
 
 ## Engine + optional Platform
 
 The flow engine is MIT and runs without an API key against any `get` / `set` / `delete` store (Redis, Upstash, Cloudflare KV, DynamoDB, Postgres, in-memory).
 
-Set `WANIWANI_API_KEY` to connect the [Waniwani Platform](https://docs.waniwani.ai/platform/overview):
+Set `WANIWANI_API_KEY` to connect the [Waniwani Platform](https://docs.waniwani.ai/sdk/platform/overview):
 
 - Hosted, encrypted-at-rest flow state. No infra to run.
 - Event tracking and funnel analytics.
@@ -106,10 +106,10 @@ Same code, opt in by env var. `withWaniwani(server)` wraps any MCP server to add
 
 ## What you can build
 
-- [Sales funnel MCP](https://docs.waniwani.ai/guides/sales-funnel). Qualify intent, capture lead, branch on stage, push to CRM.
-- [Lead generation MCP](https://docs.waniwani.ai/guides/lead-generation). Email, role, use case, webhook to CRM.
-- [Booking MCP](https://docs.waniwani.ai/guides/booking). Pick service, check availability, pick slot, confirm.
-- [Insurance or pricing quote MCP](https://docs.waniwani.ai/guides/insurance-quote). Collect details, validate, call your pricing API, return widget cards.
+- [Sales funnel MCP](https://docs.waniwani.ai/sdk/guides/sales-funnel). Qualify intent, capture lead, branch on stage, push to CRM.
+- [Lead generation MCP](https://docs.waniwani.ai/sdk/guides/lead-generation). Email, role, use case, webhook to CRM.
+- [Booking MCP](https://docs.waniwani.ai/sdk/guides/booking). Pick service, check availability, pick slot, confirm.
+- [Insurance or pricing quote MCP](https://docs.waniwani.ai/sdk/guides/insurance-quote). Collect details, validate, call your pricing API, return widget cards.
 
 For a fuller starter project with chat widget, dev tunnel, and a sample funnel pre-wired:
 
@@ -128,16 +128,16 @@ waniwani connect   # pick an org + agent, writes waniwani.config.ts
 waniwani dev       # run local MCP, open playground bridged to localhost
 ```
 
-See the [CLI docs](https://docs.waniwani.ai/cli/overview) for the full command reference.
+See the [CLI docs](https://docs.waniwani.ai/sdk/cli/overview) for the full command reference.
 
 ## Documentation
 
-Full docs at **[docs.waniwani.ai](https://docs.waniwani.ai)**. Same source as [`./docs/`](./docs).
+Full docs at **[docs.waniwani.ai](https://docs.waniwani.ai)**.
 
-- **Start:** [Quickstart](https://docs.waniwani.ai/quickstart) · [Why MCP funnels](https://docs.waniwani.ai/why-mcp-funnels) · [Funnels overview](https://docs.waniwani.ai/guides/funnels)
-- **Engine:** [Flows](https://docs.waniwani.ai/flows/overview) · [State](https://docs.waniwani.ai/flows/state) · [Interrupts](https://docs.waniwani.ai/flows/interrupts) · [KV store adapters](https://docs.waniwani.ai/flows/kv-store)
-- **Deploy:** [Overview](https://docs.waniwani.ai/deployment/overview) · [Self-hosting](https://docs.waniwani.ai/deployment/self-hosting)
-- **Platform:** [Overview](https://docs.waniwani.ai/platform/overview) · [Tracking](https://docs.waniwani.ai/tracking/overview) · [Knowledge base](https://docs.waniwani.ai/knowledge-base/overview) · [Chat widget](https://docs.waniwani.ai/chat/embed)
+- **Start:** [Quickstart](https://docs.waniwani.ai/sdk/quickstart) · [Why MCP funnels](https://docs.waniwani.ai/sdk/why-mcp-funnels) · [Funnels overview](https://docs.waniwani.ai/sdk/guides/funnels)
+- **Engine:** [Flows](https://docs.waniwani.ai/sdk/flows/overview) · [State](https://docs.waniwani.ai/sdk/flows/state) · [Interrupts](https://docs.waniwani.ai/sdk/flows/interrupts) · [KV store adapters](https://docs.waniwani.ai/sdk/flows/kv-store)
+- **Deploy:** [Overview](https://docs.waniwani.ai/sdk/deployment/overview) · [Self-hosting](https://docs.waniwani.ai/sdk/deployment/self-hosting)
+- **Platform:** [Overview](https://docs.waniwani.ai/sdk/platform/overview) · [Tracking](https://docs.waniwani.ai/sdk/tracking/overview) · [Knowledge base](https://docs.waniwani.ai/sdk/knowledge-base/overview) · [Chat widget](https://docs.waniwani.ai/sdk/chat/embed)
 
 ## Links
 
