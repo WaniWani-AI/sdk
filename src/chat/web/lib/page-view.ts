@@ -28,7 +28,7 @@ export interface FirePageViewOptions {
 	/**
 	 * Channel-specific event source from the resolved `/config`. Required for
 	 * the event to fire: without it the page view is skipped, so events always
-	 * attribute to a real channel source rather than a generic `"widget"`.
+	 * attribute to a real channel source.
 	 */
 	source?: string;
 }
