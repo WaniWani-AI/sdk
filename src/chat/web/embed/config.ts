@@ -159,7 +159,7 @@ export interface EmbedConfig {
 	/**
 	 * Delay in milliseconds before the floating dock animates into view after
 	 * the page renders. Letting the page settle first keeps the bar from
-	 * competing with the host's initial content. Defaults to `3000`. `0` shows
+	 * competing with the host's initial content. Defaults to `2000`. `0` shows
 	 * it immediately. Only applies when `mode` is `"floating"`. Surfaced as
 	 * `data-appear-delay`.
 	 */

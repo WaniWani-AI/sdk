@@ -232,7 +232,7 @@ The chat fits within whatever bound you set and scrolls internally — no need t
 | `data-height` | No | Inline only. Default container height — any CSS length (`"500px"`, `"80vh"`) or a bare number (px). Defaults to `500px` |
 | `data-position` | No | Floating only. `"bottom-center"` (default), `"bottom-right"`, or `"bottom-left"` |
 | `data-launcher-text` | No | Floating only. Overrides the docked input's placeholder. Defaults to the agent's configured input placeholder (typed out), then a localized "Ask anything…" |
-| `data-appear-delay` | No | Floating only. Milliseconds to wait after the page renders before the docked input animates in. Defaults to `3000`. `0` shows it immediately (still fades in) |
+| `data-appear-delay` | No | Floating only. Milliseconds to wait after the page renders before the docked input animates in. Defaults to `2000`. `0` shows it immediately (still fades in) |
 | `data-disable-page-view` | No | `"true"` (or a bare attribute) opts out of the top-of-funnel `page.viewed` event fired once on init. Use on surfaces where a page view is noise. See [Tracked events](#event-tracking) |
 
 For finer-grained colour, radius, or font overrides, set CSS variables on the container — see [Theming the chat widget](#theming-the-chat-widget).
@@ -241,7 +241,7 @@ For finer-grained colour, radius, or font overrides, set CSS variables on the co
 
 Set `data-mode="floating"` for a docked, progressively-revealing chat (no `[data-waniwani-embed]` element needed — the surface is appended to `<body>` and overlays the page without blocking it). It has three states:
 
-1. **Docked input** — after `data-appear-delay` (default 3s, so the page settles first) a thin input bar animates in at the bottom of the screen (not a launcher button). It mirrors the in-chat composer: a soft-rounded card, no decorative icon. The page stays fully usable.
+1. **Docked input** — after `data-appear-delay` (default 2s, so the page settles first) a thin input bar animates in at the bottom of the screen (not a launcher button). It mirrors the in-chat composer: a soft-rounded card, no decorative icon. The page stays fully usable.
 2. **Expanded** — clicking/focusing the bar widens it and, a beat later, fades in the agent's starter suggestions as the same chips used inside the chat. The chat does **not** open yet. Clicking away collapses it back to the resting width. (With no suggestions, the bar just widens.)
 3. **Full chat** — the moment the visitor sends a message (typed or a suggestion), the full chat panel expands open from the input's position: a card on desktop, full-screen on mobile. The header "−" collapses back to the docked input.
 

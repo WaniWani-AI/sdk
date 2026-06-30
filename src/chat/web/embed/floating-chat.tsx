@@ -37,10 +37,10 @@ import { useRemoteEmbedConfig } from "./remote-config";
 import { useVisibilityGate } from "./use-pathname";
 
 /** Default delay before the docked input animates into view on load. */
-const DEFAULT_APPEAR_DELAY_MS = 3000;
+const DEFAULT_APPEAR_DELAY_MS = 2000;
 
 /** Beat between the bar widening and the suggestion CTAs fading in. */
-const SUGGESTIONS_REVEAL_DELAY_MS = 1200;
+const SUGGESTIONS_REVEAL_DELAY_MS = 500;
 
 export interface FloatingChatProps {
 	config: EmbedConfig;
