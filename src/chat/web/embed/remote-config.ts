@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { firePageView } from "../lib/page-view";
 import type { EmbedConfig } from "./config";
 import { resolveConfig } from "./config";
+import type { VisibilityRules } from "./visibility";
 
 // ---------------------------------------------------------------------------
 // Session cache
@@ -95,6 +96,12 @@ interface RemoteConfigResponse {
 	 * `titles-only` → `"titles-only"`.
 	 */
 	toolCallDisplay?: "full" | "titles-only" | "hidden" | null;
+	/**
+	 * Per-URL show/hide rules for the floating bar (WAN-516). Consumed by the
+	 * embed to gate the floating dock per `window.location.pathname`. `null`
+	 * (or absent) means show everywhere.
+	 */
+	visibility?: VisibilityRules | null;
 }
 
 /**
@@ -170,6 +177,9 @@ function remoteToConfigPartial(
 		out.showToolCalls = "titles-only";
 	} else if (data.toolCallDisplay === "hidden") {
 		out.showToolCalls = false;
+	}
+	if (data.visibility) {
+		out.visibility = data.visibility;
 	}
 	return out;
 }

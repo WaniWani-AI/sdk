@@ -18,6 +18,8 @@ import {
 } from "./config";
 import { FloatingChat, type FloatingChatHandle } from "./floating-chat";
 import { InlineChat, type InlineChatHandle } from "./inline-chat";
+import { loadCachedConfig } from "./remote-config";
+import { isVisibleForPath } from "./visibility";
 
 // ---------------------------------------------------------------------------
 // CSS placeholder — replaced at build time with the actual CSS string
@@ -381,6 +383,29 @@ function mountInline(
 
 	const inlineRef = React.createRef<InlineChatHandle>();
 
+	// Collapse the container (which we own, outside React) on gated pages so it
+	// shows no empty card. Pre-hide synchronously from the sessionStorage cache
+	// so repeat visits to a gated page don't flash before the fetch resolves;
+	// `onVisibilityChange` then keeps it in sync (incl. SPA route changes).
+	const toggleContainer = (vis: boolean) => {
+		if (container instanceof HTMLElement) {
+			container.style.display = vis ? "" : "none";
+		}
+	};
+	if (config.token) {
+		const cached = loadCachedConfig(
+			config.api ?? "",
+			config.token,
+			config.channelId,
+		);
+		if (
+			cached?.visibility &&
+			!isVisibleForPath(cached.visibility, window.location.pathname)
+		) {
+			toggleContainer(false);
+		}
+	}
+
 	reactRoot = ReactDOM.createRoot(mountContainer);
 	reactRoot.render(
 		React.createElement(InlineChat, {
@@ -388,6 +413,7 @@ function mountInline(
 			config,
 			programmatic,
 			scriptConfig,
+			onVisibilityChange: toggleContainer,
 		}),
 	);
 
