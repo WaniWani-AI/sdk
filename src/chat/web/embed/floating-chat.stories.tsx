@@ -101,7 +101,6 @@ interface FloatingArgs {
 	placeholder: string;
 	welcomeMessage: string;
 	suggestions: string[];
-	position: NonNullable<EmbedConfig["position"]>;
 	appearDelay: number;
 	theme: NonNullable<NonNullable<EmbedConfig["appearance"]>["theme"]>;
 }
@@ -115,7 +114,6 @@ function buildConfig(args: FloatingArgs): EmbedConfig {
 		placeholder: args.placeholder,
 		welcomeMessage: args.welcomeMessage,
 		suggestions: args.suggestions,
-		position: args.position,
 		appearDelay: args.appearDelay,
 		appearance: { theme: args.theme },
 	};
@@ -159,15 +157,10 @@ const meta: Meta<FloatingArgs> = {
 		placeholder: "What would you like to know?",
 		welcomeMessage: "Hi! Ask me anything about the product.",
 		suggestions: ["What can you do?", "How much does it cost?", "Book a demo"],
-		position: "bottom-center",
-		appearDelay: 3000,
+		appearDelay: 2000,
 		theme: "light",
 	},
 	argTypes: {
-		position: {
-			control: "inline-radio",
-			options: ["bottom-center", "bottom-right", "bottom-left"],
-		},
 		theme: {
 			control: "inline-radio",
 			options: ["light", "dark", "auto"],
@@ -182,17 +175,12 @@ export default meta;
 
 type Story = StoryObj<FloatingArgs>;
 
-/** Default: centered dock, 3s appear delay, three suggestions. */
+/** Default: centered dock, 2s appear delay, three suggestions. */
 export const Default: Story = {};
 
 /** No delay — the bar is present from first paint (still fades in). */
 export const InstantAppear: Story = {
 	args: { appearDelay: 0 },
-};
-
-/** Anchored bottom-right; the panel grows out of the right-hand input. */
-export const BottomRight: Story = {
-	args: { position: "bottom-right" },
 };
 
 /** Dark theme. */

@@ -78,10 +78,10 @@
    (`data-state="hidden"`). On exit `visibility` is delayed by the transition
    duration so the motion plays before it leaves the a11y tree + hit-testing.
 
-   Panel: expands open from the docked input's footprint via an animated
-   `clip-path` inset, biased to the dock's anchor (`data-position`) so it
-   grows out of the bar — up, left, and right. The resting clip uses a
-   negative inset so the panel's drop shadow isn't clipped away.
+   Panel: expands open from the centered docked input's footprint via an
+   animated `clip-path` inset, so it grows out of the bar — up, left, and
+   right. The resting clip uses a negative inset so the panel's drop shadow
+   isn't clipped away.
 
    The shadow host overlay is `pointer-events: none`; a shown dock/panel must
    opt back in or real clicks pass straight through to the page.
@@ -121,21 +121,13 @@
 	transition: clip-path 0.44s cubic-bezier(0.22, 1, 0.36, 1),
 		opacity 0.26s ease, visibility 0s;
 }
+/* Closed clip — a small rounded box where the centered dock input sits, so
+   the panel appears to grow out of the bar. */
 [data-waniwani-floating="panel"][data-state="hidden"] {
 	opacity: 0;
 	visibility: hidden;
 	pointer-events: none;
-}
-/* Closed clip — a small rounded box where the dock input sits, biased to the
-   anchor side so the panel appears to grow out of the bar. */
-[data-waniwani-floating="panel"][data-state="hidden"][data-position="bottom-center"] {
 	clip-path: inset(calc(100% - 60px) 28% 0 28% round 24px);
-}
-[data-waniwani-floating="panel"][data-state="hidden"][data-position="bottom-right"] {
-	clip-path: inset(calc(100% - 60px) 5% 0 60% round 24px);
-}
-[data-waniwani-floating="panel"][data-state="hidden"][data-position="bottom-left"] {
-	clip-path: inset(calc(100% - 60px) 60% 0 5% round 24px);
 }
 
 /* Mobile: the panel is a full-screen sheet — reveal it edge-to-edge (no
@@ -144,7 +136,7 @@
 	[data-waniwani-floating="panel"][data-state="shown"] {
 		clip-path: inset(0 round 0);
 	}
-	[data-waniwani-floating="panel"][data-state="hidden"][data-position] {
+	[data-waniwani-floating="panel"][data-state="hidden"] {
 		clip-path: inset(calc(100% - 72px) 6% 0 6% round 22px);
 	}
 }

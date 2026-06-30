@@ -230,7 +230,6 @@ The chat fits within whatever bound you set and scrolls internally — no need t
 | `data-locale` | No | `"en"`, `"fr"`, or `"es"`. Auto-detects from `<html lang>` / `navigator.language` when omitted |
 | `data-mode` | No | `"inline"` (default) or `"floating"` — see [Floating mode](#floating-mode) |
 | `data-height` | No | Inline only. Default container height — any CSS length (`"500px"`, `"80vh"`) or a bare number (px). Defaults to `500px` |
-| `data-position` | No | Floating only. `"bottom-center"` (default), `"bottom-right"`, or `"bottom-left"` |
 | `data-launcher-text` | No | Floating only. Overrides the docked input's placeholder. Defaults to the agent's configured input placeholder (typed out), then a localized "Ask anything…" |
 | `data-appear-delay` | No | Floating only. Milliseconds to wait after the page renders before the docked input animates in. Defaults to `2000`. `0` shows it immediately (still fades in) |
 | `data-disable-page-view` | No | `"true"` (or a bare attribute) opts out of the top-of-funnel `page.viewed` event fired once on init. Use on surfaces where a page view is noise. See [Tracked events](#event-tracking) |
@@ -251,7 +250,6 @@ Set `data-mode="floating"` for a docked, progressively-revealing chat (no `[data
   defer
   data-token="wwp_..."
   data-mode="floating"
-  data-position="bottom-center"
   data-launcher-text="Ask anything"
   data-title="Support"
   data-theme="auto"

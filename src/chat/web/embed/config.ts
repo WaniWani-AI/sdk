@@ -136,13 +136,6 @@ export interface EmbedConfig {
 	 */
 	mode?: "inline" | "floating";
 	/**
-	 * Where the floating dock (input bar) and the expanded chat panel anchor
-	 * along the bottom edge. Only applies when `mode` is `"floating"`.
-	 * Defaults to `"bottom-center"` (a centered dock).
-	 * Surfaced as `data-position`.
-	 */
-	position?: "bottom-center" | "bottom-right" | "bottom-left";
-	/**
 	 * Default height for the inline embed container. Any CSS length
 	 * (`"500px"`, `"80vh"`, …) or a bare number (treated as `px`). Applied to
 	 * the `[data-waniwani-embed]` container unless you size it yourself in
@@ -337,15 +330,6 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const modeRaw = str("data-mode");
 	if (modeRaw === "inline" || modeRaw === "floating") {
 		config.mode = modeRaw;
-	}
-
-	const positionRaw = str("data-position");
-	if (
-		positionRaw === "bottom-center" ||
-		positionRaw === "bottom-right" ||
-		positionRaw === "bottom-left"
-	) {
-		config.position = positionRaw;
 	}
 
 	const height = str("data-height");

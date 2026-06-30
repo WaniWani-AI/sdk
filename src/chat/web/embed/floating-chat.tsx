@@ -114,7 +114,6 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 
 		const preset = config.appearance?.theme;
 		const userVars = config.appearance?.variables;
-		const position = config.position ?? "bottom-center";
 		const cssVars = useMemo(
 			() => (userVars ? themeToCSSProperties(userVars) : {}),
 			[userVars],
@@ -266,21 +265,6 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			body.channelId = config.channelId;
 		}
 
-		// Anchor classes. The dock applies them at all widths; the panel only on
-		// desktop (it goes full-screen on mobile).
-		const dockAlign =
-			position === "bottom-left"
-				? "ww:left-4 ww:right-auto"
-				: position === "bottom-right"
-					? "ww:right-4 ww:left-auto"
-					: "ww:left-0 ww:right-0 ww:mx-auto";
-		const panelAlign =
-			position === "bottom-left"
-				? "ww:sm:left-4 ww:sm:right-auto"
-				: position === "bottom-right"
-					? "ww:sm:right-4 ww:sm:left-auto"
-					: "ww:sm:left-0 ww:sm:right-0 ww:sm:mx-auto";
-
 		const closeButton = (
 			<button
 				type="button"
@@ -314,10 +298,9 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 							data-state={phase === "open" ? "hidden" : "shown"}
 							data-appeared={appeared ? "true" : "false"}
 							className={cn(
-								"ww:fixed ww:bottom-4 ww:z-[2147483002] ww:flex ww:flex-col ww:gap-1",
+								"ww:fixed ww:bottom-4 ww:left-0 ww:right-0 ww:mx-auto ww:z-[2147483002] ww:flex ww:flex-col ww:gap-1",
 								"ww:w-[calc(100vw-2rem)] ww:transition-[max-width] ww:duration-300 ww:ease-out",
 								phase === "input" ? "ww:max-w-[400px]" : "ww:max-w-[560px]",
-								dockAlign,
 							)}
 						>
 							{suggestions.length > 0 && (
@@ -379,15 +362,13 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 							aria-label={config.title ?? dockPlaceholder}
 							data-waniwani-floating="panel"
 							data-state={phase === "open" ? "shown" : "hidden"}
-							data-position={position}
 							style={{ boxShadow: cardShadow }}
 							className={cn(
 								"ww:fixed ww:z-[2147483002] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
 								// Mobile: full-screen sheet.
 								"ww:inset-0 ww:w-full ww:rounded-none",
-								// Desktop: anchored card (matches the expanded dock width).
-								"ww:sm:inset-auto ww:sm:bottom-4 ww:sm:h-[640px] ww:sm:max-h-[calc(100dvh-2rem)] ww:sm:w-[calc(100vw-2rem)] ww:sm:max-w-[560px] ww:sm:rounded-2xl ww:sm:border ww:sm:border-border",
-								panelAlign,
+								// Desktop: centered card (matches the expanded dock width).
+								"ww:sm:inset-auto ww:sm:bottom-4 ww:sm:left-0 ww:sm:right-0 ww:sm:mx-auto ww:sm:h-[640px] ww:sm:max-h-[calc(100dvh-2rem)] ww:sm:w-[calc(100vw-2rem)] ww:sm:max-w-[560px] ww:sm:rounded-2xl ww:sm:border ww:sm:border-border",
 							)}
 						>
 							<ChatEmbed
