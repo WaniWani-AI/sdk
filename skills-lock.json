@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "skills": {
+    "agent-browser": {
+      "source": "WaniWani-AI/skills",
+      "sourceType": "github",
+      "skillPath": "skills/agent-browser/SKILL.md",
+      "computedHash": "8a4c03f8556fba126291bd9466145e332076d55cb7af8d1919e5ae9f30a29a09"
+    },
+    "copy": {
+      "source": "WaniWani-AI/skills",
+      "sourceType": "github",
+      "skillPath": "skills/copy/SKILL.md",
+      "computedHash": "94c6053a07fdfdbcfa1a949d2474c5fd6703faf8683ec66ba9e468b7ad380da9"
+    },
+    "deploy-prod": {
+      "source": "WaniWani-AI/skills",
+      "sourceType": "github",
+      "skillPath": "skills/deploy-prod/SKILL.md",
+      "computedHash": "22148c1bd54580968b02261c5f48b817ad1a4ea55faff402c339622393c78d02"
+    },
+    "linear-oneshot": {
+      "source": "WaniWani-AI/skills",
+      "sourceType": "github",
+      "skillPath": "skills/linear-oneshot/SKILL.md",
+      "computedHash": "2f42d412bf85faa5d56960a67c6e6a78d3352cabb554e82ecda45cf869ca8169"
+    },
+    "project-planning": {
+      "source": "WaniWani-AI/skills",
+      "sourceType": "github",
+      "skillPath": "skills/project-planning/SKILL.md",
+      "computedHash": "42893243406d485ebd1d92df0b8a96a79789396604cbf414bd8df9a6f25b1904"
+    },
+    "project-update": {
+      "source": "WaniWani-AI/skills",
+      "sourceType": "github",
+      "skillPath": "skills/project-update/SKILL.md",
+      "computedHash": "70393c9260331cfb74165bca0bfd34584837f59dc783e43c1ee72d181139a058"
+    },
+    "pull-request": {
+      "source": "WaniWani-AI/skills",
+      "sourceType": "github",
+      "skillPath": "skills/pull-request/SKILL.md",
+      "computedHash": "e81ea4346aac4fbf32f036808db2b24c0b6ca5387d6a5cd928f547fe6986f7b4"
+    },
+    "wani-code-review": {
+      "source": "WaniWani-AI/skills",
+      "sourceType": "github",
+      "skillPath": "skills/wani-code-review/SKILL.md",
+      "computedHash": "beed98ce9690b48428dcf331ee992410137ae478e02382ae8434c77a8aef5ce1"
+    }
+  }
+}

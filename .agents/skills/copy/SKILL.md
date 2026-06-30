@@ -11,6 +11,7 @@ Copy text content to the user's system clipboard.
 ## Platform Detection
 
 Detect the platform and use the appropriate command:
+
 - **macOS**: `pbcopy`
 - **Linux**: `xclip -selection clipboard` (or `xsel --clipboard`)
 
@@ -19,6 +20,7 @@ Detect the platform and use the appropriate command:
 For multi-line content, use a heredoc with the appropriate clipboard command:
 
 **macOS:**
+
 ```bash
 cat <<'EOF' | pbcopy
 Your content here
@@ -27,6 +29,7 @@ EOF
 ```
 
 **Linux:**
+
 ```bash
 cat <<'EOF' | xclip -selection clipboard
 Your content here
@@ -37,6 +40,7 @@ EOF
 ## Cross-Platform Detection
 
 Check the OS before copying:
+
 ```bash
 if [[ "$OSTYPE" == "darwin"* ]]; then
   # macOS
