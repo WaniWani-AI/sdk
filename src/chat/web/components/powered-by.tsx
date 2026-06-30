@@ -17,7 +17,7 @@ export function PoweredBy() {
 			href={HREF}
 			target="_blank"
 			rel="noopener noreferrer"
-			className="ww:flex ww:items-center ww:gap-1.5 ww:text-[11px] ww:text-muted-foreground ww:opacity-70 hover:ww:opacity-100 ww:transition-opacity"
+			className="ww:flex ww:items-center ww:gap-1.5 ww:whitespace-nowrap ww:text-[10px] ww:sm:text-[11px] ww:text-muted-foreground ww:opacity-70 hover:ww:opacity-100 ww:transition-opacity"
 		>
 			<span>{t.poweredBy.label}</span>
 			<img

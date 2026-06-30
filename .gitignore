@@ -28,3 +28,4 @@ coverage/
 .waniwani
 package-lock.json
 test-results/
+storybook-static/

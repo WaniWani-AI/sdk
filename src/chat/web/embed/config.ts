@@ -4,6 +4,7 @@
 
 import type { ChatTheme } from "../@types";
 import type { Locale } from "../i18n";
+import type { VisibilityRules } from "./visibility";
 
 /**
  * Built-in theme presets. `auto` follows the host's `prefers-color-scheme`
@@ -135,13 +136,6 @@ export interface EmbedConfig {
 	 */
 	mode?: "inline" | "floating";
 	/**
-	 * Where the floating dock (input bar) and the expanded chat panel anchor
-	 * along the bottom edge. Only applies when `mode` is `"floating"`.
-	 * Defaults to `"bottom-center"` (the rose.ai-style centered dock).
-	 * Surfaced as `data-position`.
-	 */
-	position?: "bottom-center" | "bottom-right" | "bottom-left";
-	/**
 	 * Default height for the inline embed container. Any CSS length
 	 * (`"500px"`, `"80vh"`, …) or a bare number (treated as `px`). Applied to
 	 * the `[data-waniwani-embed]` container unless you size it yourself in
@@ -156,6 +150,14 @@ export interface EmbedConfig {
 	 */
 	launcherText?: string;
 	/**
+	 * Delay in milliseconds before the floating dock animates into view after
+	 * the page renders. Letting the page settle first keeps the bar from
+	 * competing with the host's initial content. Defaults to `2000`. `0` shows
+	 * it immediately. Only applies when `mode` is `"floating"`. Surfaced as
+	 * `data-appear-delay`.
+	 */
+	appearDelay?: number;
+	/**
 	 * Opt out of the top-of-funnel `page.viewed` event the widget fires once
 	 * on mount. Leave unset (or `false`) to keep the default landing-funnel
 	 * tracking; set `true` on surfaces where a page view is meaningless and
@@ -164,6 +166,14 @@ export interface EmbedConfig {
 	 * `data-disable-page-view` on the embed script tag.
 	 */
 	disablePageView?: boolean;
+	/**
+	 * Per-URL show/hide rules for the floating bar. Comes from the remote
+	 * `/config` response (not author-set). When set, the floating dock only
+	 * renders on paths the rules resolve to `"show"`. Unset/`null` means show
+	 * on every page (default behavior). Only applies when `mode` is
+	 * `"floating"`.
+	 */
+	visibility?: VisibilityRules;
 }
 
 /** Fallback height applied to an inline embed container with no author sizing. */
@@ -322,15 +332,6 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.mode = modeRaw;
 	}
 
-	const positionRaw = str("data-position");
-	if (
-		positionRaw === "bottom-center" ||
-		positionRaw === "bottom-right" ||
-		positionRaw === "bottom-left"
-	) {
-		config.position = positionRaw;
-	}
-
 	const height = str("data-height");
 	if (height) {
 		config.height = height;
@@ -339,6 +340,14 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const launcherText = str("data-launcher-text");
 	if (launcherText) {
 		config.launcherText = launcherText;
+	}
+
+	const appearDelayRaw = str("data-appear-delay");
+	if (appearDelayRaw !== undefined) {
+		const parsed = Number.parseInt(appearDelayRaw.trim(), 10);
+		if (Number.isFinite(parsed) && parsed >= 0) {
+			config.appearDelay = parsed;
+		}
 	}
 
 	const disclaimerRaw = str("data-disclaimer");

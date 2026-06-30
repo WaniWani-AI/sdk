@@ -141,14 +141,12 @@ describe("resolveConfig — render mode", () => {
 		expect(config.mode).toBe("floating");
 	});
 
-	test("position and launcherText pass through", () => {
+	test("launcherText passes through", () => {
 		const config = resolveConfig({
 			token: "tok",
 			mode: "floating",
-			position: "bottom-left",
 			launcherText: "Chat with us",
 		});
-		expect(config.position).toBe("bottom-left");
 		expect(config.launcherText).toBe("Chat with us");
 	});
 
@@ -199,16 +197,16 @@ describe("parseConfigFromScript — render mode attrs", () => {
 		expect(cfg.mode).toBeUndefined();
 	});
 
-	test("data-position, data-height, data-launcher-text parse", async () => {
+	test("data-height, data-launcher-text, data-appear-delay parse", async () => {
 		const cfg = await parseWithAttrs({
 			"data-token": "tok",
-			"data-position": "bottom-left",
 			"data-height": "500px",
 			"data-launcher-text": "Need help?",
+			"data-appear-delay": "1500",
 		});
-		expect(cfg.position).toBe("bottom-left");
 		expect(cfg.height).toBe("500px");
 		expect(cfg.launcherText).toBe("Need help?");
+		expect(cfg.appearDelay).toBe(1500);
 	});
 });
 

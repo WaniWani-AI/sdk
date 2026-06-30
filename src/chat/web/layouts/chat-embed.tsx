@@ -494,7 +494,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 										/>
 									</div>
 								</PromptInput>
-								<div className="ww:pt-2 ww:pb-1 ww:flex ww:justify-center ww:items-center ww:gap-1.5">
+								<div className="ww:pt-2 ww:pb-1 ww:flex ww:flex-nowrap ww:justify-center ww:items-center ww:gap-1.5">
 									<PoweredBy />
 									<AiDisclaimer text={disclaimer} />
 								</div>

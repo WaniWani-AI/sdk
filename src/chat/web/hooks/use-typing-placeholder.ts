@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
-const TYPE_SPEED_MS = 50;
-const DELETE_SPEED_MS = 30;
-const PAUSE_AFTER_TYPE_MS = 2000;
+const TYPE_SPEED_MS = 80;
+const DELETE_SPEED_MS = 50;
+const PAUSE_AFTER_TYPE_MS = 15000;
 const PAUSE_AFTER_DELETE_MS = 500;
 
 /**

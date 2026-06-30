@@ -14,6 +14,7 @@ import {
 	loadCachedConfig,
 	saveCachedConfig,
 } from "../embed/remote-config";
+import { useVisibilityGate } from "../embed/use-pathname";
 import type { Locale, MessageOverrides } from "../i18n";
 import { firePageView } from "../lib/page-view";
 import { ChatEmbed } from "./chat-embed";
@@ -265,12 +266,22 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			[programmatic, remote],
 		);
 
+		// Per-URL gating. When the channel's `visibility` rules hide this path,
+		// render nothing (no leftover box) — correct for a `<WaniwaniChat>` placed
+		// in a shared layout. Held until `ready` so a hidden page never flashes;
+		// re-evaluates on SPA route changes.
+		const visible = useVisibilityGate(config.visibility, ready);
+
 		const body: Record<string, unknown> = {};
 		if (config.mcpServerUrl) {
 			body.mcpServerUrl = config.mcpServerUrl;
 		}
 		if (config.channelId) {
 			body.channelId = config.channelId;
+		}
+
+		if (!visible) {
+			return null;
 		}
 
 		return (

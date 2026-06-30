@@ -11,6 +11,7 @@ import type { ChatHandle } from "../@types";
 import { ChatEmbed } from "../layouts/chat-embed";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
+import { useVisibilityGate } from "./use-pathname";
 
 export interface InlineChatProps {
 	config: EmbedConfig;
@@ -18,6 +19,13 @@ export interface InlineChatProps {
 	/** Pre-parsed `data-*` snapshot. */
 	scriptConfig?: Partial<EmbedConfig>;
 	onReady?: () => void;
+	/**
+	 * Called whenever per-URL `visibility` gating flips. `embed.ts` uses it to
+	 * collapse the `[data-waniwani-embed]` container (which it owns, outside
+	 * React) so a gated page shows no empty card. The chat stays mounted while
+	 * hidden, so conversation state survives an SPA route change away and back.
+	 */
+	onVisibilityChange?: (visible: boolean) => void;
 }
 
 export interface InlineChatHandle {
@@ -26,7 +34,13 @@ export interface InlineChatHandle {
 
 export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 	function InlineChat(
-		{ config: initialConfig, programmatic, scriptConfig, onReady },
+		{
+			config: initialConfig,
+			programmatic,
+			scriptConfig,
+			onReady,
+			onVisibilityChange,
+		},
 		ref,
 	) {
 		const { config, ready } = useRemoteEmbedConfig(
@@ -41,6 +55,14 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		useEffect(() => {
 			onReady?.();
 		}, []);
+
+		// Per-URL gating. Report the decision up to `embed.ts`, which collapses
+		// the container so a gated page shows no empty card. Re-runs on SPA route
+		// changes (via `usePathname` inside the hook).
+		const visible = useVisibilityGate(config.visibility, ready);
+		useEffect(() => {
+			onVisibilityChange?.(visible);
+		}, [visible, onVisibilityChange]);
 
 		useImperativeHandle(
 			ref,

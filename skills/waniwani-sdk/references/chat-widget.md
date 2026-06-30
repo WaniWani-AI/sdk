@@ -160,7 +160,7 @@ Self-contained IIFE bundle with React bundled. Drop a `<script>` tag on any webs
 Two render modes, chosen with `data-mode`:
 
 - **`inline`** (default) — mounts the chat into a `[data-waniwani-embed]` element. **You don't have to add that element** — if the page has none, the embed creates one and inserts it immediately in front of the `<script>` tag, so the bare snippet works as-is. A container the embed creates is presented as a **centered, rounded card** (≈448px wide, 500px tall, with a subtle border + shadow); a container **you** place keeps its own layout (full width unless you size it). See [Sizing the inline embed](#sizing-the-inline-embed).
-- **`floating`** — docks a thin chat input at the bottom of the screen that reveals starter suggestions on idle, then slides the full chat up from the bottom on the first message (card on desktop, full-screen on mobile). No marker element needed. See [Floating mode](#floating-mode).
+- **`floating`** — docks a thin chat input at the bottom of the screen; clicking it widens the bar and reveals starter suggestions, then the full chat expands open from the input on the first message (card on desktop, full-screen on mobile). No marker element needed. See [Floating mode](#floating-mode).
 
 ### Prerequisites
 
@@ -230,8 +230,8 @@ The chat fits within whatever bound you set and scrolls internally — no need t
 | `data-locale` | No | `"en"`, `"fr"`, or `"es"`. Auto-detects from `<html lang>` / `navigator.language` when omitted |
 | `data-mode` | No | `"inline"` (default) or `"floating"` — see [Floating mode](#floating-mode) |
 | `data-height` | No | Inline only. Default container height — any CSS length (`"500px"`, `"80vh"`) or a bare number (px). Defaults to `500px` |
-| `data-position` | No | Floating only. `"bottom-center"` (default), `"bottom-right"`, or `"bottom-left"` |
 | `data-launcher-text` | No | Floating only. Overrides the docked input's placeholder. Defaults to the agent's configured input placeholder (typed out), then a localized "Ask anything…" |
+| `data-appear-delay` | No | Floating only. Milliseconds to wait after the page renders before the docked input animates in. Defaults to `2000`. `0` shows it immediately (still fades in) |
 | `data-disable-page-view` | No | `"true"` (or a bare attribute) opts out of the top-of-funnel `page.viewed` event fired once on init. Use on surfaces where a page view is noise. See [Tracked events](#event-tracking) |
 
 For finer-grained colour, radius, or font overrides, set CSS variables on the container — see [Theming the chat widget](#theming-the-chat-widget).
@@ -240,9 +240,9 @@ For finer-grained colour, radius, or font overrides, set CSS variables on the co
 
 Set `data-mode="floating"` for a docked, progressively-revealing chat (no `[data-waniwani-embed]` element needed — the surface is appended to `<body>` and overlays the page without blocking it). It has three states:
 
-1. **Docked input** — on load, only a thin input bar sits at the bottom of the screen (not a launcher button). The page stays fully usable.
-2. **Suggestions** — after a short idle delay it auto-expands to show the agent's starter suggestions as tappable CTAs above the input, with a "−" to collapse. (Skipped when the agent has no suggestions.)
-3. **Full chat** — the moment the visitor sends a message (typed or a suggestion), the full chat panel slides up from the bottom: a card on desktop, full-screen on mobile. The header "−" collapses back to the docked input.
+1. **Docked input** — after `data-appear-delay` (default 2s, so the page settles first) a thin input bar animates in at the bottom of the screen (not a launcher button). It mirrors the in-chat composer: a soft-rounded card, no decorative icon. The page stays fully usable.
+2. **Expanded** — clicking/focusing the bar widens it and, a beat later, fades in the agent's starter suggestions as the same chips used inside the chat. The chat does **not** open yet. Clicking away collapses it back to the resting width. (With no suggestions, the bar just widens.)
+3. **Full chat** — the moment the visitor sends a message (typed or a suggestion), the full chat panel expands open from the input's position: a card on desktop, full-screen on mobile. The header "−" collapses back to the docked input.
 
 ```html
 <script
@@ -250,7 +250,6 @@ Set `data-mode="floating"` for a docked, progressively-revealing chat (no `[data
   defer
   data-token="wwp_..."
   data-mode="floating"
-  data-position="bottom-center"
   data-launcher-text="Ask anything"
   data-title="Support"
   data-theme="auto"
@@ -321,6 +320,18 @@ On mount the widget (both React and script) fetches `GET {api}/config` with the 
 | `systemPrompt`, `maxSteps` — applied at inference, never leak to the browser | `title`, `welcomeMessage`, `placeholder`, `suggestions` — sent to the widget |
 
 Merge order (later wins): **defaults < remote config < `data-*` attrs < programmatic options**. The dashboard value is the default; data-attrs / props still override per-page if you need a local tweak.
+
+### Per-URL visibility (advanced)
+
+By default a chat surface shows on every page it's loaded on. For surfaces dropped into a site-wide template (the floating bar, an inline embed, or `<WaniwaniChat>` in a shared layout), you can restrict where they appear with per-channel show/hide rules configured in the dashboard.
+
+The rules match against `window.location.pathname`:
+
+- **Default action** — show everywhere and hide on a few paths, or hide everywhere and allowlist a few.
+- **Patterns** — `*` matches within one path segment (`/docs/*` matches `/docs/intro`, not `/docs/a/b`); `**` matches across segments (`/docs/**` matches everything under `/docs/`). Anything else is matched literally.
+- **Precedence** — when several patterns match, the last one in the list wins.
+
+This applies to **every** chat surface: floating, inline, and React. Rules are evaluated before the chat paints (no flash) and re-checked on client-side route changes, so they work on single-page apps. It's configured per channel in the dashboard — there is no script-tag attribute or prop for it. A channel with no rules shows everywhere.
 
 ## Shared building blocks
 
