@@ -139,11 +139,21 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// animate in. `appearDelay: 0` shows it on the next tick (still a
 		// transition, so it fades/slides rather than popping). The CTAs are no
 		// longer auto-surfaced — the visitor reveals them by clicking the bar.
+		//
+		// Gated on `visible` so the entrance replays per appearance: a page the
+		// channel's `visibility` rules hide keeps `appeared` false, and when the
+		// visitor navigates (SPA route change) to a page that shows the dock, the
+		// delay runs again and the bar slides in — rather than popping in already
+		// "appeared" from an earlier page.
 		useEffect(() => {
+			if (!visible) {
+				setAppeared(false);
+				return;
+			}
 			const delay = config.appearDelay ?? DEFAULT_APPEAR_DELAY_MS;
 			const id = setTimeout(() => setAppeared(true), Math.max(0, delay));
 			return () => clearTimeout(id);
-		}, [config.appearDelay]);
+		}, [visible, config.appearDelay]);
 
 		// Focus the chat input after the panel has opened. Runs post-commit, so
 		// the (previously hidden) textarea is in layout and can take focus.
