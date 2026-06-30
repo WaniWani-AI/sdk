@@ -26,6 +26,7 @@ import {
 	useState,
 } from "react";
 import type { ChatHandle } from "../@types";
+import BorderGlow from "../components/border-glow";
 import { Suggestions } from "../components/suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
@@ -298,9 +299,9 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 							data-state={phase === "open" ? "hidden" : "shown"}
 							data-appeared={appeared ? "true" : "false"}
 							className={cn(
-								"ww:fixed ww:bottom-4 ww:left-0 ww:right-0 ww:mx-auto ww:z-[2147483002] ww:flex ww:flex-col ww:gap-1",
+								"ww:fixed ww:bottom-3 ww:sm:bottom-4 ww:left-0 ww:right-0 ww:mx-auto ww:z-[2147483002] ww:flex ww:flex-col ww:gap-1",
 								"ww:w-[calc(100vw-2rem)] ww:transition-[max-width] ww:duration-300 ww:ease-out",
-								phase === "input" ? "ww:max-w-[400px]" : "ww:max-w-[560px]",
+								phase === "input" ? "ww:max-w-[440px]" : "ww:max-w-[720px]",
 							)}
 						>
 							{suggestions.length > 0 && (
@@ -321,37 +322,50 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 								</div>
 							)}
 
-							{/* Mirrors the in-chat composer: soft-rounded card on the
-							    themeable input surface, no decorative icon. */}
-							<div
+							{/* Composer wrapped in the ReactBits border glow. Background +
+							    radius are themed to match the input surface; the glow plays
+							    a one-off sweep on appear. */}
+							<BorderGlow
+								animated={appeared}
+								backgroundColor="var(--ww-color-input)"
+								borderRadius={16}
+								edgeSensitivity={30}
+								coneSpread={25}
+								colors={["#c084fc", "#f472b6", "#38bdf8"]}
+								className="ww:border-border"
 								style={{ boxShadow: cardShadow }}
-								className="ww:flex ww:items-center ww:gap-1 ww:rounded-2xl ww:border ww:border-border ww:bg-input ww:pl-4 ww:pr-2 ww:py-2"
 							>
-								<input
-									ref={composerInputRef}
-									type="text"
-									value={composerText}
-									placeholder={animatedDockPlaceholder}
-									onChange={(e) => setComposerText(e.target.value)}
-									onFocus={onComposerFocus}
-									onKeyDown={(e) => {
-										if (e.key === "Enter" && !e.shiftKey) {
-											e.preventDefault();
-											submitComposer();
-										}
-									}}
-									className="ww:min-w-0 ww:flex-1 ww:bg-transparent ww:py-1 ww:text-base ww:sm:text-sm ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground"
-								/>
-								<button
-									type="button"
-									onClick={submitComposer}
-									disabled={!composerText.trim()}
-									aria-label={t.promptInput.submit}
-									className="ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:bg-foreground ww:text-background ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40"
-								>
-									<ArrowUp className="ww:size-4" />
-								</button>
-							</div>
+								<div className="ww:flex ww:items-center ww:gap-1 ww:pl-3.5 ww:pr-1.5 ww:py-1.5 ww:sm:pl-4 ww:sm:pr-2 ww:sm:py-2">
+									{/* `text-base` (16px) on mobile is load-bearing: iOS Safari
+									    auto-zooms a focused input under 16px. `sm:text-sm`
+									    restores the smaller text where the zoom rule doesn't
+									    apply. Do not drop the 16px mobile size. */}
+									<input
+										ref={composerInputRef}
+										type="text"
+										value={composerText}
+										placeholder={animatedDockPlaceholder}
+										onChange={(e) => setComposerText(e.target.value)}
+										onFocus={onComposerFocus}
+										onKeyDown={(e) => {
+											if (e.key === "Enter" && !e.shiftKey) {
+												e.preventDefault();
+												submitComposer();
+											}
+										}}
+										className="ww:min-w-0 ww:flex-1 ww:bg-transparent ww:py-1 ww:text-base ww:sm:text-sm ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground"
+									/>
+									<button
+										type="button"
+										onClick={submitComposer}
+										disabled={!composerText.trim()}
+										aria-label={t.promptInput.submit}
+										className="ww:relative ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:bg-foreground ww:text-background ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40"
+									>
+										<ArrowUp className="ww:size-4" />
+									</button>
+								</div>
+							</BorderGlow>
 						</div>
 
 						{/* Full chat panel — expands open from the docked input's
@@ -367,8 +381,11 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 								"ww:fixed ww:z-[2147483002] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
 								// Mobile: full-screen sheet.
 								"ww:inset-0 ww:w-full ww:rounded-none",
-								// Desktop: centered card (matches the expanded dock width).
-								"ww:sm:inset-auto ww:sm:bottom-4 ww:sm:left-0 ww:sm:right-0 ww:sm:mx-auto ww:sm:h-[640px] ww:sm:max-h-[calc(100dvh-2rem)] ww:sm:w-[calc(100vw-2rem)] ww:sm:max-w-[560px] ww:sm:rounded-2xl ww:sm:border ww:sm:border-border",
+								// Desktop: wide ChatGPT-style card. Message content + input both
+								// stay capped at max-w-3xl and centered, so they share one
+								// column (good input/text ratio) and the extra panel width
+								// reads as balanced side padding — not a narrow Intercom panel.
+								"ww:sm:inset-auto ww:sm:bottom-4 ww:sm:left-0 ww:sm:right-0 ww:sm:mx-auto ww:sm:h-[720px] ww:sm:max-h-[calc(100dvh-2rem)] ww:sm:w-[calc(100vw-2rem)] ww:sm:max-w-[1000px] ww:sm:rounded-2xl ww:sm:border ww:sm:border-border",
 							)}
 						>
 							<ChatEmbed

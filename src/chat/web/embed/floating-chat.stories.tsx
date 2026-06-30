@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { INITIAL_VIEWPORTS } from "storybook/viewport";
 import type { EmbedConfig } from "./config";
 import { FloatingChat } from "./floating-chat";
 
@@ -169,6 +170,11 @@ const meta: Meta<FloatingArgs> = {
 			control: { type: "number", min: 0, step: 250 },
 		},
 	},
+	// Expose the device presets in the toolbar so any story can be checked at
+	// phone widths (the panel goes full-screen below 640px).
+	parameters: {
+		viewport: { options: INITIAL_VIEWPORTS },
+	},
 };
 
 export default meta;
@@ -176,7 +182,11 @@ export default meta;
 type Story = StoryObj<FloatingArgs>;
 
 /** Default: centered dock, 2s appear delay, three suggestions. */
-export const Default: Story = {};
+export const Default: Story = {
+	args: {
+		placeholder: "WASSUP",
+	},
+};
 
 /** No delay — the bar is present from first paint (still fades in). */
 export const InstantAppear: Story = {
@@ -191,4 +201,13 @@ export const DarkTheme: Story = {
 /** No suggestions — clicking the bar just widens it; the chat opens on send. */
 export const NoSuggestions: Story = {
 	args: { suggestions: [] },
+};
+
+/**
+ * Phone viewport: the dock is fluid (full width minus margins) and the open
+ * panel becomes a full-screen sheet (the `max-width:639px` branch). Switch the
+ * toolbar viewport to any device to check other stories at phone widths too.
+ */
+export const Mobile: Story = {
+	globals: { viewport: { value: "mobile2", isRotated: false } },
 };

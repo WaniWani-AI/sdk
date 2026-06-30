@@ -7,6 +7,10 @@ import type { StorybookConfig } from "@storybook/react-vite";
 const config: StorybookConfig = {
 	stories: ["../src/**/*.stories.@(ts|tsx)"],
 	framework: { name: "@storybook/react-vite", options: {} },
+	// Disable react-docgen: its separate Babel pass chokes on some component
+	// syntax that tsc/Vite handle fine (surfacing as a dev transform error),
+	// and this playground doesn't need auto-generated prop tables.
+	typescript: { reactDocgen: false },
 	// Tailwind v4 with the same `ww` prefix the chat widget uses, so stories
 	// render with the real utility classes from `src/chat/web/tailwind.css`.
 	async viteFinal(viteConfig) {

@@ -14,7 +14,7 @@ export function AiDisclaimer({ text }: { text?: string | false }) {
 		return null;
 	}
 	return (
-		<span className="ww:text-[11px] ww:text-muted-foreground ww:opacity-70">
+		<span className="ww:whitespace-nowrap ww:text-[10px] ww:sm:text-[11px] ww:text-muted-foreground ww:opacity-70">
 			{text || t.aiDisclaimer.default}
 		</span>
 	);
