@@ -72,42 +72,91 @@
 	--font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-/* ─── Floating embed: dock ⇄ panel enter/exit ──────────────────────────
-   The docked input and the expanded chat panel cross-fade + slide. On exit
-   `visibility` is delayed by the transition duration so the fade/slide can
-   play before the element leaves the a11y tree + hit-testing; on enter it
-   flips immediately so the motion is visible. Transform/opacity are driven
-   here (not via utilities) so the two states animate symmetrically.
+/* ─── Floating embed: dock entrance + panel expand ─────────────────────
+   Dock: held off-screen until `data-appeared="true"` (the appear delay),
+   then fades/slides up into view. Slides back down while the panel is open
+   (`data-state="hidden"`). On exit `visibility` is delayed by the transition
+   duration so the motion plays before it leaves the a11y tree + hit-testing.
+
+   Panel: expands open from the docked input's footprint via an animated
+   `clip-path` inset, biased to the dock's anchor (`data-position`) so it
+   grows out of the bar — up, left, and right. The resting clip uses a
+   negative inset so the panel's drop shadow isn't clipped away.
+
+   The shadow host overlay is `pointer-events: none`; a shown dock/panel must
+   opt back in or real clicks pass straight through to the page.
    ───────────────────────────────────────────────────────────────────── */
-[data-waniwani-floating] {
-	transition: opacity 0.28s ease, transform 0.28s ease,
-		visibility 0s linear 0.28s;
+[data-waniwani-floating="dock"] {
+	transition: opacity 0.32s ease,
+		transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.3s ease,
+		visibility 0s linear 0.42s;
 }
-[data-waniwani-floating][data-state="shown"] {
+[data-waniwani-floating="dock"][data-appeared="true"][data-state="shown"] {
 	visibility: visible;
 	opacity: 1;
 	transform: translateY(0);
-	/* The shadow host overlay is `pointer-events: none`; the shown dock/panel
-	   must opt back in or real clicks pass straight through to the page. */
 	pointer-events: auto;
-	transition: opacity 0.28s ease, transform 0.28s ease, visibility 0s;
+	transition: opacity 0.32s ease,
+		transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.3s ease,
+		visibility 0s;
 }
-[data-waniwani-floating][data-state="hidden"] {
+/* Not yet appeared, or hidden because the panel took over. */
+[data-waniwani-floating="dock"][data-appeared="false"],
+[data-waniwani-floating="dock"][data-state="hidden"] {
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+	transform: translateY(1rem);
+}
+
+[data-waniwani-floating="panel"] {
+	transition: clip-path 0.44s cubic-bezier(0.22, 1, 0.36, 1),
+		opacity 0.26s ease, visibility 0s linear 0.44s;
+}
+[data-waniwani-floating="panel"][data-state="shown"] {
+	visibility: visible;
+	opacity: 1;
+	pointer-events: auto;
+	clip-path: inset(-40px round 18px);
+	transition: clip-path 0.44s cubic-bezier(0.22, 1, 0.36, 1),
+		opacity 0.26s ease, visibility 0s;
+}
+[data-waniwani-floating="panel"][data-state="hidden"] {
 	opacity: 0;
 	visibility: hidden;
 	pointer-events: none;
 }
-[data-waniwani-floating="dock"][data-state="hidden"] {
-	transform: translateY(0.5rem);
+/* Closed clip — a small rounded box where the dock input sits, biased to the
+   anchor side so the panel appears to grow out of the bar. */
+[data-waniwani-floating="panel"][data-state="hidden"][data-position="bottom-center"] {
+	clip-path: inset(calc(100% - 60px) 28% 0 28% round 24px);
 }
-[data-waniwani-floating="panel"][data-state="hidden"] {
-	transform: translateY(2rem);
+[data-waniwani-floating="panel"][data-state="hidden"][data-position="bottom-right"] {
+	clip-path: inset(calc(100% - 60px) 5% 0 60% round 24px);
 }
-@media (prefers-reduced-motion: reduce) {
-	[data-waniwani-floating] {
-		transition: visibility 0s linear 0.01s;
+[data-waniwani-floating="panel"][data-state="hidden"][data-position="bottom-left"] {
+	clip-path: inset(calc(100% - 60px) 60% 0 5% round 24px);
+}
+
+/* Mobile: the panel is a full-screen sheet — reveal it edge-to-edge (no
+   rounding) from a centered strip near the bottom where the dock spans. */
+@media (max-width: 639px) {
+	[data-waniwani-floating="panel"][data-state="shown"] {
+		clip-path: inset(0 round 0);
 	}
-	[data-waniwani-floating][data-state="shown"] {
+	[data-waniwani-floating="panel"][data-state="hidden"][data-position] {
+		clip-path: inset(calc(100% - 72px) 6% 0 6% round 22px);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-waniwani-floating="dock"],
+	[data-waniwani-floating="panel"] {
+		transition: visibility 0s linear 0.01s;
+		clip-path: none;
+	}
+	[data-waniwani-floating="dock"][data-appeared="true"][data-state="shown"],
+	[data-waniwani-floating="panel"][data-state="shown"] {
 		transition: visibility 0s;
 	}
 }

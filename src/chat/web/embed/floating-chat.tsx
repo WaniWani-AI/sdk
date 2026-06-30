@@ -1,11 +1,13 @@
 // ============================================================================
 // FloatingChat — the `mode: "floating"` embed surface.
 //
-// On load it shows only a thin **docked input** at the bottom of the screen —
-// not a launcher button. After a short delay it auto-expands to reveal the
-// agent's starter suggestions (CTAs) above the input, with a collapse control.
-// As soon as the visitor sends their first message (typed or a suggestion),
-// the full chat panel slides up from the bottom.
+// After a short appear delay (so the host page settles first) a thin **docked
+// input** animates into view at the bottom of the screen — not a launcher
+// button. The input mirrors the in-chat composer: a soft-rounded card, no
+// decorative icon. Clicking/focusing it widens the bar and reveals the agent's
+// starter suggestions (CTAs) above it — without opening the chat yet. As soon
+// as the visitor sends their first message (typed or a suggestion), the full
+// chat panel expands open from the input's position.
 //
 // The chat itself (`ChatEmbed`) is mounted eagerly but kept hidden until the
 // panel opens, so the docked input can hand off the first message to it and
@@ -13,7 +15,7 @@
 // ============================================================================
 
 import type { UIMessage } from "ai";
-import { ArrowRight, ArrowUp, Minus, Sparkles } from "lucide-react";
+import { ArrowUp, Minus } from "lucide-react";
 import {
 	forwardRef,
 	useCallback,
@@ -24,6 +26,7 @@ import {
 	useState,
 } from "react";
 import type { ChatHandle } from "../@types";
+import { Suggestions } from "../components/suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
@@ -33,8 +36,11 @@ import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { useVisibilityGate } from "./use-pathname";
 
-/** Idle delay before the dock auto-expands to show suggestion CTAs. */
-const AUTO_EXPAND_DELAY_MS = 3500;
+/** Default delay before the docked input animates into view on load. */
+const DEFAULT_APPEAR_DELAY_MS = 3000;
+
+/** Beat between the bar widening and the suggestion CTAs fading in. */
+const SUGGESTIONS_REVEAL_DELAY_MS = 1200;
 
 export interface FloatingChatProps {
 	config: EmbedConfig;
@@ -92,10 +98,14 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 
 		const chatRef = useRef<ChatHandle>(null);
 		const composerInputRef = useRef<HTMLInputElement>(null);
+		const dockRef = useRef<HTMLDivElement>(null);
 		const [phase, setPhase] = useState<Phase>("input");
 		const [composerText, setComposerText] = useState("");
-		// Once the visitor touches the dock we stop the idle auto-expand.
-		const interactedRef = useRef(false);
+		// Gates the dock's entrance: it stays out of view until the appear
+		// delay elapses, then animates in (see the `data-appeared` CSS).
+		const [appeared, setAppeared] = useState(false);
+		// The CTAs fade in a beat after the bar widens, so the widen reads first.
+		const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 		// Bumped to request focusing the chat input once the panel has opened.
 		// A textarea inside a still-hidden panel can't take focus, and React
 		// commits the open state after our handlers return, so we focus from an
@@ -125,25 +135,15 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// panel — matches the inline embed's default (themeable via --ww-shadow).
 		const cardShadow = "var(--ww-shadow, 0 10px 30px rgba(0, 0, 0, 0.08))";
 
-		// Auto-expand to surface the CTAs once, after an idle delay — only if
-		// there are suggestions, the visitor hasn't engaged, and there's no
-		// conversation. Persisted thread history loads from IndexedDB in well
-		// under this delay, so by the time the timer fires `messages` already
-		// reflects a returning visitor's thread.
+		// Hold the dock back until the host page has settled, then let it
+		// animate in. `appearDelay: 0` shows it on the next tick (still a
+		// transition, so it fades/slides rather than popping). The CTAs are no
+		// longer auto-surfaced — the visitor reveals them by clicking the bar.
 		useEffect(() => {
-			if (suggestions.length === 0) {
-				return;
-			}
-			const id = setTimeout(() => {
-				if (
-					!interactedRef.current &&
-					(chatRef.current?.messages.length ?? 0) === 0
-				) {
-					setPhase((p) => (p === "input" ? "expanded" : p));
-				}
-			}, AUTO_EXPAND_DELAY_MS);
+			const delay = config.appearDelay ?? DEFAULT_APPEAR_DELAY_MS;
+			const id = setTimeout(() => setAppeared(true), Math.max(0, delay));
 			return () => clearTimeout(id);
-		}, [suggestions.length]);
+		}, [config.appearDelay]);
 
 		// Focus the chat input after the panel has opened. Runs post-commit, so
 		// the (previously hidden) textarea is in layout and can take focus.
@@ -154,18 +154,45 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			}
 		}, [focusNonce, phase]);
 
-		// Any explicit engagement — open, close, collapse, toggle, focus, send —
-		// stops the idle auto-expand. Otherwise a pending timer could re-surface
-		// the starter CTAs after the visitor has already dismissed them (e.g.
-		// collapsing the tray, or `open()`/`close()` without sending).
 		const openPanel = useCallback(() => {
-			interactedRef.current = true;
 			setPhase("open");
 		}, []);
+		// Collapse back to the resting (narrow) input, dropping the CTAs.
 		const collapse = useCallback(() => {
-			interactedRef.current = true;
 			setPhase("input");
 		}, []);
+
+		// Reveal the CTAs a beat after the bar has widened. Reset whenever we
+		// leave the expanded phase so re-expanding replays the staggered entrance.
+		useEffect(() => {
+			if (phase !== "expanded") {
+				setSuggestionsVisible(false);
+				return;
+			}
+			const id = setTimeout(
+				() => setSuggestionsVisible(true),
+				SUGGESTIONS_REVEAL_DELAY_MS,
+			);
+			return () => clearTimeout(id);
+		}, [phase]);
+
+		// Click-away from an expanded (but not-yet-open) bar collapses it back to
+		// the resting width. `composedPath()` so the hit-test works through the
+		// embed's shadow root, where `event.target` is retargeted to the host.
+		useEffect(() => {
+			if (phase !== "expanded") {
+				return;
+			}
+			const onPointerDown = (event: Event) => {
+				const dock = dockRef.current;
+				if (dock && !event.composedPath().includes(dock)) {
+					collapse();
+				}
+			};
+			document.addEventListener("pointerdown", onPointerDown, true);
+			return () =>
+				document.removeEventListener("pointerdown", onPointerDown, true);
+		}, [phase, collapse]);
 
 		const openWith = useCallback(
 			(text: string) => {
@@ -184,7 +211,6 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				open: () => openPanel(),
 				close: () => collapse(),
 				toggle: () => {
-					interactedRef.current = true;
 					setPhase((p) => (p === "open" ? "input" : "open"));
 				},
 				sendMessage: (text: string) => openWith(text),
@@ -218,7 +244,6 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		}, [composerText, openWith]);
 
 		const onComposerFocus = useCallback(() => {
-			interactedRef.current = true;
 			// Once a conversation exists, the visitor has history they can't see
 			// while minimized — refocusing the dock reopens the full chat rather
 			// than re-offering the starter CTAs. Focusing the chat input happens
@@ -226,10 +251,12 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			if ((chatRef.current?.messages.length ?? 0) > 0) {
 				setPhase("open");
 				setFocusNonce((n) => n + 1);
-			} else if (suggestions.length > 0) {
+			} else {
+				// First focus with no conversation: widen the bar (and reveal the
+				// CTAs, if any) — but stay docked. The chat only opens on send.
 				setPhase((p) => (p === "input" ? "expanded" : p));
 			}
-		}, [suggestions.length]);
+		}, []);
 
 		const body: Record<string, unknown> = {};
 		if (config.mcpServerUrl) {
@@ -279,55 +306,44 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			>
 				{visible && (
 					<>
-						{/* Docked composer — the only thing visible on load. */}
+						{/* Docked composer — animates in after the appear delay. Narrow
+						    at rest; widens (and reveals the CTAs) once clicked. */}
 						<div
+							ref={dockRef}
 							data-waniwani-floating="dock"
 							data-state={phase === "open" ? "hidden" : "shown"}
+							data-appeared={appeared ? "true" : "false"}
 							className={cn(
-								"ww:fixed ww:bottom-4 ww:z-[2147483002] ww:flex ww:flex-col ww:gap-2",
-								"ww:w-[calc(100vw-2rem)] ww:max-w-[480px]",
+								"ww:fixed ww:bottom-4 ww:z-[2147483002] ww:flex ww:flex-col ww:gap-1",
+								"ww:w-[calc(100vw-2rem)] ww:transition-[max-width] ww:duration-300 ww:ease-out",
+								phase === "input" ? "ww:max-w-[400px]" : "ww:max-w-[560px]",
 								dockAlign,
 							)}
 						>
 							{suggestions.length > 0 && (
 								<div
 									className={cn(
-										"ww:flex ww:flex-col ww:gap-2 ww:origin-bottom ww:transition-all ww:duration-300 ww:ease-out",
-										phase === "expanded"
+										"ww:origin-bottom ww:transition-all ww:duration-300 ww:ease-out",
+										suggestionsVisible
 											? "ww:max-h-96 ww:translate-y-0 ww:opacity-100"
 											: "ww:pointer-events-none ww:max-h-0 ww:translate-y-2 ww:overflow-hidden ww:opacity-0",
 									)}
 								>
-									<div className="ww:flex ww:justify-end">
-										<button
-											type="button"
-											onClick={collapse}
-											aria-label={t.launcher.minimize}
-											className="ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-full ww:bg-background/80 ww:text-muted-foreground ww:shadow ww:backdrop-blur ww:transition-colors hover:ww:text-foreground"
-										>
-											<Minus className="ww:size-4" />
-										</button>
-									</div>
-									{suggestions.map((s) => (
-										<button
-											key={s}
-											type="button"
-											onClick={() => openWith(s)}
-											style={{ boxShadow: cardShadow }}
-											className="ww:flex ww:items-center ww:justify-between ww:gap-3 ww:rounded-full ww:bg-background ww:px-5 ww:py-3 ww:text-left ww:text-sm ww:font-medium ww:text-foreground ww:transition-colors hover:ww:bg-accent"
-										>
-											<span className="ww:truncate">{s}</span>
-											<ArrowRight className="ww:size-4 ww:shrink-0 ww:opacity-50" />
-										</button>
-									))}
+									{/* Same chips as the in-chat composer (card parity). */}
+									<Suggestions
+										suggestions={suggestions}
+										onSelect={openWith}
+										className="ww:px-1 ww:pb-1.5 ww:pt-0"
+									/>
 								</div>
 							)}
 
+							{/* Mirrors the in-chat composer: soft-rounded card on the
+							    themeable input surface, no decorative icon. */}
 							<div
 								style={{ boxShadow: cardShadow }}
-								className="ww:flex ww:items-center ww:gap-2 ww:rounded-full ww:border ww:border-border ww:bg-background ww:px-4 ww:py-2.5"
+								className="ww:flex ww:items-center ww:gap-1 ww:rounded-2xl ww:border ww:border-border ww:bg-input ww:pl-4 ww:pr-2 ww:py-2"
 							>
-								<Sparkles className="ww:size-4 ww:shrink-0 ww:text-muted-foreground" />
 								<input
 									ref={composerInputRef}
 									type="text"
@@ -341,7 +357,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 											submitComposer();
 										}
 									}}
-									className="ww:min-w-0 ww:flex-1 ww:bg-transparent ww:text-sm ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground"
+									className="ww:min-w-0 ww:flex-1 ww:bg-transparent ww:py-1 ww:text-base ww:sm:text-sm ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground"
 								/>
 								<button
 									type="button"
@@ -355,20 +371,22 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 							</div>
 						</div>
 
-						{/* Full chat panel — slides up from the bottom on first message.
-				    Same width as the dock so opening is a clean vertical grow. */}
+						{/* Full chat panel — expands open from the docked input's
+				    position (clip-path, see tailwind.css). Same desktop width
+				    as the expanded dock so the growth reads as one motion. */}
 						<div
 							role="dialog"
 							aria-label={config.title ?? dockPlaceholder}
 							data-waniwani-floating="panel"
 							data-state={phase === "open" ? "shown" : "hidden"}
+							data-position={position}
 							style={{ boxShadow: cardShadow }}
 							className={cn(
 								"ww:fixed ww:z-[2147483002] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
 								// Mobile: full-screen sheet.
 								"ww:inset-0 ww:w-full ww:rounded-none",
-								// Desktop: anchored card (matches the dock's 480px width).
-								"ww:sm:inset-auto ww:sm:bottom-4 ww:sm:h-[640px] ww:sm:max-h-[calc(100dvh-2rem)] ww:sm:w-[calc(100vw-2rem)] ww:sm:max-w-[480px] ww:sm:rounded-2xl ww:sm:border ww:sm:border-border",
+								// Desktop: anchored card (matches the expanded dock width).
+								"ww:sm:inset-auto ww:sm:bottom-4 ww:sm:h-[640px] ww:sm:max-h-[calc(100dvh-2rem)] ww:sm:w-[calc(100vw-2rem)] ww:sm:max-w-[560px] ww:sm:rounded-2xl ww:sm:border ww:sm:border-border",
 								panelAlign,
 							)}
 						>

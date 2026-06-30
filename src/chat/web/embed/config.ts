@@ -157,6 +157,14 @@ export interface EmbedConfig {
 	 */
 	launcherText?: string;
 	/**
+	 * Delay in milliseconds before the floating dock animates into view after
+	 * the page renders. Letting the page settle first keeps the bar from
+	 * competing with the host's initial content. Defaults to `3000`. `0` shows
+	 * it immediately. Only applies when `mode` is `"floating"`. Surfaced as
+	 * `data-appear-delay`.
+	 */
+	appearDelay?: number;
+	/**
 	 * Opt out of the top-of-funnel `page.viewed` event the widget fires once
 	 * on mount. Leave unset (or `false`) to keep the default landing-funnel
 	 * tracking; set `true` on surfaces where a page view is meaningless and
@@ -348,6 +356,14 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const launcherText = str("data-launcher-text");
 	if (launcherText) {
 		config.launcherText = launcherText;
+	}
+
+	const appearDelayRaw = str("data-appear-delay");
+	if (appearDelayRaw !== undefined) {
+		const parsed = Number.parseInt(appearDelayRaw.trim(), 10);
+		if (Number.isFinite(parsed) && parsed >= 0) {
+			config.appearDelay = parsed;
+		}
 	}
 
 	const disclaimerRaw = str("data-disclaimer");
