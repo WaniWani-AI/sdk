@@ -10,15 +10,35 @@
 // intentionally tiny — see `globToRegExp`.
 // ============================================================================
 
+/** One glob → action mapping evaluated against `window.location.pathname`. */
+export interface VisibilityPattern {
+	glob: string;
+	action: "show" | "hide";
+}
+
 /**
  * Per-channel visibility rules. Mirrors the app-side `visibility` JSONB shape
  * (WAN-516). Semantics: show on all pages by default, override per-URL.
+ *
+ * The list of globs may arrive under either key: the app persists it as
+ * `rules`, while older payloads / this SDK's original contract used
+ * `patterns`. {@link patternsOf} reads whichever is present so a channel
+ * configured in the dashboard takes effect without a data migration.
  */
 export interface VisibilityRules {
 	/** Action when no pattern matches the current path. */
 	default: "show" | "hide";
-	/** Glob patterns evaluated against `window.location.pathname`, in order. */
-	patterns: { glob: string; action: "show" | "hide" }[];
+	/** Glob patterns, in order. SDK contract key. */
+	patterns?: VisibilityPattern[];
+	/** Glob patterns, in order. Key the app/dashboard persists. */
+	rules?: VisibilityPattern[];
+}
+
+/** The glob list from a rules object, under whichever key it arrived. */
+export function patternsOf(
+	rules: VisibilityRules | null | undefined,
+): VisibilityPattern[] {
+	return rules?.patterns ?? rules?.rules ?? [];
 }
 
 // Sentinel that survives the single-`*` pass so we can translate `**` first
@@ -71,7 +91,7 @@ export function isVisibleForPath(
 		return true;
 	}
 	let action: "show" | "hide" = rules.default ?? "show";
-	for (const pattern of rules.patterns ?? []) {
+	for (const pattern of patternsOf(rules)) {
 		if (matchGlob(pattern.glob, pathname)) {
 			action = pattern.action;
 		}

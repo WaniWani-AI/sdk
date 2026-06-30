@@ -8,7 +8,8 @@
 // on every route change — not just hard navigations.
 // ============================================================================
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { debugLog } from "../lib/debug";
 import { isVisibleForPath, type VisibilityRules } from "./visibility";
 
 const LOCATION_CHANGE = "waniwani:locationchange";
@@ -79,5 +80,10 @@ export function useVisibilityGate(
 	ready: boolean,
 ): boolean {
 	const pathname = usePathname();
-	return ready && isVisibleForPath(rules, pathname);
+	const visible = ready && isVisibleForPath(rules, pathname);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: log on decision change, not rules identity churn
+	useEffect(() => {
+		debugLog("visibility gate", { pathname, ready, visible, rules });
+	}, [pathname, ready, visible]);
+	return visible;
 }

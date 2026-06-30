@@ -99,6 +99,29 @@ describe("isVisibleForPath", () => {
 		expect(isVisibleForPath(flipped, "/admin/help")).toBe(false);
 	});
 
+	it("reads patterns from the app's `rules` key (not just `patterns`)", () => {
+		// The dashboard persists the glob list under `rules`; the embed must
+		// honor it without a data migration.
+		const rules = {
+			default: "show",
+			rules: [{ glob: "/", action: "hide" }],
+		} as unknown as VisibilityRules;
+		// Hidden on the root page…
+		expect(isVisibleForPath(rules, "/")).toBe(false);
+		// …shown everywhere else.
+		expect(isVisibleForPath(rules, "/pricing")).toBe(true);
+	});
+
+	it("prefers `patterns` when both keys are present", () => {
+		const rules = {
+			default: "show",
+			patterns: [{ glob: "/a", action: "hide" }],
+			rules: [{ glob: "/b", action: "hide" }],
+		} as unknown as VisibilityRules;
+		expect(isVisibleForPath(rules, "/a")).toBe(false);
+		expect(isVisibleForPath(rules, "/b")).toBe(true);
+	});
+
 	it("treats regex-special characters in a glob literally and never throws", () => {
 		const rules: VisibilityRules = {
 			default: "show",

@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { useEffect, useState } from "react";
+import { debugLog } from "../lib/debug";
 import { firePageView } from "../lib/page-view";
 import type { EmbedConfig } from "./config";
 import { resolveConfig } from "./config";
@@ -244,8 +245,13 @@ export function useRemoteEmbedConfig(
 		const cached = loadCachedConfig(api, token, channelId);
 		if (cached) {
 			try {
-				setConfig(resolveConfig(programmatic, cached, scriptConfig));
+				const resolved = resolveConfig(programmatic, cached, scriptConfig);
+				setConfig(resolved);
 				setReady(true);
+				debugLog("config resolved (sessionStorage cache)", {
+					config: resolved,
+					visibility: resolved.visibility,
+				});
 				pageView(cached.source);
 			} catch {
 				// Fall through to the fetch path.
@@ -258,10 +264,16 @@ export function useRemoteEmbedConfig(
 				if (controller.signal.aborted) {
 					return;
 				}
+				debugLog("remote /config response", remote);
 				if (Object.keys(remote).length > 0) {
 					saveCachedConfig(api, token, channelId, remote);
 					try {
-						setConfig(resolveConfig(programmatic, remote, scriptConfig));
+						const resolved = resolveConfig(programmatic, remote, scriptConfig);
+						setConfig(resolved);
+						debugLog("config resolved (remote)", {
+							config: resolved,
+							visibility: resolved.visibility,
+						});
 					} catch (err) {
 						// `resolveConfig` throws if token is missing. Shouldn't happen
 						// here (initial resolve already validated), but swallow so a
