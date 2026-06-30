@@ -322,6 +322,18 @@ On mount the widget (both React and script) fetches `GET {api}/config` with the 
 
 Merge order (later wins): **defaults < remote config < `data-*` attrs < programmatic options**. The dashboard value is the default; data-attrs / props still override per-page if you need a local tweak.
 
+### Per-URL visibility (advanced)
+
+By default a chat surface shows on every page it's loaded on. For surfaces dropped into a site-wide template (the floating bar, an inline embed, or `<WaniwaniChat>` in a shared layout), you can restrict where they appear with per-channel show/hide rules configured in the dashboard.
+
+The rules match against `window.location.pathname`:
+
+- **Default action** — show everywhere and hide on a few paths, or hide everywhere and allowlist a few.
+- **Patterns** — `*` matches within one path segment (`/docs/*` matches `/docs/intro`, not `/docs/a/b`); `**` matches across segments (`/docs/**` matches everything under `/docs/`). Anything else is matched literally.
+- **Precedence** — when several patterns match, the last one in the list wins.
+
+This applies to **every** chat surface: floating, inline, and React. Rules are evaluated before the chat paints (no flash) and re-checked on client-side route changes, so they work on single-page apps. It's configured per channel in the dashboard — there is no script-tag attribute or prop for it. A channel with no rules shows everywhere.
+
 ## Shared building blocks
 
 ### `WelcomeConfig`

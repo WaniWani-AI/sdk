@@ -1,5 +1,5 @@
 // ============================================================================
-// FloatingChat — the `mode: "floating"` embed surface (rose.ai-style).
+// FloatingChat — the `mode: "floating"` embed surface.
 //
 // On load it shows only a thin **docked input** at the bottom of the screen —
 // not a launcher button. After a short delay it auto-expands to reveal the
@@ -31,6 +31,7 @@ import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
+import { useVisibilityGate } from "./use-pathname";
 
 /** Idle delay before the dock auto-expands to show suggestion CTAs. */
 const AUTO_EXPAND_DELAY_MS = 3500;
@@ -82,6 +83,12 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			programmatic,
 			scriptConfig,
 		);
+
+		// Per-URL gating — the dock and panel only render on paths the channel's
+		// `visibility` rules resolve to "show". The overlay host stays mounted
+		// but is invisible (pointer-events:none, no background), so a gated page
+		// shows nothing — no empty box, no flash before remote config resolves.
+		const visible = useVisibilityGate(config.visibility, ready);
 
 		const chatRef = useRef<ChatHandle>(null);
 		const composerInputRef = useRef<HTMLInputElement>(null);
@@ -270,124 +277,130 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				)}
 				style={cssVars}
 			>
-				{/* Docked composer — the only thing visible on load. */}
-				<div
-					data-waniwani-floating="dock"
-					data-state={phase === "open" ? "hidden" : "shown"}
-					className={cn(
-						"ww:fixed ww:bottom-4 ww:z-[2147483002] ww:flex ww:flex-col ww:gap-2",
-						"ww:w-[calc(100vw-2rem)] ww:max-w-[480px]",
-						dockAlign,
-					)}
-				>
-					{suggestions.length > 0 && (
+				{visible && (
+					<>
+						{/* Docked composer — the only thing visible on load. */}
 						<div
+							data-waniwani-floating="dock"
+							data-state={phase === "open" ? "hidden" : "shown"}
 							className={cn(
-								"ww:flex ww:flex-col ww:gap-2 ww:origin-bottom ww:transition-all ww:duration-300 ww:ease-out",
-								phase === "expanded"
-									? "ww:max-h-96 ww:translate-y-0 ww:opacity-100"
-									: "ww:pointer-events-none ww:max-h-0 ww:translate-y-2 ww:overflow-hidden ww:opacity-0",
+								"ww:fixed ww:bottom-4 ww:z-[2147483002] ww:flex ww:flex-col ww:gap-2",
+								"ww:w-[calc(100vw-2rem)] ww:max-w-[480px]",
+								dockAlign,
 							)}
 						>
-							<div className="ww:flex ww:justify-end">
+							{suggestions.length > 0 && (
+								<div
+									className={cn(
+										"ww:flex ww:flex-col ww:gap-2 ww:origin-bottom ww:transition-all ww:duration-300 ww:ease-out",
+										phase === "expanded"
+											? "ww:max-h-96 ww:translate-y-0 ww:opacity-100"
+											: "ww:pointer-events-none ww:max-h-0 ww:translate-y-2 ww:overflow-hidden ww:opacity-0",
+									)}
+								>
+									<div className="ww:flex ww:justify-end">
+										<button
+											type="button"
+											onClick={collapse}
+											aria-label={t.launcher.minimize}
+											className="ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-full ww:bg-background/80 ww:text-muted-foreground ww:shadow ww:backdrop-blur ww:transition-colors hover:ww:text-foreground"
+										>
+											<Minus className="ww:size-4" />
+										</button>
+									</div>
+									{suggestions.map((s) => (
+										<button
+											key={s}
+											type="button"
+											onClick={() => openWith(s)}
+											style={{ boxShadow: cardShadow }}
+											className="ww:flex ww:items-center ww:justify-between ww:gap-3 ww:rounded-full ww:bg-background ww:px-5 ww:py-3 ww:text-left ww:text-sm ww:font-medium ww:text-foreground ww:transition-colors hover:ww:bg-accent"
+										>
+											<span className="ww:truncate">{s}</span>
+											<ArrowRight className="ww:size-4 ww:shrink-0 ww:opacity-50" />
+										</button>
+									))}
+								</div>
+							)}
+
+							<div
+								style={{ boxShadow: cardShadow }}
+								className="ww:flex ww:items-center ww:gap-2 ww:rounded-full ww:border ww:border-border ww:bg-background ww:px-4 ww:py-2.5"
+							>
+								<Sparkles className="ww:size-4 ww:shrink-0 ww:text-muted-foreground" />
+								<input
+									ref={composerInputRef}
+									type="text"
+									value={composerText}
+									placeholder={animatedDockPlaceholder}
+									onChange={(e) => setComposerText(e.target.value)}
+									onFocus={onComposerFocus}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" && !e.shiftKey) {
+											e.preventDefault();
+											submitComposer();
+										}
+									}}
+									className="ww:min-w-0 ww:flex-1 ww:bg-transparent ww:text-sm ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground"
+								/>
 								<button
 									type="button"
-									onClick={collapse}
-									aria-label={t.launcher.minimize}
-									className="ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-full ww:bg-background/80 ww:text-muted-foreground ww:shadow ww:backdrop-blur ww:transition-colors hover:ww:text-foreground"
+									onClick={submitComposer}
+									disabled={!composerText.trim()}
+									aria-label={t.promptInput.submit}
+									className="ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:bg-foreground ww:text-background ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40"
 								>
-									<Minus className="ww:size-4" />
+									<ArrowUp className="ww:size-4" />
 								</button>
 							</div>
-							{suggestions.map((s) => (
-								<button
-									key={s}
-									type="button"
-									onClick={() => openWith(s)}
-									style={{ boxShadow: cardShadow }}
-									className="ww:flex ww:items-center ww:justify-between ww:gap-3 ww:rounded-full ww:bg-background ww:px-5 ww:py-3 ww:text-left ww:text-sm ww:font-medium ww:text-foreground ww:transition-colors hover:ww:bg-accent"
-								>
-									<span className="ww:truncate">{s}</span>
-									<ArrowRight className="ww:size-4 ww:shrink-0 ww:opacity-50" />
-								</button>
-							))}
 						</div>
-					)}
 
-					<div
-						style={{ boxShadow: cardShadow }}
-						className="ww:flex ww:items-center ww:gap-2 ww:rounded-full ww:border ww:border-border ww:bg-background ww:px-4 ww:py-2.5"
-					>
-						<Sparkles className="ww:size-4 ww:shrink-0 ww:text-muted-foreground" />
-						<input
-							ref={composerInputRef}
-							type="text"
-							value={composerText}
-							placeholder={animatedDockPlaceholder}
-							onChange={(e) => setComposerText(e.target.value)}
-							onFocus={onComposerFocus}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" && !e.shiftKey) {
-									e.preventDefault();
-									submitComposer();
-								}
-							}}
-							className="ww:min-w-0 ww:flex-1 ww:bg-transparent ww:text-sm ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground"
-						/>
-						<button
-							type="button"
-							onClick={submitComposer}
-							disabled={!composerText.trim()}
-							aria-label={t.promptInput.submit}
-							className="ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:bg-foreground ww:text-background ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40"
-						>
-							<ArrowUp className="ww:size-4" />
-						</button>
-					</div>
-				</div>
-
-				{/* Full chat panel — slides up from the bottom on first message.
+						{/* Full chat panel — slides up from the bottom on first message.
 				    Same width as the dock so opening is a clean vertical grow. */}
-				<div
-					role="dialog"
-					aria-label={config.title ?? dockPlaceholder}
-					data-waniwani-floating="panel"
-					data-state={phase === "open" ? "shown" : "hidden"}
-					style={{ boxShadow: cardShadow }}
-					className={cn(
-						"ww:fixed ww:z-[2147483002] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
-						// Mobile: full-screen sheet.
-						"ww:inset-0 ww:w-full ww:rounded-none",
-						// Desktop: anchored card (matches the dock's 480px width).
-						"ww:sm:inset-auto ww:sm:bottom-4 ww:sm:h-[640px] ww:sm:max-h-[calc(100dvh-2rem)] ww:sm:w-[calc(100vw-2rem)] ww:sm:max-w-[480px] ww:sm:rounded-2xl ww:sm:border ww:sm:border-border",
-						panelAlign,
-					)}
-				>
-					<ChatEmbed
-						ref={chatRef}
-						api={config.api ?? ""}
-						headers={{ Authorization: `Bearer ${config.token}` }}
-						skipRemoteConfig
-						body={Object.keys(body).length > 0 ? body : undefined}
-						appearance={config.appearance}
-						title={config.title}
-						headerActions={closeButton}
-						// Force the header on in floating mode: the minimize control
-						// lives in `headerActions`, so honoring `hideHeader` here would
-						// leave an opened (full-screen on mobile) panel with no in-UI
-						// way back to the dock. The panel is its own chrome anyway.
-						hideHeader={false}
-						welcomeMessage={config.welcomeMessage}
-						placeholder={config.placeholder}
-						suggestions={
-							config.suggestions ? { initial: config.suggestions } : undefined
-						}
-						enableThreadHistory={config.enableThreadHistory}
-						showToolCalls={config.showToolCalls}
-						locale={config.locale}
-						initializing={!ready}
-					/>
-				</div>
+						<div
+							role="dialog"
+							aria-label={config.title ?? dockPlaceholder}
+							data-waniwani-floating="panel"
+							data-state={phase === "open" ? "shown" : "hidden"}
+							style={{ boxShadow: cardShadow }}
+							className={cn(
+								"ww:fixed ww:z-[2147483002] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
+								// Mobile: full-screen sheet.
+								"ww:inset-0 ww:w-full ww:rounded-none",
+								// Desktop: anchored card (matches the dock's 480px width).
+								"ww:sm:inset-auto ww:sm:bottom-4 ww:sm:h-[640px] ww:sm:max-h-[calc(100dvh-2rem)] ww:sm:w-[calc(100vw-2rem)] ww:sm:max-w-[480px] ww:sm:rounded-2xl ww:sm:border ww:sm:border-border",
+								panelAlign,
+							)}
+						>
+							<ChatEmbed
+								ref={chatRef}
+								api={config.api ?? ""}
+								headers={{ Authorization: `Bearer ${config.token}` }}
+								skipRemoteConfig
+								body={Object.keys(body).length > 0 ? body : undefined}
+								appearance={config.appearance}
+								title={config.title}
+								headerActions={closeButton}
+								// Force the header on in floating mode: the minimize control
+								// lives in `headerActions`, so honoring `hideHeader` here would
+								// leave an opened (full-screen on mobile) panel with no in-UI
+								// way back to the dock. The panel is its own chrome anyway.
+								hideHeader={false}
+								welcomeMessage={config.welcomeMessage}
+								placeholder={config.placeholder}
+								suggestions={
+									config.suggestions
+										? { initial: config.suggestions }
+										: undefined
+								}
+								enableThreadHistory={config.enableThreadHistory}
+								showToolCalls={config.showToolCalls}
+								locale={config.locale}
+								initializing={!ready}
+							/>
+						</div>
+					</>
+				)}
 			</div>
 		);
 	},

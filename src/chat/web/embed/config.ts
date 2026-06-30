@@ -4,6 +4,7 @@
 
 import type { ChatTheme } from "../@types";
 import type { Locale } from "../i18n";
+import type { VisibilityRules } from "./visibility";
 
 /**
  * Built-in theme presets. `auto` follows the host's `prefers-color-scheme`
@@ -137,7 +138,7 @@ export interface EmbedConfig {
 	/**
 	 * Where the floating dock (input bar) and the expanded chat panel anchor
 	 * along the bottom edge. Only applies when `mode` is `"floating"`.
-	 * Defaults to `"bottom-center"` (the rose.ai-style centered dock).
+	 * Defaults to `"bottom-center"` (a centered dock).
 	 * Surfaced as `data-position`.
 	 */
 	position?: "bottom-center" | "bottom-right" | "bottom-left";
@@ -164,6 +165,14 @@ export interface EmbedConfig {
 	 * `data-disable-page-view` on the embed script tag.
 	 */
 	disablePageView?: boolean;
+	/**
+	 * Per-URL show/hide rules for the floating bar. Comes from the remote
+	 * `/config` response (not author-set). When set, the floating dock only
+	 * renders on paths the rules resolve to `"show"`. Unset/`null` means show
+	 * on every page (default behavior). Only applies when `mode` is
+	 * `"floating"`.
+	 */
+	visibility?: VisibilityRules;
 }
 
 /** Fallback height applied to an inline embed container with no author sizing. */
