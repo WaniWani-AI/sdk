@@ -77,7 +77,7 @@ describe("isVisibleForPath", () => {
 		expect(isVisibleForPath(rules, "/pricing")).toBe(false);
 	});
 
-	it("resolves overlapping patterns with last-match-wins", () => {
+	it("resolves overlapping patterns with hide-always-wins (order-independent)", () => {
 		const rules: VisibilityRules = {
 			default: "show",
 			patterns: [
@@ -85,10 +85,11 @@ describe("isVisibleForPath", () => {
 				{ glob: "/admin/help", action: "show" },
 			],
 		};
-		expect(isVisibleForPath(rules, "/admin/help")).toBe(true);
+		// The show rule cannot un-hide a path a hide rule also matches.
+		expect(isVisibleForPath(rules, "/admin/help")).toBe(false);
 		expect(isVisibleForPath(rules, "/admin/users")).toBe(false);
 
-		// Flipping order flips the result for the overlapping path.
+		// Order doesn't matter — hide still wins.
 		const flipped: VisibilityRules = {
 			default: "show",
 			patterns: [
@@ -97,6 +98,20 @@ describe("isVisibleForPath", () => {
 			],
 		};
 		expect(isVisibleForPath(flipped, "/admin/help")).toBe(false);
+	});
+
+	it("allowlists with a carve-out (show /docs/**, hide /docs/internal)", () => {
+		// Presence of a show rule flips the baseline to hidden (default: "hide").
+		const rules: VisibilityRules = {
+			default: "hide",
+			patterns: [
+				{ glob: "/docs/**", action: "show" },
+				{ glob: "/docs/internal", action: "hide" },
+			],
+		};
+		expect(isVisibleForPath(rules, "/docs/intro")).toBe(true);
+		expect(isVisibleForPath(rules, "/docs/internal")).toBe(false);
+		expect(isVisibleForPath(rules, "/pricing")).toBe(false);
 	});
 
 	it("reads patterns from the app's `rules` key (not just `patterns`)", () => {

@@ -80,8 +80,11 @@ export function matchGlob(glob: string, pathname: string): boolean {
  * - `null`/`undefined` rules → `true` (show everywhere). Keeps a new embed
  *   safe against servers that don't send the field yet, and an old embed safe
  *   against a server that does.
- * - Otherwise the **last** matching pattern (in list order) wins; if none
- *   match, `rules.default` decides.
+ * - Otherwise **hide always wins** (most restrictive): if any matching pattern
+ *   hides, the bar is hidden — order-independent, so you can allowlist
+ *   `/docs/**` (show) then carve out `/docs/internal` (hide). If no hide
+ *   matches but a show matches, it's shown. If nothing matches, `rules.default`
+ *   decides (the dashboard infers `default` from whether any show rule exists).
  */
 export function isVisibleForPath(
 	rules: VisibilityRules | null | undefined,
@@ -90,11 +93,17 @@ export function isVisibleForPath(
 	if (!rules) {
 		return true;
 	}
-	let action: "show" | "hide" = rules.default ?? "show";
+	let matchedShow = false;
 	for (const pattern of patternsOf(rules)) {
 		if (matchGlob(pattern.glob, pathname)) {
-			action = pattern.action;
+			if (pattern.action === "hide") {
+				return false; // hide always wins
+			}
+			matchedShow = true;
 		}
 	}
-	return action !== "hide";
+	if (matchedShow) {
+		return true; // a show match beats the default
+	}
+	return (rules.default ?? "show") !== "hide";
 }
