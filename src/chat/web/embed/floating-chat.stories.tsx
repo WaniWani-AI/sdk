@@ -144,6 +144,81 @@ function FakePage({ dark }: { dark: boolean }) {
 	);
 }
 
+// A host page with a full-height hero up top, then long scrollable content.
+// The floating bar is configured to appear only after `#ww-hero` scrolls above
+// the viewport — mimicking a site whose hero already has its own floating card.
+function HeroPage({ dark }: { dark: boolean }) {
+	const border = dark ? "#1f2530" : "#e5e7eb";
+	const sections = Array.from({ length: 6 }, (_, i) => i);
+	return (
+		<div
+			style={{
+				background: dark ? "#0f1115" : "#f7f7f8",
+				color: dark ? "#e5e7eb" : "#1f2937",
+				fontFamily: "system-ui, sans-serif",
+			}}
+		>
+			{/* While any part of this hero is on screen the bar stays hidden. */}
+			<section
+				id="ww-hero"
+				style={{
+					minHeight: "92vh",
+					display: "flex",
+					flexDirection: "column",
+					alignItems: "center",
+					justifyContent: "center",
+					textAlign: "center",
+					padding: "48px 24px",
+					borderBottom: `1px solid ${border}`,
+				}}
+			>
+				<span
+					style={{
+						fontSize: 13,
+						textTransform: "uppercase",
+						letterSpacing: 1,
+						opacity: 0.6,
+					}}
+				>
+					#ww-hero
+				</span>
+				<h1 style={{ fontSize: 40, fontWeight: 800, marginTop: 12 }}>
+					Hero section
+				</h1>
+				<p
+					style={{
+						maxWidth: 520,
+						marginTop: 12,
+						lineHeight: 1.6,
+						opacity: 0.8,
+					}}
+				>
+					The floating bar is held back while this hero is in view — imagine a
+					floating card living here. Scroll down past it and the bar slides in;
+					scroll back up and it hides again (reactive).
+				</p>
+				<p style={{ marginTop: 24, fontSize: 13, opacity: 0.6 }}>
+					↓ scroll down
+				</p>
+			</section>
+
+			<div
+				style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px 200px" }}
+			>
+				{sections.map((i) => (
+					<section key={i} style={{ marginTop: i === 0 ? 0 : 40 }}>
+						<h2 style={{ fontSize: 22, fontWeight: 700 }}>Section {i + 1}</h2>
+						<p style={{ marginTop: 10, lineHeight: 1.7, opacity: 0.85 }}>
+							Body content below the hero. The bar is visible here because
+							`#ww-hero` has scrolled above the top of the viewport.
+						</p>
+					</section>
+				))}
+			</div>
+		</div>
+	);
+}
+
 const meta: Meta<FloatingArgs> = {
 	title: "Chat/FloatingChat",
 	// Each story re-creates the component from args; this render is shared.
@@ -201,6 +276,31 @@ export const DarkTheme: Story = {
 /** No suggestions — clicking the bar just widens it; the chat opens on send. */
 export const NoSuggestions: Story = {
 	args: { suggestions: [] },
+};
+
+/**
+ * Appear-after-a-section: the bar is hidden while the `#ww-hero` section is in
+ * view and slides in only once you scroll past it (reactive — it hides again on
+ * the way back up). Configured via the channel's `visibility.appearRules`
+ * (`glob: "**"` matches Storybook's iframe path). The `appearDelay` timer is
+ * ignored while a scroll rule applies. Scroll the preview to try it.
+ */
+export const AppearAfterSection: Story = {
+	args: { appearDelay: 0 },
+	render: (args) => (
+		<>
+			<HeroPage dark={args.theme === "dark"} />
+			<FloatingChat
+				config={{
+					...buildConfig(args),
+					visibility: {
+						default: "show",
+						appearRules: [{ glob: "**", appearAfter: "#ww-hero" }],
+					},
+				}}
+			/>
+		</>
+	),
 };
 
 /**
