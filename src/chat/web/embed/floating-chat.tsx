@@ -3,12 +3,13 @@
 //
 // After a short appear delay (so the host page settles first) a thin **docked
 // input** animates into view at the bottom of the screen — not a launcher
-// button. At rest it's just the input bar. Clicking/focusing it widens the
-// bar, wraps it in a frosted-glass card (translucent + blurred, so the host
-// page reads through it), and reveals the agent's starter suggestions (CTAs)
-// as pills *inside that card*, above the input — without opening the chat
-// yet. As soon as the visitor sends their first message (typed or a
-// suggestion), the full chat panel expands open from the input's position.
+// button. A beat after it settles the bar widens on its own, wraps itself in a
+// frosted-glass card (translucent + blurred, so the host page reads through
+// it), and reveals the agent's starter suggestions (CTAs) as pills *inside
+// that card*, above the input — without opening the chat yet. (Clicking/
+// focusing the resting bar does the same thing immediately.) As soon as the
+// visitor sends their first message (typed or a suggestion), the full chat
+// panel expands open from the input's position.
 //
 // The chat itself (`ChatEmbed`) is mounted eagerly but kept hidden until the
 // panel opens, so the docked input can hand off the first message to it and
@@ -47,6 +48,11 @@ const DEFAULT_APPEAR_DELAY_MS = 2000;
  *  (`grid-rows-[0fr]`) state to paint so the grow transition actually runs.
  *  Kept short so the card forming and the pills rising read as one motion. */
 const SUGGESTIONS_REVEAL_DELAY_MS = 90;
+
+/** Delay after the dock has appeared before the suggestion card auto-expands.
+ *  The bar surfaces its CTAs on its own a beat after it settles, rather than
+ *  waiting for the visitor to click it. */
+const AUTO_EXPAND_DELAY_MS = 1000;
 
 export interface FloatingChatProps {
 	config: EmbedConfig;
@@ -177,6 +183,23 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			const id = setTimeout(() => setAppeared(true), Math.max(0, delay));
 			return () => clearTimeout(id);
 		}, [visible, config.appearDelay, appearAfter, scrolledPast]);
+
+		// Once the dock has appeared, surface the suggestion card on its own a
+		// beat later — the visitor no longer has to click the bar to reveal the
+		// CTAs. Only fires when there are suggestions to show and the bar is still
+		// at rest (`input`); if the visitor has already interacted (widened it,
+		// opened the chat), we leave their state alone. Firing off `appeared`
+		// means a click-away collapse back to `input` won't re-trigger it.
+		useEffect(() => {
+			if (!appeared || suggestions.length === 0) {
+				return;
+			}
+			const id = setTimeout(
+				() => setPhase((p) => (p === "input" ? "expanded" : p)),
+				AUTO_EXPAND_DELAY_MS,
+			);
+			return () => clearTimeout(id);
+		}, [appeared, suggestions.length]);
 
 		// Focus the chat input after the panel has opened. Runs post-commit, so
 		// the (previously hidden) textarea is in layout and can take focus.

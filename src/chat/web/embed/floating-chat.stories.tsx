@@ -136,9 +136,10 @@ function FakePage({ dark }: { dark: boolean }) {
 			<p
 				style={{ maxWidth: 560, marginTop: 12, lineHeight: 1.6, opacity: 0.8 }}
 			>
-				The floating bar appears at the bottom after the configured delay. Click
-				it to widen the bar and reveal the suggestion CTAs; send a message (type
-				or pick a suggestion) to expand the full chat panel from the input.
+				The floating bar appears at the bottom after the configured delay, then
+				widens on its own a second later to reveal the suggestion CTAs (clicking
+				it does the same immediately). Send a message (type or pick a
+				suggestion) to expand the full chat panel from the input.
 			</p>
 		</div>
 	);
