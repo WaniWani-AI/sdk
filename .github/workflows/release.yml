@@ -113,6 +113,16 @@ jobs:
         if: steps.check.outputs.published == 'false'
         run: npm publish --access public --tag ${{ steps.channel.outputs.npm_tag }} --provenance --ignore-scripts
 
+      - name: Purge jsDelivr @latest cache
+        if: steps.check.outputs.published == 'false' && steps.channel.outputs.npm_tag == 'latest'
+        run: |
+          for path in \
+            "@waniwani/sdk@latest/dist/chat/embed.js" \
+            "@waniwani/sdk@latest/dist/chat/styles.css"; do
+            echo "Purging $path"
+            curl -sf "https://purge.jsdelivr.net/npm/$path" || echo "::warning::purge failed for $path"
+          done
+
       - name: Create GitHub Release
         if: steps.check.outputs.published == 'false'
         run: |

@@ -87,6 +87,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "prepublishOnly": "bun run build",
+    "purge:cdn": "curl -sf https://purge.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js && curl -sf https://purge.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/styles.css",
     "release": "npm run release:patch",
     "release:patch": "npm version patch && git push --follow-tags",
     "release:minor": "npm version minor && git push --follow-tags",
