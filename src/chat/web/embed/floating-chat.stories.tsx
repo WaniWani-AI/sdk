@@ -273,7 +273,8 @@ export const DarkTheme: Story = {
 	args: { theme: "dark" },
 };
 
-/** No suggestions — clicking the bar just widens it; the chat opens on send. */
+/** No suggestions — no frosted card at all; it stays the plain input bar and
+ *  the chat opens on send. */
 export const NoSuggestions: Story = {
 	args: { suggestions: [] },
 };

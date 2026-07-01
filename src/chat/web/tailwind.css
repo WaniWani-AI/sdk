@@ -195,6 +195,12 @@
 	--ww-radius: var(--ww-radius, 16px);
 	--ww-font-sans: var(--ww-font, system-ui, -apple-system, "Segoe UI", sans-serif);
 
+	/* Frosted-glass tint for the floating bar's suggestion card. Neutral by
+	   default — not white, a soft translucent surface that reads over any
+	   page. Internal for now (not a public theme option). */
+	--ww-glass: rgba(236, 238, 244, 0.6);
+	--ww-glass-border: rgba(0, 0, 0, 0.06);
+
 	/* Opt-in panel chrome. Defaults are no-ops so customers who slot
 	   `<ChatEmbed>` into their own bordered/shadowed container see no
 	   change. Set `appearance.variables.borderWidth` / `boxShadow` or
@@ -223,6 +229,8 @@
 	--ww-color-card-header-foreground: var(--ww-header-text, #ececec);
 	--ww-color-status: var(--ww-status, #22c55e);
 	--ww-color-tool-card: var(--ww-tool-card, #262626);
+	--ww-glass: rgba(40, 42, 52, 0.5);
+	--ww-glass-border: rgba(255, 255, 255, 0.12);
 }
 
 /* `appearance.theme === "auto"` — follow the host's prefers-color-scheme.
@@ -246,6 +254,8 @@
 		--ww-color-card-header-foreground: var(--ww-header-text, #ececec);
 		--ww-color-status: var(--ww-status, #22c55e);
 		--ww-color-tool-card: var(--ww-tool-card, #262626);
+		--ww-glass: rgba(40, 42, 52, 0.5);
+		--ww-glass-border: rgba(255, 255, 255, 0.12);
 	}
 }
 

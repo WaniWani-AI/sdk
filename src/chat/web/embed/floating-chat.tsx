@@ -3,11 +3,12 @@
 //
 // After a short appear delay (so the host page settles first) a thin **docked
 // input** animates into view at the bottom of the screen — not a launcher
-// button. The input mirrors the in-chat composer: a soft-rounded card, no
-// decorative icon. Clicking/focusing it widens the bar and reveals the agent's
-// starter suggestions (CTAs) above it — without opening the chat yet. As soon
-// as the visitor sends their first message (typed or a suggestion), the full
-// chat panel expands open from the input's position.
+// button. At rest it's just the input bar. Clicking/focusing it widens the
+// bar, wraps it in a frosted-glass card (translucent + blurred, so the host
+// page reads through it), and reveals the agent's starter suggestions (CTAs)
+// as pills *inside that card*, above the input — without opening the chat
+// yet. As soon as the visitor sends their first message (typed or a
+// suggestion), the full chat panel expands open from the input's position.
 //
 // The chat itself (`ChatEmbed`) is mounted eagerly but kept hidden until the
 // panel opens, so the docked input can hand off the first message to it and
@@ -42,8 +43,10 @@ import { appearTriggerForPath } from "./visibility";
 /** Default delay before the docked input animates into view on load. */
 const DEFAULT_APPEAR_DELAY_MS = 2000;
 
-/** Beat between the bar widening and the suggestion CTAs fading in. */
-const SUGGESTIONS_REVEAL_DELAY_MS = 500;
+/** Tiny beat before the pills reveal — just enough for the collapsed
+ *  (`grid-rows-[0fr]`) state to paint so the grow transition actually runs.
+ *  Kept short so the card forming and the pills rising read as one motion. */
+const SUGGESTIONS_REVEAL_DELAY_MS = 90;
 
 export interface FloatingChatProps {
 	config: EmbedConfig;
@@ -296,6 +299,11 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			body.channelId = config.channelId;
 		}
 
+		// The frosted card only exists to hold the suggestion pills, so it only
+		// materializes once the bar is expanded *and* there are suggestions. With
+		// none, focusing leaves the plain input bar (no empty card, no widen).
+		const showCard = suggestions.length > 0 && phase !== "input";
+
 		const closeButton = (
 			<button
 				type="button"
@@ -329,73 +337,103 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 							data-state={phase === "open" ? "hidden" : "shown"}
 							data-appeared={appeared ? "true" : "false"}
 							className={cn(
-								"ww:fixed ww:bottom-3 ww:sm:bottom-4 ww:left-0 ww:right-0 ww:mx-auto ww:z-[2147483002] ww:flex ww:flex-col ww:gap-1",
+								"ww:fixed ww:bottom-3 ww:sm:bottom-4 ww:left-0 ww:right-0 ww:mx-auto ww:z-[2147483002] ww:flex ww:flex-col",
 								"ww:w-[calc(100vw-2rem)] ww:transition-[max-width] ww:duration-300 ww:ease-out",
-								phase === "input" ? "ww:max-w-[440px]" : "ww:max-w-[720px]",
+								showCard ? "ww:max-w-[720px]" : "ww:max-w-[440px]",
 							)}
 						>
-							{suggestions.length > 0 && (
-								<div
-									className={cn(
-										"ww:origin-bottom ww:transition-all ww:duration-300 ww:ease-out",
-										suggestionsVisible
-											? "ww:max-h-96 ww:translate-y-0 ww:opacity-100"
-											: "ww:pointer-events-none ww:max-h-0 ww:translate-y-2 ww:overflow-hidden ww:opacity-0",
-									)}
-								>
-									{/* Same chips as the in-chat composer (card parity). */}
-									<Suggestions
-										suggestions={suggestions}
-										onSelect={openWith}
-										className="ww:px-1 ww:pb-1.5 ww:pt-0"
-									/>
-								</div>
-							)}
-
-							{/* Composer wrapped in the ReactBits border glow. Background +
-							    radius are themed to match the input surface; the glow plays
-							    a one-off sweep on appear. */}
-							<BorderGlow
-								animated={appeared}
-								backgroundColor="var(--ww-color-input)"
-								borderRadius={16}
-								edgeSensitivity={30}
-								coneSpread={25}
-								colors={["#c084fc", "#f472b6", "#38bdf8"]}
-								className="ww:border-border"
-								style={{ boxShadow: cardShadow }}
-							>
-								<div className="ww:flex ww:items-center ww:gap-1 ww:pl-3.5 ww:pr-1.5 ww:py-1.5 ww:sm:pl-4 ww:sm:pr-2 ww:sm:py-2">
-									{/* `text-base` (16px) on mobile is load-bearing: iOS Safari
-									    auto-zooms a focused input under 16px. `sm:text-sm`
-									    restores the smaller text where the zoom rule doesn't
-									    apply. Do not drop the 16px mobile size. */}
-									<input
-										ref={composerInputRef}
-										type="text"
-										value={composerText}
-										placeholder={animatedDockPlaceholder}
-										onChange={(e) => setComposerText(e.target.value)}
-										onFocus={onComposerFocus}
-										onKeyDown={(e) => {
-											if (e.key === "Enter" && !e.shiftKey) {
-												e.preventDefault();
-												submitComposer();
+							{/* Frosted-glass card around the input. It only materializes
+							    once the dock is expanded/open (the visitor clicked the bar);
+							    at rest the wrapper is invisible (no fill/border/padding) so
+							    the input looks exactly like the standalone bar. The tint is
+							    the theme's brand color at low alpha — not white — so it reads
+							    as intentional glass and the host page shows through it. */}
+							<div
+								className={cn(
+									"ww:flex ww:flex-col ww:rounded-[20px] ww:border ww:transition-all ww:duration-300 ww:ease-out",
+									showCard
+										? "ww:p-2 ww:backdrop-blur-xl ww:backdrop-saturate-150"
+										: "ww:border-transparent ww:p-0",
+								)}
+								style={
+									showCard
+										? {
+												boxShadow: cardShadow,
+												backgroundColor: "var(--ww-glass)",
+												borderColor: "var(--ww-glass-border)",
 											}
-										}}
-										className="ww:min-w-0 ww:flex-1 ww:bg-transparent ww:py-1 ww:text-base ww:sm:text-sm ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground"
-									/>
-									<button
-										type="button"
-										onClick={submitComposer}
-										disabled={!composerText.trim()}
-										aria-label={t.promptInput.submit}
-										className="ww:relative ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:bg-foreground ww:text-background ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40"
+										: undefined
+								}
+							>
+								{suggestions.length > 0 && (
+									// The card grows straight up to reveal the pills: a
+									// `grid-rows` 0fr → 1fr height animation (eases to the pills'
+									// real height — no `max-h` guessing, no scale, so it rises
+									// vertically rather than diagonally) plus a fade. Anchored at
+									// the bottom of the screen, so the growth pushes upward.
+									<div
+										className={cn(
+											"ww:grid ww:transition-all ww:duration-300 ww:ease-out",
+											suggestionsVisible
+												? "ww:grid-rows-[1fr] ww:opacity-100"
+												: "ww:pointer-events-none ww:grid-rows-[0fr] ww:opacity-0",
+										)}
 									>
-										<ArrowUp className="ww:size-4" />
-									</button>
-								</div>
-							</BorderGlow>
+										<div className="ww:overflow-hidden">
+											<Suggestions
+												suggestions={suggestions}
+												onSelect={openWith}
+												className="ww:px-1 ww:pt-1 ww:pb-2.5"
+											/>
+										</div>
+									</div>
+								)}
+
+								{/* Composer wrapped in the ReactBits border glow. Background +
+								    radius are themed to match the input surface; the glow plays
+								    a one-off sweep on appear. */}
+								<BorderGlow
+									animated={appeared}
+									backgroundColor="var(--ww-color-input)"
+									borderRadius={16}
+									edgeSensitivity={30}
+									coneSpread={25}
+									colors={["#c084fc", "#f472b6", "#38bdf8"]}
+									className="ww:border-border"
+									style={{ boxShadow: cardShadow }}
+								>
+									<div className="ww:flex ww:items-center ww:gap-1 ww:pl-3.5 ww:pr-1.5 ww:py-1.5 ww:sm:pl-4 ww:sm:pr-2 ww:sm:py-2">
+										{/* `text-base` (16px) on mobile is load-bearing: iOS Safari
+										    auto-zooms a focused input under 16px. `sm:text-sm`
+										    restores the smaller text where the zoom rule doesn't
+										    apply. Do not drop the 16px mobile size. */}
+										<input
+											ref={composerInputRef}
+											type="text"
+											value={composerText}
+											placeholder={animatedDockPlaceholder}
+											onChange={(e) => setComposerText(e.target.value)}
+											onFocus={onComposerFocus}
+											onKeyDown={(e) => {
+												if (e.key === "Enter" && !e.shiftKey) {
+													e.preventDefault();
+													submitComposer();
+												}
+											}}
+											className="ww:min-w-0 ww:flex-1 ww:bg-transparent ww:py-1 ww:text-base ww:sm:text-sm ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground"
+										/>
+										<button
+											type="button"
+											onClick={submitComposer}
+											disabled={!composerText.trim()}
+											aria-label={t.promptInput.submit}
+											className="ww:relative ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:bg-foreground ww:text-background ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40"
+										>
+											<ArrowUp className="ww:size-4" />
+										</button>
+									</div>
+								</BorderGlow>
+							</div>
 						</div>
 
 						{/* Full chat panel — expands open from the docked input's
