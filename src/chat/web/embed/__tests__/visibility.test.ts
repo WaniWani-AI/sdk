@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+	appearTriggerForPath,
 	globToRegExp,
 	isVisibleForPath,
 	matchGlob,
@@ -147,5 +148,55 @@ describe("isVisibleForPath", () => {
 		expect(isVisibleForPath(rules, "/[weird](path)")).toBe(false);
 		// A different path is unaffected.
 		expect(isVisibleForPath(rules, "/weird")).toBe(true);
+	});
+});
+
+describe("appearTriggerForPath", () => {
+	it("returns null when there are no appear rules", () => {
+		expect(appearTriggerForPath(null, "/")).toBeNull();
+		expect(appearTriggerForPath(undefined, "/")).toBeNull();
+		const rules: VisibilityRules = { default: "show", rules: [] };
+		expect(appearTriggerForPath(rules, "/")).toBeNull();
+	});
+
+	it("returns the selector of the first matching rule", () => {
+		const rules: VisibilityRules = {
+			default: "show",
+			appearRules: [
+				{ glob: "/", appearAfter: "#hero" },
+				{ glob: "/pricing", appearAfter: "#pricing-table" },
+			],
+		};
+		expect(appearTriggerForPath(rules, "/")).toBe("#hero");
+		expect(appearTriggerForPath(rules, "/pricing")).toBe("#pricing-table");
+	});
+
+	it("returns null on a path no appear rule matches (falls back to the timer)", () => {
+		const rules: VisibilityRules = {
+			default: "show",
+			appearRules: [{ glob: "/", appearAfter: "#hero" }],
+		};
+		expect(appearTriggerForPath(rules, "/about")).toBeNull();
+	});
+
+	it("resolves overlapping rules by order (first match wins)", () => {
+		const rules: VisibilityRules = {
+			default: "show",
+			appearRules: [
+				{ glob: "/docs/**", appearAfter: "#docs-hero" },
+				{ glob: "/docs/api", appearAfter: "#api-hero" },
+			],
+		};
+		// `/docs/api` matches both; the earlier rule wins.
+		expect(appearTriggerForPath(rules, "/docs/api")).toBe("#docs-hero");
+	});
+
+	it("supports glob wildcards the same way visibility does", () => {
+		const rules: VisibilityRules = {
+			default: "show",
+			appearRules: [{ glob: "/blog/*", appearAfter: ".post-header" }],
+		};
+		expect(appearTriggerForPath(rules, "/blog/hello")).toBe(".post-header");
+		expect(appearTriggerForPath(rules, "/blog/a/b")).toBeNull();
 	});
 });

@@ -35,7 +35,9 @@ import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
-import { useVisibilityGate } from "./use-pathname";
+import { usePathname, useVisibilityGate } from "./use-pathname";
+import { useScrollAppearance } from "./use-scroll-appearance";
+import { appearTriggerForPath } from "./visibility";
 
 /** Default delay before the docked input animates into view on load. */
 const DEFAULT_APPEAR_DELAY_MS = 2000;
@@ -97,6 +99,16 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// shows nothing — no empty box, no flash before remote config resolves.
 		const visible = useVisibilityGate(config.visibility, ready);
 
+		// Per-URL "appear after" trigger. On paths with a matching rule the dock
+		// holds back until the visitor scrolls past the configured element,
+		// replacing the timer below; `null` (no rule / hidden page) keeps the
+		// timer. Resolved from the same `visibility` config as the gate.
+		const pathname = usePathname();
+		const appearAfter = visible
+			? appearTriggerForPath(config.visibility, pathname)
+			: null;
+		const scrolledPast = useScrollAppearance(appearAfter);
+
 		const chatRef = useRef<ChatHandle>(null);
 		const composerInputRef = useRef<HTMLInputElement>(null);
 		const dockRef = useRef<HTMLDivElement>(null);
@@ -145,15 +157,23 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// visitor navigates (SPA route change) to a page that shows the dock, the
 		// delay runs again and the bar slides in — rather than popping in already
 		// "appeared" from an earlier page.
+		//
+		// When an "appear after" rule matches this path, the scroll trigger owns
+		// `appeared` instead of the timer: the bar tracks `scrolledPast`
+		// reactively (revealed once past the element, hidden again on scroll up).
 		useEffect(() => {
 			if (!visible) {
 				setAppeared(false);
 				return;
 			}
+			if (appearAfter) {
+				setAppeared(scrolledPast);
+				return;
+			}
 			const delay = config.appearDelay ?? DEFAULT_APPEAR_DELAY_MS;
 			const id = setTimeout(() => setAppeared(true), Math.max(0, delay));
 			return () => clearTimeout(id);
-		}, [visible, config.appearDelay]);
+		}, [visible, config.appearDelay, appearAfter, scrolledPast]);
 
 		// Focus the chat input after the panel has opened. Runs post-commit, so
 		// the (previously hidden) textarea is in layout and can take focus.

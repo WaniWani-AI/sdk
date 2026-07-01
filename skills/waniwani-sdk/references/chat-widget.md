@@ -333,6 +333,20 @@ The rules match against `window.location.pathname`:
 
 This applies to **every** chat surface: floating, inline, and React. Rules are evaluated before the chat paints (no flash) and re-checked on client-side route changes, so they work on single-page apps. It's configured per channel in the dashboard — there is no script-tag attribute or prop for it. A channel with no rules shows everywhere.
 
+### Appear after scrolling (floating only, advanced)
+
+On pages where the floating bar shows, you can hold it back until the visitor scrolls past a specific element instead of using the fixed `data-appear-delay` timer — handy when the bar would otherwise overlap an above-the-fold hero.
+
+Configured per channel in the dashboard as **appear-after** rules, alongside the visibility rules. Each rule is a URL pattern (same glob dialect as visibility) plus a **CSS selector** on your page:
+
+- On a matching path, the bar stays hidden until that element is scrolled above the top of the viewport, then slides in.
+- It's **reactive** — scroll back up and the bar hides again, so it never re-collides with the element.
+- Paths with no matching rule keep the default `data-appear-delay` behavior.
+- These rules are independent of show/hide: adding one never changes *whether* the bar appears on a page, only *when*. A hidden page stays hidden.
+- If the selector matches nothing on the page, the bar fails open (shows) rather than staying hidden.
+
+Example: on `/`, hold the bar until the visitor scrolls past `#hero`. Everywhere else, the timer applies as usual.
+
 ## Shared building blocks
 
 ### `WelcomeConfig`

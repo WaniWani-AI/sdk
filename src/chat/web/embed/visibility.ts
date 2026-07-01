@@ -17,6 +17,17 @@ export interface VisibilityPattern {
 }
 
 /**
+ * One glob → "appear after" mapping. Orthogonal to {@link VisibilityPattern}:
+ * it never affects whether the bar shows on a page, only *when* it appears on
+ * pages where it's already visible. `appearAfter` is a CSS selector on the host
+ * page; the bar holds back until that element is scrolled above the viewport.
+ */
+export interface AppearPattern {
+	glob: string;
+	appearAfter: string;
+}
+
+/**
  * Per-channel visibility rules. Mirrors the app-side `visibility` JSONB shape
  * (WAN-516). Semantics: show on all pages by default, override per-URL.
  *
@@ -32,6 +43,13 @@ export interface VisibilityRules {
 	patterns?: VisibilityPattern[];
 	/** Glob patterns, in order. Key the app/dashboard persists. */
 	rules?: VisibilityPattern[];
+	/**
+	 * Per-URL "appear after" timing, in order. Independent of the show/hide
+	 * patterns above: the first rule whose glob matches the current path holds
+	 * the bar back until its `appearAfter` element is scrolled past. Pages with
+	 * no matching rule keep the default appear-delay timer.
+	 */
+	appearRules?: AppearPattern[];
 }
 
 /** The glob list from a rules object, under whichever key it arrived. */
@@ -106,4 +124,25 @@ export function isVisibleForPath(
 		return true; // a show match beats the default
 	}
 	return (rules.default ?? "show") !== "hide";
+}
+
+/**
+ * The "appear after" CSS selector for `pathname`, or `null` if none applies.
+ *
+ * Returns the `appearAfter` of the first {@link AppearPattern} whose glob
+ * matches — order decides ties. `null` (no rules, or no match) means the caller
+ * falls back to the default appear-delay timer. Only meaningful on paths where
+ * {@link isVisibleForPath} is already true; a hidden page never renders the bar
+ * regardless.
+ */
+export function appearTriggerForPath(
+	rules: VisibilityRules | null | undefined,
+	pathname: string,
+): string | null {
+	for (const pattern of rules?.appearRules ?? []) {
+		if (matchGlob(pattern.glob, pathname)) {
+			return pattern.appearAfter;
+		}
+	}
+	return null;
 }
