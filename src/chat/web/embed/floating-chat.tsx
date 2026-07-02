@@ -189,7 +189,8 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// CTAs. Only fires when there are suggestions to show and the bar is still
 		// at rest (`input`); if the visitor has already interacted (widened it,
 		// opened the chat), we leave their state alone. Firing off `appeared`
-		// means a click-away collapse back to `input` won't re-trigger it.
+		// means a collapse back to `input` (via the close button) won't
+		// re-trigger it.
 		useEffect(() => {
 			if (!appeared || suggestions.length === 0) {
 				return;
@@ -231,24 +232,6 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			);
 			return () => clearTimeout(id);
 		}, [phase]);
-
-		// Click-away from an expanded (but not-yet-open) bar collapses it back to
-		// the resting width. `composedPath()` so the hit-test works through the
-		// embed's shadow root, where `event.target` is retargeted to the host.
-		useEffect(() => {
-			if (phase !== "expanded") {
-				return;
-			}
-			const onPointerDown = (event: Event) => {
-				const dock = dockRef.current;
-				if (dock && !event.composedPath().includes(dock)) {
-					collapse();
-				}
-			};
-			document.addEventListener("pointerdown", onPointerDown, true);
-			return () =>
-				document.removeEventListener("pointerdown", onPointerDown, true);
-		}, [phase, collapse]);
 
 		const openWith = useCallback(
 			(text: string) => {
