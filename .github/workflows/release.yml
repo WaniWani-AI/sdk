@@ -113,15 +113,11 @@ jobs:
         if: steps.check.outputs.published == 'false'
         run: npm publish --access public --tag ${{ steps.channel.outputs.npm_tag }} --provenance --ignore-scripts
 
-      - name: Purge jsDelivr @latest cache
-        if: steps.check.outputs.published == 'false' && steps.channel.outputs.npm_tag == 'latest'
-        run: |
-          for path in \
-            "@waniwani/sdk@latest/dist/chat/embed.js" \
-            "@waniwani/sdk@latest/dist/chat/styles.css"; do
-            echo "Purging $path"
-            curl -sf "https://purge.jsdelivr.net/npm/$path" || echo "::warning::purge failed for $path"
-          done
+      # No CDN purge step: the chat embed is served via the app.waniwani.ai/embed.js
+      # loader, which resolves the latest version server-side (short-cached) and
+      # injects an immutable version-pinned bundle. Customers never load a mutable
+      # `@latest/*` CDN URL, so there is nothing to purge on release. See the
+      # embed loader docs in the app repo.
 
       - name: Create GitHub Release
         if: steps.check.outputs.published == 'false'

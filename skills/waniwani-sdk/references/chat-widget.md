@@ -174,7 +174,7 @@ The simplest possible snippet — no markup, no CSS — mounts an inline chat wh
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
+  src="https://app.waniwani.ai/embed.js"
   defer
   data-token="wwp_..."
   data-title="Support"
@@ -189,6 +189,29 @@ To control *where* the chat mounts (and to size it yourself), place a `[data-wan
 <div data-waniwani-embed></div>
 <script src="…/embed.js" defer data-token="wwp_..."></script>
 ```
+
+### How the script loads & updates
+
+The `src` is `https://app.waniwani.ai/embed.js`, **not** a CDN URL. That endpoint is a tiny **loader**: it resolves the latest published SDK version server-side and injects the real, version-pinned bundle from jsdelivr. You get automatic updates without ever editing the snippet.
+
+Two things make this work, and they matter if you're debugging "why am I still seeing the old widget":
+
+- **The loader is short-cached (`max-age=300`).** Waniwani controls this header, so a new release reaches every page within ~5 minutes. This is the knob a public CDN doesn't give you.
+- **The bundle it injects is version-pinned and immutable.** The loader emits `…/@waniwani/sdk@<exact-version>/dist/chat/embed.js`, which jsdelivr caches for a year. Fast, and it never goes stale for the wrong reasons.
+
+You don't need to purge anything on release. Do **not** hard-code a `cdn.jsdelivr.net/...@latest/...` URL yourself: mutable jsdelivr tags are served with a **7-day** browser cache Waniwani can't invalidate, so returning visitors would stay on an old build for up to a week. Always point at `app.waniwani.ai/embed.js`.
+
+> Serving the loader from the vendor's own domain (rather than a public CDN) is the standard pattern for embeddable widgets — Intercom (`widget.intercom.io`, `max-age=300`), Crisp (`client.crisp.chat/l.js`), and Drift (`js.driftt.com`, `no-cache`) all do the same, for the same reason: it's the only way to control how fast an update reaches your page.
+
+**Scenarios:**
+
+| Situation | What happens |
+|---|---|
+| Waniwani publishes a new SDK version | Within ~5 min the loader resolves it and pages inject the new pinned bundle. No action from you. |
+| A visitor loaded your page an hour ago, returns now | Their browser revalidates the loader (5-min TTL lapsed), picks up the current version, and swaps to the new bundle. |
+| You want to confirm which version is live | `curl -sI https://app.waniwani.ai/embed.js` — the `X-Waniwani-Embed-Version` header shows the pinned version currently served. |
+| You need to pin a version (e.g. reproduce a bug) | Temporarily point `src` at `https://cdn.jsdelivr.net/npm/@waniwani/sdk@<version>/dist/chat/embed.js`. Immutable, but you lose auto-updates — revert to the loader afterward. |
+| jsdelivr/npm briefly unreachable when the loader resolves | The loader falls back to a known-good pinned version, never `@latest` — so a resolution blip never degrades your cache posture. |
 
 ### Sizing the inline embed
 
@@ -246,7 +269,7 @@ Set `data-mode="floating"` for a docked, progressively-revealing chat (no `[data
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js"
+  src="https://app.waniwani.ai/embed.js"
   defer
   data-token="wwp_..."
   data-mode="floating"
@@ -263,7 +286,7 @@ The docked input types out the agent's configured input placeholder (set `data-l
 The IIFE exposes the same imperative methods as the React ref, both globally and on the instance returned by `init()`.
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@waniwani/sdk@latest/dist/chat/embed.js" defer></script>
+<script src="https://app.waniwani.ai/embed.js" defer></script>
 <script>
   window.addEventListener('DOMContentLoaded', async function() {
     const chat = window.WaniWani.chat.init({

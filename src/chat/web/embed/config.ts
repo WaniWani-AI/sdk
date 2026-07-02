@@ -203,7 +203,17 @@ export function findScriptTag(): HTMLScriptElement | null {
 		return document.currentScript;
 	}
 
-	// Fallback: find by src containing "embed"
+	// Fallback for async / late-injected execution, where `currentScript` is
+	// null. Prefer a script that actually carries config (`data-token`): when a
+	// loader (app.waniwani.ai/embed.js) injects this bundle, both scripts match
+	// `/embed/`, but the loader strips its own `data-token`, so this pins the
+	// real config carrier regardless of DOM order.
+	const withToken = document.querySelector("script[src][data-token]");
+	if (withToken instanceof HTMLScriptElement) {
+		return withToken;
+	}
+
+	// Last resort: first script whose src looks like the embed bundle.
 	const scripts = document.querySelectorAll("script[src]");
 	for (const script of scripts) {
 		if (script instanceof HTMLScriptElement && /embed/i.test(script.src)) {

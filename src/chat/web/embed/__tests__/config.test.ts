@@ -5,6 +5,7 @@ const g = globalThis as any;
 g.HTMLScriptElement = class HTMLScriptElement {};
 g.document = {
 	currentScript: null,
+	querySelector: () => null,
 	querySelectorAll: () => [],
 };
 
@@ -285,6 +286,87 @@ describe("parseConfigFromScript — data-show-tool-calls", () => {
 			"data-show-tool-calls": "maybe",
 		});
 		expect(cfg.showToolCalls).toBeUndefined();
+	});
+});
+
+describe("findScriptTag — loader scenario", () => {
+	test("returns document.currentScript when present (sync execution)", async () => {
+		const { findScriptTag } = await import(
+			`../config?t=${Date.now()}-${Math.random()}`
+		);
+		const prev = g.document;
+		const prevH = g.HTMLScriptElement;
+		g.HTMLScriptElement = class {};
+		const cur = {};
+		Object.setPrototypeOf(cur, g.HTMLScriptElement.prototype);
+		g.document = {
+			currentScript: cur,
+			querySelector: () => null,
+			querySelectorAll: () => [],
+		};
+		try {
+			expect(findScriptTag()).toBe(cur);
+		} finally {
+			g.document = prev;
+			g.HTMLScriptElement = prevH;
+		}
+	});
+
+	test("async: prefers the script carrying data-token (the injected bundle)", async () => {
+		const { findScriptTag } = await import(
+			`../config?t=${Date.now()}-${Math.random()}`
+		);
+		const prev = g.document;
+		const prevH = g.HTMLScriptElement;
+		g.HTMLScriptElement = class {};
+		// The loader has stripped its own data-token; only the bundle carries it.
+		const bundle = {
+			src: "https://cdn.jsdelivr.net/npm/@waniwani/sdk@0.14.11/dist/chat/embed.js",
+			getAttribute: (n: string) => (n === "data-token" ? "wwp_x" : null),
+		};
+		Object.setPrototypeOf(bundle, g.HTMLScriptElement.prototype);
+		g.document = {
+			currentScript: null,
+			querySelector: (sel: string) =>
+				sel === "script[src][data-token]" ? bundle : null,
+			querySelectorAll: () => [],
+		};
+		try {
+			expect(findScriptTag()).toBe(bundle);
+		} finally {
+			g.document = prev;
+			g.HTMLScriptElement = prevH;
+		}
+	});
+
+	test("async, no data-token anywhere: falls back to /embed/ src match", async () => {
+		const { findScriptTag } = await import(
+			`../config?t=${Date.now()}-${Math.random()}`
+		);
+		const prev = g.document;
+		const prevH = g.HTMLScriptElement;
+		g.HTMLScriptElement = class {};
+		const other = {
+			src: "https://example.com/analytics.js",
+			getAttribute: () => null,
+		};
+		const embed = {
+			src: "https://app.waniwani.ai/embed.js",
+			getAttribute: () => null,
+		};
+		Object.setPrototypeOf(other, g.HTMLScriptElement.prototype);
+		Object.setPrototypeOf(embed, g.HTMLScriptElement.prototype);
+		g.document = {
+			currentScript: null,
+			querySelector: () => null,
+			querySelectorAll: () => [other, embed],
+		};
+		try {
+			expect(findScriptTag()).toBe(embed);
+		} finally {
+			g.document = prev;
+			g.HTMLScriptElement = prevH;
+		}
 	});
 });
 
