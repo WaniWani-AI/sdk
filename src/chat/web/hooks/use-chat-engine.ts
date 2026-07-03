@@ -8,6 +8,7 @@ import type { ModelContextUpdate } from "../../../shared/model-context";
 import { hasModelContext } from "../../../shared/model-context";
 import type { ChatBaseProps } from "../@types";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
+import { buildApiUrl } from "../lib/api-url";
 import { LenientChatTransport } from "../lib/lenient-chat-transport";
 import {
 	deleteThread as deleteThreadFromStore,
@@ -84,7 +85,7 @@ async function fetchToolDefinitions(
 	api: string,
 	headers?: Record<string, string>,
 ): Promise<ToolDefinitionsMap> {
-	const url = `${api.replace(/\/$/, "")}/tools`;
+	const url = buildApiUrl(api, "/tools");
 	const response = await fetch(url, {
 		method: "GET",
 		headers: headers ? { ...headers } : undefined,
