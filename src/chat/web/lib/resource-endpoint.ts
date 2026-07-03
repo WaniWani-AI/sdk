@@ -1,3 +1,5 @@
+import { buildApiUrl } from "./api-url";
+
 /**
  * Build the resource-endpoint URL used by widget iframes to fetch their
  * HTML via GET.
@@ -21,7 +23,9 @@ export function buildResourceEndpoint(
 		typeof authHeaderValue === "string" && authHeaderValue.startsWith("Bearer ")
 			? authHeaderValue.slice(7)
 			: null;
-	return resourceToken
-		? `${api}/resource?token=${encodeURIComponent(resourceToken)}`
-		: `${api}/resource`;
+	return buildApiUrl(
+		api,
+		"/resource",
+		resourceToken ? { token: resourceToken } : undefined,
+	);
 }

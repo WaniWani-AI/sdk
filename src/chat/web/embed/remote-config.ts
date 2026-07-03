@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { useEffect, useState } from "react";
+import { buildApiUrl } from "../lib/api-url";
 import { debugLog } from "../lib/debug";
 import { firePageView } from "../lib/page-view";
 import type { EmbedConfig } from "./config";
@@ -120,10 +121,11 @@ export async function fetchRemoteConfig(
 	channelId?: string,
 ): Promise<Partial<EmbedConfig>> {
 	try {
-		const base = `${api.replace(/\/$/, "")}/config`;
-		const url = channelId
-			? `${base}?channel=${encodeURIComponent(channelId)}`
-			: base;
+		const url = buildApiUrl(
+			api,
+			"/config",
+			channelId ? { channel: channelId } : undefined,
+		);
 		const res = await fetch(url, {
 			method: "GET",
 			headers: { Authorization: `Bearer ${token}` },

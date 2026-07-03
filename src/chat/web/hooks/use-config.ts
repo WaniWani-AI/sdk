@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { buildApiUrl } from "../lib/api-url";
 
 export interface WaniWaniConfig {
 	debug: boolean;
@@ -30,7 +31,7 @@ export function useConfig(
 		(async () => {
 			try {
 				const current = headersRef.current;
-				const r = await fetch(`${api}/config`, {
+				const r = await fetch(buildApiUrl(api, "/config"), {
 					headers: current ? { ...current } : undefined,
 				});
 				const data = await r.json();
