@@ -21,6 +21,7 @@ Same SDK, hosted features added when the key is present.
 
 - `WaniwaniKvStore` (hosted flow state) — used by `createFlow` default when key is set
 - `waniwani()`, `tracking/*`, `withWaniwani`, `createTrackingRoute`, `widget-token`, `scoped-client` from `@waniwani/sdk` and `@waniwani/sdk/mcp`
+- Modules — `ctx.waniwani.modules.email.send()` inside `withWaniwani`-wrapped flow nodes (requires `projectId` in `waniwani.json`); types (`EmailModule`, `EmailSendInput`, `EmailSendResult`, `ModulesContext`) exported from `@waniwani/sdk/mcp`
 - `createKbClient` from `@waniwani/sdk/kb`
 - `useWaniwani` from `@waniwani/sdk/mcp/react` (also OSS — degrades to no-op without config; BYO endpoint also supported)
 - `WaniwaniChat` (hosted React chat — recommended), themes, `embed.js` (IIFE for non-React hosts), `styles.css` from `@waniwani/sdk/chat`
@@ -61,6 +62,7 @@ src/
 │   ├── server/
 │   │   ├── flows/        # OSS: createFlow, StateGraph
 │   │   ├── kv/           # OSS interface + MemoryKvStore + WaniwaniKvStore
+│   │   ├── modules/      # Free tier: ctx.waniwani.modules.* (email)
 │   │   ├── tools/        # LEGACY: createTool
 │   │   ├── resources/    # LEGACY: createResource
 │   │   ├── with-waniwani/# Free tier wrapper (no-key safe)
@@ -127,6 +129,7 @@ Target SDK **users**, not SDK developers.
 | `src/mcp/server/flows/` | `references/flows.md` + `flows-api-reference.md` |
 | `src/tracking/` + `src/mcp/server/scoped-client.ts` | `references/events.md` (NEW) |
 | `src/mcp/server/kv/` | `references/kv-store.md` (NEW) |
+| `src/mcp/server/modules/` | `references/modules.md` |
 | Self-hosting | `references/self-hosting.md` (NEW) |
 | `src/kb/` | `references/knowledge-base.md` |
 | `src/chat/web/` | `references/chat-widget.md` |

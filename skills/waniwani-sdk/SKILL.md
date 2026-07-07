@@ -82,7 +82,7 @@ Get a free key at [app.waniwani.ai](https://app.waniwani.ai). See [setup.md](ref
 | Export | Purpose | Tier | Reference |
 |---|---|---|---|
 | `@waniwani/sdk` | `waniwani()` client, `track.*` event helpers, `WaniWaniError` | Free tier | [setup.md](references/setup.md), [events.md](references/events.md) |
-| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md), [events.md](references/events.md) |
+| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers, modules types | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md), [events.md](references/events.md), [modules.md](references/modules.md) |
 | `@waniwani/sdk/mcp/react` | `useWaniwani` standalone tracking hook | OSS + Free tier | (rest of this entry point is legacy) |
 | `@waniwani/sdk/chat` | `ChatEmbed`, themes | Free tier | [chat-widget.md](references/chat-widget.md) |
 | `@waniwani/sdk/chat/embed.js` | Self-contained `<script>` install for any website | Free tier | [chat-widget.md](references/chat-widget.md) |
@@ -112,6 +112,7 @@ Adds hosted features on top of the OSS flow engine.
 - **Knowledge base** — `createKbClient()` for ingest/search.
 - **Funnel analytics** — flow graphs auto-sync to the dashboard.
 - **Chat widget** — `ChatEmbed` talks directly to `app.waniwani.ai`.
+- **Modules** — `ctx.waniwani.modules.email.send()` inside flow nodes (requires `projectId` in `waniwani.json`). See [modules.md](references/modules.md).
 
 `withWaniwani(server)` is safe to call with or without an API key — its auto-captured `tool.called` events are internally guarded, and session-ID bridging and widget metadata forwarding still happen. Your own tracking calls are **not** guarded: `client.track.*`, `identify()`, and the scoped `context.waniwani` throw `WANIWANI_API_KEY is not set` when no key is configured, so guard them in code paths that must also run keyless. See [events.md](references/events.md).
 
@@ -133,6 +134,7 @@ The following are still exported for back-compat with existing customer MCPs but
 | Add a free-tier API key and unlock tracking + dashboard | [setup.md](references/setup.md) |
 | Track events and build a revenue funnel (lead → price → converted), incl. off-platform conversions | [events.md](references/events.md) |
 | Use the flow API in detail (nodes, edges, interrupts, widgets) | [flows-api-reference.md](references/flows-api-reference.md) |
+| Send emails from flow nodes | [modules.md](references/modules.md) |
 | Add knowledge-base search | [knowledge-base.md](references/knowledge-base.md) |
 | Embed the chat widget on a website | [chat-widget.md](references/chat-widget.md) |
 | Upgrade the SDK / fix a build that broke after a version bump | [upgrading.md](references/upgrading.md) |

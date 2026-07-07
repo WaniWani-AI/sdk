@@ -30,6 +30,13 @@ export {
 // Generic key-value store — OSS interface, free-tier hosted impl
 export type { KvStore, KvStoreSetOptions } from "./server/kv";
 export { MemoryKvStore, WaniwaniKvStore } from "./server/kv";
+// Modules — pre-built integrations for MCP flows (email, etc.)
+export type {
+	EmailModule,
+	EmailSendInput,
+	EmailSendResult,
+	ModulesContext,
+} from "./server/modules";
 // Scoped client — free tier (used inside withWaniwani-wrapped tools)
 export type { ScopedWaniWaniClient } from "./server/scoped-client";
 // Tracking helpers — free tier

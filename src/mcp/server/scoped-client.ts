@@ -6,6 +6,8 @@ import type {
 	TrackingClient,
 } from "../../tracking/@types.js";
 import { createRevenueApi } from "../../tracking/revenue.js";
+import { createEmailModule } from "./modules/email/index.js";
+import type { ModulesContext } from "./modules/index.js";
 
 /**
  * Well-known key used to attach the scoped client to the MCP `extra` object.
@@ -33,8 +35,13 @@ export interface ScopedWaniWaniClient {
 	): Promise<{ eventId: string }>;
 	/** Knowledge base client (no meta needed). */
 	readonly kb: KbClient;
+	/**
+	 * Pre-built integrations for MCP flows.
+	 * Requires `projectId` in `waniwani.json` to be set.
+	 */
+	readonly modules: ModulesContext;
 	/** @internal Resolved API config from withWaniwani(). */
-	readonly _config?: { apiUrl?: string; apiKey?: string };
+	readonly _config?: { apiUrl?: string; apiKey?: string; projectId?: string };
 }
 
 /**
@@ -57,10 +64,29 @@ export function createScopedClient(
 		readonly kb: KbClient;
 	},
 	meta: Record<string, unknown>,
-	config?: { apiUrl?: string; apiKey?: string },
+	config?: { apiUrl?: string; apiKey?: string; projectId?: string },
 ): ScopedWaniWaniClient {
 	const trackOnce = (event: TrackInput): Promise<{ eventId: string }> =>
 		base.track({ ...event, meta: { ...meta, ...event.meta } });
+
+	const modules: ModulesContext = {
+		email:
+			config?.apiUrl && config?.apiKey && config?.projectId
+				? createEmailModule({
+						apiUrl: config.apiUrl,
+						apiKey: config.apiKey,
+						projectId: config.projectId,
+					})
+				: {
+						send: () =>
+							Promise.reject(
+								new Error(
+									"Email module unavailable: missing apiUrl, apiKey, or projectId in config. " +
+										"Set projectId in waniwani.json to enable modules.",
+								),
+							),
+					},
+	};
 
 	return {
 		track: Object.assign(trackOnce, createRevenueApi(trackOnce)),
@@ -68,6 +94,7 @@ export function createScopedClient(
 			return base.identify(userId, properties, meta);
 		},
 		kb: base.kb,
+		modules,
 		_config: config,
 	};
 }
