@@ -95,12 +95,11 @@ export function extractCorrelationId(
 /**
  * Channel the conversation belongs to, as forwarded by the calling host.
  *
- * The WaniWani app sends the channel UUID as `waniwani/channelId`; when the
- * request has no real channel it sends a stable bucket label instead (e.g.
- * `"playground"` for dashboard test sessions). Servers wrapped with
- * `withWaniwani` additionally get a fallback stamped for hosts that send no
- * channel at all: the resolved source (`"claude"`, `"chatgpt"`) or
- * `"unknown"` — so this always returns a value inside wrapped tool handlers.
+ * The WaniWani app forwards the channel UUID as `waniwani/channelId` when the
+ * request resolved a real channel; there is deliberately no synthetic
+ * fallback. Hosts that talk to the server directly (Claude, ChatGPT) send no
+ * channel, so this returns undefined for them — derive coarse attribution
+ * from `extractSource` / `waniwani/authSource` instead.
  */
 export function extractChannelId(
 	meta: Record<string, unknown> | undefined,
