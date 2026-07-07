@@ -6,6 +6,7 @@ import { REDACTED_STATE_UPDATE_FIELDS_META_KEY } from "../flows/redacted.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import type { McpServer } from "../types";
 import {
+	extractChannelId,
 	extractSessionId,
 	extractSource,
 	extractSourceFromHeaders,
@@ -209,20 +210,34 @@ function createWrappedHandler(
 			}
 		}
 
-		// Resolve and stamp the caller source into _meta once, so downstream
-		// consumers (flow nodes, nested tool handlers, tracking) can branch on
+		// Resolve the caller source once from every available signal. Hosts like
+		// Claude carry no source in _meta and no transport session id; clientInfo
+		// (MCP initialize) and the request headers are the only signals.
+		const requestHeaders = isRecord(extra)
+			? ((extra as { requestInfo?: { headers?: unknown } }).requestInfo
+					?.headers as Record<string, unknown> | undefined)
+			: undefined;
+		const resolvedSource =
+			extractSource(meta, clientInfo) ??
+			extractSourceFromHeaders(requestHeaders);
+
+		// Stamp the caller source into _meta once, so downstream consumers
+		// (flow nodes, nested tool handlers, tracking) can branch on
 		// `waniwani/source` without each re-deriving it from clientInfo/headers.
-		// Hosts like Claude carry no source in _meta and no transport session id;
-		// clientInfo (MCP initialize) and the request headers are the only signals.
-		if (!extractSource(meta) && isRecord(extra)) {
-			const headers = (extra as { requestInfo?: { headers?: unknown } })
-				.requestInfo?.headers as Record<string, unknown> | undefined;
-			const resolvedSource =
-				extractSource(meta, clientInfo) ?? extractSourceFromHeaders(headers);
-			if (resolvedSource) {
-				meta["waniwani/source"] = resolvedSource;
-				(extra as UnknownRecord)._meta = meta;
-			}
+		if (!extractSource(meta) && isRecord(extra) && resolvedSource) {
+			meta["waniwani/source"] = resolvedSource;
+			(extra as UnknownRecord)._meta = meta;
+		}
+
+		// Guarantee `waniwani/channelId` is always present in _meta. The WaniWani
+		// app forwards a real channel id (or a bucket label like "playground");
+		// hosts that talk to the server directly send none, so fall back to the
+		// resolved source ("claude", "chatgpt") and finally "unknown". Downstream
+		// consumers (e.g. MCPs forwarding attribution to their own APIs) can rely
+		// on `extractChannelId` returning a value inside wrapped handlers.
+		if (!extractChannelId(meta) && isRecord(extra)) {
+			meta["waniwani/channelId"] = resolvedSource ?? "unknown";
+			(extra as UnknownRecord)._meta = meta;
 		}
 
 		const scopedClient = createScopedClient(tracker, meta, {

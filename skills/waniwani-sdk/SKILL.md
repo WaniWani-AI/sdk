@@ -82,7 +82,7 @@ Get a free key at [app.waniwani.ai](https://app.waniwani.ai). See [setup.md](ref
 | Export | Purpose | Tier | Reference |
 |---|---|---|---|
 | `@waniwani/sdk` | `waniwani()` client, `track.*` event helpers, `WaniWaniError` | Free tier | [setup.md](references/setup.md), [events.md](references/events.md) |
-| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md), [events.md](references/events.md) |
+| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, `extractChannelId`, tracking helpers | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md), [events.md](references/events.md) |
 | `@waniwani/sdk/mcp/react` | `useWaniwani` standalone tracking hook | OSS + Free tier | (rest of this entry point is legacy) |
 | `@waniwani/sdk/chat` | `ChatEmbed`, themes | Free tier | [chat-widget.md](references/chat-widget.md) |
 | `@waniwani/sdk/chat/embed.js` | Self-contained `<script>` install for any website | Free tier | [chat-widget.md](references/chat-widget.md) |
@@ -113,7 +113,7 @@ Adds hosted features on top of the OSS flow engine.
 - **Funnel analytics** — flow graphs auto-sync to the dashboard.
 - **Chat widget** — `ChatEmbed` talks directly to `app.waniwani.ai`.
 
-`withWaniwani(server)` is safe to call with or without an API key — its auto-captured `tool.called` events are internally guarded, and session-ID bridging and widget metadata forwarding still happen. Your own tracking calls are **not** guarded: `client.track.*`, `identify()`, and the scoped `context.waniwani` throw `WANIWANI_API_KEY is not set` when no key is configured, so guard them in code paths that must also run keyless. See [events.md](references/events.md).
+`withWaniwani(server)` is safe to call with or without an API key — its auto-captured `tool.called` events are internally guarded, and session-ID bridging, channel-ID stamping (`waniwani/channelId` always carries a value inside wrapped handlers — read it with `extractChannelId`), and widget metadata forwarding still happen. Your own tracking calls are **not** guarded: `client.track.*`, `identify()`, and the scoped `context.waniwani` throw `WANIWANI_API_KEY is not set` when no key is configured, so guard them in code paths that must also run keyless. See [events.md](references/events.md).
 
 ### Legacy
 

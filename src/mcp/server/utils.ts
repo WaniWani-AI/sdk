@@ -53,6 +53,8 @@ const EXTERNAL_USER_ID_KEYS = [
 
 const CORRELATION_ID_KEYS = ["correlationId", "openai/requestId"] as const;
 
+const CHANNEL_ID_KEYS = ["waniwani/channelId", "channelId"] as const;
+
 const TURN_COUNT_KEYS = ["waniwani/turnCount"] as const;
 
 /** Meta key for flow execution path (nodesVisited, flowId). */
@@ -88,6 +90,22 @@ export function extractCorrelationId(
 	meta: Record<string, unknown> | undefined,
 ): string | undefined {
 	return meta ? pickFirst(meta, CORRELATION_ID_KEYS) : undefined;
+}
+
+/**
+ * Channel the conversation belongs to, as forwarded by the calling host.
+ *
+ * The WaniWani app sends the channel UUID as `waniwani/channelId`; when the
+ * request has no real channel it sends a stable bucket label instead (e.g.
+ * `"playground"` for dashboard test sessions). Servers wrapped with
+ * `withWaniwani` additionally get a fallback stamped for hosts that send no
+ * channel at all: the resolved source (`"claude"`, `"chatgpt"`) or
+ * `"unknown"` — so this always returns a value inside wrapped tool handlers.
+ */
+export function extractChannelId(
+	meta: Record<string, unknown> | undefined,
+): string | undefined {
+	return meta ? pickFirst(meta, CHANNEL_ID_KEYS) : undefined;
 }
 
 /**

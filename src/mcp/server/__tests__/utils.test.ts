@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { extractSource, extractSourceFromHeaders } from "../utils";
+import {
+	extractChannelId,
+	extractSource,
+	extractSourceFromHeaders,
+} from "../utils";
 
 describe("extractSource", () => {
 	it("returns undefined for missing meta", () => {
@@ -110,6 +114,39 @@ describe("extractSource", () => {
 				extractSource({ "waniwani/source": "playground" }, { name: "Claude" }),
 			).toBe("playground");
 		});
+	});
+});
+
+describe("extractChannelId", () => {
+	it("returns undefined for missing meta", () => {
+		expect(extractChannelId(undefined)).toBeUndefined();
+		expect(extractChannelId({})).toBeUndefined();
+	});
+
+	it("returns the namespaced waniwani/channelId when set", () => {
+		expect(
+			extractChannelId({
+				"waniwani/channelId": "5d7a2c9e-1234-4f00-9a9b-000000000000",
+			}),
+		).toBe("5d7a2c9e-1234-4f00-9a9b-000000000000");
+	});
+
+	it("falls back to the generic channelId key", () => {
+		expect(extractChannelId({ channelId: "chan-1" })).toBe("chan-1");
+	});
+
+	it("namespaced key wins over the generic key", () => {
+		expect(
+			extractChannelId({
+				"waniwani/channelId": "chan-namespaced",
+				channelId: "chan-generic",
+			}),
+		).toBe("chan-namespaced");
+	});
+
+	it("ignores non-string and empty values", () => {
+		expect(extractChannelId({ "waniwani/channelId": 42 })).toBeUndefined();
+		expect(extractChannelId({ "waniwani/channelId": "" })).toBeUndefined();
 	});
 });
 

@@ -200,6 +200,9 @@ describe("withWaniwani", () => {
 
 		expect(tracked[0]?.meta).toEqual({
 			"openai/sessionId": "session-1",
+			// Stamped by the wrapper: no explicit channel id, so the fallback is
+			// the meta-derived source (openai session → chatgpt).
+			"waniwani/channelId": "chatgpt",
 		});
 	});
 
@@ -226,6 +229,92 @@ describe("withWaniwani", () => {
 		);
 		// And carried through to the tracked event source.
 		expect(tracked[0]?.source).toBe("claude");
+	});
+
+	test("stamps waniwani/channelId from the resolved source when the host sends none", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra = {
+			_meta: {},
+			requestInfo: { headers: { "user-agent": "Claude-User" } },
+		} as Record<string, unknown>;
+		await handler?.({}, extra);
+
+		expect((extra._meta as Record<string, unknown>)["waniwani/channelId"]).toBe(
+			"claude",
+		);
+	});
+
+	test("stamps waniwani/channelId as unknown when no source resolves", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra = { _meta: {} } as Record<string, unknown>;
+		await handler?.({}, extra);
+
+		expect((extra._meta as Record<string, unknown>)["waniwani/channelId"]).toBe(
+			"unknown",
+		);
+	});
+
+	test("keeps an explicit waniwani/channelId untouched", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra = {
+			_meta: { "waniwani/channelId": "chan-uuid-1" },
+			requestInfo: { headers: { "user-agent": "Claude-User" } },
+		} as Record<string, unknown>;
+		await handler?.({}, extra);
+
+		expect((extra._meta as Record<string, unknown>)["waniwani/channelId"]).toBe(
+			"chan-uuid-1",
+		);
+	});
+
+	// Sources derivable from meta keys (openai/sessionId → chatgpt) never get
+	// stamped as waniwani/source; the channel id fallback must still see them.
+	test("channel id fallback uses a meta-derived source that was not stamped", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra = {
+			_meta: { "openai/sessionId": "v1/abc" },
+		} as Record<string, unknown>;
+		await handler?.({}, extra);
+
+		expect((extra._meta as Record<string, unknown>)["waniwani/channelId"]).toBe(
+			"chatgpt",
+		);
 	});
 
 	test("does not override an explicit _meta source with header detection", async () => {
