@@ -578,6 +578,8 @@ This is the top of the funnel: it counts everyone who *landed* on a page where t
 
 The event goes to the same canonical ingest every other event uses (`POST /api/mcp/events/v2/batch`, the V2 batch envelope), authenticated with the same public `wwp_...` token the widget already uses for `/chat` and `/config` (no API key, no separate JWT in the browser). Tracking is fire-and-forget — failures never break the chat.
 
+**Surface attribution.** Every event the widget produces carries `properties.mode`, the embed surface it came from: `"floating"` for the floating bar, `"inline"` for an in-page mount (`<WaniwaniChat>` or the inline `<script>` embed). `page.viewed` sets it directly; chat requests send the same value with every turn, so the server-logged `chat.user_message` and `chat.assistant_message` events carry it too. Use it to slice analytics by surface, for example floating-bar conversations vs inline ones on the same channel.
+
 **Opting out.** On surfaces where a page view is meaningless — an already-authenticated app shell, an internal tool, a staging preview — suppress the event so it doesn't inflate the customer's funnel. Set `overrides={{ disablePageView: true }}` on `<WaniwaniChat>`, or `data-disable-page-view="true"` (a bare `data-disable-page-view` works too) on the `<script>` embed. The rest of the widget is unaffected; only the `page.viewed` event is skipped.
 
 ## `ChatEmbed` (advanced)

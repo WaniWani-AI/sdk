@@ -32,6 +32,10 @@ Think of instrumentation as three stages. Emit at least the **start** and the
 | **Step** | `option_selected` | `track.optionSelected({ id, amount, currency })` | The user picked one of those options. |
 | **Conversion** | `converted` | `track.converted({ amount, currency })` | The user became paying — possibly later, off-platform. |
 
+Events produced by the chat widget (`page.viewed`, `chat.user_message`,
+`chat.assistant_message`) also carry `properties.mode` (`"floating"` for the floating
+bar, `"inline"` for an in-page mount) so funnels can be sliced by embed surface.
+
 The conceptual "start / step / conversion" maps onto these concrete events. There is
 **no generic `step()` helper and no arbitrary custom event name** in the typed surface —
 model your funnel steps with the revenue events above. Emitting `track.lead(...)` once

@@ -272,7 +272,10 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 		// re-evaluates on SPA route changes.
 		const visible = useVisibilityGate(config.visibility, ready);
 
-		const body: Record<string, unknown> = {};
+		// `mode` tags every chat request with the embed surface so server-logged
+		// chat events carry it in `properties.mode`, matching `page.viewed`.
+		// `WaniwaniChat` is always an in-page mount, so it reports "inline".
+		const body: Record<string, unknown> = { mode: "inline" };
 		if (config.mcpServerUrl) {
 			body.mcpServerUrl = config.mcpServerUrl;
 		}
@@ -290,7 +293,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				api={config.api ?? DEFAULT_API}
 				headers={{ Authorization: `Bearer ${config.token}` }}
 				skipRemoteConfig
-				body={Object.keys(body).length > 0 ? body : undefined}
+				body={body}
 				appearance={config.appearance}
 				title={config.title}
 				hideHeader={config.hideHeader}
