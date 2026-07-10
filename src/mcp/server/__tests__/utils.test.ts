@@ -96,6 +96,16 @@ describe("extractSource", () => {
 			expect(extractSource({}, { name: "CLAUDE" })).toBe("claude");
 		});
 
+		it("derives chatgpt from an openai/chatgpt clientInfo.name", () => {
+			expect(extractSource({}, { name: "ChatGPT" })).toBe("chatgpt");
+			expect(extractSource({}, { name: "openai-mcp" })).toBe("chatgpt");
+			expect(extractSource(undefined, { name: "OpenAI" })).toBe("chatgpt");
+		});
+
+		it("derives gemini from a gemini clientInfo.name", () => {
+			expect(extractSource({}, { name: "Gemini" })).toBe("gemini");
+		});
+
 		it("returns undefined for unknown clientInfo.name", () => {
 			expect(extractSource({}, { name: "some-other-client" })).toBeUndefined();
 			expect(extractSource({}, { name: "" })).toBeUndefined();
@@ -146,7 +156,16 @@ describe("extractSourceFromHeaders", () => {
 		);
 	});
 
-	it("returns undefined for non-Claude user agents", () => {
+	it("derives chatgpt from an openai/chatgpt user-agent", () => {
+		expect(extractSourceFromHeaders({ "user-agent": "ChatGPT-User/1.0" })).toBe(
+			"chatgpt",
+		);
+		expect(
+			extractSourceFromHeaders({ "user-agent": "OpenAI-Python/1.2" }),
+		).toBe("chatgpt");
+	});
+
+	it("returns undefined for unrecognized user agents", () => {
 		expect(
 			extractSourceFromHeaders({ "user-agent": "Mozilla/5.0" }),
 		).toBeUndefined();

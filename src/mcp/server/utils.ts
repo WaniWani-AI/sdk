@@ -123,11 +123,21 @@ const SOURCE_SESSION_KEYS = [
  * the SDK maps to a known source. Match is case-insensitive substring on the
  * advertised name, so this catches "Claude", "Claude Code", "claude-ai", etc.
  * without having to enumerate every surface.
+ *
+ * ChatGPT is primarily identified by its `openai/*` session key (see
+ * SOURCE_SESSION_KEYS), but a session without that key still resolves here from
+ * the advertised client name so assistant traffic is attributed consistently.
+ * First match wins, so order the needles most-specific first.
  */
 const CLIENT_INFO_NAME_SOURCES: ReadonlyArray<{
 	needle: string;
 	source: string;
-}> = [{ needle: "claude", source: "claude" }];
+}> = [
+	{ needle: "claude", source: "claude" },
+	{ needle: "chatgpt", source: "chatgpt" },
+	{ needle: "openai", source: "chatgpt" },
+	{ needle: "gemini", source: "gemini" },
+];
 
 export type ExtractSourceClientInfo = {
 	name?: string;
@@ -208,6 +218,11 @@ export function extractSourceFromHeaders(
 		(anthropicClient && /claude|anthropic/i.test(anthropicClient))
 	) {
 		return "claude";
+	}
+	// ChatGPT / OpenAI surfaces without an `openai/*` session key still send an
+	// OpenAI user-agent (e.g. `ChatGPT-User`), so attribute them here too.
+	if (userAgent && /chatgpt|openai/i.test(userAgent)) {
+		return "chatgpt";
 	}
 	return undefined;
 }
