@@ -103,7 +103,7 @@ describe("firePageView", () => {
 		}
 	});
 
-	test("is a no-op without an api, token, or source", async () => {
+	test("is a no-op without an api or token", async () => {
 		const { calls, restore } = mockFetch();
 		try {
 			await firePageView({ api: "", token: "wwp_test", source: "acme-web" });
@@ -112,14 +112,29 @@ describe("firePageView", () => {
 				token: "",
 				source: "acme-web",
 			});
-			// No source resolved from /config — skip rather than fire a generic
-			// "widget" attribution.
+			expect(calls).toHaveLength(0);
+		} finally {
+			restore();
+		}
+	});
+
+	test("fires without a source tag when the channel has no configured source", async () => {
+		const { calls, restore } = mockFetch();
+		try {
+			// A channel with a blank Analytics source still records page views;
+			// attribution rides on `properties.channelId`. No source tag is sent,
+			// and none is invented.
 			await firePageView({
 				api: "https://app.waniwani.ai/api/mcp/chat",
 				token: "wwp_test",
 				channelId: "chan_1",
 			});
-			expect(calls).toHaveLength(0);
+			expect(calls).toHaveLength(1);
+			const batch = JSON.parse(calls[0].init.body as string);
+			const [ev] = batch.events;
+			expect(ev.name).toBe("page.viewed");
+			expect("source" in ev).toBe(false);
+			expect(ev.properties.channelId).toBe("chan_1");
 		} finally {
 			restore();
 		}

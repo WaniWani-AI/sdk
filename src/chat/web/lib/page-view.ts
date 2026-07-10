@@ -26,9 +26,11 @@ export interface FirePageViewOptions {
 	/** Embed mode the widget initialized in. */
 	mode?: "inline" | "floating";
 	/**
-	 * Channel-specific event source from the resolved `/config`. Required for
-	 * the event to fire: without it the page view is skipped, so events always
-	 * attribute to a real channel source.
+	 * Channel-specific event source from the resolved `/config`, used as the
+	 * event's `source` tag so events can be sliced by channel. Optional: the
+	 * event attributes to its channel via `properties.channelId` regardless, so
+	 * a channel with no configured source still records page views. Omitted from
+	 * the event entirely when blank.
 	 */
 	source?: string;
 }
@@ -63,7 +65,7 @@ function eventsEndpoint(api: string): string {
  */
 export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 	const { api, token, channelId, mode, source } = opts;
-	if (typeof window === "undefined" || !api || !token || !source) {
+	if (typeof window === "undefined" || !api || !token) {
 		return;
 	}
 
