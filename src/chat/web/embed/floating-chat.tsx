@@ -297,7 +297,9 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			}
 		}, []);
 
-		const body: Record<string, unknown> = {};
+		// `mode` tags every chat request with the embed surface so server-logged
+		// chat events carry it in `properties.mode`, matching `page.viewed`.
+		const body: Record<string, unknown> = { mode: "floating" };
 		if (config.mcpServerUrl) {
 			body.mcpServerUrl = config.mcpServerUrl;
 		}
@@ -467,7 +469,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 								api={config.api ?? ""}
 								headers={{ Authorization: `Bearer ${config.token}` }}
 								skipRemoteConfig
-								body={Object.keys(body).length > 0 ? body : undefined}
+								body={body}
 								appearance={config.appearance}
 								title={config.title}
 								headerActions={closeButton}
