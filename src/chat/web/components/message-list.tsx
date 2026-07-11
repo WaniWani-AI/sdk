@@ -1,7 +1,12 @@
 "use client";
 
 import type { ChatStatus, ReasoningUIPart, ToolUIPart, UIMessage } from "ai";
-import { GlobeIcon, type LucideIcon, WrenchIcon } from "lucide-react";
+import {
+	ClockIcon,
+	GlobeIcon,
+	type LucideIcon,
+	WrenchIcon,
+} from "lucide-react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import type { ShowToolCalls, WelcomeConfig } from "../@types";
 import { Attachments } from "../ai-elements/attachments";
@@ -265,72 +270,92 @@ export function MessageList({
 						    reasoning trace folds in at the top, then each tool is a
 						    timeline step. `full` makes steps expand to their
 						    request/response JSON; `titles-only` shows label-only steps. */}
-						{showChain && (
-							<ChainOfThought
-								// Drive the header off the whole turn streaming (stable),
-								// not per-step running (which blips false between steps and
-								// makes the label flicker / settle early).
-								isWorking={
-									isLastAssistant &&
-									(status === "streaming" || status === "submitted")
-								}
-							>
-								<ChainOfThoughtHeader
-									workingLabel={t.chainOfThought.working}
-									label={t.chainOfThought.done}
-								/>
-								<ChainOfThoughtContent>
-									{activityParts.map((part, i) => {
-										const isLast = i === activityParts.length - 1;
-										if (part.type === "reasoning") {
-											return (
-												<ChainOfThoughtReasoning
-													key={`reasoning-${message.id}-${i}`}
-													isStreaming={part.state === "streaming"}
-													isLast={isLast}
-												>
-													{part.text}
-												</ChainOfThoughtReasoning>
-											);
+						{showChain &&
+							(() => {
+								// The active step drives the collapsed chain's single-line
+								// ticker: it's the last activity part (the one the model is
+								// on), mapped to a timeline icon + label. Reasoning reads as
+								// "Thinking…"; a tool reads as its humanized name.
+								const last = activityParts[activityParts.length - 1];
+								const activeStep =
+									last.type === "reasoning"
+										? { icon: ClockIcon, label: t.reasoning.thinking }
+										: {
+												icon: pickStepIcon(last.toolName),
+												label: last.title ?? formatToolName(last.toolName),
+											};
+								return (
+									<ChainOfThought
+										// Drive the header off the whole turn streaming (stable),
+										// not per-step running (which blips false between steps and
+										// makes the label flicker / settle early).
+										isWorking={
+											isLastAssistant &&
+											(status === "streaming" || status === "submitted")
 										}
-										const title = part.title ?? formatToolName(part.toolName);
-										const icon = pickStepIcon(part.toolName);
-										if (showToolCalls === "titles-only") {
-											return (
-												<ChainOfThoughtStep
-													key={part.toolCallId}
-													icon={icon}
-													title={title}
-													state={part.state}
-													isLast={isLast}
-												/>
-											);
-										}
-										const output = "output" in part ? part.output : undefined;
-										return (
-											<ChainOfThoughtStep
-												key={part.toolCallId}
-												icon={icon}
-												title={title}
-												state={part.state}
-												isLast={isLast}
-											>
-												<ToolInput input={part.input} debug={debug} />
-												{output !== undefined && (
-													<ToolOutput
-														output={output}
-														errorText={
-															"errorText" in part ? part.errorText : undefined
-														}
-														debug={debug}
-													/>
-												)}
-											</ChainOfThoughtStep>
-										);
-									})}
-								</ChainOfThoughtContent>
-							</ChainOfThought>
-						)}
+										activeStep={activeStep}
+									>
+										<ChainOfThoughtHeader
+											workingLabel={t.chainOfThought.working}
+											label={t.chainOfThought.done}
+										/>
+										<ChainOfThoughtContent>
+											{activityParts.map((part, i) => {
+												const isLast = i === activityParts.length - 1;
+												if (part.type === "reasoning") {
+													return (
+														<ChainOfThoughtReasoning
+															key={`reasoning-${message.id}-${i}`}
+															isStreaming={part.state === "streaming"}
+															isLast={isLast}
+														>
+															{part.text}
+														</ChainOfThoughtReasoning>
+													);
+												}
+												const title =
+													part.title ?? formatToolName(part.toolName);
+												const icon = pickStepIcon(part.toolName);
+												if (showToolCalls === "titles-only") {
+													return (
+														<ChainOfThoughtStep
+															key={part.toolCallId}
+															icon={icon}
+															title={title}
+															state={part.state}
+															isLast={isLast}
+														/>
+													);
+												}
+												const output =
+													"output" in part ? part.output : undefined;
+												return (
+													<ChainOfThoughtStep
+														key={part.toolCallId}
+														icon={icon}
+														title={title}
+														state={part.state}
+														isLast={isLast}
+													>
+														<ToolInput input={part.input} debug={debug} />
+														{output !== undefined && (
+															<ToolOutput
+																output={output}
+																errorText={
+																	"errorText" in part
+																		? part.errorText
+																		: undefined
+																}
+																debug={debug}
+															/>
+														)}
+													</ChainOfThoughtStep>
+												);
+											})}
+										</ChainOfThoughtContent>
+									</ChainOfThought>
+								);
+							})()}
 						{/* Lone tool with no reasoning → render it directly (no chain
 						    wrapper, which would just duplicate the one step under a
 						    header). With reasoning present, the chain above handles it. */}

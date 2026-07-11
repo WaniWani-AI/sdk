@@ -9,25 +9,34 @@ import {
 	useContext,
 	useEffect,
 	useMemo,
-	useRef,
 	useState,
 } from "react";
 import { cn } from "../lib/utils";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "./reasoning";
 import { Shimmer } from "./shimmer";
 
-const AUTO_CLOSE_DELAY = 1000;
-// Delay after the auto-close fires before swapping the header label, so the
-// text change trails the collapse animation instead of racing it (smoother).
-const SETTLE_AFTER_CLOSE = 240;
+// After work ends, hold the last action on the single-line ticker for a beat
+// (shimmer off, label static) before swapping to the settled accordion header,
+// so the transition reads as "landed" rather than an abrupt cut.
+const SETTLE_DELAY = 500;
+
+/** A single live action shown on the collapsed chain's one-line ticker: the
+ * step's timeline icon plus a short label (e.g. a wrench + "Getting a quote"). */
+export type ChainStep = {
+	icon: LucideIcon;
+	label: string;
+};
 
 interface ChainContextValue {
 	open: boolean;
 	setOpen: (open: boolean) => void;
 	isWorking: boolean;
-	/** Latches true only after the chain has finished its post-work collapse,
-	 * so the header label swaps after the thread closes — not mid-collapse. */
+	/** Latches true once the run is done (after {@link SETTLE_DELAY}). While
+	 * false the header is the live single-line ticker; once true it becomes the
+	 * clickable "Thought process" accordion. */
 	settled: boolean;
+	/** The in-flight step — drives the ticker while unsettled. */
+	activeStep?: ChainStep;
 }
 
 const ChainContext = createContext<ChainContextValue | null>(null);
@@ -43,26 +52,36 @@ function useChain(): ChainContextValue {
 }
 
 export type ChainOfThoughtProps = HTMLAttributes<HTMLDivElement> & {
-	/** True while any step is still running (no output yet). Drives the
-	 * shimmering header and the auto open/close behavior. */
+	/** True while the turn is still in flight. While true the chain stays
+	 * collapsed and the header is a live single-line ticker of {@link activeStep};
+	 * when it flips false the chain settles into a clickable accordion. */
 	isWorking?: boolean;
+	/** The step being executed. While working, the collapsed chain shows this
+	 * as one shimmering line, swapping cleanly as the step changes. Ignored once
+	 * the chain has settled. */
+	activeStep?: ChainStep;
 	open?: boolean;
 	defaultOpen?: boolean;
 	onOpenChange?: (open: boolean) => void;
 };
 
 /**
- * Compound root that groups a run of tool-call steps into a single
- * collapsible "chain of thought". Mirrors the {@link Reasoning} lifecycle:
- * auto-opens while work is in flight so the live steps are visible, then
- * auto-collapses ~1s after the last step completes, leaving a tidy header.
+ * Compound root that groups a run of tool-call steps into a single "chain of
+ * thought". While working it stays collapsed and the header shows the live
+ * action on one line (icon + shimmering label) that transitions as steps
+ * advance — the timeline never expands on its own. Once work ends the header
+ * settles into a clickable "Thought process" accordion the user can open to
+ * reveal the full step timeline.
  *
  * ```tsx
- * <ChainOfThought isWorking={anyRunning}>
- *   <ChainOfThoughtHeader label="Canopy offer" />
+ * <ChainOfThought
+ *   isWorking={anyRunning}
+ *   activeStep={{ icon: WrenchIcon, label: "Canopy offer" }}
+ * >
+ *   <ChainOfThoughtHeader label="Thought process" />
  *   <ChainOfThoughtContent>
  *     <ChainOfThoughtStep icon={WrenchIcon} title="Getting you a quote" state="output-available" />
- *     <ChainOfThoughtStep icon={WrenchIcon} title="Canopy offer" state="input-available" isLast />
+ *     <ChainOfThoughtStep icon={WrenchIcon} title="Canopy offer" state="output-available" isLast />
  *   </ChainOfThoughtContent>
  * </ChainOfThought>
  * ```
@@ -70,16 +89,15 @@ export type ChainOfThoughtProps = HTMLAttributes<HTMLDivElement> & {
 export function ChainOfThought({
 	className,
 	isWorking = false,
+	activeStep,
 	open,
-	defaultOpen,
+	defaultOpen = false,
 	onOpenChange,
 	children,
 	...props
 }: ChainOfThoughtProps) {
-	const resolvedDefaultOpen = defaultOpen ?? isWorking;
-
 	const isControlled = open !== undefined;
-	const [internalOpen, setInternalOpen] = useState(resolvedDefaultOpen);
+	const [internalOpen, setInternalOpen] = useState(defaultOpen);
 	const isOpen = isControlled ? open : internalOpen;
 	const setOpen = useCallback(
 		(next: boolean) => {
@@ -91,48 +109,23 @@ export function ChainOfThought({
 		[isControlled, onOpenChange],
 	);
 
-	const wasWorkingRef = useRef(isWorking);
-	const [hasAutoClosed, setHasAutoClosed] = useState(false);
+	// `settled` gates the header between its two modes. It starts true for a
+	// chain that mounts already done (e.g. a historical message), flips false
+	// the moment work starts, and latches true again a beat after work ends.
 	const [settled, setSettled] = useState(!isWorking);
 
-	// Auto-open whenever work (re)starts; allow a fresh auto-close after.
 	useEffect(() => {
 		if (isWorking) {
-			wasWorkingRef.current = true;
-			setHasAutoClosed(false);
 			setSettled(false);
-			if (!isControlled) {
-				setInternalOpen(true);
-			}
+			return;
 		}
-	}, [isWorking, isControlled]);
-
-	// Auto-close ~1s after work ends (once per work burst).
-	useEffect(() => {
-		if (wasWorkingRef.current && !isWorking && isOpen && !hasAutoClosed) {
-			const timer = setTimeout(() => {
-				setOpen(false);
-				setHasAutoClosed(true);
-			}, AUTO_CLOSE_DELAY);
-			return () => clearTimeout(timer);
-		}
-	}, [isWorking, isOpen, hasAutoClosed, setOpen]);
-
-	// Latch `settled` only after the close has had time to animate, so the
-	// header swaps to the done label *after* the thread collapses.
-	useEffect(() => {
-		if (wasWorkingRef.current && !isWorking && !settled) {
-			const timer = setTimeout(
-				() => setSettled(true),
-				AUTO_CLOSE_DELAY + SETTLE_AFTER_CLOSE,
-			);
-			return () => clearTimeout(timer);
-		}
-	}, [isWorking, settled]);
+		const timer = setTimeout(() => setSettled(true), SETTLE_DELAY);
+		return () => clearTimeout(timer);
+	}, [isWorking]);
 
 	const contextValue = useMemo<ChainContextValue>(
-		() => ({ open: isOpen, setOpen, isWorking, settled }),
-		[isOpen, setOpen, isWorking, settled],
+		() => ({ open: isOpen, setOpen, isWorking, settled, activeStep }),
+		[isOpen, setOpen, isWorking, settled, activeStep],
 	);
 
 	return (
@@ -153,15 +146,20 @@ export type ChainOfThoughtHeaderProps = HTMLAttributes<HTMLButtonElement> & {
 	/** Generic header label for the settled chain (e.g. "Thought process").
 	 * Deliberately not a per-turn summary — just a stable label. */
 	label?: string;
-	/** Shimmering label while the chain is still working (e.g. "Working on it…").
-	 * Falls back to `label`. */
+	/** Fallback ticker label while working when no {@link ChainStep} is set
+	 * (e.g. "Working on it…"). Falls back to `label`. */
 	workingLabel?: string;
 };
 
 /**
- * Clickable header that toggles the chain. No leading icon — just the label
- * and a trailing chevron, the cleaner Claude-style treatment. While the chain
- * is working the label shimmers. The step icons live on the timeline below.
+ * The chain header, which renders in one of two modes:
+ *
+ * - **Working** (before the chain settles): a single, non-interactive line
+ *   showing the active step — its icon plus a shimmering label. The label is
+ *   keyed on its text so each new step animates in, giving a clean transition
+ *   between tool calls. There is no chevron; the timeline stays collapsed.
+ * - **Settled** (once work is done): a clickable "Thought process" accordion
+ *   header with a trailing chevron that toggles the step timeline below.
  */
 export function ChainOfThoughtHeader({
 	className,
@@ -170,19 +168,41 @@ export function ChainOfThoughtHeader({
 	children,
 	...props
 }: ChainOfThoughtHeaderProps) {
-	const { open, setOpen, isWorking, settled } = useChain();
-	// Working label (shimmering while active, static while collapsing) until the
-	// chain has fully settled, then the done label. Keeps the text swap from
-	// racing the collapse.
-	const content =
-		children ??
-		(settled ? (
-			label
-		) : isWorking ? (
-			<Shimmer duration={1.6}>{workingLabel ?? label ?? ""}</Shimmer>
-		) : (
-			(workingLabel ?? label)
-		));
+	const { open, setOpen, isWorking, settled, activeStep } = useChain();
+
+	if (!settled) {
+		const Icon = activeStep?.icon;
+		const text = activeStep?.label ?? workingLabel ?? label ?? "";
+		return (
+			<div
+				className={cn(
+					"ww:flex ww:min-h-5 ww:w-full ww:items-center ww:gap-1.5 ww:text-sm ww:text-muted-foreground",
+					className,
+				)}
+			>
+				{/* Keyed on the label so a new action fades/slides in as one unit —
+				    the "clean transition between tool calls". While work is live the
+				    label shimmers; during the settle beat it holds static. */}
+				<span
+					key={text}
+					className="ww:flex ww:min-w-0 ww:items-center ww:gap-1.5"
+					style={{ animation: "ww-fade-in 0.25s ease-out" }}
+				>
+					{Icon && (
+						<Icon
+							className={cn(
+								"ww:size-4 ww:shrink-0",
+								isWorking && "ww:animate-pulse",
+							)}
+						/>
+					)}
+					<span className="ww:truncate">
+						{isWorking ? <Shimmer duration={2.6}>{text}</Shimmer> : text}
+					</span>
+				</span>
+			</div>
+		);
+	}
 
 	return (
 		<button
@@ -190,12 +210,13 @@ export function ChainOfThoughtHeader({
 			onClick={() => setOpen(!open)}
 			aria-expanded={open}
 			className={cn(
-				"ww:flex ww:w-full ww:items-center ww:gap-1.5 ww:text-sm ww:text-muted-foreground ww:transition-colors ww:hover:text-foreground",
+				"ww:flex ww:min-h-5 ww:w-full ww:items-center ww:gap-1.5 ww:text-sm ww:text-muted-foreground ww:transition-colors ww:hover:text-foreground",
 				className,
 			)}
+			style={{ animation: "ww-fade-in 0.25s ease-out" }}
 			{...props}
 		>
-			<span className="ww:truncate">{content}</span>
+			<span className="ww:truncate">{children ?? label}</span>
 			<ChevronDownIcon
 				className={cn(
 					"ww:size-4 ww:shrink-0 ww:transition-transform ww:duration-200",
