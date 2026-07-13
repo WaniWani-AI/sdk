@@ -196,31 +196,32 @@ interface EmbedArgs {
 	resourceEndpoint: string;
 }
 
+// The embed itself, shared across every story's render so only the wrapping
+// container (full-bleed vs. fixed card) differs.
+function Embed(args: EmbedArgs) {
+	return (
+		<ChatEmbed
+			api={MOCK_API}
+			skipRemoteConfig
+			mcp={{ resourceEndpoint: args.resourceEndpoint }}
+			appearance={{ theme: args.theme }}
+			title={args.title}
+			hideHeader={args.hideHeader}
+			welcomeMessage={args.welcomeMessage}
+			placeholder={args.placeholder}
+		/>
+	);
+}
+
 const meta: Meta<EmbedArgs> = {
 	title: "Chat/ChatEmbed",
+	// Full-bleed by default: the embed fills the viewport the way the hosted
+	// channel page places it (`<div class="h-dvh">`), which is the realistic
+	// deployment. The chat scrolls internally. `FixedSize` is the one story
+	// that puts it in a bounded card instead.
 	render: (args) => (
-		// A bounded parent — ChatEmbed sizes to `height`/`max-height`. Without a
-		// bound it would grow with content instead of scrolling internally.
-		<div
-			style={{
-				height: "min(80vh, 720px)",
-				maxWidth: 560,
-				margin: "0 auto",
-				border: "1px solid var(--ww-color-border)",
-				borderRadius: 12,
-				overflow: "hidden",
-			}}
-		>
-			<ChatEmbed
-				api={MOCK_API}
-				skipRemoteConfig
-				mcp={{ resourceEndpoint: args.resourceEndpoint }}
-				appearance={{ theme: args.theme }}
-				title={args.title}
-				hideHeader={args.hideHeader}
-				welcomeMessage={args.welcomeMessage}
-				placeholder={args.placeholder}
-			/>
+		<div style={{ height: "100dvh", width: "100%" }}>
+			<Embed {...args} />
 		</div>
 	),
 	args: {
@@ -243,9 +244,9 @@ export default meta;
 type Story = StoryObj<EmbedArgs>;
 
 /**
- * Default: a bounded embed. Send any message to stream a reply plus an inline
- * MCP App widget. Click **Expand to fullscreen** on the widget to take over
- * the embed; **Minimize** returns it inline.
+ * Default: a full-bleed embed (fills the viewport). Send any message to stream
+ * a reply plus an inline MCP App widget. Click **Expand to fullscreen** on the
+ * widget to take over the embed; **Minimize** returns it inline.
  */
 export const Default: Story = {};
 
@@ -267,11 +268,7 @@ export const NoHeader: Story = {
  * conversation. This is the path that stresses the embed's fullscreen
  * takeover.
  */
-export const FullscreenWidget: Story = {
-	args: {
-		hideHeader: false,
-	},
-};
+export const FullscreenWidget: Story = {};
 
 /**
  * Auto-fullscreen widget. The widget requests `fullscreen` on its own the
@@ -293,16 +290,29 @@ export const AutoFullscreenWidget: Story = {
 export const UnboundedParent: Story = {
 	render: (args) => (
 		<div style={{ maxWidth: 560, margin: "0 auto" }}>
-			<ChatEmbed
-				api={MOCK_API}
-				skipRemoteConfig
-				mcp={{ resourceEndpoint: args.resourceEndpoint }}
-				appearance={{ theme: args.theme }}
-				title={args.title}
-				hideHeader={args.hideHeader}
-				welcomeMessage={args.welcomeMessage}
-				placeholder={args.placeholder}
-			/>
+			<Embed {...args} />
+		</div>
+	),
+};
+
+/**
+ * The one fixed-size placement: the embed in a bounded card (fixed height and
+ * width), e.g. dropped into a sidebar or a marketing section. The chat scrolls
+ * within the card and a fullscreen widget fills just the card, not the page.
+ */
+export const FixedSize: Story = {
+	render: (args) => (
+		<div
+			style={{
+				height: 640,
+				width: 400,
+				margin: "24px auto",
+				border: "1px solid var(--ww-color-border)",
+				borderRadius: 12,
+				overflow: "hidden",
+			}}
+		>
+			<Embed {...args} />
 		</div>
 	),
 };
