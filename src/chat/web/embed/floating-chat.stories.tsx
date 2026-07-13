@@ -247,9 +247,12 @@ const meta: Meta<FloatingArgs> = {
 		},
 	},
 	// Expose the device presets in the toolbar so any story can be checked at
-	// phone widths (the panel goes full-screen below 640px).
+	// phone widths (the panel goes full-screen below 640px). `bare` lets this
+	// story own the full canvas (it renders its own host page + dock) instead
+	// of the shared centered card.
 	parameters: {
 		viewport: { options: INITIAL_VIEWPORTS },
+		bare: true,
 	},
 };
 

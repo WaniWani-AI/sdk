@@ -1,0 +1,232 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family: system-ui, sans-serif;
+      }
+      #app {
+        /* Inline: size to content so the reported height is accurate and the
+           readout is never clipped. Fullscreen (.fs) fills the frame instead. */
+        min-height: 220px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 16px;
+        background: #0ea5e9;
+        color: #fff;
+      }
+      #app.fs {
+        height: 100%;
+        padding: 32px;
+        background: linear-gradient(135deg, #0ea5e9, #6366f1);
+      }
+      h2 {
+        margin: 0;
+        font-size: 18px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .big {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 64px;
+        font-weight: 800;
+        opacity: 0.95;
+        padding: 20px 0;
+      }
+      /* Only fill (and vertically center) in fullscreen; inline sizes to
+         content so nothing is clipped and the reported height is accurate. */
+      #app.fs .big {
+        flex: 1;
+        padding: 0;
+      }
+      button {
+        font: inherit;
+        font-weight: 600;
+        border: 0;
+        border-radius: 8px;
+        padding: 8px 14px;
+        cursor: pointer;
+        background: #fff;
+        color: #0f172a;
+      }
+      .muted {
+        opacity: 0.85;
+        font-size: 13px;
+      }
+      .readout {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        background: rgba(0, 0, 0, 0.28);
+        border-radius: 8px;
+        padding: 8px 10px;
+        white-space: pre-line;
+      }
+    </style>
+  </head>
+  <body></body>
+  <script>
+    // Self-contained MCP UI widget for the ChatEmbed Storybook stories.
+    // Served same-origin (Storybook `staticDirs`) so the sandboxed iframe
+    // (`allow-scripts allow-same-origin`) runs it in every browser — a `data:`
+    // URL would be blocked from executing scripts in some engines.
+    //
+    // Handshake: ui/initialize -> initialized -> render + report size. Renders
+    // an Expand/Minimize button that requests fullscreen/inline. With `?auto=1`
+    // it requests fullscreen on its own right after the handshake.
+    //
+    // It also reports its heights, both on screen (the `.readout`) and to the
+    // console, so the embed's sizing is easy to inspect:
+    //   - reported ("should be"): the content height this widget asks the host
+    //     to size its iframe to (`app.scrollHeight`, sent via size-changed).
+    //   - actual: the height the iframe is actually rendered at, as this widget
+    //     sees it (`window.innerHeight`). In fullscreen the host sizes the frame
+    //     to `100%`, so this tracks the area the embed grants — not the request.
+    var params = new URLSearchParams(location.search);
+    var auto = params.get("auto") === "1";
+    var mode = "inline";
+    var reported = 0;
+
+    function post(msg) {
+      parent.postMessage(msg, "*");
+    }
+    function updateReadout() {
+      var elReadout = document.getElementById("readout");
+      var actual = window.innerHeight;
+      if (elReadout) {
+        elReadout.textContent =
+          "mode: " +
+          mode +
+          "\nreported (should be): " +
+          reported +
+          "px\nactual (rendered): " +
+          actual +
+          "px";
+      }
+      console.log(
+        "[ww-mock-widget] mode=%s reported(should-be)=%dpx actual(rendered)=%dpx",
+        mode,
+        reported,
+        actual,
+      );
+    }
+    function reportSize() {
+      var app = document.getElementById("app");
+      reported = app.scrollHeight;
+      post({
+        jsonrpc: "2.0",
+        method: "ui/notifications/size-changed",
+        params: { height: reported },
+      });
+      updateReadout();
+    }
+    function requestMode(m) {
+      post({
+        jsonrpc: "2.0",
+        id: "req-" + Date.now(),
+        method: "ui/request-display-mode",
+        params: { mode: m },
+      });
+    }
+    function el(tag, props, kids) {
+      var node = document.createElement(tag);
+      if (props)
+        Object.keys(props).forEach(function (k) {
+          node[k] = props[k];
+        });
+      (kids || []).forEach(function (c) {
+        node.appendChild(c);
+      });
+      return node;
+    }
+    function render() {
+      var fs = mode === "fullscreen";
+      var app = document.getElementById("app");
+      app.className = fs ? "fs" : "";
+      while (app.firstChild) app.removeChild(app.firstChild);
+      app.appendChild(
+        el("div", { className: "row" }, [
+          el("h2", { textContent: "Lisbon" }),
+          el("span", { className: "muted", textContent: "activity score" }),
+        ]),
+      );
+      app.appendChild(el("div", { className: "big", textContent: "82" }));
+      var btn = fs
+        ? el("button", {
+            textContent: "Minimize",
+            onclick: function () {
+              requestMode("inline");
+            },
+          })
+        : el("button", {
+            textContent: "Expand to fullscreen",
+            onclick: function () {
+              requestMode("fullscreen");
+            },
+          });
+      app.appendChild(el("div", { className: "row" }, [btn]));
+      app.appendChild(el("div", { className: "readout", id: "readout" }));
+      // Fill the readout first so the content is at full size, then report —
+      // otherwise the height would be measured before the text lands and the
+      // readout would be clipped.
+      updateReadout();
+      // Report in every mode (like a real skybridge widget, which reports its
+      // content size continuously via a ResizeObserver). In fullscreen this is
+      // what would drive a resize feedback loop if the host applied it, so it
+      // doubles as the regression check for that fix.
+      reportSize();
+    }
+    window.addEventListener("message", function (e) {
+      var d = e.data;
+      if (!d || d.jsonrpc !== "2.0") return;
+      if (d.id === 1 && d.result) {
+        post({ jsonrpc: "2.0", method: "ui/notifications/initialized" });
+        render();
+        if (auto) requestMode("fullscreen");
+      }
+      if (
+        d.method === "ui/notifications/host-context-changed" &&
+        d.params &&
+        d.params.displayMode
+      ) {
+        mode = d.params.displayMode;
+        render();
+      }
+    });
+    // The iframe changes size when the host applies the reported height or
+    // switches to fullscreen; refresh the readout (and log) when it does.
+    window.addEventListener("resize", updateReadout);
+    document.addEventListener("DOMContentLoaded", function () {
+      var app = el("div", { id: "app" });
+      document.body.appendChild(app);
+      // Re-report on any content resize, mirroring skybridge. This is the pulse
+      // that a host must not answer with a height change while fullscreen, or
+      // widget and host chase each other's sizes forever.
+      if (typeof ResizeObserver !== "undefined") {
+        new ResizeObserver(function () {
+          reportSize();
+        }).observe(app);
+      }
+      post({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "ui/initialize",
+        params: { protocolVersion: "2026-01-26" },
+      });
+    });
+  </script>
+</html>

@@ -190,6 +190,29 @@ export function McpAppFrame({
 	const isDarkRef = useRef(isDark);
 	isDarkRef.current = isDark;
 
+	// Mirror `isFullscreen` into a ref so the long-lived postMessage handler
+	// reads the current value (it isn't in that effect's dep list). The size
+	// handler only runs on async postMessages, always after this effect has
+	// committed, so syncing the ref here is timely.
+	//
+	// In fullscreen the iframe fills its container (`height: 100%`). A widget
+	// still emits `size-changed` for its content, and applying that (via the
+	// `fill: "forwards"` height animation, which overrides the inline `100%`)
+	// would shrink the frame to the reported/clamped height; the widget then
+	// re-measures the smaller frame and reports again — an endless resize loop.
+	// So height reports are ignored while fullscreen (see the size-changed
+	// handler). On toggle, cancel any in-flight animation and invalidate the
+	// dedup cache so the first report in the new mode is always applied.
+	const isFullscreenRef = useRef(isFullscreen);
+	useEffect(() => {
+		isFullscreenRef.current = isFullscreen;
+		lastSizeRef.current.height = -1;
+		if (animationRef.current) {
+			animationRef.current.cancel();
+			animationRef.current = null;
+		}
+	}, [isFullscreen]);
+
 	// Send theme changes to the iframe (only after handshake is complete)
 	useEffect(() => {
 		if (!initializedRef.current) {
@@ -374,6 +397,12 @@ export function McpAppFrame({
 
 				if (heightChanged && newHeight !== undefined) {
 					last.height = newHeight;
+					// While fullscreen, the iframe must stay at `height: 100%`; applying
+					// the reported content height here would override that and trigger a
+					// resize feedback loop with the widget (see the toggle effect above).
+					if (isFullscreenRef.current) {
+						return;
+					}
 					const clamped = clampHeight(newHeight);
 
 					// Get current visual height before canceling the old animation

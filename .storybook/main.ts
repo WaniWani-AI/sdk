@@ -6,6 +6,11 @@ import type { StorybookConfig } from "@storybook/react-vite";
 //   bun run storybook
 const config: StorybookConfig = {
 	stories: ["../src/**/*.stories.@(ts|tsx)"],
+	// Serves `./public` at the Storybook root — e.g. `ww-mock-widget.html`, the
+	// self-contained MCP UI widget the ChatEmbed stories load into their iframe.
+	// Same-origin (not a `data:` URL) so the sandboxed frame runs its scripts in
+	// every browser.
+	staticDirs: ["./public"],
 	framework: { name: "@storybook/react-vite", options: {} },
 	// Disable react-docgen: its separate Babel pass chokes on some component
 	// syntax that tsc/Vite handle fine (surfacing as a dev transform error),

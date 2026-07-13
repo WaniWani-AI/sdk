@@ -140,6 +140,16 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		const [fullscreenToolCallId, setFullscreenToolCallId] = useState<
 			string | null
 		>(null);
+		// A fullscreen widget renders `position:absolute; inset:0`, and the
+		// message list hides everything else. In a parent with a definite height
+		// the scroll area still spans it, so the widget fills it. But when the
+		// embed is left to grow with its content (the standalone default, an
+		// unbounded parent), hiding everything collapses the scroll area to
+		// nothing and the widget shrinks to a sliver. Freezing the embed to the
+		// height it was rendering at the instant fullscreen is requested gives the
+		// widget a definite area to fill in that case; it's a no-op when the
+		// parent already bounds the height. Captured pre-collapse in the handler.
+		const [frozenHeight, setFrozenHeight] = useState<number | null>(null);
 		const rootRef = useRef<HTMLDivElement>(null);
 		const scrollRef = useRef<HTMLDivElement>(null);
 		const scrollContentRef = useRef<HTMLDivElement>(null);
@@ -358,6 +368,12 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				style={{
 					...cssVars,
 					maxHeight: "inherit",
+					// Pin the height while a widget is fullscreen so the absolutely
+					// positioned widget has a definite area to fill even when the
+					// parent doesn't bound the height (see `frozenHeight`).
+					...(fullscreenToolCallId && frozenHeight
+						? { height: frozenHeight }
+						: {}),
 					opacity: masked ? 0 : 1,
 					transition: "opacity 220ms ease-out",
 				}}
@@ -435,9 +451,17 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							showToolCalls={showToolCalls}
 							toolDefinitions={engine.toolDefinitions}
 							onWidgetDisplayModeChange={(mode, widget) => {
-								setFullscreenToolCallId(
-									mode === "fullscreen" ? widget.toolCallId : null,
-								);
+								if (mode === "fullscreen") {
+									// Read the height while the embed is still laid out inline
+									// (before this state change collapses an unbounded parent).
+									const h =
+										rootRef.current?.getBoundingClientRect().height ?? 0;
+									setFrozenHeight(h > 0 ? h : null);
+									setFullscreenToolCallId(widget.toolCallId);
+								} else {
+									setFrozenHeight(null);
+									setFullscreenToolCallId(null);
+								}
 							}}
 						/>
 						<div ref={bottomRef} aria-hidden style={{ height: 1 }} />

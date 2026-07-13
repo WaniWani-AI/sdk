@@ -254,6 +254,9 @@ const meta: Meta<Args> = {
 		loop: { control: "boolean" },
 		dark: { control: "boolean" },
 	},
+	// Owns its full canvas (its own `Stage` supplies the palette + `dark` arg),
+	// so skip the shared centered-card wrapper.
+	parameters: { bare: true },
 };
 
 export default meta;
