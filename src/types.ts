@@ -20,7 +20,10 @@ export interface WaniWaniConfig {
 	/**
 	 * The base URL of the Waniwani API
 	 *
-	 * Defaults to https://app.waniwani.ai
+	 * Defaults to process.env.WANIWANI_API_URL if not provided, then to
+	 * https://app.waniwani.ai. Set WANIWANI_API_URL (e.g. to
+	 * https://eu.app.waniwani.ai) to keep .env as the single source of truth
+	 * and avoid pointing at the wrong region.
 	 */
 	apiUrl?: string;
 	/**

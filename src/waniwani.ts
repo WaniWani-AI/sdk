@@ -37,7 +37,10 @@ export function waniwani(
 		| (WaniWaniConfig & WaniWaniProjectConfig)
 		| undefined;
 
-	const apiUrl = effective?.apiUrl ?? "https://app.waniwani.ai";
+	const apiUrl =
+		effective?.apiUrl ??
+		process.env.WANIWANI_API_URL ??
+		"https://app.waniwani.ai";
 	const apiKey = effective?.apiKey ?? process.env.WANIWANI_API_KEY;
 	const trackingConfig = {
 		endpointPath:

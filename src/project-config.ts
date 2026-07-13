@@ -27,7 +27,8 @@ export interface WaniWaniProjectConfig {
 	projectId?: string;
 	/**
 	 * The base URL of the Waniwani API.
-	 * Defaults to `https://app.waniwani.ai`.
+	 * Falls back to the `WANIWANI_API_URL` env var when omitted here, then to
+	 * `https://app.waniwani.ai`.
 	 */
 	apiUrl?: string;
 	/**

@@ -47,8 +47,11 @@ type MaybeWrappedHandler = RawHandler & { [WRAPPED_HANDLER]?: true };
 export type WithWaniwaniOptions = {
 	/**
 	 * The Waniwani client instance. When omitted, a client is created
-	 * automatically using the global config registered by `defineConfig()`,
-	 * falling back to env vars.
+	 * automatically from `waniwani.json` / the global config registered by
+	 * `defineConfig()`, falling back to env vars (`WANIWANI_API_KEY` and
+	 * `WANIWANI_API_URL`). Set `WANIWANI_API_URL` (e.g.
+	 * `https://eu.app.waniwani.ai`) so the auto-created client targets the
+	 * right region instead of defaulting to US.
 	 */
 	client?: WaniwaniTracker;
 	/**
