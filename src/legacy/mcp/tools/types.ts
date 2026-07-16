@@ -6,6 +6,7 @@ import type {
 	ShapeOutput,
 	ZodRawShapeCompat,
 } from "@modelcontextprotocol/sdk/server/zod-compat.js";
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import type { ScopedWaniWaniClient } from "../../../mcp/server/scoped-client";
 import type { RegisteredResource } from "../resources/types";
 
@@ -44,13 +45,15 @@ export type ToolConfig<TInput extends ZodRawShapeCompat> = {
 	 * result is consumed programmatically by the widget.
 	 */
 	autoInjectResultText?: boolean;
-	/** Annotations describe the tool's potential impact. */
-	annotations?: {
-		readOnlyHint?: boolean;
-		idempotentHint?: boolean;
-		openWorldHint?: boolean;
-		destructiveHint?: boolean;
-	};
+	/**
+	 * Annotations describe the tool's potential impact. Passed through to
+	 * `registerTool` as-is.
+	 *
+	 * Includes MCP's `title` — a human-readable name for the tool. Claude's
+	 * Connectors Directory requires it on every tool and flags the server at
+	 * submission without it; the top-level `title` does not satisfy that.
+	 */
+	annotations?: ToolAnnotations;
 };
 
 export type ToolHandler<TInput extends ZodRawShapeCompat> = (

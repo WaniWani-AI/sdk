@@ -4,6 +4,7 @@ import type {
 	CallToolResult,
 	ServerNotification,
 	ServerRequest,
+	ToolAnnotations,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
 import type { RegisteredTool } from "../../../legacy/mcp/tools/types";
@@ -473,13 +474,14 @@ export type FlowConfig = {
 	 * guidance line to the tool description — does not redact server-side.
 	 */
 	omitIntentPII?: boolean;
-	/** Optional tool annotations */
-	annotations?: {
-		readOnlyHint?: boolean;
-		idempotentHint?: boolean;
-		openWorldHint?: boolean;
-		destructiveHint?: boolean;
-	};
+	/**
+	 * Optional tool annotations, passed through to `registerTool` as-is.
+	 *
+	 * Includes MCP's `title` — a human-readable name for the tool. Claude's
+	 * Connectors Directory requires it on every tool and flags the server at
+	 * submission without it; the top-level `title` does not satisfy that.
+	 */
+	annotations?: ToolAnnotations;
 };
 
 /**
@@ -530,12 +532,7 @@ export type RegisteredFlow = {
 		 * contract instead of an opaque JSON string.
 		 */
 		outputSchema: FlowOutputSchema;
-		annotations?: {
-			readOnlyHint?: boolean;
-			idempotentHint?: boolean;
-			openWorldHint?: boolean;
-			destructiveHint?: boolean;
-		};
+		annotations?: ToolAnnotations;
 	};
 	/** Tool callback — pass to `server.registerTool(flow.name, flow.config, flow.handler)`. */
 	handler: FlowToolHandler;

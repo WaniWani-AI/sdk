@@ -370,11 +370,19 @@ const flow = createFlow({
   title: "Lookup",
   description: "Look up information",
   state: { query: z.string().describe("Search query") },
-  annotations: { readOnlyHint: true, idempotentHint: true },
+  annotations: { title: "Look up information", readOnlyHint: true, idempotentHint: true },
 })
 ```
 
-Supported annotations: `readOnlyHint`, `idempotentHint`, `openWorldHint`, `destructiveHint`.
+Supported annotations: `title`, `readOnlyHint`, `idempotentHint`, `openWorldHint`, `destructiveHint`.
+
+**Always set `annotations.title`** — a human-readable name for the tool. Claude's
+Connectors Directory requires it on every tool and flags the server at submission
+without it; the top-level `title` does not satisfy that. Pair it with the applicable
+hint (`readOnlyHint: true` for read-only tools, `destructiveHint: true` for tools that
+modify or delete data) — the directory requires one of those too, and they drive
+Claude's auto-permissions: read-only tools run without a per-call prompt, destructive
+tools always prompt.
 
 ## Common Mistakes
 
