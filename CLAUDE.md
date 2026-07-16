@@ -106,6 +106,18 @@ const flow = createFlow({ /* …same… */ }).compile(); // hosted flow state, a
 - Test: `bun test`
 - Pre-commit: always run `bun biome check . --fix`
 
+## Releasing (version bumps)
+
+`@waniwani/sdk` is `0.x`, so **minor bumps may break the public API** — and every breaking change is a migration our users have to do. The rule: no user should have to figure out an upgrade by hand. Whenever a release contains a breaking change, ship the migration alongside it so an agent can auto-apply it in one pass.
+
+**Every breaking change in a version bump must ship all three:**
+
+1. **A changelog entry** — a `## <version>:` section with a before/after and a mechanical, agent-applicable migration (a codemod recipe, not prose). Add it to the "Breaking changes at a glance" table too.
+2. **An entry in `skills/waniwani-sdk/references/upgrading.md`** — under "Currently auto-fixable breaking changes", mirroring the changelog so an agent can migrate without a network fetch.
+3. **A `@deprecated` shim where feasible** — keep the old shape working with a `@deprecated` notice naming the removal version, so the bump isn't a hard cliff.
+
+This is a standing obligation, not a per-release decision: the `.claude/skills/release-migration/` skill walks through cutting a release this way, and the user-facing upgrade path lives in `skills/waniwani-sdk/references/upgrading.md`. If you bump the version and touch the public API, you are not done until the migration for it exists. The same discipline applies at every future version (0.15, 1.0, 15.0): a version bump always ships its migration.
+
 ## Skills (kept in sync with source)
 
 When changing the public API or behavior, **always update the corresponding skill docs**.
@@ -116,6 +128,7 @@ When changing the public API or behavior, **always update the corresponding skil
 - `knowledge-base/SKILL.md` — KB setup (free tier)
 - `visualize-flow/SKILL.md` — Mermaid diagrams from `createFlow`
 - `translations/SKILL.md` — app translations
+- `release-migration/SKILL.md` — cut a version bump that ships its own migration (changelog + `upgrading.md` + deprecation shim)
 - (`create-mcp-app` and `mcp-server` were removed — they taught the legacy `createTool`/`createResource` patterns)
 
 ### External skills (`skills/waniwani-sdk/`, published to skills.sh)
