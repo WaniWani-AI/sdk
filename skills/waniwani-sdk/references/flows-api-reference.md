@@ -12,7 +12,7 @@ Creates a new `StateGraph`. The state type is automatically inferred from the `s
 | `title` | `string` | yes | Display title |
 | `description` | `string` | yes | Tells the AI when to use this flow |
 | `state` | `Record<string, z.ZodType>` | yes | State schema. Values are Zod schemas with `.describe()`. Use `z.object()` for grouped nested fields (1 level max). |
-| `annotations` | `object` | no | MCP tool annotation hints: `readOnlyHint`, `idempotentHint`, `openWorldHint`, `destructiveHint` |
+| `annotations` | `object` | no | MCP tool annotations: `title`, `readOnlyHint`, `idempotentHint`, `openWorldHint`, `destructiveHint`. Always set `title` (human-readable tool name) plus the applicable hint — Claude's Connectors Directory requires both and flags the server at submission without them. |
 
 ```ts
 import { createFlow } from "@waniwani/sdk/mcp";

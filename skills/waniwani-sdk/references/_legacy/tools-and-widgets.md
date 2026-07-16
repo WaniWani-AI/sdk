@@ -61,7 +61,7 @@ Creates an MCP tool. When `resource` is provided, the tool returns `structuredCo
 | `inputSchema` | `ZodRawShape` | Yes | Input parameters using Zod |
 | `invoking` | `string` | No | Loading message (default: `"Loading..."`) |
 | `invoked` | `string` | No | Loaded message (default: `"Loaded"`) |
-| `annotations` | `object` | No | `readOnlyHint`, `idempotentHint`, `openWorldHint`, `destructiveHint` |
+| `annotations` | `object` | No | `title`, `readOnlyHint`, `idempotentHint`, `openWorldHint`, `destructiveHint`. Always set `title` (human-readable tool name) plus the applicable hint — Claude's Connectors Directory requires both and flags the server at submission without them. |
 
 **Handler signature:**
 
@@ -159,7 +159,7 @@ const pricingTool = createTool({
   inputSchema: {
     plan: z.enum(["starter", "pro", "enterprise"]).describe("Plan to display"),
   },
-  annotations: { readOnlyHint: true },
+  annotations: { title: "Show pricing", readOnlyHint: true },
 }, async ({ plan }, context) => {
   const pricing = await getPricing(plan);
   return {
@@ -176,7 +176,7 @@ const searchTool = createTool({
   inputSchema: {
     query: z.string().describe("Search query"),
   },
-  annotations: { readOnlyHint: true },
+  annotations: { title: "Search", readOnlyHint: true },
 }, async ({ query }) => {
   const results = await search(query);
   return { text: JSON.stringify(results) };
