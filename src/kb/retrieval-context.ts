@@ -21,6 +21,10 @@ if (!store) {
 }
 export const retrievalCollectorStore = store;
 
+// Best-effort: recording runs inside kb.search(), so it must never throw back
+// into a user's search (e.g. a corrupted collector from a mixed SDK version).
 export function recordKbSearch(trace: KbSearchTrace): void {
-	retrievalCollectorStore.getStore()?.searches.push(trace);
+	try {
+		retrievalCollectorStore.getStore()?.searches.push(trace);
+	} catch {}
 }
