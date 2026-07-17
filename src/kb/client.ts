@@ -2,6 +2,7 @@
 
 import { WaniWaniError } from "../error.js";
 import type { InternalConfig } from "../types.js";
+import { recordKbSearch } from "./retrieval-context.js";
 import type {
 	KbClient,
 	KbIngestFile,
@@ -68,10 +69,24 @@ export function createKbClient(config: InternalConfig): KbClient {
 			query: string,
 			options?: KbSearchOptions,
 		): Promise<SearchResult[]> {
-			return request<SearchResult[]>("POST", "/api/mcp/kb/search", {
+			const results = await request<SearchResult[]>(
+				"POST",
+				"/api/mcp/kb/search",
+				{
+					query,
+					...options,
+				},
+			);
+			recordKbSearch({
 				query,
-				...options,
+				resultCount: results.length,
+				results: results.map((r) => ({
+					source: r.source,
+					heading: r.heading,
+					score: r.score,
+				})),
 			});
+			return results;
 		},
 
 		async sources(): Promise<KbSource[]> {

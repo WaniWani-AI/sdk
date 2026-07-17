@@ -1,3 +1,7 @@
+import {
+	type RetrievalCollector,
+	retrievalCollectorStore,
+} from "../../../kb/retrieval-context.js";
 import type { ToolCalledProperties } from "../../../tracking/index.js";
 import { createLogger } from "../../../utils/logger.js";
 import { waniwani } from "../../../waniwani.js";
@@ -236,9 +240,12 @@ function createWrappedHandler(
 			extra[SCOPED_CLIENT_KEY] = scopedClient;
 		}
 
+		const retrievalCollector: RetrievalCollector = { searches: [] };
 		const startTime = performance.now();
 		try {
-			const result = await originalHandler(input, extra);
+			const result = await retrievalCollectorStore.run(retrievalCollector, () =>
+				originalHandler(input, extra),
+			);
 			const durationMs = Math.round(performance.now() - startTime);
 
 			log(
@@ -270,6 +277,7 @@ function createWrappedHandler(
 					},
 					clientInfo,
 					{ input, output: result },
+					retrievalCollector.searches,
 				),
 				opts.onError,
 			);
@@ -315,6 +323,7 @@ function createWrappedHandler(
 					},
 					clientInfo,
 					{ input },
+					retrievalCollector.searches,
 				),
 				opts.onError,
 			);
