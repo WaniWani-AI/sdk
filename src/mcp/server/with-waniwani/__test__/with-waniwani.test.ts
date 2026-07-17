@@ -228,6 +228,54 @@ describe("withWaniwani", () => {
 		expect(tracked[0]?.source).toBe("claude");
 	});
 
+	test("does not stamp any waniwani/channelId when the host sends none", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra = {
+			_meta: {},
+			requestInfo: { headers: { "user-agent": "Claude-User" } },
+		} as Record<string, unknown>;
+		await handler?.({}, extra);
+
+		// No synthetic fallback: the key is absent unless the calling host
+		// (e.g. the WaniWani app) forwarded a real channel id.
+		expect(
+			(extra._meta as Record<string, unknown>)["waniwani/channelId"],
+		).toBeUndefined();
+	});
+
+	test("keeps a host-forwarded waniwani/channelId readable via _meta", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra = {
+			_meta: { "waniwani/channelId": "chan-uuid-1" },
+		} as Record<string, unknown>;
+		await handler?.({}, extra);
+
+		expect((extra._meta as Record<string, unknown>)["waniwani/channelId"]).toBe(
+			"chan-uuid-1",
+		);
+		expect(tracked[0]?.meta).toMatchObject({
+			"waniwani/channelId": "chan-uuid-1",
+		});
+	});
+
 	test("does not override an explicit _meta source with header detection", async () => {
 		const { client, tracked } = mockClient();
 		const mock = mockServer();

@@ -53,6 +53,8 @@ const EXTERNAL_USER_ID_KEYS = [
 
 const CORRELATION_ID_KEYS = ["correlationId", "openai/requestId"] as const;
 
+const CHANNEL_ID_KEYS = ["waniwani/channelId", "channelId"] as const;
+
 const TURN_COUNT_KEYS = ["waniwani/turnCount"] as const;
 
 /** Meta key for flow execution path (nodesVisited, flowId). */
@@ -88,6 +90,21 @@ export function extractCorrelationId(
 	meta: Record<string, unknown> | undefined,
 ): string | undefined {
 	return meta ? pickFirst(meta, CORRELATION_ID_KEYS) : undefined;
+}
+
+/**
+ * Channel the conversation belongs to, as forwarded by the calling host.
+ *
+ * The WaniWani app forwards the channel UUID as `waniwani/channelId` when the
+ * request resolved a real channel; there is deliberately no synthetic
+ * fallback. Hosts that talk to the server directly (Claude, ChatGPT) send no
+ * channel, so this returns undefined for them — derive coarse attribution
+ * from `extractSource` / `waniwani/authSource` instead.
+ */
+export function extractChannelId(
+	meta: Record<string, unknown> | undefined,
+): string | undefined {
+	return meta ? pickFirst(meta, CHANNEL_ID_KEYS) : undefined;
 }
 
 /**

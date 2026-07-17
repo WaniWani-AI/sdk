@@ -37,6 +37,8 @@ export type { TrackingRouteOptions } from "./server/tracking-route";
 export { createTrackingRoute } from "./server/tracking-route";
 // Shared MCP server types (non-legacy)
 export type { McpServer, ZodRawShapeCompat } from "./server/types";
+// Request `_meta` extraction helpers — OSS
+export { extractChannelId } from "./server/utils";
 export type { WithWaniwaniOptions } from "./server/with-waniwani/index";
 export { withWaniwani } from "./server/with-waniwani/index";
 
