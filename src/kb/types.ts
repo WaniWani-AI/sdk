@@ -6,6 +6,14 @@ export interface SearchResult {
 	metadata?: Record<string, string>;
 }
 
+// One kb.search() call, folded onto the tool.called event as
+// properties.kbSearch. Metadata only — chunk bodies stay in the tool output.
+export interface KbSearchTrace {
+	query: string;
+	resultCount: number;
+	results: Array<Pick<SearchResult, "source" | "heading" | "score">>;
+}
+
 /** A file to ingest into the knowledge base */
 export interface KbIngestFile {
 	/** Filename (used as chunk source identifier) */

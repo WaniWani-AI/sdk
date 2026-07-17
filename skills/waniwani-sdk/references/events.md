@@ -156,6 +156,11 @@ await client.track({ event: "quote.succeeded", properties: { amount: 120, curren
   server is safe without an API key (its auto-capture is internally guarded and
   session metadata still bridges) — but your own `track.*` calls still throw keyless;
   see the tier note above.
+- **KB retrieval trace:** when a wrapped tool handler calls `client.kb.search()`, the
+  `tool.called` event for that tool carries `properties.kbSearch`: an array of
+  `{ query, resultCount, results: [{ source, heading, score }] }`, one entry per
+  search. It is metadata only — chunk bodies stay in the tool's own output. This makes
+  retrieval a deterministic, first-class signal without a separate event.
 - **Identify:** `client.identify(userId, properties?)` attaches a stable external
   identity to the session — useful right before an off-platform conversion so the later
   `converted` can be joined by `externalUserId`.

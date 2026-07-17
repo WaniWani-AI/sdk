@@ -1,3 +1,4 @@
+import type { KbSearchTrace } from "../../../kb/types.js";
 import type {
 	CallableTrack,
 	ToolCalledProperties,
@@ -117,6 +118,7 @@ export function buildTrackInput(
 	timing?: { durationMs: number; status: string; errorMessage?: string },
 	clientInfo?: { name: string; version: string },
 	io?: { input?: unknown; output?: unknown },
+	kbSearch?: KbSearchTrace[],
 ): TrackInput {
 	const toolType = resolveToolType(toolName, options.toolType);
 
@@ -183,6 +185,7 @@ export function buildTrackInput(
 			...(timing ?? {}),
 			...(input !== undefined && { input }),
 			...(output !== undefined && { output }),
+			...(kbSearch && kbSearch.length > 0 && { kbSearch }),
 		},
 		meta: mergedMeta,
 		source: extractSource(mergedMeta ?? meta, clientInfo),

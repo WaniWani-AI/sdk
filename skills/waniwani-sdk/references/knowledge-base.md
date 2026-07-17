@@ -28,6 +28,10 @@ const results = await client.kb.search("pricing", { metadata: { category: "prici
 | `minScore` | `number` | `0.3` | Minimum similarity score (0-1) |
 | `metadata` | `Record<string, string>` | -- | Filter by exact metadata key-value match |
 
+When `search()` runs inside a tool wrapped by `withWaniwani`, its query and retrieved
+sources are automatically recorded onto that tool's `tool.called` event as
+`properties.kbSearch` (metadata only). See the `events.md` reference for the shape.
+
 ## `client.kb.ingest(files)`
 
 Ingest markdown files into the knowledge base. **Destructive** -- deletes all existing chunks for the environment before ingesting.

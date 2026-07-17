@@ -1,5 +1,7 @@
 // Tracking Module Types
 
+import type { KbSearchTrace } from "../kb/types.js";
+
 // ============================================
 // Event Types
 // ============================================
@@ -58,6 +60,8 @@ export interface PageViewedProperties {
 export interface ToolCalledProperties {
 	name?: string;
 	type?: "pricing" | "product_info" | "availability" | "support" | "other";
+	/** Retrieval traces for kb.search() calls made inside this tool handler. */
+	kbSearch?: KbSearchTrace[];
 }
 
 export interface QuoteSucceededProperties {
