@@ -28,7 +28,7 @@ export type EventType =
 	| "price_shown"
 	| "prices_compared"
 	| "option_selected"
-	| "lead"
+	| "lead_qualified"
 	| "converted";
 
 // ============================================
@@ -105,7 +105,23 @@ export interface OptionSelectedProperties {
 	currency: string;
 }
 
-export interface LeadProperties {
+/**
+ * Properties for `lead_qualified` — your code declaring that a person met your
+ * qualification bar (finished the qualifying questions, requested a demo,
+ * matched your target profile). Sharing an email mid-conversation is
+ * `identify(userId, { email })`, not a qualified lead.
+ */
+export interface LeadQualifiedProperties {
+	/**
+	 * Your own lead id (e.g. the record id your lead-gen API returns). The
+	 * strongest dedup key and the stable reference back to your system.
+	 */
+	externalId?: string;
+	/** The lead's email, if known. */
+	email?: string;
+	/** The lead's name, if known. */
+	name?: string;
+	/** Acquisition source of the lead (e.g. "newsletter"). */
 	source?: string;
 }
 
@@ -188,7 +204,10 @@ export type TrackEvent =
 			event: "option_selected";
 			properties?: OptionSelectedProperties;
 	  } & BaseTrackEvent)
-	| ({ event: "lead"; properties?: LeadProperties } & BaseTrackEvent)
+	| ({
+			event: "lead_qualified";
+			properties?: LeadQualifiedProperties;
+	  } & BaseTrackEvent)
 	| ({
 			event: "converted";
 			properties?: ConvertedProperties;
@@ -236,12 +255,14 @@ export interface RevenueOptionSelectedInput
 		OptionSelectedProperties {}
 
 /**
- * Input for `track.lead()`. `source` is the lead's acquisition source
- * (the `lead` event property, e.g. "newsletter") — on this helper it shadows
- * the envelope `source` from the tracking context. To set a custom envelope
- * source on a lead, use the generic `track({ event: "lead", … })`.
+ * Input for `track.leadQualified()`. `source` is the lead's acquisition source
+ * (the event property, e.g. "newsletter") — on this helper it shadows the
+ * envelope `source` from the tracking context. To set a custom envelope source
+ * on a lead, use the generic `track({ event: "lead_qualified", … })`.
  */
-export interface RevenueLeadInput extends TrackingContext, LeadProperties {}
+export interface RevenueLeadQualifiedInput
+	extends TrackingContext,
+		LeadQualifiedProperties {}
 
 export interface RevenueConvertedInput
 	extends TrackingContext,
@@ -260,7 +281,9 @@ export interface RevenueTrackingApi {
 	optionSelected: (
 		input: RevenueOptionSelectedInput,
 	) => Promise<{ eventId: string }>;
-	lead: (input?: RevenueLeadInput) => Promise<{ eventId: string }>;
+	leadQualified: (
+		input?: RevenueLeadQualifiedInput,
+	) => Promise<{ eventId: string }>;
 	converted: (input: RevenueConvertedInput) => Promise<{ eventId: string }>;
 }
 
@@ -273,7 +296,7 @@ export type CallableTrack = (event: TrackInput) => Promise<{ eventId: string }>;
 
 /**
  * `client.track` — callable for generic events (`track(event)`), with the
- * revenue helpers attached flat: `track.priceShown()`, `track.lead()`,
+ * revenue helpers attached flat: `track.priceShown()`, `track.leadQualified()`,
  * `track.converted()`, etc.
  */
 export interface TrackFn extends RevenueTrackingApi {
@@ -334,7 +357,7 @@ export interface TrackingClient {
 	 * Returns a deterministic event id immediately after enqueue.
 	 *
 	 * Also exposes the revenue helpers flat: `client.track.priceShown()`,
-	 * `client.track.lead()`, `client.track.converted()`, etc.
+	 * `client.track.leadQualified()`, `client.track.converted()`, etc.
 	 */
 	track: TrackFn;
 	/**
