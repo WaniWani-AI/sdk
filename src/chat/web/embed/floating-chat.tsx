@@ -329,7 +329,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				type="button"
 				onClick={collapse}
 				aria-label={t.launcher.close}
-				className="ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground"
+				className="ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer"
 			>
 				<Minus className="ww:size-4" />
 			</button>
@@ -395,7 +395,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 										type="button"
 										onClick={collapse}
 										aria-label={t.launcher.close}
-										className="ww:absolute ww:right-2 ww:top-2 ww:z-10 ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground"
+										className="ww:absolute ww:right-2 ww:top-2 ww:z-10 ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer"
 									>
 										<XIcon className="ww:size-4" />
 									</button>
