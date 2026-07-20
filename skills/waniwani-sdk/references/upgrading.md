@@ -23,7 +23,7 @@ This list mirrors the changelog so you can apply migrations without a network fe
 
 ### 0.15.0: `track.lead()` → `track.leadQualified()`, event `"lead"` → `"lead_qualified"`
 
-The lead event is named `lead_qualified`, its helper is `track.leadQualified()`, and it carries richer properties: `externalId` (your CRM/lead record id, the strongest dedup key), `email`, and `name` alongside `source`. Types renamed: `RevenueLeadInput` → `RevenueLeadQualifiedInput`, `LeadProperties` → `LeadQualifiedProperties`.
+The lead event is named `lead_qualified`, its helper is `track.leadQualified()`, and it carries richer properties: `externalId` (your CRM/lead record id, the strongest dedup key), `email`, and `name`. Types renamed: `RevenueLeadInput` → `RevenueLeadQualifiedInput`, `LeadProperties` → `LeadQualifiedProperties`.
 
 **Auto-fix:**
 
@@ -40,7 +40,6 @@ await client.track.lead({ source: "newsletter", externalUserId: "user_123" });
 await client.track.leadQualified({
   externalId: "lead_abc123",
   email: "jane@example.com",
-  source: "newsletter",
   externalUserId: "user_123",
 });
 ```

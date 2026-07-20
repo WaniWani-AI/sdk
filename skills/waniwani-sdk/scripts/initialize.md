@@ -370,7 +370,7 @@ Follow the waniwani-sdk skill's instrument-tracking reference
 to instrument Waniwani funnel
 events across every createFlow app in this project. Inventory the flows, map nodes to
 the event taxonomy, insert guarded track calls with metadata from flow state
-(lead_qualified with externalId/email/name/source at the node where the qualification
+(lead_qualified with externalId/email/name at the node where the qualification
 bar is met, identify as soon as a stable id exists, price_shown / prices_compared /
 option_selected where the numbers are, converted only on real conversion), ensure
 withWaniwani(server) wraps the server, run typecheck, and report the node -> event

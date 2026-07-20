@@ -100,16 +100,17 @@ describe("track.* revenue helpers", () => {
 		});
 	});
 
-	test("leadQualified carries the source", async () => {
+	test("leadQualified emits no acquisition-source property", async () => {
 		const { events } = await captureBatch((c) =>
 			c.track.leadQualified({
-				source: "newsletter",
+				email: "jane@example.com",
 				externalUserId: "user@example.com",
 			}),
 		);
 
 		expect(events[0]?.name).toBe("lead_qualified");
-		expect(events[0]?.properties).toEqual({ source: "newsletter" });
+		// Exact match — a `source` property would fail this assertion.
+		expect(events[0]?.properties).toEqual({ email: "jane@example.com" });
 		expect(events[0]?.correlation.externalUserId).toBe("user@example.com");
 	});
 
@@ -135,13 +136,13 @@ describe("track.* revenue helpers", () => {
 	test("deprecated track.lead alias emits lead_qualified", async () => {
 		const { events } = await captureBatch((c) =>
 			c.track.lead({
-				source: "newsletter",
+				email: "jane@example.com",
 				externalUserId: "user@example.com",
 			}),
 		);
 
 		expect(events[0]?.name).toBe("lead_qualified");
-		expect(events[0]?.properties).toEqual({ source: "newsletter" });
+		expect(events[0]?.properties).toEqual({ email: "jane@example.com" });
 	});
 
 	test("generic track normalizes the pre-0.15 lead name to lead_qualified", async () => {

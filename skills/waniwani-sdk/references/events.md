@@ -26,7 +26,7 @@ Think of instrumentation as three stages. Emit at least the **start** and the
 |---|---|---|---|
 | **Landing** | `page.viewed` | chat widget (auto) | A visitor lands on a page where the widget is present. Auto-emitted once on widget init — no code. Attributed to an anonymous `visitorId`, **not** a session. Opt out per-surface with `disablePageView` / `data-disable-page-view` (see [chat-widget.md](./chat-widget.md#event-tracking)). |
 | (start, auto) | `tool.called` | `withWaniwani(server)` | Auto-captured for every tool call — no code. |
-| **Qualification** | `lead_qualified` | `track.leadQualified({ externalId?, email?, name?, source? })` | The person met your qualification bar (finished the qualifying questions, requested a demo, matched your target profile). Fires once per flow run, at the node where qualification completes, not at flow entry. |
+| **Qualification** | `lead_qualified` | `track.leadQualified({ externalId?, email?, name? })` | The person met your qualification bar (finished the qualifying questions, requested a demo, matched your target profile). Fires once per flow run, at the node where qualification completes, not at flow entry. |
 | **Step** | `price_shown` | `track.priceShown({ amount, currency })` | You showed the user a price. |
 | **Step** | `prices_compared` | `track.pricesCompared({ options })` | You showed two or more options side by side. |
 | **Step** | `option_selected` | `track.optionSelected({ id, amount, currency })` | The user picked one of those options. |
@@ -120,7 +120,7 @@ import { waniwani } from "@waniwani/sdk";
 
 const client = waniwani(); // reads WANIWANI_API_KEY from env
 
-await client.track.leadQualified({ source: "newsletter", externalUserId: "user_123" });
+await client.track.leadQualified({ email: "jane@acme.com", externalUserId: "user_123" });
 await client.track.converted({ amount: 85, currency: "EUR", externalUserId: "user_123" });
 ```
 
@@ -139,7 +139,7 @@ shape. Every input also accepts the shared tracking context (`sessionId`,
 | `track.priceShown({ amount, currency, itemId?, label? })` | `price_shown` | `amount`, `currency` |
 | `track.pricesCompared({ options: [{ id, amount, currency }] })` | `prices_compared` | `options[]` |
 | `track.optionSelected({ id, amount, currency })` | `option_selected` | `id`, `amount`, `currency` |
-| `track.leadQualified({ externalId?, email?, name?, source? })` | `lead_qualified` | none (identity still required; `externalId` is the strongest dedup key) |
+| `track.leadQualified({ externalId?, email?, name? })` | `lead_qualified` | none (identity still required; `externalId` is the strongest dedup key) |
 | `track.converted({ amount, currency, occurredAt? })` | `converted` | `amount`, `currency` |
 
 `occurredAt` on `converted` is an ISO timestamp for **backdating** an off-platform sale
@@ -248,7 +248,6 @@ export const quoteFlow = createFlow({
     waniwani?.identify(state.email);                       // stable identity for later join
     waniwani?.track.leadQualified({                        // QUALIFICATION bar met
       email: state.email,
-      source: "mcp_chat",
     });
     return {};
   })

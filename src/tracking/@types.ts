@@ -121,8 +121,6 @@ export interface LeadQualifiedProperties {
 	email?: string;
 	/** The lead's name, if known. */
 	name?: string;
-	/** Acquisition source of the lead (e.g. "newsletter"). */
-	source?: string;
 }
 
 export interface ConvertedProperties {
@@ -255,10 +253,9 @@ export interface RevenueOptionSelectedInput
 		OptionSelectedProperties {}
 
 /**
- * Input for `track.leadQualified()`. `source` is the lead's acquisition source
- * (the event property, e.g. "newsletter") — on this helper it shadows the
- * envelope `source` from the tracking context. To set a custom envelope source
- * on a lead, use the generic `track({ event: "lead_qualified", … })`.
+ * Input for `track.leadQualified()` — identity only (`externalId`, `email`,
+ * `name`) plus the shared tracking context. There is no acquisition-source
+ * property; the envelope `source` (the origin channel) is set automatically.
  */
 export interface RevenueLeadQualifiedInput
 	extends TrackingContext,

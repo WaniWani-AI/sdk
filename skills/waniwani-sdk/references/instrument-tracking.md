@@ -11,7 +11,7 @@ Events are typed and first-class. Never invent a custom event name; model every 
 | Event | Helper | When it fires | Required data |
 |---|---|---|---|
 | `tool.called` | automatic via `withWaniwani(server)` | Every tool invocation | none |
-| `lead_qualified` | `waniwani?.track.leadQualified({ externalId?, email?, name?, source? })` | The person met your qualification bar | identity only |
+| `lead_qualified` | `waniwani?.track.leadQualified({ externalId?, email?, name? })` | The person met your qualification bar | identity only |
 | `price_shown` | `waniwani?.track.priceShown({ amount, currency, itemId?, label? })` | You showed one price | `amount`, `currency` |
 | `prices_compared` | `waniwani?.track.pricesCompared({ options: [{ id, amount, currency }] })` | You showed 2+ options side by side | `options[]` |
 | `option_selected` | `waniwani?.track.optionSelected({ id, amount, currency })` | The user picked one option | `id`, `amount`, `currency` |
@@ -28,7 +28,8 @@ Work these out per flow, in order:
 2. **`lead_qualified` metadata comes from flow state.** Fill every property you can:
    - `externalId`: the strongest field. Use the record id your CRM or lead API returns (place the event *after* that push so the id exists).
    - `email` and `name`: map from the state fields that hold them, whatever they are called (`email`, `workEmail`, `contactName`, ...).
-   - `source`: the acquisition channel. Default to `"mcp_chat"` for a flow; use something more specific if the project has one.
+
+   Do **not** add a `source` — `leadQualified` has no acquisition-source property. The origin channel is set automatically on the event envelope.
 3. **`identify` as soon as a stable id exists.** The first node where an email or user id is present in state gets `waniwani?.identify(state.email)`. This is the join key for off-platform conversions. Sharing an email is `identify`, not `lead_qualified`.
 4. **Price events go where the numbers are.** The node that computes or returns a single price gets `priceShown`. A node that presents multiple plans (usually right before or inside the node feeding a comparison widget) gets `pricesCompared`. The node that runs after the user picked (the selected id is now in state) gets `optionSelected`.
 5. **`converted` only on real conversion.** A booking confirmed, a purchase completed, a signup finished inside the flow. If conversion happens later on the customer's own site, do not emit it from the flow; instead make sure `identify` ran, and add a snippet for their backend that calls `client.track.converted({ amount, currency, externalUserId })`.
@@ -60,7 +61,7 @@ For every flow, read the full node graph and build a table: node id, node kind (
 ```
 START -> welcome (interrupt: email)        -> [identify after answer]
       -> qualify (interrupt: role, size)
-      -> push_to_crm (action, returns id)  -> lead_qualified { externalId, email, name, source }
+      -> push_to_crm (action, returns id)  -> lead_qualified { externalId, email, name }
       -> compute_quote (action)            -> price_shown { amount, currency }
       -> show_plans (widget: 3 options)    -> prices_compared { options }
       -> confirm_plan (action)             -> option_selected { id, amount, currency }
@@ -84,7 +85,6 @@ Insert the calls. `waniwani` comes from the node handler context, next to `state
       externalId: lead.id,
       email: state.email,
       name: state.name,
-      source: "mcp_chat",
     });
     return { leadId: lead.id };
   },
@@ -126,3 +126,4 @@ The subagent needs write access to the project and nothing else; tracking keys a
 - **Passing `sessionId` inside a flow.** The scoped client already carries it; a manual value can mis-attribute the event.
 - **Custom event names.** The taxonomy is closed. `track({ event: "my_step" })` is rejected by the types.
 - **`converted` for "reached the last node".** Finishing a conversation is not revenue. Only emit on actual purchase/booking, or from the customer's backend with `externalUserId`.
+- **Adding `source` to `lead_qualified`.** There is no acquisition-source property (`source: "mcp_chat"` is wrong). `leadQualified` takes only `externalId`, `email`, and `name`; the origin channel is stamped on the envelope automatically.

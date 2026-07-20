@@ -15,10 +15,10 @@ type Emit = (event: TrackInput) => Promise<{ eventId: string }>;
  */
 export function createRevenueApi(emit: Emit): RevenueTrackingApi {
 	const leadQualified: RevenueTrackingApi["leadQualified"] = (input) => {
-		const { externalId, email, name, source, ...context } = input ?? {};
+		const { externalId, email, name, ...context } = input ?? {};
 		return emit({
 			event: "lead_qualified",
-			properties: { externalId, email, name, source },
+			properties: { externalId, email, name },
 			...context,
 		});
 	};
