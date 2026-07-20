@@ -84,6 +84,17 @@ export type UseWaniwaniOptions = ContextDrivenOptions | ExplicitEndpointOptions;
  * The tracking API returned by `useWaniwani()`.
  */
 export interface WaniwaniWidget {
+	/**
+	 * The session ID stamped on every event this widget emits, so hosts can
+	 * correlate widget activity with server-side tracking without reaching into
+	 * the internal `_meta` shape.
+	 *
+	 * Resolved from (1) the explicit `sessionId` option, (2)
+	 * `toolResponseMetadata.waniwani.sessionId`, else a random UUID generated
+	 * on mount. `undefined` until the widget initializes (same lifecycle as the
+	 * tracking methods) and when no config resolves (no-op widget).
+	 */
+	readonly sessionId?: string;
 	/** Tie all subsequent widget events to this user. */
 	identify(userId: string, traits?: Record<string, unknown>): void;
 	/** Record a funnel step. Auto-incrementing sequence per session. */
@@ -96,6 +107,7 @@ export interface WaniwaniWidget {
 
 /** No-op widget that silently discards all calls. */
 const NOOP_WIDGET: WaniwaniWidget = {
+	sessionId: undefined,
 	identify() {},
 	step() {},
 	track() {},
@@ -263,6 +275,7 @@ function createState(
 	return {
 		captureKey: captureKeyOf(capture),
 		widget: {
+			sessionId,
 			identify(id: string, traits?: Record<string, unknown>) {
 				userId = id;
 				enqueue([
@@ -328,6 +341,7 @@ function createState(
  *   const wani = useWaniwani();
  *   // Auto-captures clicks, links, errors, scrolls, forms
  *   // Optionally call wani.track("custom_event") for manual events
+ *   // Read wani.sessionId to correlate with server-side tracking
  *   return <a href="https://example.com">Visit</a>;
  * }
  * ```
