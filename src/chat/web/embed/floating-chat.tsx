@@ -17,7 +17,7 @@
 // ============================================================================
 
 import type { UIMessage } from "ai";
-import { ArrowUp, Minus } from "lucide-react";
+import { ArrowUp, Minus, XIcon } from "lucide-react";
 import {
 	forwardRef,
 	useCallback,
@@ -121,6 +121,10 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		const chatRef = useRef<ChatHandle>(null);
 		const composerInputRef = useRef<HTMLInputElement>(null);
 		const dockRef = useRef<HTMLDivElement>(null);
+		// Set when the visitor manually collapses the expanded card (close button)
+		// so a still-pending auto-expand timer won't immediately reopen it. Cleared
+		// when they click/focus the docked bar again to ask for the CTAs back.
+		const userDismissed = useRef(false);
 		const [phase, setPhase] = useState<Phase>("input");
 		const [composerText, setComposerText] = useState("");
 		// Gates the dock's entrance: it stays out of view until the appear
@@ -195,10 +199,13 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			if (!appeared || suggestions.length === 0) {
 				return;
 			}
-			const id = setTimeout(
-				() => setPhase((p) => (p === "input" ? "expanded" : p)),
-				AUTO_EXPAND_DELAY_MS,
-			);
+			const id = setTimeout(() => {
+				// Honor a manual dismiss that landed while the timer was pending.
+				if (userDismissed.current) {
+					return;
+				}
+				setPhase((p) => (p === "input" ? "expanded" : p));
+			}, AUTO_EXPAND_DELAY_MS);
 			return () => clearTimeout(id);
 		}, [appeared, suggestions.length]);
 
@@ -214,8 +221,11 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		const openPanel = useCallback(() => {
 			setPhase("open");
 		}, []);
-		// Collapse back to the resting (narrow) input, dropping the CTAs.
+		// Collapse back to the resting (narrow) input, dropping the CTAs. Marks the
+		// collapse as deliberate so the auto-expand doesn't reopen the card behind
+		// the visitor's back — they get the CTAs again by clicking the bar.
 		const collapse = useCallback(() => {
+			userDismissed.current = true;
 			setPhase("input");
 		}, []);
 
@@ -293,6 +303,8 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			} else {
 				// First focus with no conversation: widen the bar (and reveal the
 				// CTAs, if any) — but stay docked. The chat only opens on send.
+				// Clicking back on the bar clears any prior dismiss.
+				userDismissed.current = false;
 				setPhase((p) => (p === "input" ? "expanded" : p));
 			}
 		}, []);
@@ -358,7 +370,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 							    as intentional glass and the host page shows through it. */}
 							<div
 								className={cn(
-									"ww:flex ww:flex-col ww:rounded-[20px] ww:border ww:transition-all ww:duration-300 ww:ease-out",
+									"ww:relative ww:flex ww:flex-col ww:rounded-[20px] ww:border ww:transition-all ww:duration-300 ww:ease-out",
 									showCard
 										? "ww:p-2 ww:backdrop-blur-xl ww:backdrop-saturate-150"
 										: "ww:border-transparent ww:p-0",
@@ -373,6 +385,22 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 										: undefined
 								}
 							>
+								{/* Close (X) in the card's top-right — collapses the expanded
+								    card back to just the docked input, so the visitor can read
+								    only their own text. Clicking the bar again brings the CTAs
+								    back. Only while expanded; the open panel has its own header
+								    collapse control (`closeButton` via `headerActions`). */}
+								{showCard && phase !== "open" && (
+									<button
+										type="button"
+										onClick={collapse}
+										aria-label={t.launcher.close}
+										className="ww:absolute ww:right-2 ww:top-2 ww:z-10 ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground"
+									>
+										<XIcon className="ww:size-4" />
+									</button>
+								)}
+
 								{suggestions.length > 0 && (
 									// The card grows straight up to reveal the pills: a
 									// `grid-rows` 0fr → 1fr height animation (eases to the pills'
@@ -391,7 +419,9 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 											<Suggestions
 												suggestions={suggestions}
 												onSelect={openWith}
-												className="ww:px-1 ww:pt-1 ww:pb-2.5"
+												// Right padding keeps the top row of pills clear of the
+												// absolutely-positioned close button in the corner.
+												className="ww:pl-1 ww:pr-9 ww:pt-1 ww:pb-2.5"
 											/>
 										</div>
 									</div>
