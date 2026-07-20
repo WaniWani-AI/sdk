@@ -365,8 +365,9 @@ Test the flow:
 Once the flow builds and runs, instrument funnel events across it. Launch a **sub-agent** (background is fine) with this prompt:
 
 ```
-Follow the instrument-tracking skill (the installed instrument-tracking skill, or
-https://docs.waniwani.ai/sdk/tracking/instrumentation) to instrument Waniwani funnel
+Follow the waniwani-sdk skill's instrument-tracking reference
+(references/instrument-tracking.md, or https://docs.waniwani.ai/sdk/tracking/instrumentation)
+to instrument Waniwani funnel
 events across every createFlow app in this project. Inventory the flows, map nodes to
 the event taxonomy, insert guarded track calls with metadata from flow state
 (lead_qualified with externalId/email/name/source at the node where the qualification

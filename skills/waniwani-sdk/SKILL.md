@@ -132,7 +132,7 @@ The following are still exported for back-compat with existing customer MCPs but
 | Deploy a pure OSS production MCP server | [self-hosting.md](references/self-hosting.md) |
 | Add a free-tier API key and unlock tracking + dashboard | [setup.md](references/setup.md) |
 | Track events and build a revenue funnel (lead_qualified → price → converted), incl. off-platform conversions | [events.md](references/events.md) |
-| Auto-instrument funnel events across existing flows | the sibling `instrument-tracking` skill (`skills/instrument-tracking/SKILL.md`), or [docs.waniwani.ai/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation) |
+| Auto-instrument funnel events across existing flows | [instrument-tracking.md](references/instrument-tracking.md) |
 | Use the flow API in detail (nodes, edges, interrupts, widgets) | [flows-api-reference.md](references/flows-api-reference.md) |
 | Add knowledge-base search | [knowledge-base.md](references/knowledge-base.md) |
 | Embed the chat widget on a website | [chat-widget.md](references/chat-widget.md) |

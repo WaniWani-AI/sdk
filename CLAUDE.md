@@ -135,10 +135,13 @@ When changing the public API or behavior, **always update the corresponding skil
 
 Target SDK **users**, not SDK developers.
 
+**`waniwani-sdk` is the one and only external skill.** `skills/` must contain exactly one skill folder (`waniwani-sdk/`). Everything else — tracking instrumentation, scaffolding, upgrades — lives *inside* it, as a `references/*.md` reference or a `scripts/*.md` playbook linked from `SKILL.md`, never as a sibling `SKILL.md` in `skills/`. A standalone sibling skill publishes as a separate skill on skills.sh, which fragments the surface and breaks the single-entry-point contract. When you need a new user-facing guide, add a reference under `waniwani-sdk/references/` and link it from `SKILL.md`; do not create `skills/<something-else>/SKILL.md`.
+
 | Source area | Reference file |
 |---|---|
 | `src/mcp/server/flows/` | `references/flows.md` + `flows-api-reference.md` |
 | `src/tracking/` + `src/mcp/server/scoped-client.ts` | `references/events.md` (NEW) |
+| Auto-instrumentation playbook (funnel events across flows) | `references/instrument-tracking.md` |
 | `src/mcp/server/kv/` | `references/kv-store.md` (NEW) |
 | Self-hosting | `references/self-hosting.md` (NEW) |
 | `src/kb/` | `references/knowledge-base.md` |

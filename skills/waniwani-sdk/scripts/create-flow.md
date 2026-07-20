@@ -204,7 +204,7 @@ await registerTools(server, [displayTool, myFlow, ...existingTools]);
 
 ## Step 9: Instrument Tracking
 
-With the flow working, add funnel events. Follow the `instrument-tracking` skill if it is installed (or the rules at [docs.waniwani.ai/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation)), either directly or via a sub-agent. In short: `identify` at the earliest node where a stable id (email) exists; `lead_qualified` once, at the node where the qualification bar is met (often the CRM push, so `externalId` carries the record id); `price_shown` / `prices_compared` / `option_selected` where the numbers are; `converted` only on real conversion. Guard every call with `waniwani?.` and never pass `sessionId` inside a flow.
+With the flow working, add funnel events. Follow the [instrument-tracking.md](../references/instrument-tracking.md) reference (or the rules at [docs.waniwani.ai/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation)), either directly or via a sub-agent. In short: `identify` at the earliest node where a stable id (email) exists; `lead_qualified` once, at the node where the qualification bar is met (often the CRM push, so `externalId` carries the record id); `price_shown` / `prices_compared` / `option_selected` where the numbers are; `converted` only on real conversion. Guard every call with `waniwani?.` and never pass `sessionId` inside a flow.
 
 ## Common Pitfalls
 

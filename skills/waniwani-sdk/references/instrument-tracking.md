@@ -1,11 +1,3 @@
----
-name: instrument-tracking
-description: "Auto-instrument Waniwani funnel events across a createFlow app. Analyzes every flow in the project, decides where each tracking event belongs (lead_qualified, price_shown, prices_compared, option_selected, converted, identify), inserts the calls with the right metadata from flow state, and verifies the result. Trigger when the user wants to add tracking to a flow, track qualified leads, instrument a funnel, measure conversions, or right after scaffolding a new flow with @waniwani/sdk."
-license: MIT
-metadata:
-  author: Waniwani
----
-
 # Instrument tracking on a createFlow app
 
 Read the project's flows, map each node to the Waniwani event taxonomy, insert the tracking calls with metadata sourced from flow state, and verify. The output is a flow where every funnel stage emits exactly the right event, without the user writing a single `track` call.
@@ -112,11 +104,11 @@ Do not `await` tracking calls inside hot paths unless the runtime is serverless;
 
 ## Running as a subagent
 
-Scaffolding playbooks (for example the Waniwani `initialize` playbook) invoke this skill as a follow-up step once a flow exists. Spawn a subagent with this prompt, adjusted for the project root:
+Scaffolding playbooks (for example the Waniwani `initialize` playbook) invoke this playbook as a follow-up step once a flow exists. Spawn a subagent with this prompt, adjusted for the project root:
 
 ```
-Follow the instrument-tracking skill (skills/instrument-tracking/SKILL.md, or the
-installed instrument-tracking skill) to instrument Waniwani funnel events across
+Follow the waniwani-sdk skill's instrument-tracking reference
+(references/instrument-tracking.md) to instrument Waniwani funnel events across
 every createFlow app in this project. Inventory the flows, map nodes to the event
 taxonomy, insert guarded track calls with metadata from flow state (lead_qualified
 with externalId/email/name/source where the qualification bar is met), ensure
