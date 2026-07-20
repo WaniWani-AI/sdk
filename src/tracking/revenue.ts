@@ -29,9 +29,13 @@ export function createRevenueApi(emit: Emit): RevenueTrackingApi {
 				properties: { id, amount, currency },
 				...context,
 			}),
-		lead: (input) => {
-			const { source, ...context } = input ?? {};
-			return emit({ event: "lead", properties: { source }, ...context });
+		leadQualified: (input) => {
+			const { externalId, email, name, source, ...context } = input ?? {};
+			return emit({
+				event: "lead_qualified",
+				properties: { externalId, email, name, source },
+				...context,
+			});
 		},
 		converted: ({ amount, currency, occurredAt, ...context }) =>
 			emit({

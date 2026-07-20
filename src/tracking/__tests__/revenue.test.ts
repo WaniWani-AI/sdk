@@ -100,17 +100,36 @@ describe("track.* revenue helpers", () => {
 		});
 	});
 
-	test("lead carries the source", async () => {
+	test("leadQualified carries the source", async () => {
 		const { events } = await captureBatch((c) =>
-			c.track.lead({
+			c.track.leadQualified({
 				source: "newsletter",
 				externalUserId: "user@example.com",
 			}),
 		);
 
-		expect(events[0]?.name).toBe("lead");
+		expect(events[0]?.name).toBe("lead_qualified");
 		expect(events[0]?.properties).toEqual({ source: "newsletter" });
 		expect(events[0]?.correlation.externalUserId).toBe("user@example.com");
+	});
+
+	test("leadQualified carries externalId, email and name", async () => {
+		const { events } = await captureBatch((c) =>
+			c.track.leadQualified({
+				externalId: "lead_abc123",
+				email: "jane@example.com",
+				name: "Jane Doe",
+				sessionId: "sess_1",
+			}),
+		);
+
+		expect(events[0]?.name).toBe("lead_qualified");
+		expect(events[0]?.properties).toEqual({
+			externalId: "lead_abc123",
+			email: "jane@example.com",
+			name: "Jane Doe",
+		});
+		expect(events[0]?.correlation.sessionId).toBe("sess_1");
 	});
 
 	test("converted carries amount, currency and a backdated occurredAt", async () => {
