@@ -134,10 +134,13 @@ function mapLegacyProperties(
 }
 
 function resolveEventName(input: TrackInput): EventType {
-	if (isLegacyTrackEvent(input)) {
-		return input.eventType;
+	const name = isLegacyTrackEvent(input) ? input.eventType : input.event;
+	// `lead` was renamed to `lead_qualified` in 0.15.0; pre-0.15 compiled
+	// callers may still send the old name.
+	if ((name as string) === "lead") {
+		return "lead_qualified";
 	}
-	return input.event;
+	return name;
 }
 
 function resolveCorrelationIds(

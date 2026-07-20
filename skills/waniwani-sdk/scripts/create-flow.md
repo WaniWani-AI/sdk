@@ -202,6 +202,10 @@ await registerTools(server, [displayTool, myFlow, ...existingTools]);
    - Branching: If conditional edges exist, test both paths
 5. **Check the dashboard**: Verify events appear at [app.waniwani.ai](https://app.waniwani.ai)
 
+## Step 9: Instrument Tracking
+
+With the flow working, add funnel events. Follow the `instrument-tracking` skill if it is installed (or the rules at [docs.waniwani.ai/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation)), either directly or via a sub-agent. In short: `identify` at the earliest node where a stable id (email) exists; `lead_qualified` once, at the node where the qualification bar is met (often the CRM push, so `externalId` carries the record id); `price_shown` / `prices_compared` / `option_selected` where the numbers are; `converted` only on real conversion. Guard every call with `waniwani?.` and never pass `sessionId` inside a flow.
+
 ## Common Pitfalls
 
 - **Forgetting START/END edges** -- The graph won't compile without them

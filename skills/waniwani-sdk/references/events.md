@@ -25,8 +25,8 @@ Think of instrumentation as three stages. Emit at least the **start** and the
 | Funnel stage | Emit | Helper / source | When |
 |---|---|---|---|
 | **Landing** | `page.viewed` | chat widget (auto) | A visitor lands on a page where the widget is present. Auto-emitted once on widget init — no code. Attributed to an anonymous `visitorId`, **not** a session. Opt out per-surface with `disablePageView` / `data-disable-page-view` (see [chat-widget.md](./chat-widget.md#event-tracking)). |
-| **Start** | `lead` | `track.lead({ source })` | User enters the funnel with intent (asked for a quote, started a flow). |
 | (start, auto) | `tool.called` | `withWaniwani(server)` | Auto-captured for every tool call — no code. |
+| **Qualification** | `lead_qualified` | `track.leadQualified({ externalId?, email?, name?, source? })` | The person met your qualification bar (finished the qualifying questions, requested a demo, matched your target profile). Fires once per flow run, at the node where qualification completes, not at flow entry. |
 | **Step** | `price_shown` | `track.priceShown({ amount, currency })` | You showed the user a price. |
 | **Step** | `prices_compared` | `track.pricesCompared({ options })` | You showed two or more options side by side. |
 | **Step** | `option_selected` | `track.optionSelected({ id, amount, currency })` | The user picked one of those options. |
@@ -38,9 +38,15 @@ bar, `"inline"` for an in-page mount) so funnels can be sliced by embed surface.
 
 The conceptual "start / step / conversion" maps onto these concrete events. There is
 **no generic `step()` helper and no arbitrary custom event name** in the typed surface —
-model your funnel steps with the revenue events above. Emitting `track.lead(...)` once
-on entry and `track.converted(...)` once on the sale is the minimum that makes a funnel;
-the price/compare/select steps make it *explain why* people drop off.
+model your funnel steps with the revenue events above. Emitting `track.leadQualified(...)`
+once at the qualification bar and `track.converted(...)` once on the sale is the minimum
+that makes a funnel; the price/compare/select steps make it *explain why* people drop off.
+
+Note the distinction `lead_qualified` draws: a user sharing an email mid-conversation is
+`identify(userId, { email })`, not a qualified lead. `identify` attaches identity;
+`lead_qualified` declares your qualification bar was met. Most flows emit both, at
+different nodes. For per-node placement rules (and a skill that applies them
+automatically), see [docs.waniwani.ai/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation).
 
 ## The one rule you can't skip: identity
 
@@ -114,7 +120,7 @@ import { waniwani } from "@waniwani/sdk";
 
 const client = waniwani(); // reads WANIWANI_API_KEY from env
 
-await client.track.lead({ source: "newsletter", externalUserId: "user_123" });
+await client.track.leadQualified({ source: "newsletter", externalUserId: "user_123" });
 await client.track.converted({ amount: 85, currency: "EUR", externalUserId: "user_123" });
 ```
 
@@ -133,7 +139,7 @@ shape. Every input also accepts the shared tracking context (`sessionId`,
 | `track.priceShown({ amount, currency, itemId?, label? })` | `price_shown` | `amount`, `currency` |
 | `track.pricesCompared({ options: [{ id, amount, currency }] })` | `prices_compared` | `options[]` |
 | `track.optionSelected({ id, amount, currency })` | `option_selected` | `id`, `amount`, `currency` |
-| `track.lead({ source? })` | `lead` | none (identity still required) |
+| `track.leadQualified({ externalId?, email?, name?, source? })` | `lead_qualified` | none (identity still required; `externalId` is the strongest dedup key) |
 | `track.converted({ amount, currency, occurredAt? })` | `converted` | `amount`, `currency` |
 
 `occurredAt` on `converted` is an ISO timestamp for **backdating** an off-platform sale
@@ -171,7 +177,8 @@ The hard problem: a lead chats today, but the sale closes next week on your own 
 with no live MCP session. To close that loop:
 
 1. While the user is in the funnel, capture a **stable `externalUserId`** (your own user
-   id, email hash, etc.) — e.g. via `client.identify(...)` or by carrying it on a `lead`.
+   id, email hash, etc.) — e.g. via `client.identify(...)` or by carrying it on a
+   `lead_qualified`.
 2. Later, from your **backend**, emit `converted` carrying that same `externalUserId`.
    The dashboard joins it back to the original lead.
 
@@ -234,21 +241,24 @@ export const quoteFlow = createFlow({
     premium: z.number().describe("Quoted monthly premium"),
   },
 })
-  .addNode("capture_lead", ({ state, waniwani }) => {
-    waniwani?.identify(state.email);                       // stable identity for later join
-    waniwani?.track.lead({ source: "mcp_chat" });          // START
-    return {};
-  })
   .addNode("ask_email", ({ interrupt }) =>
     interrupt({ email: { question: "What's your email?" } }),
   )
+  .addNode("qualify_lead", ({ state, waniwani }) => {
+    waniwani?.identify(state.email);                       // stable identity for later join
+    waniwani?.track.leadQualified({                        // QUALIFICATION bar met
+      email: state.email,
+      source: "mcp_chat",
+    });
+    return {};
+  })
   .addNode("show_quote", ({ state, waniwani }) => {
     waniwani?.track.priceShown({ amount: state.premium, currency: "EUR" }); // STEP
     return {};
   })
-  .addEdge(START, "capture_lead")
-  .addEdge("capture_lead", "ask_email")
-  .addEdge("ask_email", "show_quote")
+  .addEdge(START, "ask_email")
+  .addEdge("ask_email", "qualify_lead")
+  .addEdge("qualify_lead", "show_quote")
   .addEdge("show_quote", END)
   .compile();
 
@@ -277,10 +287,14 @@ await client.track.converted({
   `client.track.priceShown()`. There is no `.revenue` namespace.
 - **Looking for a `step()` helper or sending a custom event name** — the taxonomy is a
   closed, typed set. Model funnel steps with `price_shown` / `prices_compared` /
-  `option_selected`; emit `lead` at the start and `converted` at the end.
+  `option_selected`; emit `lead_qualified` at the qualification bar and `converted` at
+  the end.
+- **Emitting `lead_qualified` at flow entry** — entering a funnel is not qualifying
+  (`tool.called` already covers activity). Place it at the node where your qualification
+  bar is met, and fire it once per flow run.
 - **Tracking call throws "WANIWANI_API_KEY is not set"** — tracking is free-tier; set
   the key (see [setup.md](setup.md)). If a code path must also run keyless, guard the
   call — inside a flow node an unguarded throw fails the whole tool call.
 - **Off-platform `converted` never attributes** — the `externalUserId` on the conversion
-  must match an id seen during the funnel. Capture it (via `identify` or on the `lead`)
+  must match an id seen during the funnel. Capture it (via `identify` or on the `lead_qualified`)
   before the user leaves.

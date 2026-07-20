@@ -132,6 +132,30 @@ describe("track.* revenue helpers", () => {
 		expect(events[0]?.correlation.sessionId).toBe("sess_1");
 	});
 
+	test("deprecated track.lead alias emits lead_qualified", async () => {
+		const { events } = await captureBatch((c) =>
+			c.track.lead({
+				source: "newsletter",
+				externalUserId: "user@example.com",
+			}),
+		);
+
+		expect(events[0]?.name).toBe("lead_qualified");
+		expect(events[0]?.properties).toEqual({ source: "newsletter" });
+	});
+
+	test("generic track normalizes the pre-0.15 lead name to lead_qualified", async () => {
+		const { events } = await captureBatch((c) =>
+			c.track({
+				event: "lead" as unknown as "lead_qualified",
+				properties: { source: "newsletter" },
+				externalUserId: "user@example.com",
+			}),
+		);
+
+		expect(events[0]?.name).toBe("lead_qualified");
+	});
+
 	test("converted carries amount, currency and a backdated occurredAt", async () => {
 		const { events } = await captureBatch((c) =>
 			c.track.converted({

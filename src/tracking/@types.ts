@@ -284,6 +284,11 @@ export interface RevenueTrackingApi {
 	leadQualified: (
 		input?: RevenueLeadQualifiedInput,
 	) => Promise<{ eventId: string }>;
+	/**
+	 * @deprecated Renamed in 0.15.0. Use `track.leadQualified()` instead; this
+	 * alias emits a `lead_qualified` event and will be removed in 0.16.0.
+	 */
+	lead: (input?: RevenueLeadQualifiedInput) => Promise<{ eventId: string }>;
 	converted: (input: RevenueConvertedInput) => Promise<{ eventId: string }>;
 }
 

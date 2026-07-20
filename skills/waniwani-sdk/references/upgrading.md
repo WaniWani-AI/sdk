@@ -21,6 +21,36 @@ Deprecations (struck-through signatures, `@deprecated` JSDoc) are **not** breaki
 
 This list mirrors the changelog so you can apply migrations without a network fetch. Always cross-check against the live changelog for anything newer than this file.
 
+### 0.15.0: `track.lead()` → `track.leadQualified()`, event `"lead"` → `"lead_qualified"`
+
+The lead event is named `lead_qualified`, its helper is `track.leadQualified()`, and it carries richer properties: `externalId` (your CRM/lead record id, the strongest dedup key), `email`, and `name` alongside `source`. Types renamed: `RevenueLeadInput` → `RevenueLeadQualifiedInput`, `LeadProperties` → `LeadQualifiedProperties`.
+
+**Auto-fix:**
+
+1. Replace every `.track.lead(` call with `.track.leadQualified(`.
+2. Replace `event: "lead"` with `event: "lead_qualified"` in generic `track()` calls (and `eventType: "lead"` in the legacy shape).
+3. Replace type imports: `RevenueLeadInput` → `RevenueLeadQualifiedInput`, `LeadProperties` → `LeadQualifiedProperties`.
+4. Where the call site has them, enrich the event with `externalId`, `email`, and `name` (all optional).
+
+```ts
+// Before
+await client.track.lead({ source: "newsletter", externalUserId: "user_123" });
+
+// After
+await client.track.leadQualified({
+  externalId: "lead_abc123",
+  email: "jane@example.com",
+  source: "newsletter",
+  externalUserId: "user_123",
+});
+```
+
+Semantics note: `lead_qualified` fires when the person meets your qualification bar (qualifying questions answered, demo requested, CRM push done), not at flow entry. If the old `lead` call sat on the flow's first node, move it to the node where qualification completes. See [docs.waniwani.ai/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation).
+
+Since 0.15.1, `track.lead()` also exists as a `@deprecated` alias emitting `lead_qualified` (removed in 0.16.0), and the transport normalizes the runtime name `"lead"` to `"lead_qualified"`. Migrate anyway; on 0.15.0 exactly the alias is absent.
+
+After applying, run `bun run typecheck && bun test`.
+
 ### 0.14.0 — `addConditionalEdge(from, condition)` → `addConditionalEdge(from, to, condition)`
 
 The reachable nodes are now declared explicitly as the second argument; the condition's return type is constrained to that list.

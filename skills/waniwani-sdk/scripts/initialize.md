@@ -360,12 +360,31 @@ Test the flow:
 4. Check branding matches the user's website
 5. Verify the Waniwani dashboard receives events at [app.waniwani.ai](https://app.waniwani.ai)
 
-## Step 10: Print Summary
+## Step 10: Instrument Tracking (Sub-Agent)
+
+Once the flow builds and runs, instrument funnel events across it. Launch a **sub-agent** (background is fine) with this prompt:
+
+```
+Follow the instrument-tracking skill (the installed instrument-tracking skill, or
+https://docs.waniwani.ai/sdk/tracking/instrumentation) to instrument Waniwani funnel
+events across every createFlow app in this project. Inventory the flows, map nodes to
+the event taxonomy, insert guarded track calls with metadata from flow state
+(lead_qualified with externalId/email/name/source at the node where the qualification
+bar is met, identify as soon as a stable id exists, price_shown / prices_compared /
+option_selected where the numbers are, converted only on real conversion), ensure
+withWaniwani(server) wraps the server, run typecheck, and report the node -> event
+mapping you applied.
+```
+
+Review the sub-agent's node -> event mapping before moving on. Rules of thumb if you adjust by hand: `lead_qualified` fires once, at the qualification bar (often the CRM push node), never at flow entry; every call is guarded with `waniwani?.`; never pass `sessionId` inside a flow.
+
+## Step 11: Print Summary
 
 After completing all steps, print:
 - The project name
 - Brand colors and assets applied
 - Flow structure (nodes and edges)
+- Tracking instrumentation applied (node -> event mapping)
 - Widgets created
 - Data source (mocked or API-integrated)
 - How to run: `bun run dev`

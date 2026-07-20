@@ -108,7 +108,7 @@ If no `{ store }` is passed and `WANIWANI_API_KEY` is not set, `.compile()` thro
 Adds hosted features on top of the OSS flow engine.
 
 - **Hosted flow state** — `WaniwaniKvStore` used by default when no `{ store }` is passed.
-- **Event tracking** — a typed, revenue-first funnel taxonomy (`lead` → `price_shown` / `prices_compared` / `option_selected` → `converted`) via flat `track.*` helpers; `withWaniwani(server)` auto-captures `tool.called`. Off-platform conversions correlate by `externalUserId`. See [events.md](references/events.md).
+- **Event tracking** — a typed, revenue-first funnel taxonomy (`lead_qualified` → `price_shown` / `prices_compared` / `option_selected` → `converted`) via flat `track.*` helpers; `withWaniwani(server)` auto-captures `tool.called`. Off-platform conversions correlate by `externalUserId`. See [events.md](references/events.md).
 - **Knowledge base** — `createKbClient()` for ingest/search.
 - **Funnel analytics** — flow graphs auto-sync to the dashboard.
 - **Chat widget** — `ChatEmbed` talks directly to `app.waniwani.ai`.
@@ -131,7 +131,8 @@ The following are still exported for back-compat with existing customer MCPs but
 | Plug in a Redis / Upstash / Cloudflare KV / DynamoDB backend | [kv-store.md](references/kv-store.md) |
 | Deploy a pure OSS production MCP server | [self-hosting.md](references/self-hosting.md) |
 | Add a free-tier API key and unlock tracking + dashboard | [setup.md](references/setup.md) |
-| Track events and build a revenue funnel (lead → price → converted), incl. off-platform conversions | [events.md](references/events.md) |
+| Track events and build a revenue funnel (lead_qualified → price → converted), incl. off-platform conversions | [events.md](references/events.md) |
+| Auto-instrument funnel events across existing flows | the sibling `instrument-tracking` skill (`skills/instrument-tracking/SKILL.md`), or [docs.waniwani.ai/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation) |
 | Use the flow API in detail (nodes, edges, interrupts, widgets) | [flows-api-reference.md](references/flows-api-reference.md) |
 | Add knowledge-base search | [knowledge-base.md](references/knowledge-base.md) |
 | Embed the chat widget on a website | [chat-widget.md](references/chat-widget.md) |
