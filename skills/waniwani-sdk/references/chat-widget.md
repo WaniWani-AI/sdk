@@ -582,6 +582,47 @@ The event goes to the same canonical ingest every other event uses (`POST /api/m
 
 **Opting out.** On surfaces where a page view is meaningless — an already-authenticated app shell, an internal tool, a staging preview — suppress the event so it doesn't inflate the customer's funnel. Set `overrides={{ disablePageView: true }}` on `<WaniwaniChat>`, or `data-disable-page-view="true"` (a bare `data-disable-page-view` works too) on the `<script>` embed. The rest of the widget is unaffected; only the `page.viewed` event is skipped.
 
+### Mirroring events into your own analytics (`onEvent`)
+
+The `<script>` embed can report chat lifecycle events to the host page through an `onEvent` callback. The embed mounts directly in the page's DOM (the shadow root isolates styles only), so the callback runs in the page's own JS context: forwarding to `window.analytics.track(...)` (Segment), `gtag(...)`, or any other page-side SDK keeps that SDK's identity (for example Segment's `anonymousId`) attached automatically, with no server-side identity plumbing.
+
+| Event | Fired when | Notes |
+|-------|------------|-------|
+| `chat.opened` | The floating panel expands open | Floating mode only |
+| `chat.closed` | The floating panel collapses back to the dock | Floating mode only |
+| `message.sent` | The visitor submits a message | Never includes the message text |
+| `message.received` | The assistant response completes | Never includes the message text |
+
+Each event is `{ name, sessionId?, properties? }` (the `WidgetEvent` type, exported from `@waniwani/sdk/chat`). `properties.mode` carries the embed surface (`"inline"` or `"floating"`). `sessionId` is assigned by the server on the first exchange, so it is `undefined` on events that precede it.
+
+The event names are neutral and fixed. If your analytics schema uses different names or extra properties, map them in your callback:
+
+```html
+<script src="https://app.waniwani.ai/embed.js" defer></script>
+<script>
+  window.addEventListener('DOMContentLoaded', function () {
+    window.WaniWani.chat.init({
+      token: 'wwp_...',
+      mode: 'floating',
+      onEvent: function (event) {
+        var names = {
+          'chat.opened': 'chat_opened',
+          'chat.closed': 'chat_closed',
+          'message.sent': 'user_message',
+          'message.received': 'bot_message',
+        };
+        window.analytics.track(names[event.name] || event.name, {
+          page: window.location.pathname,
+          sessionId: event.sessionId,
+        });
+      },
+    });
+  });
+</script>
+```
+
+`onEvent` is programmatic-only (a function cannot be expressed as a `data-*` attribute), so it requires the `init()` call above rather than the bare auto-init script tag. Exceptions thrown by the callback are swallowed with a console warning; a broken callback never breaks the chat. Message content never passes through `onEvent`, only the fact that a message was exchanged.
+
 ## `ChatEmbed` (advanced)
 
 **Most apps should use `WaniwaniChat` or the `<script>` embed.** `ChatEmbed` is the bare-bones primitive underneath both of them: no token, no remote config, no defaults, no built-in MCP resource endpoint. You wire up `api`, `headers`, `body`, `theme`, and (optionally) `mcp` yourself.

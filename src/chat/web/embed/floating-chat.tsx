@@ -40,6 +40,7 @@ import { useRemoteEmbedConfig } from "./remote-config";
 import { usePathname, useVisibilityGate } from "./use-pathname";
 import { useScrollAppearance } from "./use-scroll-appearance";
 import { appearTriggerForPath } from "./visibility";
+import { emitWidgetEvent } from "./widget-events";
 
 /** Default delay before the docked input animates into view on load. */
 const DEFAULT_APPEAR_DELAY_MS = 2000;
@@ -253,6 +254,26 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			},
 			[openPanel],
 		);
+
+		// Report open/close transitions to the host page (`onEvent`). Watching
+		// `phase` covers every path that opens or closes the panel: dock focus,
+		// suggestion click, the imperative API, the header collapse button. The
+		// docked/expanded states both count as "closed"; only the full panel is
+		// "open". No event on mount (both start not-open).
+		const wasOpenRef = useRef(false);
+		const onEvent = config.onEvent;
+		useEffect(() => {
+			const isOpen = phase === "open";
+			if (isOpen === wasOpenRef.current) {
+				return;
+			}
+			wasOpenRef.current = isOpen;
+			emitWidgetEvent(onEvent, {
+				name: isOpen ? "chat.opened" : "chat.closed",
+				sessionId: chatRef.current?.sessionId,
+				properties: { mode: "floating" },
+			});
+		}, [phase, onEvent]);
 
 		useImperativeHandle(
 			ref,
@@ -500,6 +521,20 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 								headers={{ Authorization: `Bearer ${config.token}` }}
 								skipRemoteConfig
 								body={body}
+								onMessageSent={() =>
+									emitWidgetEvent(config.onEvent, {
+										name: "message.sent",
+										sessionId: chatRef.current?.sessionId,
+										properties: { mode: "floating" },
+									})
+								}
+								onResponseReceived={() =>
+									emitWidgetEvent(config.onEvent, {
+										name: "message.received",
+										sessionId: chatRef.current?.sessionId,
+										properties: { mode: "floating" },
+									})
+								}
 								appearance={config.appearance}
 								title={config.title}
 								headerActions={closeButton}
