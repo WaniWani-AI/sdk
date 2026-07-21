@@ -5,6 +5,7 @@
 import type { ChatTheme } from "../@types";
 import type { Locale } from "../i18n";
 import type { VisibilityRules } from "./visibility";
+import type { WidgetEvent } from "./widget-events";
 
 /**
  * Built-in theme presets. `auto` follows the host's `prefers-color-scheme`
@@ -174,6 +175,18 @@ export interface EmbedConfig {
 	 * `"floating"`.
 	 */
 	visibility?: VisibilityRules;
+	/**
+	 * Host-page callback fired on chat lifecycle events: `chat.opened`,
+	 * `chat.closed` (floating mode only), `message.sent`, `message.received`.
+	 * Message events never include the message text. The embed runs in the
+	 * host page's DOM, so the callback can forward events directly into the
+	 * page's analytics (e.g. `window.analytics.track(...)`).
+	 *
+	 * Programmatic-only: functions cannot be expressed as a `data-*`
+	 * attribute, so pass it to `WaniWani.chat.init()`. Exceptions thrown by
+	 * the callback are swallowed and never break the widget.
+	 */
+	onEvent?: (event: WidgetEvent) => void;
 }
 
 /** Fallback height applied to an inline embed container with no author sizing. */

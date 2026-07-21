@@ -12,6 +12,7 @@ import { ChatEmbed } from "../layouts/chat-embed";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { useVisibilityGate } from "./use-pathname";
+import { emitWidgetEvent } from "./widget-events";
 
 export interface InlineChatProps {
 	config: EmbedConfig;
@@ -91,6 +92,20 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 				headers={{ Authorization: `Bearer ${config.token}` }}
 				skipRemoteConfig
 				body={body}
+				onMessageSent={() =>
+					emitWidgetEvent(config.onEvent, {
+						name: "message.sent",
+						sessionId: chatRef.current?.sessionId,
+						properties: { mode: "inline" },
+					})
+				}
+				onResponseReceived={() =>
+					emitWidgetEvent(config.onEvent, {
+						name: "message.received",
+						sessionId: chatRef.current?.sessionId,
+						properties: { mode: "inline" },
+					})
+				}
 				appearance={config.appearance}
 				title={config.title}
 				hideHeader={config.hideHeader}
