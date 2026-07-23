@@ -339,9 +339,9 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.appearance = { ...config.appearance, theme: themeRaw };
 	}
 
-	const assistantBubbleRaw = str("data-assistant-bubble");
-	if (assistantBubbleRaw === "true") {
-		config.appearance = { ...config.appearance, assistantBubble: true };
+	const assistantBubble = bool("data-assistant-bubble");
+	if (assistantBubble !== undefined) {
+		config.appearance = { ...config.appearance, assistantBubble };
 	}
 
 	const localeRaw = str("data-locale");
