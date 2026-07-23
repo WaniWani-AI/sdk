@@ -92,7 +92,9 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 		);
 
 		const resolvedTheme = mergeTheme(userTheme);
-		const cssVars = themeToCSSProperties(resolvedTheme);
+		// Emit only user-set keys so the stylesheet fallback chains stay live
+		// (e.g. bubble text ← primaryForeground); defaults come from tailwind.css.
+		const cssVars = themeToCSSProperties(userTheme ?? {});
 		// Legacy heuristic: dark when the background's perceived luminance is low.
 		// New code uses the explicit `appearance.theme` preset instead.
 		const hex = resolvedTheme.backgroundColor.replace("#", "");
