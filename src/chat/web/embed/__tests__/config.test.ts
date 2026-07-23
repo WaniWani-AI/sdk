@@ -385,3 +385,61 @@ describe("resolveConfig — validation", () => {
 		);
 	});
 });
+
+describe("resolveConfig — assistantBubble", () => {
+	test("carries appearance.assistantBubble through", () => {
+		const config = resolveConfig({
+			token: "tok",
+			appearance: { theme: "light", assistantBubble: true },
+		});
+		expect(config.appearance?.assistantBubble).toBe(true);
+	});
+});
+
+describe("parseConfigFromScript — data-assistant-bubble", () => {
+	test("'true' opts in", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-assistant-bubble": "true",
+		});
+		expect(cfg.appearance).toEqual({ assistantBubble: true });
+	});
+
+	test("'1' and bare attribute opt in like sibling boolean attrs", async () => {
+		const one = await parseWithAttrs({
+			"data-token": "tok",
+			"data-assistant-bubble": "1",
+		});
+		expect(one.appearance).toEqual({ assistantBubble: true });
+
+		const bare = await parseWithAttrs({
+			"data-token": "tok",
+			"data-assistant-bubble": "",
+		});
+		expect(bare.appearance).toEqual({ assistantBubble: true });
+	});
+
+	test("'false' parses to an explicit false", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-assistant-bubble": "false",
+		});
+		expect(cfg.appearance).toEqual({ assistantBubble: false });
+	});
+
+	test("unspecified leaves appearance untouched", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "tok" });
+		expect(cfg.appearance).toBeUndefined();
+	});
+});
+
+describe("resolveConfig — assistantBubble precedence", () => {
+	test("script-tag false overrides remote true", () => {
+		const config = resolveConfig(
+			{ token: "tok" },
+			{ appearance: { assistantBubble: true } },
+			{ appearance: { assistantBubble: false } },
+		);
+		expect(config.appearance?.assistantBubble).toBe(false);
+	});
+});

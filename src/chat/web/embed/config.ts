@@ -28,6 +28,13 @@ export interface ChatAppearance {
 	theme?: ThemePreset;
 	/** Per-property overrides applied on top of the preset. */
 	variables?: ChatTheme;
+	/**
+	 * Render assistant messages inside a filled bubble (background + padding +
+	 * radius), styled by `variables.assistantBubbleColor` /
+	 * `assistantBubbleTextColor`. Defaults to `false` — assistant messages
+	 * render as plain text. Opt in for a "both sides bubbled" chat style.
+	 */
+	assistantBubble?: boolean;
 }
 
 /**
@@ -329,7 +336,12 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 
 	const themeRaw = str("data-theme");
 	if (themeRaw === "light" || themeRaw === "dark" || themeRaw === "auto") {
-		config.appearance = { theme: themeRaw };
+		config.appearance = { ...config.appearance, theme: themeRaw };
+	}
+
+	const assistantBubble = bool("data-assistant-bubble");
+	if (assistantBubble !== undefined) {
+		config.appearance = { ...config.appearance, assistantBubble };
 	}
 
 	const localeRaw = str("data-locale");
@@ -447,7 +459,11 @@ function mergeAppearance(
 		...(programmatic?.appearance?.variables ?? {}),
 	};
 	const hasVars = Object.keys(variables).length > 0;
-	if (!theme && !hasVars) {
+	const assistantBubble =
+		programmatic?.appearance?.assistantBubble ??
+		fromScript.appearance?.assistantBubble ??
+		remote?.appearance?.assistantBubble;
+	if (!theme && !hasVars && assistantBubble === undefined) {
 		return undefined;
 	}
 	const out: ChatAppearance = {};
@@ -456,6 +472,9 @@ function mergeAppearance(
 	}
 	if (hasVars) {
 		out.variables = variables;
+	}
+	if (assistantBubble !== undefined) {
+		out.assistantBubble = assistantBubble;
 	}
 	return out;
 }

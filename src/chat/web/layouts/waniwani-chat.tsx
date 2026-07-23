@@ -11,6 +11,7 @@ import {
 import type { FrontendTrackingClient } from "../../../tracking/frontend";
 import type {
 	ChatAppearance,
+	ChatClassNames,
 	ChatHandle,
 	ShowToolCalls,
 	WelcomeConfig,
@@ -80,6 +81,8 @@ export interface WaniwaniChatOverrides {
 	 * ```
 	 */
 	appearance?: ChatAppearance;
+	/** Per-slot class name overrides. See `ChatClassNames`. */
+	classNames?: ChatClassNames;
 	/** Chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
 	api?: string;
 	/** Override the MCP server URL (rarely needed). */
@@ -383,6 +386,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				skipRemoteConfig
 				body={body}
 				appearance={config.appearance}
+				classNames={overrides?.classNames}
 				title={config.title}
 				hideHeader={config.hideHeader}
 				welcomeMessage={config.welcomeMessage}

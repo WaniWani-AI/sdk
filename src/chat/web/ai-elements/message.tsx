@@ -22,10 +22,10 @@ export const Message = ({
 }: MessageProps) => (
 	<div
 		className={cn(
-			"ww:group ww:flex ww:w-full",
+			"ww-message ww:group ww:flex ww:w-full",
 			from === "user"
-				? "is-user ww:ml-auto ww:max-w-[80%] ww:flex-col ww:items-end"
-				: "is-assistant ww:flex-col",
+				? "ww-message-user is-user ww:ml-auto ww:flex-col ww:items-end ww:[max-width:var(--ww-msg-max-width,80%)]"
+				: "ww-message-assistant is-assistant ww:flex-col",
 			className,
 		)}
 		{...props}
@@ -45,8 +45,9 @@ export const MessageContent = ({
 }: MessageContentProps) => (
 	<div
 		className={cn(
-			"ww:flex ww:w-fit ww:min-w-0 ww:max-w-full ww:flex-col ww:gap-2 ww:overflow-hidden ww:text-base",
-			"ww:group-[.is-user]:ml-auto ww:group-[.is-user]:rounded-lg ww:group-[.is-user]:bg-user-bubble ww:group-[.is-user]:px-4 ww:group-[.is-user]:py-3 ww:group-[.is-user]:text-primary-foreground",
+			"ww-bubble ww:flex ww:w-fit ww:min-w-0 ww:max-w-full ww:flex-col ww:gap-2 ww:overflow-hidden",
+			"ww:[font-size:var(--ww-font-size,1rem)] ww:[line-height:var(--ww-line-height,1.5)]",
+			"ww:group-[.is-user]:ml-auto ww:group-[.is-user]:bg-user-bubble ww:group-[.is-user]:[color:var(--ww-color-user-bubble-text)] ww:group-[.is-user]:[border-radius:var(--ww-msg-radius,8px)] ww:group-[.is-user]:[padding:var(--ww-msg-pad-y,12px)_var(--ww-msg-pad-x,16px)]",
 			"ww:group-[.is-assistant]:text-foreground",
 			className,
 		)}

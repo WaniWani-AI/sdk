@@ -66,6 +66,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		const {
 			appearance,
 			className,
+			classNames,
 			allowAttachments = false,
 			welcomeMessage,
 			welcome,
@@ -91,6 +92,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		// and a `prefers-color-scheme` media query in tailwind.css.
 		const preset = appearance?.theme;
 		const userVars = appearance?.variables;
+		const assistantBubble = appearance?.assistantBubble ?? false;
 
 		// `preset: dark` doesn't need its full DARK_THEME table emitted as
 		// inline vars — the `.dark [data-waniwani-chat]` rule handles the
@@ -379,6 +381,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				}}
 				data-waniwani-chat=""
 				data-waniwani-layout="embed"
+				data-assistant-bubble={assistantBubble ? "true" : undefined}
 				data-color-scheme={preset === "auto" ? "auto" : undefined}
 				{...(masked ? { "data-waniwani-initializing": "" } : {})}
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
@@ -386,11 +389,15 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 					"ww:relative ww:w-full ww:h-full ww:flex ww:flex-col ww:bg-background ww:text-foreground ww:font-[family-name:var(--ww-font)] ww:overflow-hidden",
 					preset === "dark" && "dark",
 					className,
+					classNames?.root,
 				)}
 			>
 				{showHeader && (
 					<div
-						className="ww:shrink-0 ww:flex ww:items-center ww:gap-2 ww:pl-4 ww:pr-3 ww:py-3 ww:border-b ww:border-border"
+						className={cn(
+							"ww-header ww:shrink-0 ww:flex ww:items-center ww:gap-2 ww:pl-4 ww:pr-3 ww:py-3 ww:border-b ww:border-border",
+							classNames?.header,
+						)}
 						style={{
 							backgroundColor: "var(--ww-color-card-header)",
 							color: "var(--ww-color-card-header-foreground)",
@@ -450,6 +457,11 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							debug={debug}
 							showToolCalls={showToolCalls}
 							toolDefinitions={engine.toolDefinitions}
+							messageClassNames={{
+								message: classNames?.message,
+								userBubble: classNames?.userBubble,
+								assistantBubble: classNames?.assistantBubble,
+							}}
 							onWidgetDisplayModeChange={(mode, widget) => {
 								if (mode === "fullscreen") {
 									// Read the height while the embed is still laid out inline
@@ -502,7 +514,10 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 									onSubmit={engine.handleSubmit}
 									globalDrop={allowAttachments}
 									multiple={allowAttachments}
-									className="ww:rounded-2xl ww:border-border ww:bg-input"
+									className={cn(
+										"ww-input ww:rounded-2xl ww:border-border ww:bg-input",
+										classNames?.input,
+									)}
 								>
 									<div className="ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-2.5">
 										{allowAttachments && <PromptInputAddAttachments />}
