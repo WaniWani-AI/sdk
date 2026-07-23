@@ -71,8 +71,6 @@ export interface WaniwaniChatOverrides {
 	appearance?: ChatAppearance;
 	/** Per-slot class name overrides. See `ChatClassNames`. */
 	classNames?: ChatClassNames;
-	/** Render assistant messages in a filled bubble. Defaults to false. */
-	assistantBubble?: boolean;
 	/** Chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
 	api?: string;
 	/** Override the MCP server URL (rarely needed). */
@@ -299,11 +297,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				headers={{ Authorization: `Bearer ${config.token}` }}
 				skipRemoteConfig
 				body={body}
-				appearance={{
-					...config.appearance,
-					assistantBubble:
-						overrides?.assistantBubble ?? config.appearance?.assistantBubble,
-				}}
+				appearance={config.appearance}
 				classNames={overrides?.classNames}
 				title={config.title}
 				hideHeader={config.hideHeader}
