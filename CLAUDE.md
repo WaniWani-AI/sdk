@@ -112,13 +112,14 @@ const flow = createFlow({ /* …same… */ }).compile(); // hosted flow state, a
 
 `@waniwani/sdk` is `0.x`, so **minor bumps may break the public API** — and every breaking change is a migration our users have to do. The rule: no user should have to figure out an upgrade by hand. Whenever a release contains a breaking change, ship the migration alongside it so an agent can auto-apply it in one pass.
 
-**Every breaking change in a version bump must ship all three:**
+**Every breaking change in a version bump must ship all four:**
 
-1. **A changelog entry** — a `## <version>:` section with a before/after and a mechanical, agent-applicable migration (a codemod recipe, not prose). Add it to the "Breaking changes at a glance" table too.
+1. **A changelog entry** — a `## <version>:` section with a before/after and a mechanical, agent-applicable migration (a codemod recipe, not prose). Add it to the "Breaking changes at a glance" table too, and **link the version-specific migration skill from the section** (a `<Tip>` with the `npx skills add ... -s migrate-waniwani-sdk-<from>-to-<to>` command) so a reader can run it, not just read it.
 2. **An entry in `skills/waniwani-sdk/references/upgrading.md`** — under "Currently auto-fixable breaking changes", mirroring the changelog so an agent can migrate without a network fetch.
-3. **A `@deprecated` shim where feasible** — keep the old shape working with a `@deprecated` notice naming the removal version, so the bump isn't a hard cliff.
+3. **A version-specific migration skill** — `skills/migrate-waniwani-sdk-<from>-to-<to>/SKILL.md`, self-contained to that one hop (the Vercel `migrate-*`-per-major pattern), ending on `bun run typecheck && bun test`. Copy the newest existing one as the template and link it from `skills/waniwani-sdk/SKILL.md`.
+4. **A `@deprecated` shim where feasible** — keep the old shape working with a `@deprecated` notice naming the removal version, so the bump isn't a hard cliff. Not always possible (a surface that never worked is deleted outright).
 
-This is a standing obligation, not a per-release decision: the `.claude/skills/release-migration/` skill walks through cutting a release this way, and the user-facing upgrade path lives in `skills/waniwani-sdk/references/upgrading.md`. If you bump the version and touch the public API, you are not done until the migration for it exists. The same discipline applies at every future version (0.15, 1.0, 15.0): a version bump always ships its migration.
+This is a standing obligation, not a per-release decision: the `.claude/skills/release-migration/` skill walks through cutting a release this way, and the user-facing upgrade path lives in `skills/waniwani-sdk/references/upgrading.md` plus the per-hop migration skills. If you bump the version and touch the public API, you are not done until the changelog entry, the `upgrading.md` mirror, and the `migrate-waniwani-sdk-<from>-to-<to>` skill for it all exist and cross-link. The same discipline applies at every future version (0.15, 1.0, 15.0): a version bump always ships its migration, and the changelog always points at the skill that applies it.
 
 ## Skills (kept in sync with source)
 
