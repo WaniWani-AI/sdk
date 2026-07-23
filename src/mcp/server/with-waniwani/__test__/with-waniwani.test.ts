@@ -332,7 +332,7 @@ describe("withWaniwani", () => {
 		const handler = mock.registered[0]?.[2];
 		const result = (await handler?.({}, {})) as Record<string, unknown>;
 		const meta = result._meta as Record<string, unknown>;
-		const waniwani = meta.waniwani as Record<string, unknown>;
+		const waniwani = meta["waniwani/widget"] as Record<string, unknown>;
 
 		expect(waniwani.endpoint).toBe(
 			"https://test.waniwani.ai/api/mcp/events/v2/batch",
@@ -364,7 +364,7 @@ describe("withWaniwani", () => {
 			},
 		)) as Record<string, unknown>;
 		const meta = result._meta as Record<string, unknown>;
-		const waniwani = meta.waniwani as Record<string, unknown>;
+		const waniwani = meta["waniwani/widget"] as Record<string, unknown>;
 
 		expect(waniwani.sessionId).toBe("session-1");
 		expect(waniwani.geoLocation).toEqual({
@@ -423,7 +423,7 @@ describe("withWaniwani", () => {
 
 		// Widget endpoint metadata injected into the result
 		const meta = result._meta as Record<string, unknown>;
-		const waniwaniConfig = meta.waniwani as Record<string, unknown>;
+		const waniwaniConfig = meta["waniwani/widget"] as Record<string, unknown>;
 		expect(waniwaniConfig.endpoint).toBe(
 			"https://test.waniwani.ai/api/mcp/events/v2/batch",
 		);
@@ -737,7 +737,7 @@ describe("withWaniwani", () => {
 		expect(meta["waniwani/userLocation"]).toEqual({
 			country: "SK",
 		});
-		expect(meta.waniwani).toBe(undefined);
+		expect(meta["waniwani/widget"]).toBe(undefined);
 	});
 
 	test("stripLocationFields removes listed fields from known location meta keys", async () => {

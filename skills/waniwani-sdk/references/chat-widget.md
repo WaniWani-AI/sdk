@@ -582,6 +582,36 @@ The event goes to the same canonical ingest every other event uses (`POST /api/m
 
 **Opting out.** On surfaces where a page view is meaningless — an already-authenticated app shell, an internal tool, a staging preview — suppress the event so it doesn't inflate the customer's funnel. Set `overrides={{ disablePageView: true }}` on `<WaniwaniChat>`, or `data-disable-page-view="true"` (a bare `data-disable-page-view` works too) on the `<script>` embed. The rest of the widget is unaffected; only the `page.viewed` event is skipped.
 
+### Tracking from the host page (`chat.track`)
+
+The chat surfaces expose the SDK's typed `track` client to the host page, riding the same public `wwp_` token and channel the chat itself uses. Identity is automatic: events carry the server-assigned chat `sessionId` once the first exchange creates one, and the anonymous `visitorId` before that.
+
+With the `<script>` embed, `track` and `identify` live on the global:
+
+```html
+<script>
+  document.querySelector("#buy").addEventListener("click", () => {
+    WaniWani.chat.track.converted({ amount: 85, currency: "EUR" });
+  });
+
+  // When your page knows who the user is:
+  WaniWani.chat.identify("user_123", { plan: "pro" });
+</script>
+```
+
+With `<WaniwaniChat>`, the same surface lives on the `ChatHandle` ref:
+
+```tsx
+const chat = useRef<ChatHandle>(null);
+
+<WaniwaniChat ref={chat} token="wwp_..." channelId="..." />
+<button onClick={() => chat.current?.track?.optionSelected({ id: "pro", amount: 49, currency: "EUR" })}>
+  Choose Pro
+</button>
+```
+
+`track` is the same `TrackFn` as everywhere else: callable with a typed event (`track({ event: "link.clicked", properties: { url } })`) plus the flat revenue helpers. `track` and `identify` are **absent on the bare `ChatEmbed`** primitive, which holds no Waniwani credential. See [events.md](./events.md) for the taxonomy.
+
 ## `ChatEmbed` (advanced)
 
 **Most apps should use `WaniwaniChat` or the `<script>` embed.** `ChatEmbed` is the bare-bones primitive underneath both of them: no token, no remote config, no defaults, no built-in MCP resource endpoint. You wire up `api`, `headers`, `body`, `theme`, and (optionally) `mcp` yourself.

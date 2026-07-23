@@ -68,12 +68,13 @@ describe("createTrackingRoute", () => {
 		const response = await handler(
 			makeBatchRequest([
 				{
-					event_id: "evt-1",
-					event_type: "widget_click",
+					id: "evt-1",
+					type: "mcp.event",
+					name: "option_selected",
 					timestamp: new Date().toISOString(),
-					source: "widget",
-					session_id: "sess-1",
-					metadata: { target_tag: "button" },
+					source: "web",
+					correlation: { sessionId: "sess-1" },
+					properties: { id: "pro", amount: 49, currency: "EUR" },
 				},
 			]),
 		);
@@ -83,7 +84,7 @@ describe("createTrackingRoute", () => {
 		expect(body.accepted).toBe(1);
 	});
 
-	it("forwards events to the Waniwani backend", async () => {
+	it("forwards events with their correlation to the Waniwani backend", async () => {
 		const handler = createTrackingRoute({
 			apiKey: "test-key",
 			apiUrl: "http://localhost:3000",
@@ -91,16 +92,23 @@ describe("createTrackingRoute", () => {
 		await handler(
 			makeBatchRequest([
 				{
-					event_id: "evt-1",
-					event_type: "widget_click",
+					id: "evt-1",
+					type: "mcp.event",
+					name: "converted",
 					timestamp: new Date().toISOString(),
-					source: "widget",
+					source: "web",
+					correlation: { sessionId: "sess-1", visitorId: "vis-1" },
+					properties: { amount: 85, currency: "EUR" },
 				},
 			]),
 		);
 		// The SDK client uses fetch internally to send to the batch endpoint
 		expect(mockFetch).toHaveBeenCalled();
-		const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
+		const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
 		expect(url).toContain("/api/mcp/events/v2/batch");
+		const forwarded = JSON.parse(opts.body as string);
+		expect(forwarded.events[0].name).toBe("converted");
+		expect(forwarded.events[0].correlation.sessionId).toBe("sess-1");
+		expect(forwarded.events[0].correlation.visitorId).toBe("vis-1");
 	});
 });

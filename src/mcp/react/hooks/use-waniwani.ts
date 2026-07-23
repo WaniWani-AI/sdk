@@ -1,14 +1,15 @@
 "use client";
 
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import type { TrackFn } from "../../../tracking/@types";
+import { createFrontendClient } from "../../../tracking/frontend";
+import { WIDGET_CONFIG_META_KEY } from "../../server/utils";
 import { WidgetClientContext } from "../context";
-import { type AutoCaptureToggles, initAutoCapture } from "./auto-capture";
-import type { WidgetEvent } from "./widget-transport";
-import { WidgetTransport } from "./widget-transport";
 
 /**
- * Waniwani widget config injected into tool response `_meta.waniwani`
- * by `withWaniwani` on the server side.
+ * Waniwani widget config injected into tool response `_meta` by
+ * `withWaniwani` on the server side, under `waniwani/widget` (canonical)
+ * or the legacy bare `waniwani` key.
  */
 interface WaniwaniMeta {
 	token?: string;
@@ -28,33 +29,25 @@ interface BaseUseWaniwaniOptions {
 	/**
 	 * JWT widget token for authenticating directly with the Waniwani backend.
 	 * If omitted, the hook resolves from tool response metadata
-	 * (`toolResponseMetadata.waniwani` or `toolResponseMetadata._meta.waniwani`).
+	 * (`_meta["waniwani/widget"].token`).
 	 */
 	token?: string;
 	/**
 	 * Session ID to use for event correlation.
 	 * If omitted, the hook resolves from tool response metadata
-	 * (`toolResponseMetadata.waniwani.sessionId`), then falls back to a random UUID.
+	 * (`_meta["waniwani/widget"].sessionId`), then falls back to a random UUID
+	 * so the widget's own events still group together.
 	 */
 	sessionId?: string;
 	/**
-	 * Additional metadata to include with every tracked event.
+	 * Additional fields merged into every tracked event's envelope metadata.
 	 */
 	metadata?: Record<string, unknown>;
-	/**
-	 * Opt-in toggles for noisy auto-capture event types. Default: all off.
-	 * Always-on capture: widget_render, widget_error, widget_link_click,
-	 * `data-ww-step` / `data-ww-conversion` clicks.
-	 *
-	 * @example
-	 * useWaniwani({ capture: { click: true, scroll: true } });
-	 */
-	capture?: AutoCaptureToggles;
 }
 
 /**
- * Context-driven options: `endpoint` and `source` are resolved from
- * `WidgetProvider`'s `toolResponseMetadata.waniwani`. `source` may be
+ * Context-driven options: `endpoint` and `source` are resolved from the
+ * widget host (tool response `_meta["waniwani/widget"]`). `source` may be
  * overridden explicitly.
  */
 interface ContextDrivenOptions extends BaseUseWaniwaniOptions {
@@ -75,8 +68,8 @@ interface ExplicitEndpointOptions extends BaseUseWaniwaniOptions {
 }
 
 /**
- * Options for the useWaniwani hook. Either rely on `WidgetProvider`
- * context (omit `endpoint`) or pass `endpoint` + `source` explicitly.
+ * Options for the useWaniwani hook. Either rely on the widget host
+ * (omit `endpoint`) or pass `endpoint` + `source` explicitly.
  */
 export type UseWaniwaniOptions = ContextDrivenOptions | ExplicitEndpointOptions;
 
@@ -86,32 +79,48 @@ export type UseWaniwaniOptions = ContextDrivenOptions | ExplicitEndpointOptions;
 export interface WaniwaniWidget {
 	/**
 	 * The session ID stamped on every event this widget emits, so hosts can
-	 * correlate widget activity with server-side tracking without reaching into
-	 * the internal `_meta` shape.
+	 * correlate widget activity with server-side tracking.
 	 *
-	 * Resolved from (1) the explicit `sessionId` option, (2)
-	 * `toolResponseMetadata.waniwani.sessionId`, else a random UUID generated
-	 * on mount. `undefined` until the widget initializes (same lifecycle as the
-	 * tracking methods) and when no config resolves (no-op widget).
+	 * Resolved from (1) the explicit `sessionId` option, (2) the widget config
+	 * injected by `withWaniwani` (`_meta["waniwani/widget"].sessionId`), else a
+	 * random UUID generated on mount. `undefined` until the widget initializes
+	 * and when no config resolves (no-op widget).
 	 */
 	readonly sessionId?: string;
-	/** Tie all subsequent widget events to this user. */
-	identify(userId: string, traits?: Record<string, unknown>): void;
-	/** Record a funnel step. Auto-incrementing sequence per session. */
-	step(name: string, meta?: Record<string, unknown>): void;
-	/** Record a generic custom event. */
-	track(event: string, properties?: Record<string, unknown>): void;
-	/** Record a conversion event. */
-	conversion(name: string, data?: Record<string, unknown>): void;
+	/**
+	 * Track a typed event. The exact same surface as the server client:
+	 * `track({ event: "quote.succeeded", properties })`,
+	 * `track.priceShown({ amount, currency })`, `track.converted({ ... })`.
+	 * Identity (session, trace, user) is stamped automatically.
+	 */
+	track: TrackFn;
+	/** Tie all subsequent widget events to this user (emits `user.identified`). */
+	identify(
+		userId: string,
+		traits?: Record<string, unknown>,
+	): Promise<{ eventId: string }>;
+	/** Flush buffered events immediately instead of waiting for the timer. */
+	flush(): Promise<void>;
+}
+
+const NOOP_EMIT = async (): Promise<{ eventId: string }> => ({ eventId: "" });
+
+function createNoopTrack(): TrackFn {
+	return Object.assign(NOOP_EMIT, {
+		priceShown: NOOP_EMIT,
+		pricesCompared: NOOP_EMIT,
+		optionSelected: NOOP_EMIT,
+		leadQualified: NOOP_EMIT,
+		converted: NOOP_EMIT,
+	}) as TrackFn;
 }
 
 /** No-op widget that silently discards all calls. */
 const NOOP_WIDGET: WaniwaniWidget = {
 	sessionId: undefined,
-	identify() {},
-	step() {},
-	track() {},
-	conversion() {},
+	track: createNoopTrack(),
+	identify: NOOP_EMIT,
+	flush: async () => {},
 };
 
 interface ResolvedConfig extends WaniwaniConfig {
@@ -122,16 +131,11 @@ interface WidgetState {
 	widget: WaniwaniWidget;
 	cleanup: () => void;
 	config: ResolvedConfig | null;
-	captureKey: string;
 }
 
 /** Module-level singleton — shared across all hook consumers. */
 let state: WidgetState | null = null;
 let consumerCount = 0;
-
-function eventId(): string {
-	return crypto.randomUUID();
-}
 
 function normalizeString(value: unknown): string | undefined {
 	if (typeof value !== "string") {
@@ -141,24 +145,16 @@ function normalizeString(value: unknown): string | undefined {
 	return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function captureKeyOf(capture?: AutoCaptureToggles): string {
-	if (!capture) {
-		return "";
-	}
-	return [
-		capture.click ? "1" : "0",
-		capture.scroll ? "1" : "0",
-		capture.formField ? "1" : "0",
-		capture.formSubmit ? "1" : "0",
-	].join("");
+interface MetadataSource {
+	getToolResponseMetadata(): Record<string, unknown> | null;
 }
 
 /**
- * Try to extract Waniwani config from the WidgetProvider context.
- * Returns the config from `toolResponseMetadata.waniwani` (or nested `_meta`) if available.
+ * Extract the Waniwani widget config from tool response metadata. Reads the
+ * `waniwani/widget` key, on both the metadata root and its nested `_meta`.
  */
 function resolveConfigFromContext(
-	client: { getToolResponseMetadata(): Record<string, unknown> | null } | null,
+	client: MetadataSource | null,
 ): WaniwaniConfig | null {
 	if (!client) {
 		return null;
@@ -169,9 +165,8 @@ function resolveConfigFromContext(
 	}
 
 	const nestedMeta = meta._meta as Record<string, unknown> | undefined;
-	const waniwani = (meta.waniwani ?? nestedMeta?.waniwani) as
-		| WaniwaniMeta
-		| undefined;
+	const waniwani = (meta[WIDGET_CONFIG_META_KEY] ??
+		nestedMeta?.[WIDGET_CONFIG_META_KEY]) as WaniwaniMeta | undefined;
 	const endpoint = normalizeString(waniwani?.endpoint);
 	if (!endpoint) {
 		return null;
@@ -197,13 +192,61 @@ function isSameConfig(
 	);
 }
 
+interface HostBridgeClient extends MetadataSource {
+	onToolResponseMetadataChange(
+		callback: (metadata: Record<string, unknown> | null) => void,
+	): () => void;
+}
+
+/**
+ * Resolve the widget host bridge. Uses the `WidgetProvider` context when
+ * present; otherwise connects a standalone host client so the hook works in
+ * widgets that do not use the legacy provider. `null` while connecting and
+ * outside any widget host.
+ */
+function useHostBridge(skip: boolean): HostBridgeClient | null {
+	const contextClient = useContext(WidgetClientContext);
+	const [standalone, setStandalone] = useState<HostBridgeClient | null>(null);
+
+	useEffect(() => {
+		if (skip || contextClient || typeof window === "undefined") {
+			return;
+		}
+
+		let mounted = true;
+		let created: { close(): void } | null = null;
+
+		void (async () => {
+			try {
+				const { createWidgetClient } = await import(
+					"../../../legacy/mcp/react/widgets/widget-client"
+				);
+				const client = await createWidgetClient();
+				await client.connect();
+				if (!mounted) {
+					client.close();
+					return;
+				}
+				created = client;
+				setStandalone(client);
+			} catch {
+				// Not inside a widget host; the hook stays a no-op unless an
+				// explicit endpoint was provided.
+			}
+		})();
+
+		return () => {
+			mounted = false;
+			created?.close();
+			setStandalone(null);
+		};
+	}, [skip, contextClient]);
+
+	return contextClient ?? standalone;
+}
+
 function useContextConfig(
-	client: {
-		getToolResponseMetadata(): Record<string, unknown> | null;
-		onToolResponseMetadataChange(
-			callback: (metadata: Record<string, unknown> | null) => void,
-		): () => void;
-	} | null,
+	client: HostBridgeClient | null,
 ): WaniwaniConfig | null {
 	const [config, setConfig] = useState<WaniwaniConfig | null>(() =>
 		resolveConfigFromContext(client),
@@ -232,128 +275,73 @@ function useContextConfig(
 function createState(
 	config: ResolvedConfig,
 	metadata?: Record<string, unknown>,
-	capture?: AutoCaptureToggles,
 ): WidgetState {
 	const sessionId = config.sessionId ?? crypto.randomUUID();
 	const traceId = crypto.randomUUID();
 
-	const transport = new WidgetTransport({
+	const client = createFrontendClient({
 		endpoint: config.endpoint,
 		token: config.token,
+		source: config.source,
+		identity: () => ({ sessionId, traceId }),
 		metadata,
 	});
-	let userId: string | undefined;
-	let stepSequence = 0;
 
-	const enqueue = (events: WidgetEvent[]) => {
-		transport.send(events);
-	};
-
-	const source = config.source;
-
-	const cleanupCapture = initAutoCapture(
-		{ sessionId, traceId, metadata, source, capture },
-		enqueue,
-	);
-
-	function baseFields(
-		eventType: string,
-		extra?: Record<string, unknown>,
-	): WidgetEvent {
-		return {
-			event_id: eventId(),
-			event_type: eventType,
-			timestamp: new Date().toISOString(),
-			source,
-			session_id: sessionId,
-			trace_id: traceId,
-			user_id: userId,
-			...extra,
-		};
-	}
+	// The top-of-widget-funnel signal: emitted once per mount with resolved
+	// config, so "widget shown" exists even when nothing is tracked manually.
+	void client.track({ event: "widget_render" });
 
 	return {
-		captureKey: captureKeyOf(capture),
+		config,
 		widget: {
 			sessionId,
-			identify(id: string, traits?: Record<string, unknown>) {
-				userId = id;
-				enqueue([
-					baseFields("identify", {
-						user_id: id,
-						user_traits: traits,
-					}),
-				]);
-			},
-
-			step(name: string, meta?: Record<string, unknown>) {
-				stepSequence++;
-				enqueue([
-					baseFields("step", {
-						event_name: name,
-						step_sequence: stepSequence,
-						metadata: meta,
-					}),
-				]);
-			},
-
-			track(event: string, properties?: Record<string, unknown>) {
-				enqueue([
-					baseFields("track", {
-						event_name: event,
-						metadata: properties,
-					}),
-				]);
-			},
-
-			conversion(name: string, data?: Record<string, unknown>) {
-				enqueue([
-					baseFields("conversion", {
-						event_name: name,
-						metadata: data,
-					}),
-				]);
-			},
+			track: client.track,
+			identify: (userId, traits) => client.identify(userId, traits),
+			flush: () => client.flush(),
 		},
 		cleanup: () => {
-			cleanupCapture();
-			transport.stop();
+			void client.shutdown();
 		},
-		config,
 	};
 }
 
 /**
- * React hook for Waniwani widget tracking.
- *
- * Auto-captures DOM events (clicks, link clicks, errors, scrolls, form
- * interactions) and provides manual tracking methods. Returns a singleton
- * instance shared across all consumers.
+ * React hook for tracking from inside an MCP-app widget. Returns the same
+ * `track` surface as the server client, with session identity stamped
+ * automatically from the config `withWaniwani` injects into tool responses.
  *
  * Config resolution order:
  * 1. Explicit `endpoint` / `token` / `sessionId` / `source` options
- * 2. `toolResponseMetadata.waniwani` from WidgetProvider context
+ * 2. Tool response `_meta["waniwani/widget"]` via the widget host bridge
+ *    (with or without the legacy `WidgetProvider`)
  * 3. No-op if `endpoint` cannot be resolved or `source` is unknown
  *
  * @example
  * ```tsx
  * function MyWidget() {
  *   const wani = useWaniwani();
- *   // Auto-captures clicks, links, errors, scrolls, forms
- *   // Optionally call wani.track("custom_event") for manual events
- *   // Read wani.sessionId to correlate with server-side tracking
- *   return <a href="https://example.com">Visit</a>;
+ *   // wani.sessionId correlates with server-side tracking
+ *   return (
+ *     <button
+ *       onClick={() =>
+ *         wani.track.optionSelected({ id: "pro", amount: 49, currency: "EUR" })
+ *       }
+ *     >
+ *       Choose Pro
+ *     </button>
+ *   );
  * }
  * ```
  */
 export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
-	// Read WidgetProvider context if available (won't throw if outside provider)
-	const widgetClient = useContext(WidgetClientContext);
-	const contextConfig = useContextConfig(widgetClient);
 	const explicitEndpoint = normalizeString(options.endpoint);
 	const explicitToken = normalizeString(options.token);
 	const explicitSessionId = normalizeString(options.sessionId);
 	const explicitSource = normalizeString(options.source);
+
+	// The host bridge is only needed when config must come from context.
+	const hostBridge = useHostBridge(Boolean(explicitEndpoint));
+	const contextConfig = useContextConfig(hostBridge);
 
 	// Stabilize config identity — only changes when the primitives change
 	const config = useMemo<ResolvedConfig | null>(() => {
@@ -372,7 +360,12 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 		if (!contextConfig) {
 			return null;
 		}
-		return { ...contextConfig, source };
+		return {
+			...contextConfig,
+			token: explicitToken ?? contextConfig.token,
+			sessionId: explicitSessionId ?? contextConfig.sessionId,
+			source,
+		};
 	}, [
 		explicitEndpoint,
 		explicitToken,
@@ -382,15 +375,14 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 	]);
 
 	const [widget, setWidget] = useState<WaniwaniWidget>(NOOP_WIDGET);
+	// Ref, not a dependency: metadata is captured when the singleton is
+	// created and must not force a transport restart on every render.
 	const metadataRef = useRef(options.metadata);
 	metadataRef.current = options.metadata;
-	const captureRef = useRef(options.capture);
-	captureRef.current = options.capture;
-	const captureKey = captureKeyOf(options.capture);
 
 	// Create/swap singleton state when config changes.
-	// All side effects (timers, DOM listeners) happen here in useEffect,
-	// making this safe in Strict Mode and concurrent rendering.
+	// All side effects (timers, network) happen here in useEffect, making
+	// this safe in Strict Mode and concurrent rendering.
 	//
 	// Only consumers with a resolved config hold a stake in the singleton.
 	// A consumer with `config === null` becomes a local no-op without
@@ -406,14 +398,13 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 			return;
 		}
 
-		if (
-			!isSameConfig(state?.config, config) ||
-			state?.captureKey !== captureKey
-		) {
-			state?.cleanup();
-			state = createState(config, metadataRef.current, captureRef.current);
+		let current = state;
+		if (!current || !isSameConfig(current.config, config)) {
+			current?.cleanup();
+			current = createState(config, metadataRef.current);
+			state = current;
 		}
-		setWidget(state.widget);
+		setWidget(current.widget);
 		consumerCount++;
 
 		return () => {
@@ -423,7 +414,7 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 				state = null;
 			}
 		};
-	}, [config, captureKey]);
+	}, [config]);
 
 	return widget;
 }

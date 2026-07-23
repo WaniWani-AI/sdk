@@ -5,6 +5,7 @@ import {
 	extractSessionId,
 	extractSource,
 	extractTraceId,
+	extractVisitorId,
 } from "../mcp/server/utils.js";
 import type { EventType, LegacyTrackEvent, TrackInput } from "./@types.js";
 import type { V2CorrelationIds, V2EventEnvelope } from "./v2-types.js";
@@ -134,13 +135,7 @@ function mapLegacyProperties(
 }
 
 function resolveEventName(input: TrackInput): EventType {
-	const name = isLegacyTrackEvent(input) ? input.eventType : input.event;
-	// `lead` was renamed to `lead_qualified` in 0.15.0; pre-0.15 compiled
-	// callers may still send the old name.
-	if ((name as string) === "lead") {
-		return "lead_qualified";
-	}
-	return name;
+	return isLegacyTrackEvent(input) ? input.eventType : input.event;
 }
 
 function resolveCorrelationIds(
@@ -157,6 +152,9 @@ function resolveCorrelationIds(
 
 	const externalUserId =
 		takeNonEmptyString(input.externalUserId) ?? extractExternalUserId(meta);
+
+	const visitorId =
+		takeNonEmptyString(input.visitorId) ?? extractVisitorId(meta);
 
 	const correlationId =
 		takeNonEmptyString(input.correlationId) ??
@@ -178,6 +176,9 @@ function resolveCorrelationIds(
 	}
 	if (externalUserId) {
 		correlation.externalUserId = externalUserId;
+	}
+	if (visitorId) {
+		correlation.visitorId = visitorId;
 	}
 	return correlation;
 }

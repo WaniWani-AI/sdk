@@ -5,7 +5,12 @@ import type {
 	TrackInput,
 } from "../../../tracking/index.js";
 import type { WaniWaniClient } from "../../../types.js";
-import { extractSessionId, extractSource, FLOW_META_KEY } from "../utils.js";
+import {
+	extractSessionId,
+	extractSource,
+	FLOW_META_KEY,
+	WIDGET_CONFIG_META_KEY,
+} from "../utils.js";
 import type { WidgetTokenCache } from "../widget-token.js";
 import type { FunnelSyncPayload } from "./funnel-sync.js";
 
@@ -237,8 +242,8 @@ export async function injectWidgetConfig(
 	}
 
 	const meta = (result as UnknownRecord)._meta as UnknownRecord;
-	const existingWaniwaniConfig = isRecord(meta.waniwani)
-		? (meta.waniwani as UnknownRecord)
+	const existingWaniwaniConfig = isRecord(meta[WIDGET_CONFIG_META_KEY])
+		? (meta[WIDGET_CONFIG_META_KEY] as UnknownRecord)
 		: undefined;
 	const waniwaniConfig: UnknownRecord = {
 		...(existingWaniwaniConfig ?? {}),
@@ -277,7 +282,7 @@ export async function injectWidgetConfig(
 		waniwaniConfig.source = source;
 	}
 
-	meta.waniwani = waniwaniConfig;
+	meta[WIDGET_CONFIG_META_KEY] = waniwaniConfig;
 }
 
 /**

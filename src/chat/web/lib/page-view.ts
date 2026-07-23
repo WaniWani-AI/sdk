@@ -50,7 +50,7 @@ function dedupeKey(api: string, token: string, channelId?: string): string {
  * `.../api/mcp/events/v2/batch`, same as `injectWidgetConfig` builds it
  * server-side. Falls back to a suffix swap for non-standard bases.
  */
-function eventsEndpoint(api: string): string {
+export function eventsEndpoint(api: string): string {
 	try {
 		return `${new URL(api).origin}/api/mcp/events/v2/batch`;
 	} catch {
@@ -79,8 +79,8 @@ export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 		const ctx = await collectVisitorContext();
 		const now = new Date().toISOString();
 
-		// V2 batch envelope — identical shape to WidgetTransport's `buildV2Batch`,
-		// so this lands in the same ingest pipeline as every other event. The
+		// V2 batch envelope, so this lands in the same ingest pipeline as every
+		// other event. The
 		// anonymous device id is the identity (`correlation` carries no sessionId);
 		// the server stores it in its own `visitor_id` column, never PII-hashed,
 		// separate from the identified-user `externalUserId`.

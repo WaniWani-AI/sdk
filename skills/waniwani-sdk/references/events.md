@@ -50,26 +50,27 @@ automatically), see [docs.waniwani.ai/sdk/tracking/instrumentation](https://docs
 
 ## The one rule you can't skip: identity
 
-Every event must carry **`sessionId` OR `externalUserId`**. The ingest API rejects any
-event with neither — there's no server-side magic that can tie an anonymous conversion
-back to a session. This is the single most common mistake, so the SDK `console.warn`s
-the moment you enqueue an event without identity, even though the local enqueue still
-returns an id.
+Every event must carry **`sessionId`, `externalUserId`, or `visitorId`**. The ingest API
+rejects any event with none of the three, so the SDK `console.warn`s the moment you
+enqueue an event without identity, even though the local enqueue still returns an id.
 
 - **Inside a flow node or tool handler** → identity is **automatic**. The
   request-scoped client (`context.waniwani`) already carries the session metadata, so
-  `sessionId` rides along with every event. You don't pass anything.
+  `sessionId` rides along with every event. You don't pass anything. The resolved id is
+  readable as `context.waniwani.sessionId`; store it with your own records to link back
+  to the session later.
+- **Inside an MCP-app widget or on a chat host page** → identity is **automatic** too.
+  `useWaniwani().track` stamps the session id injected by `withWaniwani`;
+  `chat.track` carries the server-assigned chat session (and the anonymous `visitorId`
+  before one exists). See the widget/chat section below.
 - **From a top-level client or your own backend** → there is no request context, so you
-  **must pass `externalUserId`** (or `sessionId`) yourself. This is exactly how an
-  off-platform `converted` finds its original lead.
-- **From the chat widget at landing time** → there is no session yet (a session is only
-  created on the first message). The widget satisfies the identity rule with an anonymous
-  **`visitorId`** — a stable, property-derived id persisted in the browser — sent as the
-  event's `externalUserId`. This is what lets `page.viewed` count landings *before* any
-  conversation, and it is the funnel's denominator for "landed → started a conversation".
-  Treat `visitorId` as the anonymous device/visitor key (the equivalent of an analytics
-  "device id"), distinct from a `sessionId`: one visitor can land many times and may never
-  start a session.
+  **must pass `externalUserId`** (or a stored `sessionId`) yourself. This is exactly how
+  an off-platform `converted` finds its original lead.
+- **`visitorId`** is the anonymous device/visitor key (the equivalent of an analytics
+  "device id"), distinct from a `sessionId`: one visitor can land many times and may
+  never start a session. The chat widget's `page.viewed` carries only a `visitorId`,
+  deliberately, so landings don't mint sessions and the "landed → started a
+  conversation" funnel stays meaningful. It is a first-class `TrackInput` field.
 
 ## Ingest authentication: which token goes where
 
@@ -81,7 +82,7 @@ one by prefix, so you almost never need to think about it:
 |---|---|---|---|
 | **Public key** | `wwp_…` | Browser clients that already have a public token — **the chat widget**, `<script>` embed | Yes — env-scoped, CORS-safe |
 | **Secret API key** | `wwk_…` | Server-side SDK / your backend | No — server only |
-| **Widget JWT** | `eyJ…` | MCP-App widgets rendered inside tool responses, which have **no** public token (the JWT is minted server-side and injected into `_meta`) | Yes — short-lived |
+| **Widget JWT** | `eyJ…` | MCP-App widgets rendered inside tool responses, which have **no** public token (the JWT is minted server-side and injected into `_meta["waniwani/widget"]`) | Yes — short-lived |
 
 > **Don't reach for a widget JWT just because the client is a browser.** The JWT exists
 > only for the MCP-App case, where the embed has no public token. The chat widget already
@@ -91,7 +92,9 @@ one by prefix, so you almost never need to think about it:
 
 ## Getting a client
 
-There are two entry points. Prefer the scoped one inside MCP request handling.
+The same `track` surface (callable + flat revenue helpers) exists on four surfaces.
+Prefer the scoped one inside MCP request handling; use the browser ones inside widgets
+and chat host pages.
 
 **1. Scoped client — inside flows / tool handlers (recommended).** Wrap the server once
 with `withWaniwani(server)`, then read `waniwani` off the node context. Meta is
@@ -126,6 +129,35 @@ await client.track.converted({ amount: 85, currency: "EUR", externalUserId: "use
 
 Create the top-level client **once** (e.g. `lib/waniwani.ts`) and import it — don't
 construct one per call.
+
+**3. Widget client (inside MCP-app widgets).** `useWaniwani()` from
+`@waniwani/sdk/mcp/react` returns `{ sessionId, track, identify, flush }` where `track`
+is the same typed `TrackFn`. Config (endpoint, widget token, session id, source) is read
+from the `_meta["waniwani/widget"]` object `withWaniwani` injects into tool responses;
+the hook works with or without the legacy `WidgetProvider` and no-ops outside a widget
+host. One `widget_render` event is emitted automatically on init.
+
+```tsx
+const wani = useWaniwani();
+wani.track.optionSelected({ id: "pro", amount: 49, currency: "EUR" });
+```
+
+**4. Chat host page (next to the chat widget).** The `<script>` embed exposes
+`WaniWani.chat.track` / `WaniWani.chat.identify`; the `WaniwaniChat` React component
+exposes the same on its `ChatHandle` ref (`track` / `identify` are absent on the bare
+`ChatEmbed`, which holds no Waniwani credential). Events ride the widget's public
+`wwp_` token, carry the chat `sessionId` once assigned and the anonymous `visitorId`
+before that.
+
+```js
+WaniWani.chat.track.converted({ amount: 85, currency: "EUR" });
+```
+
+For custom browser surfaces, `createFrontendClient` from `@waniwani/sdk` is the
+primitive both of the above wrap: pass `{ endpoint, token, source, identity }` and get
+the same client. `createTrackingRoute` from `@waniwani/sdk/mcp` is its proxy
+counterpart when no Waniwani credential may ship to the browser: it accepts the V2
+batch envelope and forwards it with the secret key.
 
 ## Revenue helpers (typed)
 

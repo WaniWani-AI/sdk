@@ -8,6 +8,8 @@ export interface V2CorrelationIds {
 	requestId?: string;
 	correlationId?: string;
 	externalUserId?: string;
+	/** Anonymous visitor id; accepted as identity by the ingest API. */
+	visitorId?: string;
 }
 
 export interface V2EventEnvelope {

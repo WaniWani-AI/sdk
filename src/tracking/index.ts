@@ -40,6 +40,7 @@ export type {
 	TrackingShutdownOptions,
 	TrackingShutdownResult,
 } from "./@types.js";
+export { EVENT_TYPES } from "./@types.js";
 export { createEventId, mapTrackEventToV2 } from "./mapper.js";
 export type {
 	V2BatchRejectedEvent,
@@ -79,15 +80,16 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 	function emit(event: TrackInput): { eventId: string } {
 		requireApiKey();
 		const mappedEvent = mapTrackEventToV2(event);
-		// Identity is required server-side (sessionId or externalUserId, possibly
-		// derived from meta). Warn early — without it the ingest API rejects the
-		// event even though enqueue returns an id here.
+		// Identity is required server-side (sessionId, externalUserId, or
+		// visitorId, possibly derived from meta). Warn early: without it the
+		// ingest API rejects the event even though enqueue returns an id here.
 		if (
 			!mappedEvent.correlation.sessionId &&
-			!mappedEvent.correlation.externalUserId
+			!mappedEvent.correlation.externalUserId &&
+			!mappedEvent.correlation.visitorId
 		) {
 			console.warn(
-				`[waniwani] event "${mappedEvent.name}" has no sessionId or externalUserId; ` +
+				`[waniwani] event "${mappedEvent.name}" has no sessionId, externalUserId, or visitorId; ` +
 					"the ingest API requires one and will reject it.",
 			);
 		}

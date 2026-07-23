@@ -6,30 +6,33 @@ import type { KbSearchTrace } from "../kb/types.js";
 // Event Types
 // ============================================
 
-export type EventType =
-	| "session.started"
-	| "page.viewed"
-	| "tool.called"
-	| "quote.requested"
-	| "quote.succeeded"
-	| "quote.failed"
-	| "link.clicked"
-	| "purchase.completed"
-	// Widget auto-capture events
-	| "widget_render"
-	| "widget_click"
-	| "widget_link_click"
-	| "widget_error"
-	| "widget_scroll"
-	| "widget_form_field"
-	| "widget_form_submit"
-	| "user.identified"
-	// Revenue taxonomy (WAN-387) — typed first-class revenue events.
-	| "price_shown"
-	| "prices_compared"
-	| "option_selected"
-	| "lead_qualified"
-	| "converted";
+/**
+ * Every event name in the typed taxonomy, as a runtime list. Single source of
+ * truth for {@link EventType} and for surfaces that need to recognize
+ * first-class names at runtime (the widget transport passes these through
+ * verbatim instead of namespacing them as custom widget events).
+ */
+export const EVENT_TYPES = [
+	"session.started",
+	"page.viewed",
+	"tool.called",
+	"quote.requested",
+	"quote.succeeded",
+	"quote.failed",
+	"link.clicked",
+	"purchase.completed",
+	// Emitted automatically by the frontend client once per widget mount.
+	"widget_render",
+	"user.identified",
+	// Revenue taxonomy (WAN-387): typed first-class revenue events.
+	"price_shown",
+	"prices_compared",
+	"option_selected",
+	"lead_qualified",
+	"converted",
+] as const;
+
+export type EventType = (typeof EVENT_TYPES)[number];
 
 // ============================================
 // Event Properties
@@ -151,6 +154,13 @@ interface TrackingContext {
 	requestId?: string;
 	correlationId?: string;
 	externalUserId?: string;
+	/**
+	 * Anonymous visitor id (the analytics "device id"). Counts as identity on
+	 * its own: the ingest API accepts `sessionId`, `externalUserId`, or
+	 * `visitorId`. The chat widget uses it for pre-session events like
+	 * `page.viewed`.
+	 */
+	visitorId?: string;
 	/** Optional explicit envelope fields. */
 	eventId?: string;
 	timestamp?: string | Date;
@@ -190,6 +200,7 @@ export type TrackEvent =
 			properties?: PurchaseCompletedProperties;
 	  } & BaseTrackEvent)
 	| ({ event: "user.identified" } & BaseTrackEvent)
+	| ({ event: "widget_render" } & BaseTrackEvent)
 	| ({
 			event: "price_shown";
 			properties?: PriceShownProperties;
@@ -281,11 +292,6 @@ export interface RevenueTrackingApi {
 	leadQualified: (
 		input?: RevenueLeadQualifiedInput,
 	) => Promise<{ eventId: string }>;
-	/**
-	 * @deprecated Renamed in 0.15.0. Use `track.leadQualified()` instead; this
-	 * alias emits a `lead_qualified` event and will be removed in 0.16.0.
-	 */
-	lead: (input?: RevenueLeadQualifiedInput) => Promise<{ eventId: string }>;
 	converted: (input: RevenueConvertedInput) => Promise<{ eventId: string }>;
 }
 

@@ -23,6 +23,8 @@ const DEFAULT_RETRY_BASE_DELAY_MS = 200;
 const DEFAULT_RETRY_MAX_DELAY_MS = 2_000;
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 2_000;
 const SDK_NAME = "@waniwani/sdk";
+// Keepalive requests are capped by browsers (64KiB in-flight quota); stay under it.
+const TEARDOWN_MAX_BODY_BYTES = 60_000;
 
 const AUTH_FAILURE_STATUS = new Set([401, 403]);
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -34,7 +36,11 @@ interface Logger {
 
 export interface V2TransportOptions {
 	apiUrl: string;
-	apiKey: string;
+	/**
+	 * Bearer credential for the ingest endpoint: secret key (`wwk_`), public
+	 * token (`wwp_`), or widget JWT. Omit only for unauthenticated proxies.
+	 */
+	apiKey?: string;
 	endpointPath?: string;
 	flushIntervalMs?: number;
 	maxBatchSize?: number;
@@ -90,7 +96,7 @@ class BatchingV2Transport implements V2BatchTransport {
 	private readonly logger: Logger;
 	private readonly now: () => Date;
 	private readonly sleep: (delayMs: number) => Promise<void>;
-	private readonly apiKey: string;
+	private readonly apiKey?: string;
 
 	private readonly buffer: V2EventEnvelope[] = [];
 	private flushTimer: ReturnType<typeof setInterval> | undefined;
@@ -130,6 +136,8 @@ class BatchingV2Transport implements V2BatchTransport {
 				void this.flush();
 			}, this.flushIntervalMs);
 		}
+
+		this.registerBrowserTeardown();
 	}
 
 	enqueue(event: V2EventEnvelope): void {
@@ -210,6 +218,65 @@ class BatchingV2Transport implements V2BatchTransport {
 
 		this.isStopped = true;
 		return { timedOut: false, pendingEvents: this.pendingEvents() };
+	}
+
+	/**
+	 * In browsers, drain the buffer with keepalive fetches when the page is
+	 * hidden or unloading. The regular async flush loop does not survive
+	 * navigation; `keepalive` requests do. No-op outside a DOM environment.
+	 */
+	private registerBrowserTeardown(): void {
+		if (typeof document === "undefined" || typeof window === "undefined") {
+			return;
+		}
+
+		const teardownFlush = () => {
+			if (document.visibilityState === "hidden") {
+				this.keepaliveFlush();
+			}
+		};
+		document.addEventListener("visibilitychange", teardownFlush);
+		window.addEventListener("pagehide", () => this.keepaliveFlush());
+	}
+
+	/** Fire-and-forget flush of everything buffered, chunked under the keepalive body cap. */
+	private keepaliveFlush(): void {
+		if (this.isStopped || this.buffer.length === 0) {
+			return;
+		}
+		const events = this.buffer.splice(0, this.buffer.length);
+		this.sendKeepaliveChunk(events);
+	}
+
+	private sendKeepaliveChunk(events: V2EventEnvelope[]): void {
+		const body = JSON.stringify(this.makeBatchRequest(events));
+		if (body.length > TEARDOWN_MAX_BODY_BYTES && events.length > 1) {
+			const mid = Math.ceil(events.length / 2);
+			this.sendKeepaliveChunk(events.slice(0, mid));
+			this.sendKeepaliveChunk(events.slice(mid));
+			return;
+		}
+		try {
+			void this.fetchFn(this.endpointUrl, {
+				method: "POST",
+				headers: this.requestHeaders(),
+				body,
+				keepalive: true,
+			}).catch(() => {});
+		} catch {
+			// Teardown is best-effort; never throw during page unload.
+		}
+	}
+
+	private requestHeaders(): Record<string, string> {
+		const headers: Record<string, string> = {
+			"Content-Type": "application/json",
+			"X-WaniWani-SDK": SDK_NAME,
+		};
+		if (this.apiKey) {
+			headers.Authorization = `Bearer ${this.apiKey}`;
+		}
+		return headers;
 	}
 
 	private scheduleMicroFlush(): void {
@@ -298,11 +365,7 @@ class BatchingV2Transport implements V2BatchTransport {
 		try {
 			response = await this.fetchFn(this.endpointUrl, {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${this.apiKey}`,
-					"X-WaniWani-SDK": SDK_NAME,
-				},
+				headers: this.requestHeaders(),
 				body: JSON.stringify(this.makeBatchRequest(events)),
 			});
 		} catch (error) {

@@ -18,7 +18,7 @@ Events are typed and first-class. Never invent a custom event name; model every 
 | `converted` | `waniwani?.track.converted({ amount, currency, occurredAt? })` | The user became paying | `amount`, `currency` |
 | identity | `waniwani?.identify(userId, properties?)` | A stable external id becomes known | `userId` |
 
-`page.viewed`, `chat.*`, and `widget_*` are emitted automatically by the chat widget and widget runtime. Never send them from server code.
+`page.viewed`, `chat.*`, and `widget_render` are emitted automatically by the chat widget and the widget hook. Never send them from server code.
 
 ## Placement rules
 

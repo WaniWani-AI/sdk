@@ -14,14 +14,6 @@ type Emit = (event: TrackInput) => Promise<{ eventId: string }>;
  * API — see the warning emitted from the client's `emit`.
  */
 export function createRevenueApi(emit: Emit): RevenueTrackingApi {
-	const leadQualified: RevenueTrackingApi["leadQualified"] = (input) => {
-		const { externalId, email, name, ...context } = input ?? {};
-		return emit({
-			event: "lead_qualified",
-			properties: { externalId, email, name },
-			...context,
-		});
-	};
 	return {
 		priceShown: ({ amount, currency, itemId, label, ...context }) =>
 			emit({
@@ -37,8 +29,14 @@ export function createRevenueApi(emit: Emit): RevenueTrackingApi {
 				properties: { id, amount, currency },
 				...context,
 			}),
-		leadQualified,
-		lead: leadQualified,
+		leadQualified: (input) => {
+			const { externalId, email, name, ...context } = input ?? {};
+			return emit({
+				event: "lead_qualified",
+				properties: { externalId, email, name },
+				...context,
+			});
+		},
 		converted: ({ amount, currency, occurredAt, ...context }) =>
 			emit({
 				event: "converted",

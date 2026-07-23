@@ -9,6 +9,11 @@
 import type { UIMessage } from "ai";
 import React from "react";
 import ReactDOM from "react-dom/client";
+import type { TrackFn, TrackInput } from "../../../tracking/@types";
+import {
+	createChatTrackClient,
+	createNoopChatTrackClient,
+} from "../lib/chat-track";
 import type { EmbedConfig } from "./config";
 import {
 	DEFAULT_EMBED_HEIGHT,
@@ -63,6 +68,18 @@ declare global {
 				getMessages: () => UIMessage[];
 				/** Session ID for event correlation. Undefined until the first message. */
 				getSessionId: () => string | undefined;
+				/**
+				 * Track a funnel event from the host page, with the chat session
+				 * attached automatically. Same surface as the server client:
+				 * `track({ event, properties })` plus the flat revenue helpers
+				 * (`track.converted({ amount, currency })`, ...).
+				 */
+				track: TrackFn;
+				/** Tie the visitor to a stable user id (emits `user.identified`). */
+				identify: (
+					userId: string,
+					traits?: Record<string, unknown>,
+				) => Promise<{ eventId: string }>;
 			};
 		};
 	}
@@ -83,7 +100,17 @@ interface EmbedInstance {
 	focus: () => void;
 	getMessages: () => UIMessage[];
 	getSessionId: () => string | undefined;
+	/** Track a funnel event with the chat session attached automatically. */
+	track: TrackFn;
+	/** Tie the visitor to a stable user id (emits `user.identified`). */
+	identify: (
+		userId: string,
+		traits?: Record<string, unknown>,
+	) => Promise<{ eventId: string }>;
 }
+
+/** What the mount functions return; `init()` adds the tracking surface. */
+type MountedEmbed = Omit<EmbedInstance, "track" | "identify">;
 
 let currentInstance: EmbedInstance | null = null;
 let reactRoot: ReactDOM.Root | null = null;
@@ -264,7 +291,7 @@ function mountInline(
 	programmatic: Partial<EmbedConfig> | undefined,
 	scriptConfig: Partial<EmbedConfig> | undefined,
 	scriptEl: HTMLScriptElement | null,
-): EmbedInstance {
+): MountedEmbed {
 	const container = ensureInlineContainer(scriptEl);
 
 	// Size the chat against the customer's container in two complementary
@@ -461,7 +488,7 @@ function mountFloating(
 	config: EmbedConfig,
 	programmatic: Partial<EmbedConfig> | undefined,
 	scriptConfig: Partial<EmbedConfig> | undefined,
-): EmbedInstance {
+): MountedEmbed {
 	// A viewport-sized, click-through overlay appended to <body>. The launcher
 	// and panel inside set `pointer-events: auto`, so the host page stays
 	// interactive everywhere else. No `[data-waniwani-embed]` element needed.
@@ -535,10 +562,38 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 	const scriptConfig = parseConfigFromScript();
 	const config = resolveConfig(options, undefined, scriptConfig);
 
-	currentInstance =
+	const mounted =
 		config.mode === "floating"
 			? mountFloating(config, options, scriptConfig)
 			: mountInline(config, options, scriptConfig, scriptEl);
+
+	// Host-page tracking rides on the same public token and channel the chat
+	// itself uses; the session id attaches live once the first exchange
+	// assigns one.
+	const api = config.api ?? "";
+	const trackClient = config.token
+		? createChatTrackClient({
+				api,
+				token: config.token,
+				channelId: config.channelId,
+				getSource: () =>
+					loadCachedConfig(api, config.token, config.channelId)?.source ??
+					undefined,
+				getSessionId: () => mounted.getSessionId(),
+			})
+		: createNoopChatTrackClient(
+				"no public token configured (set data-token or pass token to init())",
+			);
+
+	currentInstance = {
+		...mounted,
+		track: trackClient.track,
+		identify: (userId, traits) => trackClient.identify(userId, traits),
+		destroy: () => {
+			void trackClient.shutdown();
+			mounted.destroy();
+		},
+	};
 
 	// The top-of-funnel `page.viewed` event is fired from `useRemoteEmbedConfig`
 	// once the channel's `/config` resolves, so it carries the channel's source.
@@ -556,6 +611,14 @@ function destroy(): void {
 // ---------------------------------------------------------------------------
 // Expose global API
 // ---------------------------------------------------------------------------
+
+// Calls made before `init()` warn once and are discarded, instead of crashing
+// the host page.
+const uninitializedTrack = createNoopChatTrackClient(
+	"chat widget is not initialized (call WaniWani.chat.init() first)",
+);
+const liveTrack = (): TrackFn =>
+	currentInstance ? currentInstance.track : uninitializedTrack.track;
 
 window.WaniWani = window.WaniWani || {};
 window.WaniWani.chat = {
@@ -575,6 +638,22 @@ window.WaniWani.chat = {
 	focus: () => currentInstance?.focus(),
 	getMessages: () => currentInstance?.getMessages() ?? [],
 	getSessionId: () => currentInstance?.getSessionId(),
+	track: Object.assign((event: TrackInput) => liveTrack()(event), {
+		priceShown: (input: Parameters<TrackFn["priceShown"]>[0]) =>
+			liveTrack().priceShown(input),
+		pricesCompared: (input: Parameters<TrackFn["pricesCompared"]>[0]) =>
+			liveTrack().pricesCompared(input),
+		optionSelected: (input: Parameters<TrackFn["optionSelected"]>[0]) =>
+			liveTrack().optionSelected(input),
+		leadQualified: (input?: Parameters<TrackFn["leadQualified"]>[0]) =>
+			liveTrack().leadQualified(input),
+		converted: (input: Parameters<TrackFn["converted"]>[0]) =>
+			liveTrack().converted(input),
+	}),
+	identify: (userId: string, traits?: Record<string, unknown>) =>
+		currentInstance
+			? currentInstance.identify(userId, traits)
+			: uninitializedTrack.identify(userId, traits),
 };
 
 // ---------------------------------------------------------------------------

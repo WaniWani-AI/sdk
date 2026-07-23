@@ -21,6 +21,39 @@ Deprecations (struck-through signatures, `@deprecated` JSDoc) are **not** breaki
 
 This list mirrors the changelog so you can apply migrations without a network fetch. Always cross-check against the live changelog for anything newer than this file.
 
+### 0.16.0: unified tracking client on every surface
+
+One typed `track` client everywhere (server, scoped client, `useWaniwani()`, `chat.track`). Five breaking changes, all mechanical:
+
+**1. `useWaniwani()` surface.** Returns `{ sessionId, track, identify, flush }` where `track` is the same typed `TrackFn` as the server client. Removed: string-based `track(name, properties)`, `step(name, meta)`, `conversion(name, data)`, and the `capture` option (DOM auto-capture no longer exists; one `widget_render` event is emitted automatically on init).
+
+Auto-fix:
+1. Delete any `capture` option passed to `useWaniwani()`.
+2. Replace `wani.step(...)` / `wani.conversion(...)` with the typed revenue helper matching the funnel stage (`track.optionSelected(...)`, `track.converted(...)`).
+3. Replace `wani.track("<name>", props)` with the object form `wani.track({ event: "<name>", properties: props })` when `<name>` is a typed event; otherwise pick the closest typed event (custom names are not part of the typed surface).
+
+```tsx
+// Before
+const wani = useWaniwani({ capture: { click: true } });
+wani.track("plan_viewed", { plan: "pro" });
+wani.conversion("purchase", { amount: 49 });
+
+// After
+const wani = useWaniwani();
+wani.track.priceShown({ amount: 49, currency: "EUR" });
+wani.track.converted({ amount: 49, currency: "EUR" });
+```
+
+**2. Widget auto-capture event names removed from `EventType`.** `widget_click`, `widget_link_click`, `widget_error`, `widget_scroll`, `widget_form_field`, `widget_form_submit` are gone (`widget_render` remains, auto-emitted). Replace any reference with a typed taxonomy event.
+
+**3. Widget config meta key renamed.** `withWaniwani` injects the widget tracking config under `_meta["waniwani/widget"]` (formerly the bare `waniwani` key). Only code reading the key directly needs the rename; `useWaniwani()` handles it. Upgrade server and widgets together.
+
+**4. `track.lead()` removed** (deprecated since 0.15.1). Replace `.track.lead(` with `.track.leadQualified(`. The runtime no longer rewrites the event name `"lead"`; send `"lead_qualified"`.
+
+**5. `createTrackingRoute` accepts the V2 batch envelope.** The proxy route parses `{ events: [{ id, name, correlation, properties, ... }] }`, which is what `createFrontendClient` / `useWaniwani({ endpoint })` send. Hand-rolled clients posting the old snake_case payload (`event_type`, `session_id`) must switch to the V2 envelope.
+
+New, non-breaking additions worth adopting during the same pass: `context.waniwani.sessionId` (store it to attribute off-platform conversions), `chat.track` / `chat.identify` on the chat embed and `ChatHandle`, `createFrontendClient` and `EVENT_TYPES` from `@waniwani/sdk`, `extractScopedClient` from `@waniwani/sdk/mcp`, and `visitorId` as a correlation field.
+
 ### 0.15.0: `track.lead()` → `track.leadQualified()`, event `"lead"` → `"lead_qualified"`
 
 The lead event is named `lead_qualified`, its helper is `track.leadQualified()`, and it carries richer properties: `externalId` (your CRM/lead record id, the strongest dedup key), `email`, and `name`. Types renamed: `RevenueLeadInput` → `RevenueLeadQualifiedInput`, `LeadProperties` → `LeadQualifiedProperties`.

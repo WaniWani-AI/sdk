@@ -14,6 +14,14 @@ export type {
 export type { WaniWaniProjectConfig } from "./project-config.js";
 // Project Config
 export { defineConfig } from "./project-config.js";
+// Tracking
+export { EVENT_TYPES } from "./tracking/@types.js";
+export type {
+	FrontendClientOptions,
+	FrontendIdentity,
+	FrontendTrackingClient,
+} from "./tracking/frontend.js";
+export { createFrontendClient } from "./tracking/frontend.js";
 // Types - Tracking
 export type {
 	ComparedPriceOption,

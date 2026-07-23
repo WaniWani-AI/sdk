@@ -20,11 +20,13 @@ Truly open source. Works standalone with any state backend.
 Same SDK, hosted features added when the key is present.
 
 - `WaniwaniKvStore` (hosted flow state) — used by `createFlow` default when key is set
-- `waniwani()`, `tracking/*`, `withWaniwani`, `createTrackingRoute`, `widget-token`, `scoped-client` from `@waniwani/sdk` and `@waniwani/sdk/mcp`
+- `waniwani()`, `tracking/*`, `createFrontendClient`, `EVENT_TYPES`, `withWaniwani`, `createTrackingRoute`, `widget-token`, `extractScopedClient` / `SCOPED_CLIENT_KEY` from `@waniwani/sdk` and `@waniwani/sdk/mcp`
 - `createKbClient` from `@waniwani/sdk/kb`
-- `useWaniwani` from `@waniwani/sdk/mcp/react` (also OSS — degrades to no-op without config; BYO endpoint also supported)
-- `WaniwaniChat` (hosted React chat — recommended), themes, `embed.js` (IIFE for non-React hosts), `styles.css` from `@waniwani/sdk/chat`
-- `ChatEmbed` from `@waniwani/sdk/chat` — bare-bones bring-your-own-backend primitive. Exposed but **not** the recommended path for new code; reach for it only when self-hosting the chat backend.
+- `useWaniwani` from `@waniwani/sdk/mcp/react` (also OSS — degrades to no-op without config; BYO endpoint also supported). Returns `{ sessionId, track, identify, flush }` where `track` is the same typed `TrackFn` as the server client; emits one `widget_render` automatically; works without the legacy `WidgetProvider`.
+- `WaniwaniChat` (hosted React chat — recommended), themes, `embed.js` (IIFE for non-React hosts), `styles.css` from `@waniwani/sdk/chat`. Both expose host-page tracking: `WaniWani.chat.track` / `.identify` on the embed global, `track` / `identify` on the `ChatHandle` ref.
+- `ChatEmbed` from `@waniwani/sdk/chat` — bare-bones bring-your-own-backend primitive (no `track`/`identify`). Exposed but **not** the recommended path for new code; reach for it only when self-hosting the chat backend.
+
+Tracking is one client on four surfaces (server `waniwani()`, scoped client in handlers/flows, `useWaniwani()` in widgets, `chat.track` on chat host pages); all except the top-level server client attach session identity automatically. The scoped client exposes `sessionId`; identity accepted by ingest is `sessionId` OR `externalUserId` OR `visitorId`. `withWaniwani` injects the widget tracking config under `_meta["waniwani/widget"]`.
 
 `withWaniwani` is no-key-safe: it wraps tools and bridges session metadata even without an API key, and its own auto-captured `tool.called` events are internally guarded (`safeTrack`). User-initiated tracking calls are **not**: `client.track.*`, `identify()`, and the scoped client throw `WANIWANI_API_KEY is not set` when no key is configured.
 
@@ -131,11 +133,11 @@ When changing the public API or behavior, **always update the corresponding skil
 - `release-migration/SKILL.md` — cut a version bump that ships its own migration (changelog + `upgrading.md` + deprecation shim)
 - (`create-mcp-app` and `mcp-server` were removed — they taught the legacy `createTool`/`createResource` patterns)
 
-### External skills (`skills/waniwani-sdk/`, published to skills.sh)
+### External skills (`skills/`, published to skills.sh)
 
 Target SDK **users**, not SDK developers.
 
-**`waniwani-sdk` is the one and only external skill.** `skills/` must contain exactly one skill folder (`waniwani-sdk/`). Everything else — tracking instrumentation, scaffolding, upgrades — lives *inside* it, as a `references/*.md` reference or a `scripts/*.md` playbook linked from `SKILL.md`, never as a sibling `SKILL.md` in `skills/`. A standalone sibling skill publishes as a separate skill on skills.sh, which fragments the surface and breaks the single-entry-point contract. When you need a new user-facing guide, add a reference under `waniwani-sdk/references/` and link it from `SKILL.md`; do not create `skills/<something-else>/SKILL.md`.
+**`waniwani-sdk` is the main entry-point skill; standalone sibling skills exist only for directly invocable workflows.** Current siblings: `instrument-tracking` (auto-instrument funnel events across flows) and `upgrade-waniwani-sdk` (bump the SDK and auto-apply breaking-change migrations). Everything that is reference material rather than a workflow lives *inside* `waniwani-sdk/` as a `references/*.md` file linked from `SKILL.md`. Before adding a new sibling skill, default to a reference; a sibling is justified only when users should invoke it by name (`npx skills add Waniwani-AI/sdk -s <skill>`), and it must stay in sync with the reference that covers the same ground.
 
 | Source area | Reference file |
 |---|---|
@@ -147,6 +149,7 @@ Target SDK **users**, not SDK developers.
 | `src/kb/` | `references/knowledge-base.md` |
 | `src/chat/web/` | `references/chat-widget.md` |
 | Setup / env vars | `references/setup.md` |
+| Version upgrades / migrations | `references/upgrading.md` (mirrored by the `upgrade-waniwani-sdk` sibling skill) |
 | **Legacy** (not linked from `SKILL.md`) | `references/_legacy/tools-and-widgets.md`, `references/_legacy/widget-react-hooks.md`, `references/_legacy/chat-server.md` |
 
 ## CSS / Tailwind

@@ -327,4 +327,20 @@ export interface ChatHandle {
 	messages: import("ai").UIMessage[];
 	/** Session ID used for event correlation. Available after the first message. */
 	sessionId: string | undefined;
+	/**
+	 * Track a funnel event from the host page with the chat session attached
+	 * automatically. Same surface as the server client: callable with a typed
+	 * event, plus the flat revenue helpers (`track.converted({ ... })`, ...).
+	 * Present on `WaniwaniChat` (hosted); absent on the bare `ChatEmbed`
+	 * primitive, which has no Waniwani credential to send events with.
+	 */
+	track?: import("../../tracking/@types").TrackFn;
+	/**
+	 * Tie the visitor to a stable user id (emits `user.identified`).
+	 * Present on `WaniwaniChat` only, like `track`.
+	 */
+	identify?: (
+		userId: string,
+		traits?: Record<string, unknown>,
+	) => Promise<{ eventId: string }>;
 }

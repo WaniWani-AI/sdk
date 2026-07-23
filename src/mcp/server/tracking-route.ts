@@ -1,8 +1,11 @@
 /**
- * Server-side API route handler for widget tracking events.
+ * Server-side API route handler for frontend tracking events.
  *
- * Receives batched events from the `useWaniwani` React hook and forwards them
- * to the Waniwani backend using the server-side SDK.
+ * Receives V2 batch payloads from the SDK's frontend tracking client
+ * (`createFrontendClient`, `useWaniwani`, `chat.track`) configured with your
+ * own endpoint, and forwards them to the Waniwani backend with the secret
+ * API key. Use this proxy when you do not want any Waniwani credential in
+ * the browser; the direct path (public token or widget JWT) needs no route.
  *
  * @example Next.js App Router
  * ```typescript
@@ -19,6 +22,7 @@
  */
 
 import type { EventType, TrackInput } from "../../tracking/@types.js";
+import type { V2EventEnvelope } from "../../tracking/v2-types.js";
 import type { WaniWaniConfig } from "../../types.js";
 import { waniwani } from "../../waniwani.js";
 
@@ -29,63 +33,36 @@ export interface TrackingRouteOptions {
 	apiUrl?: string;
 }
 
-/** Shape of a single event from the WidgetTransport client. */
-interface WidgetEventPayload {
-	event_id?: string;
-	event_type?: string;
-	timestamp?: string;
-	source?: string;
-	session_id?: string;
-	trace_id?: string;
-	user_id?: string;
-	event_name?: string;
-	metadata?: Record<string, unknown>;
-	[key: string]: unknown;
-}
-
-/** Batch payload sent by WidgetTransport. */
+/** Batch payload sent by the frontend tracking client (the V2 batch shape). */
 interface BatchPayload {
-	events: WidgetEventPayload[];
+	events: Partial<V2EventEnvelope>[];
 	sentAt?: string;
 }
 
 /**
- * Map a WidgetEvent from the client to the SDK's TrackInput format.
+ * Map an incoming V2 envelope back to the SDK's TrackInput so the server
+ * client re-validates, re-maps, and batches it like any other event.
  */
-function mapWidgetEvent(ev: WidgetEventPayload): TrackInput {
-	const eventType = ev.event_type ?? "widget_click";
-
-	// For manual tracking methods (track, identify, step, conversion),
-	// use "widget_<type>" as the event name. Auto-capture events already
-	// have the "widget_" prefix.
-	const isAutoCapture = eventType.startsWith("widget_");
-	const eventName: EventType = (
-		isAutoCapture ? eventType : `widget_${eventType}`
-	) as EventType;
-
-	// Merge metadata + any extra properties from the event
-	const properties: Record<string, unknown> = {
-		...(ev.metadata ?? {}),
-	};
-	if (ev.event_name) {
-		properties.event_name = ev.event_name;
-	}
-
+function mapEnvelope(envelope: Partial<V2EventEnvelope>): TrackInput {
 	return {
-		event: eventName,
-		properties,
-		sessionId: ev.session_id,
-		traceId: ev.trace_id,
-		externalUserId: ev.user_id,
-		eventId: ev.event_id,
-		timestamp: ev.timestamp,
-		source: ev.source ?? "widget",
+		event: (envelope.name ?? "widget_render") as EventType,
+		properties: envelope.properties,
+		metadata: envelope.metadata,
+		sessionId: envelope.correlation?.sessionId,
+		traceId: envelope.correlation?.traceId,
+		requestId: envelope.correlation?.requestId,
+		correlationId: envelope.correlation?.correlationId,
+		externalUserId: envelope.correlation?.externalUserId,
+		visitorId: envelope.correlation?.visitorId,
+		eventId: envelope.id,
+		timestamp: envelope.timestamp,
+		source: envelope.source,
 	} as TrackInput;
 }
 
 /**
- * Creates a POST handler that receives tracking events from `useWaniwani`
- * and forwards them to the Waniwani backend.
+ * Creates a POST handler that receives frontend tracking batches and
+ * forwards them to the Waniwani backend.
  */
 export function createTrackingRoute(options?: TrackingRouteOptions) {
 	const config: WaniWaniConfig = {
@@ -128,9 +105,8 @@ export function createTrackingRoute(options?: TrackingRouteOptions) {
 			const c = getClient();
 			const results: string[] = [];
 
-			for (const ev of body.events) {
-				const trackInput = mapWidgetEvent(ev);
-				const result = await c.track(trackInput);
+			for (const envelope of body.events) {
+				const result = await c.track(mapEnvelope(envelope));
 				results.push(result.eventId);
 			}
 

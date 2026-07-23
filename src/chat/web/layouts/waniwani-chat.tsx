@@ -1,6 +1,14 @@
 "use client";
 
-import { forwardRef, useEffect, useMemo, useState } from "react";
+import {
+	forwardRef,
+	useEffect,
+	useImperativeHandle,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import type { FrontendTrackingClient } from "../../../tracking/frontend";
 import type {
 	ChatAppearance,
 	ChatHandle,
@@ -16,6 +24,10 @@ import {
 } from "../embed/remote-config";
 import { useVisibilityGate } from "../embed/use-pathname";
 import type { Locale, MessageOverrides } from "../i18n";
+import {
+	createChatTrackClient,
+	createNoopChatTrackClient,
+} from "../lib/chat-track";
 import { firePageView } from "../lib/page-view";
 import { ChatEmbed } from "./chat-embed";
 
@@ -159,6 +171,11 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 	function WaniwaniChat(props, ref) {
 		const { token, channelId, className, overrides } = props;
 
+		// The inner ChatEmbed handle; the ref we expose augments it with the
+		// tracking surface (`track`, `identify`).
+		const innerRef = useRef<ChatHandle>(null);
+		const trackClientRef = useRef<FrontendTrackingClient | null>(null);
+
 		const programmatic = useMemo<Partial<EmbedConfig>>(
 			() => ({
 				token,
@@ -266,6 +283,77 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			[programmatic, remote],
 		);
 
+		// Host-page tracking client: same public token and channel as the chat,
+		// session id attached live once the first exchange assigns one.
+		useEffect(() => {
+			if (!token) {
+				return;
+			}
+			const client = createChatTrackClient({
+				api: resolvedApi,
+				token,
+				channelId,
+				getSource: () =>
+					loadCachedConfig(resolvedApi, token, channelId)?.source ?? undefined,
+				getSessionId: () => innerRef.current?.sessionId,
+			});
+			trackClientRef.current = client;
+			return () => {
+				trackClientRef.current = null;
+				void client.shutdown();
+			};
+		}, [resolvedApi, token, channelId]);
+
+		useImperativeHandle(ref, (): ChatHandle => {
+			const trackClient = (): FrontendTrackingClient =>
+				trackClientRef.current ??
+				createNoopChatTrackClient("no public token configured");
+			const track = Object.assign(
+				(event: Parameters<FrontendTrackingClient["track"]>[0]) =>
+					trackClient().track(event),
+				{
+					priceShown: (
+						input: Parameters<FrontendTrackingClient["track"]["priceShown"]>[0],
+					) => trackClient().track.priceShown(input),
+					pricesCompared: (
+						input: Parameters<
+							FrontendTrackingClient["track"]["pricesCompared"]
+						>[0],
+					) => trackClient().track.pricesCompared(input),
+					optionSelected: (
+						input: Parameters<
+							FrontendTrackingClient["track"]["optionSelected"]
+						>[0],
+					) => trackClient().track.optionSelected(input),
+					leadQualified: (
+						input?: Parameters<
+							FrontendTrackingClient["track"]["leadQualified"]
+						>[0],
+					) => trackClient().track.leadQualified(input),
+					converted: (
+						input: Parameters<FrontendTrackingClient["track"]["converted"]>[0],
+					) => trackClient().track.converted(input),
+				},
+			);
+			return {
+				sendMessage: (text) => innerRef.current?.sendMessage(text),
+				sendMessageAndWait: (text) =>
+					innerRef.current
+						? innerRef.current.sendMessageAndWait(text)
+						: Promise.resolve(undefined),
+				reset: () => innerRef.current?.reset(),
+				focus: () => innerRef.current?.focus(),
+				get messages() {
+					return innerRef.current?.messages ?? [];
+				},
+				get sessionId() {
+					return innerRef.current?.sessionId;
+				},
+				track,
+				identify: (userId, traits) => trackClient().identify(userId, traits),
+			};
+		}, []);
+
 		// Per-URL gating. When the channel's `visibility` rules hide this path,
 		// render nothing (no leftover box) — correct for a `<WaniwaniChat>` placed
 		// in a shared layout. Held until `ready` so a hidden page never flashes;
@@ -289,7 +377,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 
 		return (
 			<ChatEmbed
-				ref={ref}
+				ref={innerRef}
 				api={config.api ?? DEFAULT_API}
 				headers={{ Authorization: `Bearer ${config.token}` }}
 				skipRemoteConfig

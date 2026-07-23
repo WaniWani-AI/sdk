@@ -51,12 +51,22 @@ const EXTERNAL_USER_ID_KEYS = [
 	"actorId",
 ] as const;
 
+const VISITOR_ID_KEYS = ["waniwani/visitorId", "visitorId"] as const;
+
 const CORRELATION_ID_KEYS = ["correlationId", "openai/requestId"] as const;
 
 const TURN_COUNT_KEYS = ["waniwani/turnCount"] as const;
 
 /** Meta key for flow execution path (nodesVisited, flowId). */
 export const FLOW_META_KEY = "waniwani/flow" as const;
+
+/**
+ * Meta key under which `withWaniwani` injects the widget tracking config
+ * (`{ endpoint, token, sessionId, source, geoLocation }`) into tool response
+ * `_meta`. The frontend client reads it to track without any manual wiring.
+ * Older SDKs wrote the same object under the bare `waniwani` key.
+ */
+export const WIDGET_CONFIG_META_KEY = "waniwani/widget" as const;
 
 // --- Extractors ---
 
@@ -82,6 +92,12 @@ export function extractExternalUserId(
 	meta: Record<string, unknown> | undefined,
 ): string | undefined {
 	return meta ? pickFirst(meta, EXTERNAL_USER_ID_KEYS) : undefined;
+}
+
+export function extractVisitorId(
+	meta: Record<string, unknown> | undefined,
+): string | undefined {
+	return meta ? pickFirst(meta, VISITOR_ID_KEYS) : undefined;
 }
 
 export function extractCorrelationId(
