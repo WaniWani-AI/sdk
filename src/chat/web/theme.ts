@@ -13,12 +13,19 @@ export const DEFAULT_THEME: Required<ChatTheme> = {
 	userBubbleColor: "#f4f4f4",
 	inputBackgroundColor: "#f9fafb",
 	borderRadius: 16,
-	messageBorderRadius: 12,
+	messageBorderRadius: 8,
 	fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif",
 	headerBackgroundColor: "#ffffff",
 	headerTextColor: "#1f2937",
 	statusColor: "#22c55e",
 	toolCardColor: "#f4f4f5",
+	userBubbleTextColor: "#1f2937",
+	assistantBubbleTextColor: "#1f2937",
+	messagePaddingX: 16,
+	messagePaddingY: 12,
+	messageMaxWidth: "80%",
+	fontSize: 16,
+	lineHeight: "1.5",
 };
 
 export const DARK_THEME: ChatTheme = {
@@ -35,6 +42,8 @@ export const DARK_THEME: ChatTheme = {
 	primaryColor: "#6366f1",
 	statusColor: "#22c55e",
 	toolCardColor: "#262626",
+	userBubbleTextColor: "#ffffff",
+	assistantBubbleTextColor: "#ececec",
 };
 
 const CSS_VAR_MAP: Record<keyof ChatTheme, string[]> = {
@@ -60,6 +69,13 @@ const CSS_VAR_MAP: Record<keyof ChatTheme, string[]> = {
 	headerTextColor: ["--ww-header-text"],
 	statusColor: ["--ww-status"],
 	toolCardColor: ["--ww-tool-card", "--ww-color-tool-card"],
+	userBubbleTextColor: ["--ww-user-bubble-text"],
+	assistantBubbleTextColor: ["--ww-assistant-bubble-text"],
+	messagePaddingX: ["--ww-msg-pad-x"],
+	messagePaddingY: ["--ww-msg-pad-y"],
+	messageMaxWidth: ["--ww-msg-max-width"],
+	fontSize: ["--ww-font-size"],
+	lineHeight: ["--ww-line-height"],
 };
 
 export function mergeTheme(userTheme?: ChatTheme): Required<ChatTheme> {

@@ -525,15 +525,22 @@ Unset variables fall back to the preset's defaults, so you only override what yo
 | `--ww-muted` | Secondary text | `#6b7280` | `#8e8ea0` |
 | `--ww-border` | Border colour | `#e5e7eb` | `#444444` |
 | `--ww-assistant-bubble` | Assistant bubble bg | `#f3f4f6` | `#2f2f2f` |
+| `--ww-assistant-bubble-text` | Assistant bubble text | `#1f2937` | `#ececec` |
 | `--ww-user-bubble` | User bubble bg | `#f4f4f4` | `#303030` |
+| `--ww-user-bubble-text` | User bubble text | `#1f2937` | `#ffffff` |
 | `--ww-input-bg` | Input field bg | `#f9fafb` | `#2f2f2f` |
 | `--ww-header-bg` | Header background | `#ffffff` | `#1e1e1e` |
 | `--ww-header-text` | Header text | `#1f2937` | `#ececec` |
 | `--ww-status` | Status dot | `#22c55e` | `#22c55e` |
 | `--ww-tool-card` | Tool call card bg | `#f4f4f5` | `#262626` |
 | `--ww-radius` | Panel border-radius | `16px` | `16px` |
-| `--ww-msg-radius` | Message bubble radius | `12px` | `12px` |
+| `--ww-msg-radius` | Message bubble radius | `8px` | `8px` |
+| `--ww-msg-pad-x` | Message bubble padding X | `16px` | `16px` |
+| `--ww-msg-pad-y` | Message bubble padding Y | `12px` | `12px` |
+| `--ww-msg-max-width` | Message bubble max width | `80%` | `80%` |
 | `--ww-font` | Font family | system stack | system stack |
+| `--ww-font-size` | Base message font size | `16px` | `16px` |
+| `--ww-line-height` | Base message line height | `1.5` | `1.5` |
 
 #### 3. Programmatic `appearance`
 
@@ -565,6 +572,89 @@ window.WaniWani.chat.init({
 ```
 
 `variables` accepts the same keys as `ChatTheme`. The helpers `DEFAULT_THEME`, `DARK_THEME`, and `mergeTheme(base, overrides)` are exported from `@waniwani/sdk/chat` for assembling custom variable sets.
+
+#### 4. Assistant message bubble (opt-in)
+
+Assistant replies render as plain text by default. Turn them into filled bubbles — styled by `assistantBubbleColor` / `assistantBubbleTextColor`, sharing the user bubble's radius and padding — with `assistantBubble`:
+
+```js
+// embed.js
+window.WaniWani.chat.init({
+  token: "wwp_...",
+  appearance: {
+    assistantBubble: true,
+    variables: { assistantBubbleColor: "#e6f2f2", assistantBubbleTextColor: "#0b2b2e" },
+  },
+});
+```
+
+```html
+<!-- script tag -->
+<script src="…/embed.js" data-token="wwp_..." data-assistant-bubble="true"></script>
+```
+
+```tsx
+// React
+<WaniwaniChat token="wwp_..." channelId="..." overrides={{ assistantBubble: true }} />
+```
+
+Leave it unset (the default) and assistant messages stay bubble-less — existing widgets are unchanged.
+
+#### 5. Deep customization — per-slot classes
+
+Tokens cover colours, typography, and bubble shape. To restyle an element beyond what a token exposes, target it directly.
+
+**React** — pass `classNames` (type `ChatClassNames`). Each string is merged onto that slot:
+
+```tsx
+<WaniwaniChat
+  token="wwp_..."
+  channelId="..."
+  overrides={{
+    classNames: {
+      root: "my-chat",
+      header: "ww:uppercase ww:tracking-wide",
+      userBubble: "ww:shadow-md",
+      input: "ww:ring-2 ww:ring-[#0a6c74]",
+    },
+  }}
+/>
+```
+
+Slots: `root`, `header`, `message`, `userBubble`, `assistantBubble`, `input`.
+
+**Script embed** — the widget renders in a Shadow DOM, so your page's own selectors cannot reach inside. Two supported paths in:
+
+1. Set `--ww-*` variables (they inherit through the boundary) — see the table above.
+2. Inject a full stylesheet with `data-css` and target the stable semantic classes:
+
+```html
+<script
+  src="…/embed.js"
+  data-token="wwp_..."
+  data-css="https://your.site/widget.css"
+></script>
+```
+
+```css
+/* widget.css — loaded into the widget's Shadow DOM */
+.ww-header { letter-spacing: 0.02em; }
+.ww-input { box-shadow: 0 0 0 2px rgba(10, 108, 116, 0.25); }
+.ww-message-user .ww-bubble { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); }
+.ww-message-assistant .ww-bubble { border: 1px solid #0a6c74; }
+```
+
+Stable hooks: `.ww-message`, `.ww-message-user`, `.ww-message-assistant`, `.ww-bubble`, `.ww-header`, `.ww-input`. These are guaranteed selectors — the internal `ww:`-prefixed Tailwind classes are not.
+
+#### What is not themeable
+
+To set expectations for a full rebrand, these are intentionally fixed today:
+
+- **Typographic scale beyond the base** — `fontSize` / `lineHeight` set the message base; per-heading sizes inside markdown and built-in label sizes/weights are not individually exposed.
+- **Floating launcher accent** — the dock's animated border-glow uses a fixed accent gradient.
+- **"Powered by" mark** — the footer logo is not removable via theming.
+
+For anything in this list, reach out — some are candidates for future tokens.
 
 ### Event tracking
 

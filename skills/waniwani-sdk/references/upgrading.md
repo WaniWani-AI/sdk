@@ -17,6 +17,16 @@ The SDK is `0.x`, so **minor bumps can contain breaking changes**. Whenever you 
 
 Deprecations (struck-through signatures, `@deprecated` JSDoc) are **not** breaking — the old shape keeps working until the removal version listed in the notice. Migrate them opportunistically, but a build does not require it.
 
+## Non-breaking additions (no migration required)
+
+These entries add capability without changing existing behavior — listed so the surface is discoverable, not because an upgrade needs action.
+
+### Chat widget customization tokens + escape hatch
+
+New `ChatTheme` tokens on `appearance.variables`: `userBubbleTextColor`, `assistantBubbleTextColor`, `messagePaddingX`, `messagePaddingY`, `messageMaxWidth`, `fontSize`, `lineHeight`. New `appearance.assistantBubble` flag (opt-in filled assistant bubble; default `false`). New React `classNames` prop (`ChatClassNames`: `root`, `header`, `message`, `userBubble`, `assistantBubble`, `input`) and stable Shadow-DOM-reachable classes for `data-css` (`.ww-message`, `.ww-message-user`, `.ww-message-assistant`, `.ww-bubble`, `.ww-header`, `.ww-input`). See `references/chat-widget.md`.
+
+One behavioral note (not a break): `messageBorderRadius` / `--ww-msg-radius` is now applied to message bubbles (it was previously inert). Its default is pinned to `8px`, which equals the value bubbles rendered before, so existing widgets are visually unchanged. Only a consumer who explicitly set `messageBorderRadius` will now see it take effect — the intended behavior.
+
 ## Currently auto-fixable breaking changes
 
 This list mirrors the changelog so you can apply migrations without a network fetch. Always cross-check against the live changelog for anything newer than this file.

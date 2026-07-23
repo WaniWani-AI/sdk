@@ -385,3 +385,13 @@ describe("resolveConfig — validation", () => {
 		);
 	});
 });
+
+describe("resolveConfig — assistantBubble", () => {
+	test("carries appearance.assistantBubble through", () => {
+		const config = resolveConfig({
+			token: "tok",
+			appearance: { theme: "light", assistantBubble: true },
+		});
+		expect(config.appearance?.assistantBubble).toBe(true);
+	});
+});

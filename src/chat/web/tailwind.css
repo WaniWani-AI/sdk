@@ -68,6 +68,8 @@
 	--color-card-header-foreground: #1f2937;
 	--color-status: #22c55e;
 	--color-tool-card: #f4f4f5;
+	--color-user-bubble-text: #1f2937;
+	--color-assistant-bubble-text: #1f2937;
 	--radius: 16px;
 	--font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -194,6 +196,17 @@
 	--ww-color-tool-card: var(--ww-tool-card, #f4f4f5);
 	--ww-radius: var(--ww-radius, 16px);
 	--ww-font-sans: var(--ww-font, system-ui, -apple-system, "Segoe UI", sans-serif);
+	--ww-color-user-bubble-text: var(--ww-user-bubble-text, var(--ww-color-primary-foreground));
+	--ww-color-assistant-bubble-text: var(--ww-assistant-bubble-text, var(--ww-color-foreground));
+	--ww-msg-radius: var(--ww-msg-radius, 8px);
+	--ww-msg-pad-x: var(--ww-msg-pad-x, 16px);
+	--ww-msg-pad-y: var(--ww-msg-pad-y, 12px);
+	--ww-msg-max-width: var(--ww-msg-max-width, 80%);
+	--ww-font-size: var(--ww-font-size, 16px);
+	--ww-line-height: var(--ww-line-height, 1.5);
+	font-family: var(--ww-font-sans);
+	font-size: var(--ww-font-size);
+	line-height: var(--ww-line-height);
 
 	/* Frosted-glass tint for the floating bar's suggestion card. Neutral by
 	   default — not white, a soft translucent surface that reads over any
@@ -209,6 +222,19 @@
 	border-width: var(--ww-border-width, 0);
 	border-color: var(--ww-color-border);
 	box-shadow: var(--ww-shadow, none);
+}
+
+/* Opt-in assistant bubble. Off by default (assistant messages are plain
+   text). When `appearance.assistantBubble` is true the host stamps
+   `data-assistant-bubble="true"` and assistant bubbles get a filled surface
+   styled by --ww-assistant-bubble / --ww-assistant-bubble-text. */
+[data-waniwani-chat][data-assistant-bubble="true"] .ww-message-assistant .ww-bubble {
+	background: var(--ww-color-accent);
+	color: var(--ww-color-assistant-bubble-text);
+	border-radius: var(--ww-msg-radius, 8px);
+	padding: var(--ww-msg-pad-y, 12px) var(--ww-msg-pad-x, 16px);
+	width: fit-content;
+	max-width: var(--ww-msg-max-width, 80%);
 }
 
 .dark [data-waniwani-chat],
@@ -229,6 +255,8 @@
 	--ww-color-card-header-foreground: var(--ww-header-text, #ececec);
 	--ww-color-status: var(--ww-status, #22c55e);
 	--ww-color-tool-card: var(--ww-tool-card, #262626);
+	--ww-color-user-bubble-text: var(--ww-user-bubble-text, #ffffff);
+	--ww-color-assistant-bubble-text: var(--ww-assistant-bubble-text, var(--ww-color-foreground));
 	--ww-glass: rgba(40, 42, 52, 0.5);
 	--ww-glass-border: rgba(255, 255, 255, 0.12);
 }
@@ -254,6 +282,8 @@
 		--ww-color-card-header-foreground: var(--ww-header-text, #ececec);
 		--ww-color-status: var(--ww-status, #22c55e);
 		--ww-color-tool-card: var(--ww-tool-card, #262626);
+		--ww-color-user-bubble-text: var(--ww-user-bubble-text, #ffffff);
+		--ww-color-assistant-bubble-text: var(--ww-assistant-bubble-text, var(--ww-color-foreground));
 		--ww-glass: rgba(40, 42, 52, 0.5);
 		--ww-glass-border: rgba(255, 255, 255, 0.12);
 	}

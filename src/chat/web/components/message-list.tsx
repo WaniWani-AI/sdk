@@ -44,6 +44,7 @@ import {
 	WorkingIndicator,
 } from "../ai-elements/working-indicator";
 import { useTranslation } from "../i18n";
+import { cn } from "../lib/utils";
 import type { McpAppDisplayMode } from "./mcp-app-frame";
 import { McpAppFrame } from "./mcp-app-frame";
 import { WelcomeScreen } from "./welcome-screen";
@@ -128,6 +129,12 @@ interface MessageListProps {
 	 * `GET /api/waniwani/tools`.
 	 */
 	toolDefinitions?: ToolDefinitionsMap;
+	/** Per-slot class overrides forwarded to Message/MessageContent. */
+	messageClassNames?: {
+		message?: string;
+		userBubble?: string;
+		assistantBubble?: string;
+	};
 }
 
 export function MessageList({
@@ -146,6 +153,7 @@ export function MessageList({
 	debug,
 	showToolCalls = true,
 	toolDefinitions,
+	messageClassNames,
 }: MessageListProps) {
 	const { t } = useTranslation();
 	const lastMessage = messages[messages.length - 1];
@@ -250,7 +258,11 @@ export function MessageList({
 				}
 
 				return (
-					<Message from={message.role} key={message.id}>
+					<Message
+						from={message.role}
+						key={message.id}
+						className={messageClassNames?.message}
+					>
 						{/* Reasoning trace. Folded into the chain when one is shown
 						    (2+ tools); rendered on its own otherwise. Suppressed
 						    entirely in `hidden` mode (only "On it…" shows). */}
@@ -501,7 +513,13 @@ export function MessageList({
 						})}
 						{!containsFullscreenTool && (
 							<div>
-								<MessageContent>
+								<MessageContent
+									className={cn(
+										message.role === "user"
+											? messageClassNames?.userBubble
+											: messageClassNames?.assistantBubble,
+									)}
+								>
 									{fileParts.length > 0 && <Attachments files={fileParts} />}
 									{hasTextContent
 										? textParts.map((part, i) => {

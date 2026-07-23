@@ -50,6 +50,20 @@ export interface ChatTheme {
 	statusColor?: string;
 	/** Tool call JSON section background. Defaults to light gray / #262626 in dark. */
 	toolCardColor?: string;
+	/** Text color inside the user message bubble. Falls back to `primaryForeground`. */
+	userBubbleTextColor?: string;
+	/** Text color inside the assistant message bubble (only visible when `appearance.assistantBubble` is enabled). Falls back to `textColor`. */
+	assistantBubbleTextColor?: string;
+	/** Horizontal padding inside message bubbles (px). Defaults to 16. */
+	messagePaddingX?: number;
+	/** Vertical padding inside message bubbles (px). Defaults to 12. */
+	messagePaddingY?: number;
+	/** Max width of a message bubble as a CSS length/percentage. Defaults to `"80%"`. */
+	messageMaxWidth?: string;
+	/** Base font size for message text (px). Defaults to 16. */
+	fontSize?: number;
+	/** Base line height for message text (unitless string, e.g. `"1.5"`). Defaults to `"1.5"`. */
+	lineHeight?: string;
 }
 
 // ============================================================================
@@ -84,6 +98,28 @@ export interface SuggestionsConfig {
 	dynamic?: boolean;
 }
 
+/**
+ * Per-slot class name overrides for the chat widget. Each string is appended
+ * to the slot's own classes (merged with `tailwind-merge`, `ww` prefix). Use
+ * with your own (prefixed or plain) CSS to restyle any element. In the React
+ * path these reach into internals directly; in the `<script>` embed, prefer
+ * the stable `.ww-*` semantic classes with a `data-css` stylesheet.
+ */
+export interface ChatClassNames {
+	/** Root chat container. */
+	root?: string;
+	/** Sticky header bar. */
+	header?: string;
+	/** Every message wrapper (both roles). */
+	message?: string;
+	/** The user message bubble content. */
+	userBubble?: string;
+	/** The assistant message bubble content. */
+	assistantBubble?: string;
+	/** The input bar container. */
+	input?: string;
+}
+
 // ============================================================================
 // Shared Base Props
 // ============================================================================
@@ -110,6 +146,8 @@ export interface ChatBaseProps {
 	 * See `ChatAppearance` for the shape.
 	 */
 	appearance?: ChatAppearance;
+	/** Per-slot class name overrides. See {@link ChatClassNames}. */
+	classNames?: ChatClassNames;
 	/** Additional headers to send with chat API requests */
 	headers?: Record<string, string>;
 	/** Additional body fields to send with each chat request */
