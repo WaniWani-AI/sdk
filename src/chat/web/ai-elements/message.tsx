@@ -46,9 +46,9 @@ export const MessageContent = ({
 	<div
 		className={cn(
 			"ww-bubble ww:flex ww:w-fit ww:min-w-0 ww:max-w-full ww:flex-col ww:gap-2 ww:overflow-hidden",
-			"ww:[font-size:var(--ww-font-size,16px)] ww:[line-height:var(--ww-line-height,1.5)]",
+			"ww:[font-size:var(--ww-font-size,1rem)] ww:[line-height:var(--ww-line-height,1.5)]",
 			"ww:group-[.is-user]:ml-auto ww:group-[.is-user]:bg-user-bubble ww:group-[.is-user]:[color:var(--ww-color-user-bubble-text)] ww:group-[.is-user]:[border-radius:var(--ww-msg-radius,8px)] ww:group-[.is-user]:[padding:var(--ww-msg-pad-y,12px)_var(--ww-msg-pad-x,16px)]",
-			"ww:group-[.is-assistant]:[color:var(--ww-color-assistant-bubble-text)]",
+			"ww:group-[.is-assistant]:text-foreground",
 			className,
 		)}
 		{...props}

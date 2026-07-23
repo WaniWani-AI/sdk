@@ -198,15 +198,6 @@
 	--ww-font-sans: var(--ww-font, system-ui, -apple-system, "Segoe UI", sans-serif);
 	--ww-color-user-bubble-text: var(--ww-user-bubble-text, var(--ww-color-primary-foreground));
 	--ww-color-assistant-bubble-text: var(--ww-assistant-bubble-text, var(--ww-color-foreground));
-	--ww-msg-radius: var(--ww-msg-radius, 8px);
-	--ww-msg-pad-x: var(--ww-msg-pad-x, 16px);
-	--ww-msg-pad-y: var(--ww-msg-pad-y, 12px);
-	--ww-msg-max-width: var(--ww-msg-max-width, 80%);
-	--ww-font-size: var(--ww-font-size, 16px);
-	--ww-line-height: var(--ww-line-height, 1.5);
-	font-family: var(--ww-font-sans);
-	font-size: var(--ww-font-size);
-	line-height: var(--ww-line-height);
 
 	/* Frosted-glass tint for the floating bar's suggestion card. Neutral by
 	   default — not white, a soft translucent surface that reads over any
