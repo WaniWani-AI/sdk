@@ -250,6 +250,7 @@ The chat fits within whatever bound you set and scrolls internally — no need t
 | `data-show-tool-calls` | No | Tool-call activity rendering (grouped into one collapsible chain). `"true"` (default) — steps expandable to request/response JSON. `"titles-only"` — step labels only. `"false"` — hides the chain and the reasoning trace; only the "On it…" indicator shows |
 | `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |
 | `data-theme` | No | `"light"` (default), `"dark"`, or `"auto"` (follow `prefers-color-scheme`) |
+| `data-assistant-bubble` | No | `"true"`/`"false"` — render assistant replies in a filled, themeable bubble. Defaults to `"false"` (plain text). See [Assistant message bubble](#4-assistant-message-bubble-opt-in) |
 | `data-locale` | No | `"en"`, `"fr"`, or `"es"`. Auto-detects from `<html lang>` / `navigator.language` when omitted |
 | `data-mode` | No | `"inline"` (default) or `"floating"` — see [Floating mode](#floating-mode) |
 | `data-height` | No | Inline only. Default container height — any CSS length (`"500px"`, `"80vh"`) or a bare number (px). Defaults to `500px` |
@@ -539,7 +540,7 @@ Unset variables fall back to the preset's defaults, so you only override what yo
 | `--ww-msg-pad-y` | Message bubble padding Y | `12px` | `12px` |
 | `--ww-msg-max-width` | Message bubble max width | `80%` | `80%` |
 | `--ww-font` | Font family | system stack | system stack |
-| `--ww-font-size` | Base message font size | `16px` | `16px` |
+| `--ww-font-size` | Base message font size | `1rem` | `1rem` |
 | `--ww-line-height` | Base message line height | `1.5` | `1.5` |
 
 #### 3. Programmatic `appearance`
@@ -595,7 +596,11 @@ window.WaniWani.chat.init({
 
 ```tsx
 // React
-<WaniwaniChat token="wwp_..." channelId="..." overrides={{ assistantBubble: true }} />
+<WaniwaniChat
+  token="wwp_..."
+  channelId="..."
+  overrides={{ appearance: { assistantBubble: true } }}
+/>
 ```
 
 Leave it unset (the default) and assistant messages stay bubble-less — existing widgets are unchanged.
@@ -651,6 +656,7 @@ Stable hooks: `.ww-message`, `.ww-message-user`, `.ww-message-assistant`, `.ww-b
 To set expectations for a full rebrand, these are intentionally fixed today:
 
 - **Typographic scale beyond the base** — `fontSize` / `lineHeight` set the message base; per-heading sizes inside markdown and built-in label sizes/weights are not individually exposed.
+- **Chrome corner radii** — `messageBorderRadius` shapes message bubbles only; tool-call cards, the chain-of-thought accordion, menus, and welcome-screen buttons keep their fixed radii.
 - **Floating launcher accent** — the dock's animated border-glow uses a fixed accent gradient.
 - **"Powered by" mark** — the footer logo is not removable via theming.
 

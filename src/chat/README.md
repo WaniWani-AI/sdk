@@ -87,7 +87,7 @@ appearance: { theme: "dark", variables: { primaryColor: "#ff6b6b" } }
 | `messagePaddingY` | `--ww-msg-pad-y` | `12px` |
 | `messageMaxWidth` | `--ww-msg-max-width` | `80%` |
 | `fontFamily` | `--ww-font` | system stack |
-| `fontSize` | `--ww-font-size` | `16px` |
+| `fontSize` | `--ww-font-size` | `1rem` |
 | `lineHeight` | `--ww-line-height` | `1.5` |
 | `headerBackgroundColor` | `--ww-header-bg` | `#ffffff` |
 | `headerTextColor` | `--ww-header-text` | `#1f2937` |

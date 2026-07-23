@@ -60,7 +60,7 @@ export interface ChatTheme {
 	messagePaddingY?: number;
 	/** Max width of a message bubble as a CSS length/percentage. Defaults to `"80%"`. */
 	messageMaxWidth?: string;
-	/** Base font size for message text (px). Defaults to 16. */
+	/** Base font size for message text (px). When unset, messages use the CSS default of `1rem` (16px at the standard root font size). */
 	fontSize?: number;
 	/** Base line height for message text (unitless string, e.g. `"1.5"`). Defaults to `"1.5"`. */
 	lineHeight?: string;
