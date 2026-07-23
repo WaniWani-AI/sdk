@@ -150,7 +150,7 @@ When a playbook exists for the user's task, **follow the playbook step by step**
 
 ## Upgrading the SDK
 
-`@waniwani/sdk` is `0.x`, so **minor version bumps can break the public API**. Whenever you raise the SDK version in a project — editing `package.json`, running `bun add @waniwani/sdk@latest`, or fixing a build that started failing after an upgrade — do not treat it as a drop-in. Read the [changelog](https://docs.waniwani.ai/sdk/changelog) for every breaking change between the old and new version and **auto-apply the documented migration** (each one is a mechanical codemod), then run `bun run typecheck && bun test`. Full procedure in [upgrading.md](references/upgrading.md), also available as a directly invocable skill: `npx skills add Waniwani-AI/sdk -s upgrade-waniwani-sdk`.
+`@waniwani/sdk` is `0.x`, so **minor version bumps can break the public API**. Whenever you raise the SDK version in a project — editing `package.json`, running `bun add @waniwani/sdk@latest`, or fixing a build that started failing after an upgrade — do not treat it as a drop-in. Read the [changelog](https://docs.waniwani.ai/sdk/changelog) for every breaking change between the old and new version and **auto-apply the documented migration** (each one is a mechanical codemod), then run `bun run typecheck && bun test`. Full procedure in [upgrading.md](references/upgrading.md). Each version hop also has a self-contained, directly invocable migration skill named `migrate-waniwani-sdk-<from>-to-<to>` — for the latest release: `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.15-to-0.16`.
 
 ## Common mistakes
 

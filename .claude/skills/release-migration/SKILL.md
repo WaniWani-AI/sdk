@@ -21,14 +21,15 @@ If the change is purely internal (no exported symbol, type, or documented behavi
 
 ## The rule
 
-**Every breaking change in a release must ship all three of these before the release is done:**
+**A release that breaks the public API must ship all four of these before it is done:**
 
 1. **Changelog entry** — a `## <version>:` section in the docs changelog (`sdk/changelog.mdx` in the docs repo, published at [docs.waniwani.ai/sdk/changelog](https://docs.waniwani.ai/sdk/changelog)) with:
    - a **before/after** code snippet, and
    - a **mechanical migration** an agent can apply without judgment (a codemod recipe, not "update your calls").
    - Also add a row to the **Breaking changes at a glance** table.
 2. **`upgrading.md` entry** — mirror the changelog into `skills/waniwani-sdk/references/upgrading.md` under **"Currently auto-fixable breaking changes"**, so an agent can migrate a user's codebase without a network fetch. Match the existing `### <version> — <one-line summary>` format.
-3. **Deprecation shim (where feasible)** — keep the old signature/export working behind a `@deprecated` JSDoc that names the removal version. This turns a hard break into a soft one; users get warnings before errors.
+3. **A version-specific migration skill** — a self-contained sibling skill `skills/migrate-waniwani-sdk-<from>-to-<to>/SKILL.md` covering exactly this hop (one skill per version boundary, the way Vercel ships a `migrate-*` skill per major). It restates every breaking change of the release as a numbered, apply-without-judgment recipe, ends with `bun run typecheck && bun test` as the completion check, and does **not** try to handle other version deltas. Copy the newest existing `migrate-waniwani-sdk-*` skill as the template. Add a one-line pointer to it from `skills/waniwani-sdk/SKILL.md`'s upgrade section.
+4. **Deprecation shim (where feasible)** — keep the old signature/export working behind a `@deprecated` JSDoc that names the removal version. This turns a hard break into a soft one; users get warnings before errors. Not always possible (a surface that never worked is deleted outright, not shimmed).
 
 ## Steps
 
@@ -65,6 +66,7 @@ If the change is purely internal (no exported symbol, type, or documented behavi
 - [ ] Every breaking change has a changelog `## <version>:` section with before/after + codemod recipe
 - [ ] "Breaking changes at a glance" table updated
 - [ ] `skills/waniwani-sdk/references/upgrading.md` mirrors each entry under "Currently auto-fixable breaking changes"
+- [ ] `skills/migrate-waniwani-sdk-<from>-to-<to>/SKILL.md` created for this hop, and linked from `skills/waniwani-sdk/SKILL.md`
 - [ ] `@deprecated` shim added wherever the old shape can coexist, naming the removal version
 - [ ] `bun run typecheck && bun test && bun run build` pass
 - [ ] Migration recipe dry-run compiles

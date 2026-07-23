@@ -137,7 +137,9 @@ When changing the public API or behavior, **always update the corresponding skil
 
 Target SDK **users**, not SDK developers.
 
-**`waniwani-sdk` is the main entry-point skill; standalone sibling skills exist only for directly invocable workflows.** Current siblings: `instrument-tracking` (auto-instrument funnel events across flows) and `upgrade-waniwani-sdk` (bump the SDK and auto-apply breaking-change migrations). Everything that is reference material rather than a workflow lives *inside* `waniwani-sdk/` as a `references/*.md` file linked from `SKILL.md`. Before adding a new sibling skill, default to a reference; a sibling is justified only when users should invoke it by name (`npx skills add Waniwani-AI/sdk -s <skill>`), and it must stay in sync with the reference that covers the same ground.
+**`waniwani-sdk` is the main entry-point skill; standalone sibling skills exist only for directly invocable workflows.** Current siblings: `instrument-tracking` (auto-instrument funnel events across flows) and per-version migration skills named `migrate-waniwani-sdk-<from>-to-<to>` (e.g. `migrate-waniwani-sdk-0.15-to-0.16`). Migration skills are **version-specific and self-contained**, one per version hop, mirroring how Vercel ships a `migrate-*` skill per major: a user invokes exactly the skill for their jump and gets that jump's complete migration, with no version-delta logic to reason about. The general "how to approach any upgrade" procedure and the cumulative breaking-change list stay in `references/upgrading.md`. Everything that is reference material rather than an invocable workflow lives *inside* `waniwani-sdk/` as a `references/*.md` file linked from `SKILL.md`. Before adding a new sibling skill, default to a reference; a sibling is justified only when users should invoke it by name (`npx skills add Waniwani-AI/sdk -s <skill>`).
+
+**Every version bump that breaks the public API adds a new `migrate-waniwani-sdk-<from>-to-<to>` sibling skill** alongside the changelog + `upgrading.md` entries required by the release rule below.
 
 | Source area | Reference file |
 |---|---|
@@ -149,7 +151,7 @@ Target SDK **users**, not SDK developers.
 | `src/kb/` | `references/knowledge-base.md` |
 | `src/chat/web/` | `references/chat-widget.md` |
 | Setup / env vars | `references/setup.md` |
-| Version upgrades / migrations | `references/upgrading.md` (mirrored by the `upgrade-waniwani-sdk` sibling skill) |
+| Version upgrades / migrations | `references/upgrading.md` (general procedure + cumulative list); each hop also gets a version-specific `migrate-waniwani-sdk-<from>-to-<to>` sibling skill |
 | **Legacy** (not linked from `SKILL.md`) | `references/_legacy/tools-and-widgets.md`, `references/_legacy/widget-react-hooks.md`, `references/_legacy/chat-server.md` |
 
 ## CSS / Tailwind
