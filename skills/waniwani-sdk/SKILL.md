@@ -134,6 +134,7 @@ The following are still exported for back-compat with existing customer MCPs but
 | Add a free-tier API key and unlock tracking + dashboard | [setup.md](references/setup.md) |
 | Track events and build a revenue funnel (lead_qualified → price → converted), incl. off-platform conversions | [events.md](references/events.md) |
 | Auto-instrument funnel events across existing flows | [instrument-tracking.md](references/instrument-tracking.md) |
+| Audit an existing app's tracking (only defined events, find missing funnel events) | [audit-tracking.md](references/audit-tracking.md) |
 | Use the flow API in detail (nodes, edges, interrupts, widgets) | [flows-api-reference.md](references/flows-api-reference.md) |
 | Add knowledge-base search | [knowledge-base.md](references/knowledge-base.md) |
 | Embed the chat widget on a website | [chat-widget.md](references/chat-widget.md) |
@@ -151,7 +152,7 @@ When a playbook exists for the user's task, **follow the playbook step by step**
 
 ## Upgrading the SDK
 
-`@waniwani/sdk` is `0.x`, so **minor version bumps can break the public API**. Whenever you raise the SDK version in a project — editing `package.json`, running `bun add @waniwani/sdk@latest`, or fixing a build that started failing after an upgrade — do not treat it as a drop-in. Read the [changelog](https://docs.waniwani.ai/sdk/changelog) for every breaking change between the old and new version and **auto-apply the documented migration** (each one is a mechanical codemod), then run `bun run typecheck && bun test`. Full procedure in [upgrading.md](references/upgrading.md). Each version hop also has a self-contained, directly invocable migration skill named `migrate-waniwani-sdk-<from>-to-<to>` — for the latest release: `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.16-to-0.17`.
+`@waniwani/sdk` is `0.x`, so **minor version bumps can break the public API**. Whenever you raise the SDK version in a project — editing `package.json`, running `bun add @waniwani/sdk@latest`, or fixing a build that started failing after an upgrade — do not treat it as a drop-in. Read the [changelog](https://docs.waniwani.ai/sdk/changelog) for every breaking change between the old and new version and **auto-apply the documented migration** (each one is a mechanical codemod), then run `bun run typecheck && bun test`. Full procedure in [upgrading.md](references/upgrading.md). Each version hop also has a self-contained, directly invocable migration skill named `migrate-waniwani-sdk-<from>-to-<to>` — for the latest release: `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.17-to-0.18`.
 
 ## Common mistakes
 

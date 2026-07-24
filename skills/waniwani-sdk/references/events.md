@@ -26,7 +26,7 @@ Think of instrumentation as three stages. Emit at least the **start** and the
 |---|---|---|---|
 | **Landing** | `page.viewed` | chat widget (auto) | A visitor lands on a page where the widget is present. Auto-emitted once on widget init — no code. Attributed to an anonymous `visitorId`, **not** a session. Opt out per-surface with `disablePageView` / `data-disable-page-view` (see [chat-widget.md](./chat-widget.md#event-tracking)). |
 | (start, auto) | `tool.called` | `withWaniwani(server)` | Auto-captured for every tool call — no code. |
-| **Qualification** | `lead_qualified` | `track.leadQualified({ externalId?, email?, name? })` | The person met your qualification bar (finished the qualifying questions, requested a demo, matched your target profile). Fires once per flow run, at the node where qualification completes, not at flow entry. |
+| **Qualification** | `lead_qualified` | `track.leadQualified({ externalId?, email?, name? })` | The conversation produced a concrete handoff toward the business: the user was redirected to the pricing page or the business's own website, booked a call, was sent an email, or met an explicit qualification bar. Fires once per flow run, at the handoff, not at flow entry. |
 | **Step** | `price_shown` | `track.priceShown({ amount, currency })` | You showed the user a price. |
 | **Step** | `prices_compared` | `track.pricesCompared({ options })` | You showed two or more options side by side. |
 | **Step** | `option_selected` | `track.optionSelected({ id, amount, currency })` | The user picked one of those options. |
@@ -42,11 +42,13 @@ model your funnel steps with the revenue events above. Emitting `track.leadQuali
 once at the qualification bar and `track.converted(...)` once on the sale is the minimum
 that makes a funnel; the price/compare/select steps make it *explain why* people drop off.
 
-Note the distinction `lead_qualified` draws: a user sharing an email mid-conversation is
-`identify(userId, { email })`, not a qualified lead. `identify` attaches identity;
-`lead_qualified` declares your qualification bar was met. Most flows emit both, at
-different nodes. For per-node placement rules (and a skill that applies them
-automatically), see [docs.waniwani.ai/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation).
+Note the distinction `lead_qualified` draws: a user sharing an email, a phone number,
+or a first and last name mid-conversation is `identify(userId, { ... })`, not a
+qualified lead. `identify` attaches identity; `lead_qualified` declares the handoff
+happened. Most flows emit both, at different nodes. For per-node placement rules (and
+a skill that applies them automatically), see
+[docs.waniwani.ai/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation);
+to audit an existing app against the taxonomy, see [audit-tracking.md](audit-tracking.md).
 
 ## The one rule you can't skip: identity
 
@@ -209,11 +211,10 @@ to when it actually happened (the event may be sent months later).
 The typed event names are a **closed taxonomy**, not an open string. Alongside the
 revenue helpers there are a few other named events you can send with the generic
 callable form `client.track({ event, properties })`: `session.started`, `tool.called`,
-`quote.requested` / `quote.succeeded` / `quote.failed`, `link.clicked`,
-`purchase.completed`, `user.identified`.
+`link.clicked`, `user.identified`.
 
 ```ts
-await client.track({ event: "quote.succeeded", properties: { amount: 120, currency: "EUR" }, externalUserId: "user_123" });
+await client.track({ event: "link.clicked", properties: { url: "https://example.com/pricing" }, externalUserId: "user_123" });
 ```
 
 - **Auto-capture:** `withWaniwani(server)` emits `tool.called` for every tool

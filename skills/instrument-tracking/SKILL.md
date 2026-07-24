@@ -18,25 +18,26 @@ Events are typed and first-class. Never invent a custom event name; model every 
 | Event | Helper | When it fires | Required data |
 |---|---|---|---|
 | `tool.called` | automatic via `withWaniwani(server)` | Every tool invocation | none |
-| `lead_qualified` | `waniwani?.track.leadQualified({ externalId?, email?, name?, source? })` | The person met your qualification bar | identity only |
+| `lead_qualified` | `waniwani?.track.leadQualified({ externalId?, email?, name? })` | The conversation produced a concrete handoff to your business | identity only |
 | `price_shown` | `waniwani?.track.priceShown({ amount, currency, itemId?, label? })` | You showed one price | `amount`, `currency` |
 | `prices_compared` | `waniwani?.track.pricesCompared({ options: [{ id, amount, currency }] })` | You showed 2+ options side by side | `options[]` |
 | `option_selected` | `waniwani?.track.optionSelected({ id, amount, currency })` | The user picked one option | `id`, `amount`, `currency` |
 | `converted` | `waniwani?.track.converted({ amount, currency, occurredAt? })` | The user became paying | `amount`, `currency` |
 | identity | `waniwani?.identify(userId, properties?)` | A stable external id becomes known | `userId` |
 
-`page.viewed`, `chat.*`, and `widget_*` are emitted automatically by the chat widget and widget runtime. Never send them from server code.
+`page.viewed`, `chat.*`, and `widget_render` are emitted automatically by the chat widget and the widget hook. Never send them from server code.
 
 ## Placement rules
 
 Work these out per flow, in order:
 
-1. **`lead_qualified` fires when the qualification bar is met, not at flow entry.** Place it in the node where qualification completes: after the qualifying questions are answered, after a demo is requested, or after the lead is pushed to a CRM. Emit it exactly once per flow run. A user merely starting the flow is not a qualified lead; `tool.called` already covers activity.
+1. **`lead_qualified` fires at the handoff, not at flow entry.** A lead is qualified when the conversation produces a concrete handoff toward the business: the user is redirected to the pricing page or the business's own website, books a call, is sent an email, or meets an explicit qualification bar (finished the qualifying questions, requested a demo, matched the target profile). Place it where the handoff happens: the node that pushes the lead to a CRM or sends the email, or the widget callback right before the external redirect. Emit it exactly once per flow run. A user merely starting the flow is not a qualified lead; `tool.called` already covers activity. Latest definition: [docs.waniwani.ai/sdk/tracking/events](https://docs.waniwani.ai/sdk/tracking/events#what-counts-as-a-qualified-lead).
 2. **`lead_qualified` metadata comes from flow state.** Fill every property you can:
    - `externalId`: the strongest field. Use the record id your CRM or lead API returns (place the event *after* that push so the id exists).
    - `email` and `name`: map from the state fields that hold them, whatever they are called (`email`, `workEmail`, `contactName`, ...).
-   - `source`: the acquisition channel. Default to `"mcp_chat"` for a flow; use something more specific if the project has one.
-3. **`identify` as soon as a stable id exists.** The first node where an email or user id is present in state gets `waniwani?.identify(state.email)`. This is the join key for off-platform conversions. Sharing an email is `identify`, not `lead_qualified`.
+
+   Do **not** add a `source`: `leadQualified` has no acquisition-source property. The origin channel is set automatically on the event envelope.
+3. **`identify` as soon as a stable id exists.** The first node where an email, phone number, name, or user id is present in state gets `waniwani?.identify(state.email)`. This is the join key for off-platform conversions. Sharing an email, phone number, or first and last name is `identify`, not `lead_qualified`; identified is not qualified yet.
 4. **Price events go where the numbers are.** The node that computes or returns a single price gets `priceShown`. A node that presents multiple plans (usually right before or inside the node feeding a comparison widget) gets `pricesCompared`. The node that runs after the user picked (the selected id is now in state) gets `optionSelected`.
 5. **`converted` only on real conversion.** A booking confirmed, a purchase completed, a signup finished inside the flow. If conversion happens later on the customer's own site, do not emit it from the flow; instead make sure `identify` ran, and add a snippet for their backend that calls `client.track.converted({ amount, currency, externalUserId })`.
 6. **Emit from node handlers, never from `validate` callbacks.** Action nodes are the natural home. For data collected by an interrupt, emit in the next node that runs after the answer landed in state.
@@ -67,7 +68,7 @@ For every flow, read the full node graph and build a table: node id, node kind (
 ```
 START -> welcome (interrupt: email)        -> [identify after answer]
       -> qualify (interrupt: role, size)
-      -> push_to_crm (action, returns id)  -> lead_qualified { externalId, email, name, source }
+      -> push_to_crm (action, returns id)  -> lead_qualified { externalId, email, name }
       -> compute_quote (action)            -> price_shown { amount, currency }
       -> show_plans (widget: 3 options)    -> prices_compared { options }
       -> confirm_plan (action)             -> option_selected { id, amount, currency }
@@ -91,7 +92,6 @@ Insert the calls. `waniwani` comes from the node handler context, next to `state
       externalId: lead.id,
       email: state.email,
       name: state.name,
-      source: "mcp_chat",
     });
     return { leadId: lead.id };
   },
@@ -118,7 +118,7 @@ Follow the instrument-tracking skill (skills/instrument-tracking/SKILL.md, or th
 installed instrument-tracking skill) to instrument Waniwani funnel events across
 every createFlow app in this project. Inventory the flows, map nodes to the event
 taxonomy, insert guarded track calls with metadata from flow state (lead_qualified
-with externalId/email/name/source where the qualification bar is met), ensure
+with externalId/email/name where the handoff to the business happens), ensure
 withWaniwani(server) wraps the server, run typecheck, and report the node -> event
 mapping you applied.
 ```
