@@ -55,10 +55,13 @@ rejects any event with none of the three, so the SDK `console.warn`s the moment 
 enqueue an event without identity, even though the local enqueue still returns an id.
 
 - **Inside a flow node or tool handler** → identity is **automatic**. The
-  request-scoped client (`context.waniwani`) already carries the session metadata, so
-  `sessionId` rides along with every event. You don't pass anything. The resolved id is
-  readable as `context.waniwani.sessionId`; store it with your own records to link back
-  to the session later.
+  request-scoped client (`context.waniwani`) already carries the request metadata, so
+  identity rides along with every event. You don't pass anything. The resolved ids are
+  readable as `context.waniwani.sessionId`, `context.waniwani.visitorId`, and
+  `context.waniwani.externalUserId` — read whichever the current host provides (web
+  supplies `sessionId` + `visitorId`; ChatGPT supplies `sessionId` + `externalUserId`;
+  Claude supplies `sessionId` only). Store any of them with your own records to link
+  back later.
 - **Inside an MCP-app widget or on a chat host page** → identity is **automatic** too.
   `useWaniwani().track` stamps the session id injected by `withWaniwani`;
   `chat.track` carries the server-assigned chat session (and the anonymous `visitorId`

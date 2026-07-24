@@ -101,45 +101,63 @@ export function detectDeviceType(ua: string): "mobile" | "tablet" | "desktop" {
 }
 
 // ============================================================================
-// Visitor ID (property-based hash, persisted in localStorage)
+// Visitor ID (opaque id, persisted in localStorage)
 // ============================================================================
 
-async function sha256(input: string): Promise<string> {
-	const data = new TextEncoder().encode(input);
-	const hash = await crypto.subtle.digest("SHA-256", data);
-	return Array.from(new Uint8Array(hash))
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join("");
+/**
+ * A random opaque id, generated synchronously. Prefers `crypto.randomUUID`
+ * and falls back to a `crypto.getRandomValues` UUIDv4 when it is missing
+ * (older browsers), and finally to a non-crypto random string when the Web
+ * Crypto API is entirely unavailable (e.g. a non-secure context). The value
+ * is opaque, so any of these is a valid visitor id.
+ */
+function randomId(): string {
+	try {
+		if (typeof crypto !== "undefined") {
+			if (typeof crypto.randomUUID === "function") {
+				return crypto.randomUUID();
+			}
+			if (typeof crypto.getRandomValues === "function") {
+				const bytes = crypto.getRandomValues(new Uint8Array(16));
+				// RFC 4122 v4 layout
+				bytes[6] = (bytes[6] & 0x0f) | 0x40;
+				bytes[8] = (bytes[8] & 0x3f) | 0x80;
+				const hex = Array.from(bytes, (b) =>
+					b.toString(16).padStart(2, "0"),
+				).join("");
+				return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+			}
+		}
+	} catch {
+		// Fall through to the non-crypto path below.
+	}
+	return `v-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-async function computeVisitorId(): Promise<string> {
-	// Try localStorage first
+/**
+ * Synchronously return a stable, persisted visitor id, creating one on first
+ * call. Runs with no async work and no `crypto.subtle` dependency, so it never
+ * races an in-flight promise and never fails on a non-secure context — callers
+ * can rely on a visitor id being present on the very first event or request.
+ */
+export function getOrCreateVisitorId(): string {
 	try {
 		const stored = localStorage.getItem(VISITOR_ID_KEY);
 		if (stored) {
 			return stored;
 		}
 	} catch {
-		// localStorage unavailable (private browsing, security policy)
+		// localStorage unavailable (private browsing, security policy) — fall
+		// through and mint a fresh id. It won't persist, but the request/event
+		// still carries a visitor id for this page load.
 	}
 
-	const raw = [
-		navigator.userAgent,
-		screen.width,
-		screen.height,
-		screen.colorDepth,
-		Intl.DateTimeFormat().resolvedOptions().timeZone,
-		navigator.language,
-		navigator.hardwareConcurrency ?? "",
-		navigator.platform ?? "",
-	].join("|");
-
-	const id = await sha256(raw);
+	const id = randomId();
 
 	try {
 		localStorage.setItem(VISITOR_ID_KEY, id);
 	} catch {
-		// Ignore storage failures
+		// Ignore storage failures.
 	}
 
 	return id;
@@ -151,10 +169,8 @@ async function computeVisitorId(): Promise<string> {
 
 export async function collectVisitorContext(): Promise<VisitorContext> {
 	const ua = navigator.userAgent;
-	const [visitorId, memoryUserId] = await Promise.all([
-		computeVisitorId(),
-		getOrCreateMemoryUserId(),
-	]);
+	const visitorId = getOrCreateVisitorId();
+	const memoryUserId = await getOrCreateMemoryUserId();
 
 	return {
 		userAgent: ua,

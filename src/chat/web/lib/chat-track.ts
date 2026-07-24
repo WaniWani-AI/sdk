@@ -15,7 +15,7 @@ import {
 	type FrontendTrackingClient,
 } from "../../../tracking/frontend";
 import { eventsEndpoint } from "./page-view";
-import { collectVisitorContext } from "./visitor-context";
+import { getOrCreateVisitorId } from "./visitor-context";
 
 export interface CreateChatTrackClientOptions {
 	/** Chat API base, e.g. `https://app.waniwani.ai/api/mcp/chat`. */
@@ -39,14 +39,9 @@ export interface CreateChatTrackClientOptions {
 export function createChatTrackClient(
 	options: CreateChatTrackClientOptions,
 ): FrontendTrackingClient {
-	// The visitor id is derived asynchronously; until it resolves, events
-	// carry whatever session identity exists. Never blocks an emit.
-	let visitorId: string | undefined;
-	void collectVisitorContext()
-		.then((ctx) => {
-			visitorId = ctx.visitorId;
-		})
-		.catch(() => {});
+	// The visitor id is resolved synchronously and persisted, so every event —
+	// including the first one emitted before any session exists — carries it.
+	const visitorId = getOrCreateVisitorId();
 
 	return createFrontendClient({
 		endpoint: eventsEndpoint(options.api),

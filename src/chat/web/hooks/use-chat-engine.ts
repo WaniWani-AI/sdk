@@ -20,7 +20,10 @@ import {
 	upsertThread,
 } from "../lib/thread-store";
 import type { VisitorContext } from "../lib/visitor-context";
-import { collectVisitorContext } from "../lib/visitor-context";
+import {
+	collectVisitorContext,
+	getOrCreateVisitorId,
+} from "../lib/visitor-context";
 
 const SESSION_HEADER_NAME = "x-session-id";
 const THREAD_PERSIST_DEBOUNCE_MS = 250;
@@ -308,37 +311,42 @@ export function useChatEngine(props: ChatBaseProps) {
 					resolvedBody.modelContext = pendingModelContextRef.current;
 				}
 
-				if (visitorContextRef.current) {
-					const vc = visitorContextRef.current;
+				// Resolve the visitor id synchronously so it is present on the very
+				// first request, before the async `collectVisitorContext()` in the
+				// mount effect has resolved. The full context (device/client fields)
+				// enriches the body once available, but never gates the id.
+				const vc = visitorContextRef.current;
+				const visitorId = vc?.visitorId ?? getOrCreateVisitorId();
+				if (vc) {
 					resolvedBody.visitorContext = {
 						timezone: vc.timezone,
 						language: vc.language,
 						languages: vc.languages,
 						deviceType: vc.deviceType,
 						referrer: vc.referrer,
-						visitorId: vc.visitorId,
-					};
-					const existingVisitor =
-						typeof resolvedBody.visitor === "object" &&
-						resolvedBody.visitor !== null
-							? (resolvedBody.visitor as Record<string, unknown>)
-							: {};
-					const existingClient =
-						typeof existingVisitor.client === "object" &&
-						existingVisitor.client !== null
-							? (existingVisitor.client as Record<string, unknown>)
-							: {};
-					resolvedBody.visitor = {
-						...existingVisitor,
-						// Anonymous device id — the server stamps it onto chat events'
-						// `visitor_id` so visits link a `page.viewed` to its conversation.
-						id: vc.visitorId,
-						client: {
-							...existingClient,
-							memoryUserId: vc.memoryUserId,
-						},
+						visitorId,
 					};
 				}
+				const existingVisitor =
+					typeof resolvedBody.visitor === "object" &&
+					resolvedBody.visitor !== null
+						? (resolvedBody.visitor as Record<string, unknown>)
+						: {};
+				const existingClient =
+					typeof existingVisitor.client === "object" &&
+					existingVisitor.client !== null
+						? (existingVisitor.client as Record<string, unknown>)
+						: {};
+				resolvedBody.visitor = {
+					...existingVisitor,
+					// Anonymous visitor id — the server stamps it onto chat events'
+					// `visitor_id` so visits link a `page.viewed` to its conversation.
+					id: visitorId,
+					client: {
+						...existingClient,
+						...(vc && { memoryUserId: vc.memoryUserId }),
+					},
+				};
 
 				// Auto-inject SDK-managed identifiers into `extra` so the upstream
 				// API forwards them to MCP `_meta["waniwani/extra"]`.

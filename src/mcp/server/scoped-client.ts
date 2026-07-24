@@ -6,7 +6,11 @@ import type {
 	TrackingClient,
 } from "../../tracking/@types.js";
 import { createRevenueApi } from "../../tracking/revenue.js";
-import { extractSessionId } from "./utils.js";
+import {
+	extractExternalUserId,
+	extractSessionId,
+	extractVisitorId,
+} from "./utils.js";
 
 /**
  * Well-known key used to attach the scoped client to the MCP `extra` object.
@@ -28,6 +32,21 @@ export interface ScopedWaniWaniClient {
 	 * `sessionId` later). `undefined` when the host provided no session id.
 	 */
 	readonly sessionId?: string;
+	/**
+	 * The anonymous visitor id, resolved from the request meta. Present on the
+	 * web chat surface (a persisted per-device id threaded through as
+	 * `waniwani/visitorId`); `undefined` on hosts that do not supply one, such
+	 * as Claude. Ingest accepts it as an identity in its own right, so use it
+	 * to correlate events before a session or user id exists.
+	 */
+	readonly visitorId?: string;
+	/**
+	 * The external user id, resolved from the request meta (e.g. `openai/userId`
+	 * for ChatGPT's anonymous users, or a host-provided `externalUserId`). Read
+	 * it alongside `sessionId`/`visitorId` — whichever the current host provides.
+	 * `undefined` when the host supplied no user id.
+	 */
+	readonly externalUserId?: string;
 	/**
 	 * Track an event — request meta is automatically merged. Also exposes the
 	 * revenue helpers flat (`track.priceShown()`, `track.converted()`, …), which
@@ -72,6 +91,8 @@ export function createScopedClient(
 
 	return {
 		sessionId: extractSessionId(meta),
+		visitorId: extractVisitorId(meta),
+		externalUserId: extractExternalUserId(meta),
 		track: Object.assign(trackOnce, createRevenueApi(trackOnce)),
 		identify(userId, properties) {
 			return base.identify(userId, properties, meta);
