@@ -21,6 +21,7 @@ import {
 } from "../lib/thread-store";
 import type { VisitorContext } from "../lib/visitor-context";
 import {
+	applyVisitorId,
 	collectVisitorContext,
 	getOrCreateVisitorId,
 } from "../lib/visitor-context";
@@ -126,6 +127,16 @@ export function useChatEngine(props: ChatBaseProps) {
 		activeThreadId: controlledThreadId,
 		onThreadChange,
 	} = props;
+
+	// Seed a host-supplied visitor id (e.g. the PostHog / Amplitude distinct id)
+	// so every request correlates to the id the host site already tracks. Read
+	// live per request downstream, so a changed value takes effect on the next
+	// send. Accepts a literal or a sync/async resolver; a blank/failed result is
+	// ignored, keeping the auto id. The returned cancel drops a late async result
+	// after unmount or a value change. Pass a stable reference (e.g. `useCallback`)
+	// for an expensive async resolver so it isn't re-invoked on every render.
+	const propVisitorId = props.visitorId;
+	useEffect(() => applyVisitorId(propVisitorId), [propVisitorId]);
 
 	const headersRef = useRef(userHeaders);
 	const bodyRef = useRef(body);
@@ -314,9 +325,11 @@ export function useChatEngine(props: ChatBaseProps) {
 				// Resolve the visitor id synchronously so it is present on the very
 				// first request, before the async `collectVisitorContext()` in the
 				// mount effect has resolved. The full context (device/client fields)
-				// enriches the body once available, but never gates the id.
+				// enriches the body once available, but never gates the id. Read it
+				// live (not the cached `vc.visitorId`) so a host-supplied override
+				// via `setVisitorId()` takes effect on the next request.
 				const vc = visitorContextRef.current;
-				const visitorId = vc?.visitorId ?? getOrCreateVisitorId();
+				const visitorId = getOrCreateVisitorId();
 				if (vc) {
 					resolvedBody.visitorContext = {
 						timezone: vc.timezone,

@@ -211,6 +211,21 @@ describe("parseConfigFromScript — render mode attrs", () => {
 	});
 });
 
+describe("parseConfigFromScript — data-visitor-id", () => {
+	test("parses a host-supplied visitor id", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-visitor-id": "posthog-distinct-123",
+		});
+		expect(cfg.visitorId).toBe("posthog-distinct-123");
+	});
+
+	test("absent when the attribute is not set", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "tok" });
+		expect(cfg.visitorId).toBeUndefined();
+	});
+});
+
 describe("parseConfigFromScript — data-disable-page-view", () => {
 	test("undefined when unspecified — page view fires by default", async () => {
 		const cfg = await parseWithAttrs({ "data-token": "tok" });

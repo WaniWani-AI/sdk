@@ -47,6 +47,7 @@ Sized via a `height: 100%; max-height: inherit` chain — bound the chat by sizi
 |------|------|----------|-------------|
 | `token` | `string` | Yes | Embed token (`wwp_...`) from the dashboard |
 | `channelId` | `string` | No | Agent channel ID — routes the conversation to the right agent |
+| `visitorId` | `string \| (() => string \| Promise<string>)` | No | Override the anonymous visitor id with one you already track (PostHog / Amplitude / Segment distinct id, your own cookie). A string, or a sync/async resolver (`() => posthog.get_distinct_id()`) for an id that's only ready after your SDK bootstraps. Read live per request, so updating it applies to the next message. See [Bring your own visitor id](#bring-your-own-visitor-id) |
 | `className` | `string` | No | Additional CSS class names applied to the root element |
 | `overrides` | `WaniwaniChatOverrides` | No | Per-page tweaks. See below — dashboard is the source of truth, only reach for this when a local override is genuinely needed |
 
@@ -242,6 +243,7 @@ The chat fits within whatever bound you set and scrolls internally — no need t
 | `data-api` | No | Chat API URL (defaults to `https://app.waniwani.ai/api/mcp/chat`) |
 | `data-token` | Yes | Embed token (`wwp_...`) from Waniwani dashboard |
 | `data-channel-id` | No | Agent channel ID — routes the conversation to the right agent |
+| `data-visitor-id` | No | Override the anonymous visitor id with one you already track (PostHog / Amplitude / Segment distinct id, your own cookie). For an id that resolves asynchronously, use `WaniWani.chat.setVisitorId(id)` instead. See [Bring your own visitor id](#bring-your-own-visitor-id) |
 | `data-title` | No | Chat header title (default: `"Assistant"`) |
 | `data-welcome-message` | No | Greeting shown before first message |
 | `data-placeholder` | No | Input field placeholder text |
@@ -328,8 +330,47 @@ The IIFE exposes the same imperative methods as the React ref, both globally and
 | `reset()` | Clear all messages |
 | `focus()` | Focus the chat input (opens the panel in floating mode) |
 | `getMessages()` | Snapshot of current `UIMessage[]` |
+| `getSessionId()` | Server-assigned session id, `undefined` until the first message |
+| `track(...)` / `identify(...)` | Host-page funnel tracking. See [Tracked events](#event-tracking) |
+| `setVisitorId(id)` | Override the anonymous visitor id (works before `init()`). See [Bring your own visitor id](#bring-your-own-visitor-id) |
+| `getVisitorId()` | Read the visitor id the widget sends on each request |
 
 Pre-mount, write methods no-op silently and read methods return `undefined` / `[]`. Pick whichever feels right — call them globally (`window.WaniWani.chat.sendMessage(...)`) when you don't have the instance handle, or on the instance when you do.
+
+### Bring your own visitor id
+
+By default the widget mints its own anonymous **visitor id**, a stable opaque value persisted in `localStorage` and sent on every chat request and tracking event (see [events.md](./events.md) for the identity model). Override it with an id your site already tracks (a PostHog / Amplitude / Segment distinct id, your own first-party cookie) to correlate Waniwani's sessions and events to the same visitor. The overridden id threads through to server-side MCP tools and flows as `context.waniwani.visitorId`, so they can push events back to the same analytics tool the id came from.
+
+Three ways to set it, by when the id is available:
+
+**React** — pass the `visitorId` prop. It accepts a string or a sync/async resolver (read live, so updating it applies to the next message):
+
+```tsx
+// A string you already hold
+<WaniwaniChat token="wwp_..." channelId="..." visitorId={myCookieId} />
+
+// A resolver for an id that's only ready after your analytics SDK boots
+<WaniwaniChat token="wwp_..." channelId="..." visitorId={() => posthog.get_distinct_id()} />
+<WaniwaniChat token="wwp_..." channelId="..." visitorId={async () => (await analytics.ready()).anonymousId} />
+```
+
+A blank or failed result is ignored, so a not-ready id never wipes a good one. For an expensive async resolver, pass a stable reference (`useCallback`).
+
+**Script embed, known up front** — set `data-visitor-id` on the tag or pass `visitorId` to `init()`:
+
+```html
+<script src="…/embed.js" defer data-token="wwp_..." data-visitor-id="the-id-from-your-system"></script>
+```
+
+**Script embed, id resolves asynchronously (the common case)** — call `setVisitorId()` once your analytics SDK is ready. It is safe before or after `init()`; a blank value is ignored so a not-ready id never wipes a good one:
+
+```js
+posthog.onFeatureFlags(() => {
+  window.WaniWani.chat.setVisitorId(posthog.get_distinct_id());
+});
+```
+
+The visitor id identifies a device/browser, not an account. When a visitor signs in, keep the visitor id and additionally call `identify()` with your account id so anonymous and known activity stitch together.
 
 ### How auth works
 

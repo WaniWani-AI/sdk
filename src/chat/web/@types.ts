@@ -4,6 +4,7 @@
 
 import type { ChatAppearance, ShowToolCalls } from "./embed/config";
 import type { MessageOverrides } from "./i18n";
+import type { VisitorIdInput } from "./lib/visitor-context";
 
 export type {
 	ChatAppearance,
@@ -12,6 +13,7 @@ export type {
 } from "./embed/config";
 export type { Locale } from "./i18n";
 export type { MessageOverrides };
+export type { VisitorIdInput };
 
 export interface ChatTheme {
 	/** Primary brand color (bubble, send button, user messages) */
@@ -148,6 +150,21 @@ export interface ChatBaseProps {
 	appearance?: ChatAppearance;
 	/** Per-slot class name overrides. See {@link ChatClassNames}. */
 	classNames?: ChatClassNames;
+	/**
+	 * Override the anonymous visitor id the widget generates with one you
+	 * already track (a PostHog / Amplitude / Segment distinct id, your own
+	 * cookie, etc.). The chat sends it on every request, so Waniwani sessions
+	 * and events correlate to the same visitor, and server-side MCP tools and
+	 * flows read it back as `context.waniwani.visitorId`.
+	 *
+	 * A string, or a resolver that returns one — sync
+	 * (`() => posthog.get_distinct_id()`) or async
+	 * (`async () => (await sdk.ready()).id`), for analytics SDKs whose id is
+	 * only ready after they bootstrap. A blank / failed result is ignored, so
+	 * the auto-generated, `localStorage`-persisted id is kept. Leave unset to
+	 * always use the auto id.
+	 */
+	visitorId?: VisitorIdInput;
 	/** Additional headers to send with chat API requests */
 	headers?: Record<string, string>;
 	/** Additional body fields to send with each chat request */

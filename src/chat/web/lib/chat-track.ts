@@ -39,16 +39,18 @@ export interface CreateChatTrackClientOptions {
 export function createChatTrackClient(
 	options: CreateChatTrackClientOptions,
 ): FrontendTrackingClient {
-	// The visitor id is resolved synchronously and persisted, so every event —
-	// including the first one emitted before any session exists — carries it.
-	const visitorId = getOrCreateVisitorId();
-
 	return createFrontendClient({
 		endpoint: eventsEndpoint(options.api),
 		token: options.token,
 		channelId: options.channelId,
 		source: options.getSource,
-		identity: () => ({ sessionId: options.getSessionId(), visitorId }),
+		// Resolve the visitor id per event (not captured once) so it is present
+		// on the first event before any session exists, and so a host-supplied
+		// override via `setVisitorId()` is reflected on later events.
+		identity: () => ({
+			sessionId: options.getSessionId(),
+			visitorId: getOrCreateVisitorId(),
+		}),
 	});
 }
 

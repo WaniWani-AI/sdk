@@ -74,6 +74,12 @@ enqueue an event without identity, even though the local enqueue still returns a
   never start a session. The chat widget's `page.viewed` carries only a `visitorId`,
   deliberately, so landings don't mint sessions and the "landed → started a
   conversation" funnel stays meaningful. It is a first-class `TrackInput` field.
+  The web widget mints this id itself, but you can **override it** with an id your
+  site already tracks (a PostHog / Amplitude / Segment distinct id): pass `visitorId`
+  to `<WaniwaniChat>`, set `data-visitor-id`, or call `WaniWani.chat.setVisitorId(id)`
+  (see [chat-widget.md](./chat-widget.md#bring-your-own-visitor-id)). Because the same
+  value arrives server-side as `context.waniwani.visitorId`, a tool or flow can push
+  events straight to that external analytics tool keyed by the id it already knows.
 
 ## Ingest authentication: which token goes where
 

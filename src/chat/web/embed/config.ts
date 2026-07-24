@@ -4,6 +4,7 @@
 
 import type { ChatTheme } from "../@types";
 import type { Locale } from "../i18n";
+import type { VisitorIdInput } from "../lib/visitor-context";
 import type { VisibilityRules } from "./visibility";
 
 /**
@@ -63,6 +64,21 @@ export interface EmbedConfig {
 	api?: string;
 	/** Public token (wwp_...) for authentication (required). */
 	token: string;
+	/**
+	 * Override the anonymous visitor id the widget generates with one you
+	 * already track — a PostHog / Amplitude / Segment distinct id, your own
+	 * first-party cookie, etc. The chat sends it on every request, so Waniwani
+	 * sessions and events correlate to the same visitor the host site tracks,
+	 * and server-side MCP tools and flows read it back as
+	 * `context.waniwani.visitorId`. Surfaced as `data-visitor-id` on the embed
+	 * script tag (string only there).
+	 *
+	 * Passed to `init()` it may also be a resolver returning the id — sync
+	 * (`() => posthog.get_distinct_id()`) or async — for analytics SDKs whose id
+	 * is only ready after they bootstrap. A blank / failed result is ignored. For
+	 * an id that resolves later still, call `WaniWani.chat.setVisitorId(id)`.
+	 */
+	visitorId?: VisitorIdInput;
 	/** Override MCP server URL (optional — resolved from environment by default). */
 	mcpServerUrl?: string;
 	/**
@@ -269,6 +285,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const token = str("data-token");
 	if (token) {
 		config.token = token;
+	}
+
+	const visitorId = str("data-visitor-id");
+	if (visitorId) {
+		config.visitorId = visitorId;
 	}
 
 	const title = str("data-title");

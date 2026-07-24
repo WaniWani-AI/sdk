@@ -14,6 +14,7 @@ import type {
 	ChatClassNames,
 	ChatHandle,
 	ShowToolCalls,
+	VisitorIdInput,
 	WelcomeConfig,
 } from "../@types";
 import type { EmbedConfig } from "../embed/config";
@@ -157,6 +158,22 @@ export interface WaniwaniChatProps {
 	token: string;
 	/** Agent channel ID — routes the conversation to the right agent. */
 	channelId?: string;
+	/**
+	 * Override the anonymous visitor id the widget generates with one you
+	 * already track (a PostHog / Amplitude / Segment distinct id, your own
+	 * cookie, etc.). The chat sends it on every request, so Waniwani sessions
+	 * and events correlate to the same visitor, and server-side MCP tools and
+	 * flows read it back as `context.waniwani.visitorId`.
+	 *
+	 * A string, or a resolver that returns one — sync
+	 * (`() => posthog.get_distinct_id()`) or async
+	 * (`async () => (await sdk.ready()).id`), for analytics SDKs whose id is only
+	 * ready after they bootstrap. Read live on each request, so updating it
+	 * applies to the next message. A blank / failed result is ignored, keeping
+	 * the auto-generated, `localStorage`-persisted id. Leave unset to always use
+	 * the auto id.
+	 */
+	visitorId?: VisitorIdInput;
 	/** Additional class names applied to the root element. */
 	className?: string;
 	/**
@@ -172,7 +189,7 @@ const DEFAULT_API = "https://app.waniwani.ai/api/mcp/chat";
 
 export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 	function WaniwaniChat(props, ref) {
-		const { token, channelId, className, overrides } = props;
+		const { token, channelId, className, visitorId, overrides } = props;
 
 		// The inner ChatEmbed handle; the ref we expose augments it with the
 		// tracking surface (`track`, `identify`).
@@ -383,6 +400,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				ref={innerRef}
 				api={config.api ?? DEFAULT_API}
 				headers={{ Authorization: `Bearer ${config.token}` }}
+				visitorId={visitorId}
 				skipRemoteConfig
 				body={body}
 				appearance={config.appearance}

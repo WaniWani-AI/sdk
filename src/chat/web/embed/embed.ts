@@ -14,6 +14,11 @@ import {
 	createChatTrackClient,
 	createNoopChatTrackClient,
 } from "../lib/chat-track";
+import {
+	applyVisitorId,
+	getOrCreateVisitorId,
+	setVisitorId,
+} from "../lib/visitor-context";
 import type { EmbedConfig } from "./config";
 import {
 	DEFAULT_EMBED_HEIGHT,
@@ -80,6 +85,19 @@ declare global {
 					userId: string,
 					traits?: Record<string, unknown>,
 				) => Promise<{ eventId: string }>;
+				/**
+				 * Override the anonymous visitor id with one you already track (a
+				 * PostHog / Amplitude / Segment distinct id, your own cookie, …).
+				 * Persists in `localStorage` and is sent on every later chat
+				 * request and tracking event, so Waniwani correlates to the same
+				 * visitor and server-side MCP tools read it as
+				 * `context.waniwani.visitorId`. Safe to call before `init()` and
+				 * as soon as an async analytics id resolves. Returns the effective
+				 * id (a blank value is ignored, keeping the current id).
+				 */
+				setVisitorId: (id: string) => string;
+				/** Read the visitor id the widget sends on each request. */
+				getVisitorId: () => string;
 			};
 		};
 	}
@@ -107,10 +125,21 @@ interface EmbedInstance {
 		userId: string,
 		traits?: Record<string, unknown>,
 	) => Promise<{ eventId: string }>;
+	/** Override the anonymous visitor id with one you already track. */
+	setVisitorId: (id: string) => string;
+	/** Read the visitor id the widget sends on each request. */
+	getVisitorId: () => string;
 }
 
-/** What the mount functions return; `init()` adds the tracking surface. */
-type MountedEmbed = Omit<EmbedInstance, "track" | "identify">;
+/**
+ * What the mount functions return; `init()` adds the tracking surface. The
+ * visitor-id helpers operate on `localStorage`, not the mount, so `init()`
+ * layers them on rather than each mount path re-implementing them.
+ */
+type MountedEmbed = Omit<
+	EmbedInstance,
+	"track" | "identify" | "setVisitorId" | "getVisitorId"
+>;
 
 let currentInstance: EmbedInstance | null = null;
 let reactRoot: ReactDOM.Root | null = null;
@@ -562,6 +591,13 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 	const scriptConfig = parseConfigFromScript();
 	const config = resolveConfig(options, undefined, scriptConfig);
 
+	// Seed a host-supplied visitor id before mount so the very first chat
+	// request and the host-page tracking client both pick it up. Accepts a
+	// literal or a sync/async resolver; an async one applies once it settles.
+	// For an id that resolves later still, callers use
+	// `WaniWani.chat.setVisitorId()`.
+	applyVisitorId(config.visitorId);
+
 	const mounted =
 		config.mode === "floating"
 			? mountFloating(config, options, scriptConfig)
@@ -589,6 +625,8 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 		...mounted,
 		track: trackClient.track,
 		identify: (userId, traits) => trackClient.identify(userId, traits),
+		setVisitorId: (id) => setVisitorId(id),
+		getVisitorId: () => getOrCreateVisitorId(),
 		destroy: () => {
 			void trackClient.shutdown();
 			mounted.destroy();
@@ -654,6 +692,11 @@ window.WaniWani.chat = {
 		currentInstance
 			? currentInstance.identify(userId, traits)
 			: uninitializedTrack.identify(userId, traits),
+	// Visitor-id helpers operate on `localStorage`, so they work before
+	// `init()` too — a page can pin the id as soon as its analytics SDK is
+	// ready, whether or not the chat has mounted.
+	setVisitorId: (id: string) => setVisitorId(id),
+	getVisitorId: () => getOrCreateVisitorId(),
 };
 
 // ---------------------------------------------------------------------------
