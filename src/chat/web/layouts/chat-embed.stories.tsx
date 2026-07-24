@@ -156,7 +156,13 @@ function installMockBackend(): void {
 		}
 		return Promise.resolve(Response.json({ success: true }));
 	}) as unknown as typeof window.fetch;
-	mockFetch.preconnect = realFetch.preconnect;
+	// React DOM patches the global `fetch` with a `preconnect` method that isn't
+	// in the DOM lib types; carry it over so RDOM's preconnect calls still resolve
+	// against our shim.
+	const preconnect = (realFetch as { preconnect?: unknown }).preconnect;
+	if (preconnect) {
+		(mockFetch as { preconnect?: unknown }).preconnect = preconnect;
+	}
 	window.fetch = mockFetch;
 }
 
