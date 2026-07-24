@@ -1,16 +1,14 @@
 "use client";
 
 /**
- * Shared widget-client context.
+ * Shared widget-client context, owned and consumed exclusively by the legacy
+ * `WidgetProvider` (`src/legacy/mcp/react/hooks/use-widget.ts`) and
+ * `unstable-use-send-follow-up`. `useWaniwani` resolves config from explicit
+ * options or the `toolResponseMetadata` passed to it and does not read this
+ * context.
  *
- * The context value is owned by the legacy `WidgetProvider`
- * (`src/legacy/mcp/react/hooks/use-widget.ts`), but `useWaniwani` reads it
- * opportunistically to auto-discover its config when a widget is mounted
- * inside a legacy MCP-widget host. Outside that legacy host, the context
- * value is `null` and `useWaniwani` falls back to explicit options.
- *
- * Lives in non-legacy because non-legacy code (`useWaniwani`) reads it. Legacy
- * code crosses the boundary to import it, which is allowed.
+ * Kept at this path for back-compat with legacy imports; it belongs in
+ * `src/legacy/` and may move there in a future cleanup.
  */
 
 import { createContext } from "react";

@@ -1,6 +1,6 @@
 {
   "name": "@waniwani/sdk",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "MCP distribution SDK. Build sales funnels, lead generation, booking, and quote apps on top of your MCP server. Event tracking, flows, widgets, knowledge base.",
   "type": "module",
   "exports": {
@@ -18,6 +18,11 @@
       "types": "./dist/mcp/react.d.ts",
       "import": "./dist/mcp/react.js",
       "default": "./dist/mcp/react.js"
+    },
+    "./mcp/react/skybridge": {
+      "types": "./dist/mcp/react/skybridge.d.ts",
+      "import": "./dist/mcp/react/skybridge.js",
+      "default": "./dist/mcp/react/skybridge.js"
     },
     "./chat": {
       "types": "./dist/chat/index.d.ts",
@@ -102,9 +107,13 @@
     "zod": ">=4.0.0",
     "@ai-sdk/react": ">=1.0.0",
     "ai": ">=6.0.141",
-    "@ai-sdk/mcp": ">=1.0.0"
+    "@ai-sdk/mcp": ">=1.0.0",
+    "skybridge": ">=0.35.0"
   },
   "peerDependenciesMeta": {
+    "skybridge": {
+      "optional": true
+    },
     "@modelcontextprotocol/sdk": {
       "optional": true
     },

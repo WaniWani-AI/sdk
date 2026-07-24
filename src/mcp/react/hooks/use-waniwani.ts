@@ -1,10 +1,9 @@
 "use client";
 
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { TrackFn } from "../../../tracking/@types";
 import { createFrontendClient } from "../../../tracking/frontend";
 import { WIDGET_CONFIG_META_KEY } from "../../server/utils";
-import { WidgetClientContext } from "../context";
 
 /**
  * Waniwani widget config injected into tool response `_meta` by
@@ -43,16 +42,26 @@ interface BaseUseWaniwaniOptions {
 	 * Additional fields merged into every tracked event's envelope metadata.
 	 */
 	metadata?: Record<string, unknown>;
+	/**
+	 * Tool response metadata from a host you already have a connection to
+	 * (e.g. an MCP-Apps / skybridge host exposing `useToolInfo().responseMetadata`).
+	 *
+	 * The hook resolves its config (`endpoint`, `source`, `token`, `sessionId`)
+	 * from `_meta["waniwani/widget"]` in this object. The hook never opens a host
+	 * connection of its own — your app owns the host bridge and passes the
+	 * metadata in. Ignored when an explicit `endpoint` is passed.
+	 */
+	toolResponseMetadata?: Record<string, unknown> | null;
 }
 
 /**
- * Context-driven options: `endpoint` and `source` are resolved from the
- * widget host (tool response `_meta["waniwani/widget"]`). `source` may be
- * overridden explicitly.
+ * Metadata-driven options: `endpoint` and `source` are resolved from the
+ * `toolResponseMetadata` you pass (`_meta["waniwani/widget"]`). `source` may
+ * be overridden explicitly.
  */
 interface ContextDrivenOptions extends BaseUseWaniwaniOptions {
 	endpoint?: undefined;
-	/** Optional override; otherwise resolved from context. */
+	/** Optional override; otherwise resolved from `toolResponseMetadata`. */
 	source?: string;
 }
 
@@ -145,21 +154,16 @@ function normalizeString(value: unknown): string | undefined {
 	return trimmed.length > 0 ? trimmed : undefined;
 }
 
-interface MetadataSource {
-	getToolResponseMetadata(): Record<string, unknown> | null;
-}
-
 /**
- * Extract the Waniwani widget config from tool response metadata. Reads the
- * `waniwani/widget` key, on both the metadata root and its nested `_meta`.
+ * Extract the Waniwani widget config from a tool response metadata object.
+ * Reads the `waniwani/widget` key, on both the metadata root and its nested
+ * `_meta`. Returns `null` when no endpoint can be resolved.
+ *
+ * @internal exported for unit testing.
  */
-function resolveConfigFromContext(
-	client: MetadataSource | null,
+export function extractConfigFromMetadata(
+	meta: Record<string, unknown> | null,
 ): WaniwaniConfig | null {
-	if (!client) {
-		return null;
-	}
-	const meta = client.getToolResponseMetadata();
 	if (!meta) {
 		return null;
 	}
@@ -190,86 +194,6 @@ function isSameConfig(
 		a?.sessionId === b?.sessionId &&
 		a?.source === b?.source
 	);
-}
-
-interface HostBridgeClient extends MetadataSource {
-	onToolResponseMetadataChange(
-		callback: (metadata: Record<string, unknown> | null) => void,
-	): () => void;
-}
-
-/**
- * Resolve the widget host bridge. Uses the `WidgetProvider` context when
- * present; otherwise connects a standalone host client so the hook works in
- * widgets that do not use the legacy provider. `null` while connecting and
- * outside any widget host.
- */
-function useHostBridge(skip: boolean): HostBridgeClient | null {
-	const contextClient = useContext(WidgetClientContext);
-	const [standalone, setStandalone] = useState<HostBridgeClient | null>(null);
-
-	useEffect(() => {
-		if (skip || contextClient || typeof window === "undefined") {
-			return;
-		}
-
-		let mounted = true;
-		let created: { close(): void } | null = null;
-
-		void (async () => {
-			try {
-				const { createWidgetClient } = await import(
-					"../../../legacy/mcp/react/widgets/widget-client"
-				);
-				const client = await createWidgetClient();
-				await client.connect();
-				if (!mounted) {
-					client.close();
-					return;
-				}
-				created = client;
-				setStandalone(client);
-			} catch {
-				// Not inside a widget host; the hook stays a no-op unless an
-				// explicit endpoint was provided.
-			}
-		})();
-
-		return () => {
-			mounted = false;
-			created?.close();
-			setStandalone(null);
-		};
-	}, [skip, contextClient]);
-
-	return contextClient ?? standalone;
-}
-
-function useContextConfig(
-	client: HostBridgeClient | null,
-): WaniwaniConfig | null {
-	const [config, setConfig] = useState<WaniwaniConfig | null>(() =>
-		resolveConfigFromContext(client),
-	);
-
-	useEffect(() => {
-		if (!client) {
-			setConfig((prev) => (prev === null ? prev : null));
-			return;
-		}
-
-		const sync = () => {
-			const next = resolveConfigFromContext(client);
-			setConfig((prev) => (isSameConfig(prev, next) ? prev : next));
-		};
-
-		sync();
-		return client.onToolResponseMetadataChange(() => {
-			sync();
-		});
-	}, [client]);
-
-	return config;
 }
 
 function createState(
@@ -310,16 +234,20 @@ function createState(
  * `track` surface as the server client, with session identity stamped
  * automatically from the config `withWaniwani` injects into tool responses.
  *
- * Config resolution order:
- * 1. Explicit `endpoint` / `token` / `sessionId` / `source` options
- * 2. Tool response `_meta["waniwani/widget"]` via the widget host bridge
- *    (with or without the legacy `WidgetProvider`)
- * 3. No-op if `endpoint` cannot be resolved or `source` is unknown
+ * The hook never opens a host connection of its own. Supply config one of
+ * two ways:
+ * 1. Explicit `endpoint` + `source` (plus optional `token` / `sessionId`)
+ * 2. `toolResponseMetadata` — the `_meta` object your host already exposes
+ *    (e.g. skybridge's `useToolInfo().responseMetadata`); the hook reads
+ *    `_meta["waniwani/widget"]` from it
+ *
+ * No-op when neither resolves an `endpoint` and a `source`.
  *
  * @example
  * ```tsx
  * function MyWidget() {
- *   const wani = useWaniwani();
+ *   const { responseMetadata } = useToolInfo();
+ *   const wani = useWaniwani({ toolResponseMetadata: responseMetadata });
  *   // wani.sessionId correlates with server-side tracking
  *   return (
  *     <button
@@ -339,31 +267,38 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 	const explicitSessionId = normalizeString(options.sessionId);
 	const explicitSource = normalizeString(options.source);
 
-	// The host bridge is only needed when config must come from context.
-	const hostBridge = useHostBridge(Boolean(explicitEndpoint));
-	const contextConfig = useContextConfig(hostBridge);
+	// Config from the host metadata passed in. Ignored in explicit-endpoint
+	// mode, where every field comes from the options directly.
+	const suppliedConfig = explicitEndpoint
+		? null
+		: extractConfigFromMetadata(options.toolResponseMetadata ?? null);
+	const ctxEndpoint = suppliedConfig?.endpoint;
+	const ctxToken = suppliedConfig?.token;
+	const ctxSessionId = suppliedConfig?.sessionId;
+	const ctxSource = suppliedConfig?.source;
 
-	// Stabilize config identity — only changes when the primitives change
+	// Stabilize config identity — only changes when the resolved primitives do,
+	// so a new `toolResponseMetadata` object of identical content is a no-op.
 	const config = useMemo<ResolvedConfig | null>(() => {
-		const source = explicitSource ?? contextConfig?.source;
+		const source = explicitSource ?? ctxSource;
 		if (!source) {
 			return null;
 		}
 		if (explicitEndpoint) {
 			return {
 				endpoint: explicitEndpoint,
-				token: explicitToken ?? contextConfig?.token,
-				sessionId: explicitSessionId ?? contextConfig?.sessionId,
+				token: explicitToken,
+				sessionId: explicitSessionId,
 				source,
 			};
 		}
-		if (!contextConfig) {
+		if (!ctxEndpoint) {
 			return null;
 		}
 		return {
-			...contextConfig,
-			token: explicitToken ?? contextConfig.token,
-			sessionId: explicitSessionId ?? contextConfig.sessionId,
+			endpoint: ctxEndpoint,
+			token: explicitToken ?? ctxToken,
+			sessionId: explicitSessionId ?? ctxSessionId,
 			source,
 		};
 	}, [
@@ -371,7 +306,10 @@ export function useWaniwani(options: UseWaniwaniOptions = {}): WaniwaniWidget {
 		explicitToken,
 		explicitSessionId,
 		explicitSource,
-		contextConfig,
+		ctxEndpoint,
+		ctxToken,
+		ctxSessionId,
+		ctxSource,
 	]);
 
 	const [widget, setWidget] = useState<WaniwaniWidget>(NOOP_WIDGET);

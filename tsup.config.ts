@@ -54,6 +54,31 @@ export default defineConfig([
 			js: '"use client";',
 		},
 	},
+	// MCP client-side skybridge adapter (React/Browser). Thin wrapper that
+	// feeds skybridge's `useToolInfo().responseMetadata` into the core hook.
+	// `skybridge` is an optional peer dependency, kept external.
+	{
+		entry: { "mcp/react/skybridge": "src/mcp/react/skybridge.ts" },
+		format: ["esm"],
+		target: "es2022",
+		dts: true,
+		clean: false,
+		shims: false,
+		splitting: true,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		external: [
+			"react",
+			"skybridge",
+			"skybridge/web",
+			"@modelcontextprotocol/sdk",
+			"@modelcontextprotocol/ext-apps",
+		],
+		banner: {
+			js: '"use client";',
+		},
+	},
 	// Chat widget (React component)
 	{
 		entry: { "chat/index": "src/chat/web/index.ts" },

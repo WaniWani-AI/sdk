@@ -31,6 +31,39 @@ One behavioral note (not a break): `messageBorderRadius` / `--ww-msg-radius` is 
 
 This list mirrors the changelog so you can apply migrations without a network fetch. Always cross-check against the live changelog for anything newer than this file.
 
+### 0.17.0: `useWaniwani()` no longer auto-discovers its config
+
+`useWaniwani()` from `@waniwani/sdk/mcp/react` is now host-agnostic. It resolves config (endpoint, source, widget token, session id) only from **explicit options** or a **`toolResponseMetadata` object you pass**. It no longer reads a `WidgetProvider` context and no longer opens its own host connection to discover the config. A bare `useWaniwani()` that relied on that auto-discovery now returns a no-op widget.
+
+**This break is invisible to `tsc`** — a bare `useWaniwani()` still typechecks and just tracks nothing at runtime. Find call sites by auditing imports of `useWaniwani`, not by chasing type errors.
+
+Auto-fix, per call site:
+
+1. **Skybridge-hosted widget** (project depends on `skybridge` / imports `skybridge/web`) — change the import; the call stays bare.
+
+   ```tsx
+   // Before
+   import { useWaniwani } from "@waniwani/sdk/mcp/react";
+   const wani = useWaniwani();
+   // After
+   import { useWaniwani } from "@waniwani/sdk/mcp/react/skybridge";
+   const wani = useWaniwani(); // reads skybridge's useToolInfo().responseMetadata for you
+   ```
+
+   Options (`source`, `token`, `sessionId`, `metadata`) are forwarded by the adapter, so keep any you passed. `skybridge` is an optional peer dependency; a skybridge project already has it.
+
+2. **Custom host where you already hold the `_meta`** — pass it, keep the `@waniwani/sdk/mcp/react` import.
+
+   ```tsx
+   const wani = useWaniwani({ toolResponseMetadata: myHostToolResponseMetadata });
+   ```
+
+3. **Explicit endpoint (BYO backend)** — no change. `useWaniwani({ endpoint, source })` never used auto-discovery.
+
+No `@deprecated` shim: the self-connect path was unreliable (a no-op on Claude) and the `WidgetProvider`-context read was part of the retired legacy widget host, so both are removed outright. Additive in the same release: the `@waniwani/sdk/mcp/react/skybridge` entry (the adapter above) and the `toolResponseMetadata` option on the core hook.
+
+After applying, run `bun run typecheck && bun test`. Because `typecheck` cannot see this break, the real completion check is that every bare `useWaniwani()` call site has moved to case 1, 2, or 3.
+
 ### 0.16.0: unified tracking client on every surface
 
 One typed `track` client everywhere (server, scoped client, `useWaniwani()`, `chat.track`). Five breaking changes, all mechanical:

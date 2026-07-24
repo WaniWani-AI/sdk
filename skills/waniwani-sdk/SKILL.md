@@ -83,7 +83,8 @@ Get a free key at [app.waniwani.ai](https://app.waniwani.ai). See [setup.md](ref
 |---|---|---|---|
 | `@waniwani/sdk` | `waniwani()` client, `track.*` event helpers, `WaniWaniError` | Free tier | [setup.md](references/setup.md), [events.md](references/events.md) |
 | `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md), [events.md](references/events.md) |
-| `@waniwani/sdk/mcp/react` | `useWaniwani` standalone tracking hook | OSS + Free tier | (rest of this entry point is legacy) |
+| `@waniwani/sdk/mcp/react` | `useWaniwani` host-agnostic tracking hook (takes `toolResponseMetadata` or explicit `{ endpoint, source }`) | OSS + Free tier | [events.md](references/events.md) (rest of this entry point is legacy) |
+| `@waniwani/sdk/mcp/react/skybridge` | `useWaniwani` skybridge adapter — bare call resolves config from skybridge's `useToolInfo()` | OSS + Free tier | [events.md](references/events.md) |
 | `@waniwani/sdk/chat` | `ChatEmbed`, themes | Free tier | [chat-widget.md](references/chat-widget.md) |
 | `@waniwani/sdk/chat/embed.js` | Self-contained `<script>` install for any website | Free tier | [chat-widget.md](references/chat-widget.md) |
 | `@waniwani/sdk/chat/styles.css` | Prebuilt Tailwind styles for chat components | Free tier | [chat-widget.md](references/chat-widget.md) |
@@ -150,7 +151,7 @@ When a playbook exists for the user's task, **follow the playbook step by step**
 
 ## Upgrading the SDK
 
-`@waniwani/sdk` is `0.x`, so **minor version bumps can break the public API**. Whenever you raise the SDK version in a project — editing `package.json`, running `bun add @waniwani/sdk@latest`, or fixing a build that started failing after an upgrade — do not treat it as a drop-in. Read the [changelog](https://docs.waniwani.ai/sdk/changelog) for every breaking change between the old and new version and **auto-apply the documented migration** (each one is a mechanical codemod), then run `bun run typecheck && bun test`. Full procedure in [upgrading.md](references/upgrading.md). Each version hop also has a self-contained, directly invocable migration skill named `migrate-waniwani-sdk-<from>-to-<to>` — for the latest release: `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.15-to-0.16`.
+`@waniwani/sdk` is `0.x`, so **minor version bumps can break the public API**. Whenever you raise the SDK version in a project — editing `package.json`, running `bun add @waniwani/sdk@latest`, or fixing a build that started failing after an upgrade — do not treat it as a drop-in. Read the [changelog](https://docs.waniwani.ai/sdk/changelog) for every breaking change between the old and new version and **auto-apply the documented migration** (each one is a mechanical codemod), then run `bun run typecheck && bun test`. Full procedure in [upgrading.md](references/upgrading.md). Each version hop also has a self-contained, directly invocable migration skill named `migrate-waniwani-sdk-<from>-to-<to>` — for the latest release: `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.16-to-0.17`.
 
 ## Common mistakes
 

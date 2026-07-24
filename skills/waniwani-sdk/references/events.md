@@ -130,17 +130,35 @@ await client.track.converted({ amount: 85, currency: "EUR", externalUserId: "use
 Create the top-level client **once** (e.g. `lib/waniwani.ts`) and import it — don't
 construct one per call.
 
-**3. Widget client (inside MCP-app widgets).** `useWaniwani()` from
-`@waniwani/sdk/mcp/react` returns `{ sessionId, track, identify, flush }` where `track`
-is the same typed `TrackFn`. Config (endpoint, widget token, session id, source) is read
-from the `_meta["waniwani/widget"]` object `withWaniwani` injects into tool responses;
-the hook works with or without the legacy `WidgetProvider` and no-ops outside a widget
-host. One `widget_render` event is emitted automatically on init.
+**3. Widget client (inside MCP-app widgets).** `useWaniwani()` returns
+`{ sessionId, track, identify, flush }` where `track` is the same typed `TrackFn`. Config
+(endpoint, widget token, session id, source) comes from the `_meta["waniwani/widget"]`
+object `withWaniwani` injects into tool responses. The hook is host-agnostic: it takes
+that metadata as data and never opens a host connection of its own. One `widget_render`
+event is emitted automatically on init.
+
+For **skybridge-hosted** widgets, import the hook from the skybridge adapter entry and
+call it bare — it reads skybridge's `useToolInfo().responseMetadata` for you:
 
 ```tsx
+import { useWaniwani } from "@waniwani/sdk/mcp/react/skybridge";
+
 const wani = useWaniwani();
 wani.track.optionSelected({ id: "pro", amount: 49, currency: "EUR" });
 ```
+
+On any other host, import from `@waniwani/sdk/mcp/react` and hand it the metadata your
+host exposes, or an explicit endpoint:
+
+```tsx
+import { useWaniwani } from "@waniwani/sdk/mcp/react";
+
+const wani = useWaniwani({ toolResponseMetadata }); // the host's tool-response _meta
+// or, bring-your-own backend:
+const wani2 = useWaniwani({ endpoint: "https://…/v2/track", source: "chatgpt" });
+```
+
+With no resolved endpoint and source, the hook is a no-op (tracks nothing).
 
 **4. Chat host page (next to the chat widget).** The `<script>` embed exposes
 `WaniWani.chat.track` / `WaniWani.chat.identify`; the `WaniwaniChat` React component

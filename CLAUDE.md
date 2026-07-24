@@ -22,7 +22,8 @@ Same SDK, hosted features added when the key is present.
 - `WaniwaniKvStore` (hosted flow state) — used by `createFlow` default when key is set
 - `waniwani()`, `tracking/*`, `createFrontendClient`, `EVENT_TYPES`, `withWaniwani`, `createTrackingRoute`, `widget-token`, `extractScopedClient` / `SCOPED_CLIENT_KEY` from `@waniwani/sdk` and `@waniwani/sdk/mcp`
 - `createKbClient` from `@waniwani/sdk/kb`
-- `useWaniwani` from `@waniwani/sdk/mcp/react` (also OSS — degrades to no-op without config; BYO endpoint also supported). Returns `{ sessionId, track, identify, flush }` where `track` is the same typed `TrackFn` as the server client; emits one `widget_render` automatically; works without the legacy `WidgetProvider`.
+- `useWaniwani` from `@waniwani/sdk/mcp/react` (also OSS — degrades to no-op without config; BYO endpoint also supported). Host-agnostic: takes the tool-response `_meta` as data via the `toolResponseMetadata` option, or an explicit `{ endpoint, source }`; it opens no host connection and reads no `WidgetProvider` context. Returns `{ sessionId, track, identify, flush }` where `track` is the same typed `TrackFn` as the server client; emits one `widget_render` automatically.
+- `useWaniwani` from `@waniwani/sdk/mcp/react/skybridge` — the skybridge-host adapter. Reads skybridge's `useToolInfo().responseMetadata` and feeds it to the core hook, so skybridge-hosted widgets call `useWaniwani()` bare. `skybridge` is an optional peer dependency.
 - `WaniwaniChat` (hosted React chat — recommended), themes, `embed.js` (IIFE for non-React hosts), `styles.css` from `@waniwani/sdk/chat`. Both expose host-page tracking: `WaniWani.chat.track` / `.identify` on the embed global, `track` / `identify` on the `ChatHandle` ref.
 - `ChatEmbed` from `@waniwani/sdk/chat` — bare-bones bring-your-own-backend primitive (no `track`/`identify`). Exposed but **not** the recommended path for new code; reach for it only when self-hosting the chat backend.
 
