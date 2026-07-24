@@ -25,6 +25,9 @@ import {
 	saveCachedConfig,
 } from "../embed/remote-config";
 import { useVisibilityGate } from "../embed/use-pathname";
+import type { WidgetEvent } from "../embed/widget-events";
+import { createWidgetEventEmitter } from "../embed/widget-events";
+import { WidgetEventsProvider } from "../embed/widget-events-context";
 import type { Locale, MessageOverrides } from "../i18n";
 import {
 	createChatTrackClient,
@@ -183,18 +186,48 @@ export interface WaniwaniChatProps {
 	 * can't be serialized to the dashboard).
 	 */
 	overrides?: WaniwaniChatOverrides;
+	/**
+	 * Callback fired on chat lifecycle events (`chat.ready`, `message.sent`,
+	 * `message.received`, `session.started`, `thread.changed`, `chat.error`,
+	 * `suggestion.clicked`, `link.clicked`; `chat.opened`/`chat.closed` are
+	 * floating-embed-only and never fire here). Message events never include
+	 * the message text. Use it to mirror widget activity into the host page's
+	 * analytics. Exceptions thrown by the callback are swallowed and never
+	 * break the chat.
+	 */
+	onEvent?: (event: WidgetEvent) => void;
 }
 
 const DEFAULT_API = "https://app.waniwani.ai/api/mcp/chat";
 
 export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 	function WaniwaniChat(props, ref) {
-		const { token, channelId, className, visitorId, overrides } = props;
+		const { token, channelId, className, visitorId, overrides, onEvent } =
+			props;
 
 		// The inner ChatEmbed handle; the ref we expose augments it with the
 		// tracking surface (`track`, `identify`).
 		const innerRef = useRef<ChatHandle>(null);
 		const trackClientRef = useRef<FrontendTrackingClient | null>(null);
+
+		// One emitter per mount. The session id getter reads through the chat
+		// handle so events pick up the server-assigned id as soon as it exists.
+		// WaniwaniChat is an in-page mount and reports "inline", matching the
+		// `mode` tag on its chat requests and page.viewed events.
+		const widgetEvents = useMemo(
+			() =>
+				createWidgetEventEmitter({
+					mode: "inline",
+					getSessionId: () => innerRef.current?.sessionId,
+				}),
+			[],
+		);
+		useEffect(() => {
+			if (!onEvent) {
+				return;
+			}
+			return widgetEvents.subscribe(onEvent);
+		}, [onEvent, widgetEvents]);
 
 		const programmatic = useMemo<Partial<EmbedConfig>>(
 			() => ({
@@ -244,6 +277,15 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 
 		const [remote, setRemote] = useState<Partial<EmbedConfig>>({});
 		const [ready, setReady] = useState<boolean>(false);
+
+		// `chat.ready` once the remote config has resolved.
+		const readyEmittedRef = useRef(false);
+		useEffect(() => {
+			if (ready && !readyEmittedRef.current) {
+				readyEmittedRef.current = true;
+				widgetEvents.emit({ name: "chat.ready" });
+			}
+		}, [ready, widgetEvents]);
 
 		// Top-of-funnel signal, fired once the channel's `/config` resolves so
 		// the event carries the channel's source. Guarded once per page inside
@@ -396,32 +438,34 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 		}
 
 		return (
-			<ChatEmbed
-				ref={innerRef}
-				api={config.api ?? DEFAULT_API}
-				headers={{ Authorization: `Bearer ${config.token}` }}
-				visitorId={visitorId}
-				skipRemoteConfig
-				body={body}
-				appearance={config.appearance}
-				classNames={overrides?.classNames}
-				title={config.title}
-				hideHeader={config.hideHeader}
-				welcomeMessage={config.welcomeMessage}
-				welcome={overrides?.welcome}
-				placeholder={config.placeholder}
-				suggestions={
-					config.suggestions ? { initial: config.suggestions } : undefined
-				}
-				enableThreadHistory={config.enableThreadHistory}
-				showToolCalls={config.showToolCalls}
-				disclaimer={config.disclaimer}
-				allowAttachments={overrides?.allowAttachments}
-				locale={config.locale}
-				messages={overrides?.messages}
-				className={className}
-				initializing={!ready}
-			/>
+			<WidgetEventsProvider value={widgetEvents}>
+				<ChatEmbed
+					ref={innerRef}
+					api={config.api ?? DEFAULT_API}
+					headers={{ Authorization: `Bearer ${config.token}` }}
+					visitorId={visitorId}
+					skipRemoteConfig
+					body={body}
+					appearance={config.appearance}
+					classNames={overrides?.classNames}
+					title={config.title}
+					hideHeader={config.hideHeader}
+					welcomeMessage={config.welcomeMessage}
+					welcome={overrides?.welcome}
+					placeholder={config.placeholder}
+					suggestions={
+						config.suggestions ? { initial: config.suggestions } : undefined
+					}
+					enableThreadHistory={config.enableThreadHistory}
+					showToolCalls={config.showToolCalls}
+					disclaimer={config.disclaimer}
+					allowAttachments={overrides?.allowAttachments}
+					locale={config.locale}
+					messages={overrides?.messages}
+					className={className}
+					initializing={!ready}
+				/>
+			</WidgetEventsProvider>
 		);
 	},
 );

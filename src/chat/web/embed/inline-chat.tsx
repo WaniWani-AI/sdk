@@ -6,12 +6,20 @@
 // useEffect to drive the fetch.
 // ============================================================================
 
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import {
+	forwardRef,
+	useEffect,
+	useImperativeHandle,
+	useMemo,
+	useRef,
+} from "react";
 import type { ChatHandle } from "../@types";
 import { ChatEmbed } from "../layouts/chat-embed";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { useVisibilityGate } from "./use-pathname";
+import { createWidgetEventEmitter } from "./widget-events";
+import { WidgetEventsProvider } from "./widget-events-context";
 
 export interface InlineChatProps {
 	config: EmbedConfig;
@@ -51,6 +59,33 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 
 		const chatRef = useRef<ChatHandle>(null);
 
+		// One emitter per mount. The session id getter reads through the chat
+		// handle so events pick up the server-assigned id as soon as it exists.
+		const widgetEvents = useMemo(
+			() =>
+				createWidgetEventEmitter({
+					mode: "inline",
+					getSessionId: () => chatRef.current?.sessionId,
+				}),
+			[],
+		);
+		const onEvent = config.onEvent;
+		useEffect(() => {
+			if (!onEvent) {
+				return;
+			}
+			return widgetEvents.subscribe(onEvent);
+		}, [onEvent, widgetEvents]);
+
+		// `chat.ready` once the remote config has resolved.
+		const readyEmittedRef = useRef(false);
+		useEffect(() => {
+			if (ready && !readyEmittedRef.current) {
+				readyEmittedRef.current = true;
+				widgetEvents.emit({ name: "chat.ready" });
+			}
+		}, [ready, widgetEvents]);
+
 		// biome-ignore lint/correctness/useExhaustiveDependencies: fire once on mount
 		useEffect(() => {
 			onReady?.();
@@ -85,25 +120,27 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		}
 
 		return (
-			<ChatEmbed
-				ref={chatRef}
-				api={config.api ?? ""}
-				headers={{ Authorization: `Bearer ${config.token}` }}
-				skipRemoteConfig
-				body={body}
-				appearance={config.appearance}
-				title={config.title}
-				hideHeader={config.hideHeader}
-				welcomeMessage={config.welcomeMessage}
-				placeholder={config.placeholder}
-				suggestions={
-					config.suggestions ? { initial: config.suggestions } : undefined
-				}
-				enableThreadHistory={config.enableThreadHistory}
-				showToolCalls={config.showToolCalls}
-				locale={config.locale}
-				initializing={!ready}
-			/>
+			<WidgetEventsProvider value={widgetEvents}>
+				<ChatEmbed
+					ref={chatRef}
+					api={config.api ?? ""}
+					headers={{ Authorization: `Bearer ${config.token}` }}
+					skipRemoteConfig
+					body={body}
+					appearance={config.appearance}
+					title={config.title}
+					hideHeader={config.hideHeader}
+					welcomeMessage={config.welcomeMessage}
+					placeholder={config.placeholder}
+					suggestions={
+						config.suggestions ? { initial: config.suggestions } : undefined
+					}
+					enableThreadHistory={config.enableThreadHistory}
+					showToolCalls={config.showToolCalls}
+					locale={config.locale}
+					initializing={!ready}
+				/>
+			</WidgetEventsProvider>
 		);
 	},
 );

@@ -749,6 +749,61 @@ const chat = useRef<ChatHandle>(null);
 
 `track` is the same `TrackFn` as everywhere else: callable with a typed event (`track({ event: "link.clicked", properties: { url } })`) plus the flat revenue helpers. `track` and `identify` are **absent on the bare `ChatEmbed`** primitive, which holds no Waniwani credential. See [events.md](./events.md) for the taxonomy.
 
+### Mirroring events into your own analytics (`onEvent`)
+
+Both hosted surfaces accept an `onEvent` callback — `WaniWani.chat.init({ onEvent })` on the `<script>` embed and `<WaniwaniChat onEvent={...} />` in React — fired on every chat lifecycle event. The embed mounts in the host page's DOM (the shadow root isolates styles only), so the callback runs in the page's own JS context: forward events straight into `window.amplitude`, `window.analytics`, or `gtag` and the page-side SDK's identity is attached automatically, with no server-side identity plumbing.
+
+| Event | Fired when | Extra `properties` |
+|-------|-----------|--------------------|
+| `chat.ready` | Widget mounted and config resolved, or the readiness timeout elapses (all modes; fires even on pages where visibility rules hide the floating bar) | — |
+| `chat.opened` | Full chat panel opened (floating mode only; the collapsed dock does not count) | — |
+| `chat.closed` | Full chat panel closed (floating mode only; a page-gate hiding an open panel also emits this) | — |
+| `message.sent` | The visitor (or the imperative API, e.g. `sendMessage`) submits a message (never includes the message text) | — |
+| `message.received` | Assistant reply finished (never includes the message text) | — |
+| `session.started` | Server assigned the session id on the first exchange (restored threads don't re-fire) | `{ sessionId }` |
+| `thread.changed` | Thread created or switched (requires thread history) | `{ threadId }` |
+| `chat.error` | Chat request failed | `{ message }` (truncated to 200 chars) |
+| `suggestion.clicked` | Suggestion pill or welcome card clicked (dock pills, in-chat pills, welcome cards) | `{ text, index }` (`index` is `-1` when the origin is unknown) |
+| `link.clicked` | Anchor clicked inside the conversation | `{ url }` (absolute URL) |
+
+Do not assume `chat.opened` precedes the first `message.sent`: a send from the docked bar opens the panel and sends in one action, and the open transition is reported after the send.
+
+Every callback receives a `WidgetEvent` (exported from `@waniwani/sdk/chat`, alongside `WidgetEventName` and `WidgetMode`) — a discriminated union on `name` with a top-level `mode` (`"inline" | "floating"`), an optional `sessionId` (`undefined` until the server assigns one on the first exchange), a `timestamp` in epoch milliseconds, and the per-event `properties` from the table above. `<WaniwaniChat>` reports `"inline"` — it is an in-page mount, and this is the same `mode` tag its server-side events (chat requests, `page.viewed`) carry, so both streams correlate.
+
+Event names are neutral and fixed; map them to your own schema inside the callback:
+
+```html
+<script src="https://app.waniwani.ai/embed.js" defer></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const names = {
+      "chat.opened": "chat_opened",
+      "chat.closed": "chat_closed",
+      "message.sent": "user_message",
+      "message.received": "bot_message",
+    };
+    WaniWani.chat.init({
+      token: "wwp_...",
+      mode: "floating",
+      onEvent: (event) => {
+        window.amplitude.track(names[event.name] || event.name, {
+          page: window.location.pathname,
+          sessionId: event.sessionId,
+        });
+      },
+    });
+  });
+</script>
+```
+
+Notes:
+
+- **Programmatic-only on the script embed.** A function cannot be expressed as a `data-*` attribute, so `onEvent` has no declarative equivalent — pass it to `WaniWani.chat.init()`.
+- **Exceptions are swallowed.** An error thrown by your callback is caught and logged as a console warning; it never breaks the widget.
+- **Privacy.** Message content never passes through this channel — the host learns *that* a message was exchanged, never what was said. Suggestion text is operator-authored config, so `suggestion.clicked` may carry it.
+- **Separate from the `track()` taxonomy.** Some `onEvent` names (`session.started`, `link.clicked`) also exist as event names in the hosted `track()` funnel taxonomy ([events.md](./events.md)) — same concepts, but a separate client-side channel with different payload shapes. `onEvent` events are not `client.track()` events, do not feed the platform funnel dashboard, and should not be forwarded into `client.track()` as-is even where names coincide.
+- **`ChatEmbed` does not expose `onEvent`** — like `track`/`identify`, it is a hosted-surface feature.
+
 ## `ChatEmbed` (advanced)
 
 **Most apps should use `WaniwaniChat` or the `<script>` embed.** `ChatEmbed` is the bare-bones primitive underneath both of them: no token, no remote config, no defaults, no built-in MCP resource endpoint. You wire up `api`, `headers`, `body`, `theme`, and (optionally) `mcp` yourself.

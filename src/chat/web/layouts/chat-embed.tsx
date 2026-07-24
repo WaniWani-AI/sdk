@@ -23,6 +23,7 @@ import { MessageList } from "../components/message-list";
 import { PoweredBy } from "../components/powered-by";
 import { Suggestions } from "../components/suggestions";
 import { ThreadMenu } from "../components/thread-menu";
+import { useWidgetEvents } from "../embed/widget-events-context";
 import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSuggestions } from "../hooks/use-suggestions";
@@ -124,6 +125,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		const isDark = preset === "dark" || (preset === "auto" && autoIsDark);
 
 		const engine = useChatEngine({ ...props, api });
+		const widgetEvents = useWidgetEvents();
 		const handleCallTool = useCallTool({
 			...props,
 			api,
@@ -201,6 +203,28 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			observer.observe(el);
 			return () => observer.disconnect();
 		}, []);
+
+		// Delegated click listener on the messages scroller: reports every anchor click
+		// inside the conversation (markdown-rendered links) to the widget event
+		// emitter without customizing the markdown pipeline.
+		useEffect(() => {
+			const scroller = scrollRef.current;
+			if (!scroller) {
+				return;
+			}
+			const onClick = (e: MouseEvent) => {
+				const target = e.target instanceof Element ? e.target : null;
+				const anchor = target?.closest("a");
+				if (anchor?.href) {
+					widgetEvents.emit({
+						name: "link.clicked",
+						properties: { url: anchor.href },
+					});
+				}
+			};
+			scroller.addEventListener("click", onClick);
+			return () => scroller.removeEventListener("click", onClick);
+		}, [widgetEvents]);
 
 		// Auto-scroll on new messages / streaming tokens. When the user
 		// just sent a message we always jump to the bottom — they expect
@@ -305,10 +329,25 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 
 		const handleSuggestionSelect = useCallback(
 			(suggestion: string) => {
+				const dynamicIndex = suggestionsState.suggestions.indexOf(suggestion);
+				const index =
+					dynamicIndex >= 0
+						? dynamicIndex
+						: (welcome?.suggestions?.indexOf(suggestion) ?? -1);
+				widgetEvents.emit({
+					name: "suggestion.clicked",
+					properties: { text: suggestion, index },
+				});
 				suggestionsState.clear();
 				engine.handleSubmit({ text: suggestion, files: [] });
 			},
-			[suggestionsState.clear, engine.handleSubmit],
+			[
+				suggestionsState.suggestions,
+				suggestionsState.clear,
+				engine.handleSubmit,
+				welcome,
+				widgetEvents,
+			],
 		);
 
 		useImperativeHandle(

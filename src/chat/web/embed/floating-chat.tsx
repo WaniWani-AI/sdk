@@ -40,6 +40,8 @@ import { useRemoteEmbedConfig } from "./remote-config";
 import { usePathname, useVisibilityGate } from "./use-pathname";
 import { useScrollAppearance } from "./use-scroll-appearance";
 import { appearTriggerForPath } from "./visibility";
+import { createWidgetEventEmitter } from "./widget-events";
+import { WidgetEventsProvider } from "./widget-events-context";
 
 /** Default delay before the docked input animates into view on load. */
 const DEFAULT_APPEAR_DELAY_MS = 2000;
@@ -119,6 +121,23 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		const scrolledPast = useScrollAppearance(appearAfter);
 
 		const chatRef = useRef<ChatHandle>(null);
+		// One emitter per mount. The session id getter reads through the chat
+		// handle so events pick up the server-assigned id as soon as it exists.
+		const widgetEvents = useMemo(
+			() =>
+				createWidgetEventEmitter({
+					mode: "floating",
+					getSessionId: () => chatRef.current?.sessionId,
+				}),
+			[],
+		);
+		const onEvent = config.onEvent;
+		useEffect(() => {
+			if (!onEvent) {
+				return;
+			}
+			return widgetEvents.subscribe(onEvent);
+		}, [onEvent, widgetEvents]);
 		const composerInputRef = useRef<HTMLInputElement>(null);
 		const dockRef = useRef<HTMLDivElement>(null);
 		// Set when the visitor manually collapses the expanded card (close button)
@@ -217,6 +236,31 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				chatRef.current?.focus();
 			}
 		}, [focusNonce, phase]);
+
+		// `chat.ready` once the remote config has resolved.
+		const readyEmittedRef = useRef(false);
+		useEffect(() => {
+			if (ready && !readyEmittedRef.current) {
+				readyEmittedRef.current = true;
+				widgetEvents.emit({ name: "chat.ready" });
+			}
+		}, [ready, widgetEvents]);
+
+		// Open/close transitions. Watching `phase` covers every path that opens
+		// or closes the panel: dock focus, suggestion click, the imperative API,
+		// the header collapse button. The docked and expanded-dock states both
+		// count as "closed"; only the full panel is "open". `visible` folds the
+		// per-URL gate in, so a panel hidden by an SPA route change reports
+		// `chat.closed` — events reflect what is on screen. No event on mount.
+		const wasOpenRef = useRef(false);
+		useEffect(() => {
+			const isOpen = visible && phase === "open";
+			if (isOpen === wasOpenRef.current) {
+				return;
+			}
+			wasOpenRef.current = isOpen;
+			widgetEvents.emit({ name: isOpen ? "chat.opened" : "chat.closed" });
+		}, [visible, phase, widgetEvents]);
 
 		const openPanel = useCallback(() => {
 			setPhase("open");
@@ -338,192 +382,203 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		return (
 			// `display: contents` wrapper carries the theme vars (via
 			// `data-waniwani-chat`) and dark class to the dock + panel.
-			<div
-				data-waniwani-chat=""
-				data-color-scheme={preset === "auto" ? "auto" : undefined}
-				className={cn(
-					"ww:contents ww:font-[family-name:var(--ww-font-sans)]",
-					preset === "dark" && "dark",
-				)}
-				style={cssVars}
-			>
-				{visible && (
-					<>
-						{/* Docked composer — animates in after the appear delay. Narrow
+			<WidgetEventsProvider value={widgetEvents}>
+				<div
+					data-waniwani-chat=""
+					data-color-scheme={preset === "auto" ? "auto" : undefined}
+					className={cn(
+						"ww:contents ww:font-[family-name:var(--ww-font-sans)]",
+						preset === "dark" && "dark",
+					)}
+					style={cssVars}
+				>
+					{visible && (
+						<>
+							{/* Docked composer — animates in after the appear delay. Narrow
 						    at rest; widens (and reveals the CTAs) once clicked. */}
-						<div
-							ref={dockRef}
-							data-waniwani-floating="dock"
-							data-state={phase === "open" ? "hidden" : "shown"}
-							data-appeared={appeared ? "true" : "false"}
-							className={cn(
-								"ww:fixed ww:bottom-3 ww:sm:bottom-4 ww:left-0 ww:right-0 ww:mx-auto ww:z-[2147483002] ww:flex ww:flex-col",
-								"ww:w-[calc(100vw-2rem)] ww:transition-[max-width] ww:duration-300 ww:ease-out",
-								showCard ? "ww:max-w-[720px]" : "ww:max-w-[440px]",
-							)}
-						>
-							{/* Frosted-glass card around the input. It only materializes
+							<div
+								ref={dockRef}
+								data-waniwani-floating="dock"
+								data-state={phase === "open" ? "hidden" : "shown"}
+								data-appeared={appeared ? "true" : "false"}
+								className={cn(
+									"ww:fixed ww:bottom-3 ww:sm:bottom-4 ww:left-0 ww:right-0 ww:mx-auto ww:z-[2147483002] ww:flex ww:flex-col",
+									"ww:w-[calc(100vw-2rem)] ww:transition-[max-width] ww:duration-300 ww:ease-out",
+									showCard ? "ww:max-w-[720px]" : "ww:max-w-[440px]",
+								)}
+							>
+								{/* Frosted-glass card around the input. It only materializes
 							    once the dock is expanded/open (the visitor clicked the bar);
 							    at rest the wrapper is invisible (no fill/border/padding) so
 							    the input looks exactly like the standalone bar. The tint is
 							    the theme's brand color at low alpha — not white — so it reads
 							    as intentional glass and the host page shows through it. */}
-							<div
-								className={cn(
-									"ww:relative ww:flex ww:flex-col ww:rounded-[20px] ww:border ww:transition-all ww:duration-300 ww:ease-out",
-									showCard
-										? "ww:p-2 ww:backdrop-blur-xl ww:backdrop-saturate-150"
-										: "ww:border-transparent ww:p-0",
-								)}
-								style={
-									showCard
-										? {
-												boxShadow: cardShadow,
-												backgroundColor: "var(--ww-glass)",
-												borderColor: "var(--ww-glass-border)",
-											}
-										: undefined
-								}
-							>
-								{/* Close (X) in the card's top-right — collapses the expanded
+								<div
+									className={cn(
+										"ww:relative ww:flex ww:flex-col ww:rounded-[20px] ww:border ww:transition-all ww:duration-300 ww:ease-out",
+										showCard
+											? "ww:p-2 ww:backdrop-blur-xl ww:backdrop-saturate-150"
+											: "ww:border-transparent ww:p-0",
+									)}
+									style={
+										showCard
+											? {
+													boxShadow: cardShadow,
+													backgroundColor: "var(--ww-glass)",
+													borderColor: "var(--ww-glass-border)",
+												}
+											: undefined
+									}
+								>
+									{/* Close (X) in the card's top-right — collapses the expanded
 								    card back to just the docked input, so the visitor can read
 								    only their own text. Clicking the bar again brings the CTAs
 								    back. Only while expanded; the open panel has its own header
 								    collapse control (`closeButton` via `headerActions`). */}
-								{showCard && phase !== "open" && (
-									<button
-										type="button"
-										onClick={collapse}
-										aria-label={t.launcher.close}
-										className="ww:absolute ww:right-2 ww:top-2 ww:z-10 ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer"
-									>
-										<XIcon className="ww:size-4" />
-									</button>
-								)}
+									{showCard && phase !== "open" && (
+										<button
+											type="button"
+											onClick={collapse}
+											aria-label={t.launcher.close}
+											className="ww:absolute ww:right-2 ww:top-2 ww:z-10 ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer"
+										>
+											<XIcon className="ww:size-4" />
+										</button>
+									)}
 
-								{suggestions.length > 0 && (
-									// The card grows straight up to reveal the pills: a
-									// `grid-rows` 0fr → 1fr height animation (eases to the pills'
-									// real height — no `max-h` guessing, no scale, so it rises
-									// vertically rather than diagonally) plus a fade. Anchored at
-									// the bottom of the screen, so the growth pushes upward.
-									<div
-										className={cn(
-											"ww:grid ww:transition-all ww:duration-300 ww:ease-out",
-											suggestionsVisible
-												? "ww:grid-rows-[1fr] ww:opacity-100"
-												: "ww:pointer-events-none ww:grid-rows-[0fr] ww:opacity-0",
-										)}
-									>
-										<div className="ww:overflow-hidden">
-											<Suggestions
-												suggestions={suggestions}
-												onSelect={openWith}
-												// Right padding keeps the top row of pills clear of the
-												// absolutely-positioned close button in the corner.
-												className="ww:pl-1 ww:pr-9 ww:pt-1 ww:pb-2.5"
-											/>
+									{suggestions.length > 0 && (
+										// The card grows straight up to reveal the pills: a
+										// `grid-rows` 0fr → 1fr height animation (eases to the pills'
+										// real height — no `max-h` guessing, no scale, so it rises
+										// vertically rather than diagonally) plus a fade. Anchored at
+										// the bottom of the screen, so the growth pushes upward.
+										<div
+											className={cn(
+												"ww:grid ww:transition-all ww:duration-300 ww:ease-out",
+												suggestionsVisible
+													? "ww:grid-rows-[1fr] ww:opacity-100"
+													: "ww:pointer-events-none ww:grid-rows-[0fr] ww:opacity-0",
+											)}
+										>
+											<div className="ww:overflow-hidden">
+												<Suggestions
+													suggestions={suggestions}
+													onSelect={(text) => {
+														widgetEvents.emit({
+															name: "suggestion.clicked",
+															properties: {
+																text,
+																index: suggestions.indexOf(text),
+															},
+														});
+														openWith(text);
+													}}
+													// Right padding keeps the top row of pills clear of the
+													// absolutely-positioned close button in the corner.
+													className="ww:pl-1 ww:pr-9 ww:pt-1 ww:pb-2.5"
+												/>
+											</div>
 										</div>
-									</div>
-								)}
+									)}
 
-								{/* Composer wrapped in the ReactBits border glow. Background +
+									{/* Composer wrapped in the ReactBits border glow. Background +
 								    radius are themed to match the input surface; the glow plays
 								    a one-off sweep on appear. */}
-								<BorderGlow
-									animated={appeared}
-									backgroundColor="var(--ww-color-input)"
-									borderRadius={16}
-									edgeSensitivity={30}
-									coneSpread={25}
-									colors={["#c084fc", "#f472b6", "#38bdf8"]}
-									className="ww:border-border"
-									style={{ boxShadow: cardShadow }}
-								>
-									<div className="ww:flex ww:items-center ww:gap-1 ww:pl-3.5 ww:pr-1.5 ww:py-1.5 ww:sm:pl-4 ww:sm:pr-2 ww:sm:py-2">
-										{/* `text-base` (16px) on mobile is load-bearing: iOS Safari
+									<BorderGlow
+										animated={appeared}
+										backgroundColor="var(--ww-color-input)"
+										borderRadius={16}
+										edgeSensitivity={30}
+										coneSpread={25}
+										colors={["#c084fc", "#f472b6", "#38bdf8"]}
+										className="ww:border-border"
+										style={{ boxShadow: cardShadow }}
+									>
+										<div className="ww:flex ww:items-center ww:gap-1 ww:pl-3.5 ww:pr-1.5 ww:py-1.5 ww:sm:pl-4 ww:sm:pr-2 ww:sm:py-2">
+											{/* `text-base` (16px) on mobile is load-bearing: iOS Safari
 										    auto-zooms a focused input under 16px. `sm:text-sm`
 										    restores the smaller text where the zoom rule doesn't
 										    apply. Do not drop the 16px mobile size. */}
-										<input
-											ref={composerInputRef}
-											type="text"
-											value={composerText}
-											placeholder={animatedDockPlaceholder}
-											onChange={(e) => setComposerText(e.target.value)}
-											onFocus={onComposerFocus}
-											onKeyDown={(e) => {
-												if (e.key === "Enter" && !e.shiftKey) {
-													e.preventDefault();
-													submitComposer();
-												}
-											}}
-											className="ww:min-w-0 ww:flex-1 ww:bg-transparent ww:py-1 ww:text-base ww:sm:text-sm ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground"
-										/>
-										<button
-											type="button"
-											onClick={submitComposer}
-											disabled={!composerText.trim()}
-											aria-label={t.promptInput.submit}
-											className="ww:relative ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:bg-foreground ww:text-background ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40"
-										>
-											<ArrowUp className="ww:size-4" />
-										</button>
-									</div>
-								</BorderGlow>
+											<input
+												ref={composerInputRef}
+												type="text"
+												value={composerText}
+												placeholder={animatedDockPlaceholder}
+												onChange={(e) => setComposerText(e.target.value)}
+												onFocus={onComposerFocus}
+												onKeyDown={(e) => {
+													if (e.key === "Enter" && !e.shiftKey) {
+														e.preventDefault();
+														submitComposer();
+													}
+												}}
+												className="ww:min-w-0 ww:flex-1 ww:bg-transparent ww:py-1 ww:text-base ww:sm:text-sm ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground"
+											/>
+											<button
+												type="button"
+												onClick={submitComposer}
+												disabled={!composerText.trim()}
+												aria-label={t.promptInput.submit}
+												className="ww:relative ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:bg-foreground ww:text-background ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40"
+											>
+												<ArrowUp className="ww:size-4" />
+											</button>
+										</div>
+									</BorderGlow>
+								</div>
 							</div>
-						</div>
 
-						{/* Full chat panel — expands open from the docked input's
+							{/* Full chat panel — expands open from the docked input's
 				    position (clip-path, see tailwind.css). Same desktop width
 				    as the expanded dock so the growth reads as one motion. */}
-						<div
-							role="dialog"
-							aria-label={config.title ?? dockPlaceholder}
-							data-waniwani-floating="panel"
-							data-state={phase === "open" ? "shown" : "hidden"}
-							style={{ boxShadow: cardShadow }}
-							className={cn(
-								"ww:fixed ww:z-[2147483002] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
-								// Mobile: full-screen sheet.
-								"ww:inset-0 ww:w-full ww:rounded-none",
-								// Desktop: wide ChatGPT-style card. Message content + input both
-								// stay capped at max-w-3xl and centered, so they share one
-								// column (good input/text ratio) and the extra panel width
-								// reads as balanced side padding — not a narrow Intercom panel.
-								"ww:sm:inset-auto ww:sm:bottom-4 ww:sm:left-0 ww:sm:right-0 ww:sm:mx-auto ww:sm:h-[720px] ww:sm:max-h-[calc(100dvh-2rem)] ww:sm:w-[calc(100vw-2rem)] ww:sm:max-w-[1000px] ww:sm:rounded-2xl ww:sm:border ww:sm:border-border",
-							)}
-						>
-							<ChatEmbed
-								ref={chatRef}
-								api={config.api ?? ""}
-								headers={{ Authorization: `Bearer ${config.token}` }}
-								skipRemoteConfig
-								body={body}
-								appearance={config.appearance}
-								title={config.title}
-								headerActions={closeButton}
-								// Force the header on in floating mode: the minimize control
-								// lives in `headerActions`, so honoring `hideHeader` here would
-								// leave an opened (full-screen on mobile) panel with no in-UI
-								// way back to the dock. The panel is its own chrome anyway.
-								hideHeader={false}
-								welcomeMessage={config.welcomeMessage}
-								placeholder={config.placeholder}
-								suggestions={
-									config.suggestions
-										? { initial: config.suggestions }
-										: undefined
-								}
-								enableThreadHistory={config.enableThreadHistory}
-								showToolCalls={config.showToolCalls}
-								locale={config.locale}
-								initializing={!ready}
-							/>
-						</div>
-					</>
-				)}
-			</div>
+							<div
+								role="dialog"
+								aria-label={config.title ?? dockPlaceholder}
+								data-waniwani-floating="panel"
+								data-state={phase === "open" ? "shown" : "hidden"}
+								style={{ boxShadow: cardShadow }}
+								className={cn(
+									"ww:fixed ww:z-[2147483002] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
+									// Mobile: full-screen sheet.
+									"ww:inset-0 ww:w-full ww:rounded-none",
+									// Desktop: wide ChatGPT-style card. Message content + input both
+									// stay capped at max-w-3xl and centered, so they share one
+									// column (good input/text ratio) and the extra panel width
+									// reads as balanced side padding — not a narrow Intercom panel.
+									"ww:sm:inset-auto ww:sm:bottom-4 ww:sm:left-0 ww:sm:right-0 ww:sm:mx-auto ww:sm:h-[720px] ww:sm:max-h-[calc(100dvh-2rem)] ww:sm:w-[calc(100vw-2rem)] ww:sm:max-w-[1000px] ww:sm:rounded-2xl ww:sm:border ww:sm:border-border",
+								)}
+							>
+								<ChatEmbed
+									ref={chatRef}
+									api={config.api ?? ""}
+									headers={{ Authorization: `Bearer ${config.token}` }}
+									skipRemoteConfig
+									body={body}
+									appearance={config.appearance}
+									title={config.title}
+									headerActions={closeButton}
+									// Force the header on in floating mode: the minimize control
+									// lives in `headerActions`, so honoring `hideHeader` here would
+									// leave an opened (full-screen on mobile) panel with no in-UI
+									// way back to the dock. The panel is its own chrome anyway.
+									hideHeader={false}
+									welcomeMessage={config.welcomeMessage}
+									placeholder={config.placeholder}
+									suggestions={
+										config.suggestions
+											? { initial: config.suggestions }
+											: undefined
+									}
+									enableThreadHistory={config.enableThreadHistory}
+									showToolCalls={config.showToolCalls}
+									locale={config.locale}
+									initializing={!ready}
+								/>
+							</div>
+						</>
+					)}
+				</div>
+			</WidgetEventsProvider>
 		);
 	},
 );

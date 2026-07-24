@@ -157,6 +157,24 @@ describe("resolveConfig — render mode", () => {
 	});
 });
 
+describe("resolveConfig — onEvent", () => {
+	test("programmatic onEvent survives the layered merge", () => {
+		const onEvent = () => {};
+		const config = resolveConfig(
+			{ token: "tok", onEvent },
+			{ title: "Remote" },
+			{},
+		);
+		expect(config.onEvent).toBe(onEvent);
+		expect(config.title).toBe("Remote");
+	});
+
+	test("onEvent is undefined by default", () => {
+		const config = resolveConfig({ token: "tok" });
+		expect(config.onEvent).toBeUndefined();
+	});
+});
+
 async function parseWithAttrs(
 	attrs: Record<string, string>,
 ): Promise<Record<string, unknown>> {

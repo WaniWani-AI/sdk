@@ -25,6 +25,11 @@ export type {
 	McpAppFrameProps,
 } from "./components/mcp-app-frame";
 export { McpAppFrame } from "./components/mcp-app-frame";
+export type {
+	WidgetEvent,
+	WidgetEventName,
+	WidgetMode,
+} from "./embed/widget-events";
 export { ChatEmbed } from "./layouts/chat-embed";
 export {
 	WaniwaniChat,
