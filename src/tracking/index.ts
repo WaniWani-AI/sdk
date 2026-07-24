@@ -23,8 +23,6 @@ export type {
 	OptionSelectedProperties,
 	PriceShownProperties,
 	PricesComparedProperties,
-	PurchaseCompletedProperties,
-	QuoteSucceededProperties,
 	RevenueConvertedInput,
 	RevenueLeadQualifiedInput,
 	RevenueOptionSelectedInput,

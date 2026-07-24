@@ -102,30 +102,10 @@ function mapLegacyProperties(
 			}
 			return properties;
 		}
-		case "quote.succeeded": {
-			const properties: Record<string, unknown> = {};
-			if (typeof input.quoteAmount === "number") {
-				properties.amount = input.quoteAmount;
-			}
-			if (takeNonEmptyString(input.quoteCurrency)) {
-				properties.currency = input.quoteCurrency;
-			}
-			return properties;
-		}
 		case "link.clicked": {
 			const properties: Record<string, unknown> = {};
 			if (takeNonEmptyString(input.linkUrl)) {
 				properties.url = input.linkUrl;
-			}
-			return properties;
-		}
-		case "purchase.completed": {
-			const properties: Record<string, unknown> = {};
-			if (typeof input.purchaseAmount === "number") {
-				properties.amount = input.purchaseAmount;
-			}
-			if (takeNonEmptyString(input.purchaseCurrency)) {
-				properties.currency = input.purchaseCurrency;
 			}
 			return properties;
 		}

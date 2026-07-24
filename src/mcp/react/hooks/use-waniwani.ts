@@ -98,7 +98,7 @@ export interface WaniwaniWidget {
 	readonly sessionId?: string;
 	/**
 	 * Track a typed event. The exact same surface as the server client:
-	 * `track({ event: "quote.succeeded", properties })`,
+	 * `track({ event: "session.started" })`,
 	 * `track.priceShown({ amount, currency })`, `track.converted({ ... })`.
 	 * Identity (session, trace, user) is stamped automatically.
 	 */

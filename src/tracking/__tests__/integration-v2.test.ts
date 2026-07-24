@@ -46,7 +46,7 @@ describe("integration: SDK to V2 ingest", () => {
 			meta: { "openai/sessionId": "session-1", requestId: "request-1" },
 		});
 		const second = await client.track({
-			event: "quote.succeeded",
+			event: "price_shown",
 			properties: { amount: 120, currency: "USD" },
 		});
 
@@ -66,7 +66,7 @@ describe("integration: SDK to V2 ingest", () => {
 		expect(eventOne?.correlation.sessionId).toBe("session-1");
 		expect(eventOne?.correlation.requestId).toBe("request-1");
 
-		expect(eventTwo?.name).toBe("quote.succeeded");
+		expect(eventTwo?.name).toBe("price_shown");
 		expect(eventTwo?.properties).toEqual({ amount: 120, currency: "USD" });
 
 		await client.shutdown();
@@ -123,7 +123,7 @@ describe("integration: SDK to V2 ingest", () => {
 			},
 		});
 
-		await client.track({ event: "quote.requested" });
+		await client.track({ event: "session.started" });
 		await client.flush();
 
 		expect(callCount).toBe(3);

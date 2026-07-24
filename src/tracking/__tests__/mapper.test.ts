@@ -30,18 +30,18 @@ describe("mapTrackEventToV2", () => {
 		expect(mapped.rawLegacy?.eventType).toBe("tool.called");
 	});
 
-	test("maps docs-style quote fields and merges with explicit properties", () => {
+	test("merges legacy-mapped fields with explicit properties", () => {
 		const mapped = mapTrackEventToV2({
-			eventType: "quote.succeeded",
-			quoteAmount: 120,
-			quoteCurrency: "USD",
-			properties: { source: "calculator", amount: 140 },
+			eventType: "tool.called",
+			toolName: "pricing",
+			toolType: "pricing",
+			properties: { source: "calculator", name: "override" },
 		});
 
-		expect(mapped.name).toBe("quote.succeeded");
+		expect(mapped.name).toBe("tool.called");
 		expect(mapped.properties).toEqual({
-			amount: 140,
-			currency: "USD",
+			name: "override",
+			type: "pricing",
 			source: "calculator",
 		});
 	});
@@ -73,7 +73,7 @@ describe("mapTrackEventToV2", () => {
 
 	test("uses metadata fallback precedence for session and trace ids", () => {
 		const mapped = mapTrackEventToV2({
-			event: "quote.requested",
+			event: "session.started",
 			meta: {
 				"openai/sessionId": "session-openai",
 				sessionId: "session-meta",
@@ -114,7 +114,7 @@ describe("mapTrackEventToV2", () => {
 
 	test("assigns deterministic id/timestamp/source when injected", () => {
 		const mapped = mapTrackEventToV2(
-			{ event: "quote.failed" },
+			{ event: "session.started" },
 			{
 				now: () => new Date("2026-02-26T03:04:05.000Z"),
 				generateId: () => "evt_test_deterministic",

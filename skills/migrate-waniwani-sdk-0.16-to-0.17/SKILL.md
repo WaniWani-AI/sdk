@@ -88,3 +88,7 @@ There is no `@deprecated` fallback for the removed auto-discovery. The self-conn
 - **Leaving the import as `@waniwani/sdk/mcp/react` in a skybridge widget.** The bare call there is now a no-op; it must move to `@waniwani/sdk/mcp/react/skybridge`.
 - **Adding a second host connection by hand to "get the `_meta`".** Do not. In a skybridge widget skybridge already owns the connection; use the adapter, which reads what skybridge captured.
 - **Skipping the verify step.** A clean `bun run typecheck` plus green `bun test`, with every call site classified, is the definition of done.
+
+## Moving past 0.17?
+
+This skill ends at 0.17.0. The next hop (0.18.0 removes the `quote.*` and `purchase.completed` events from the `track()` taxonomy) ships its own skill: `migrate-waniwani-sdk-0.17-to-0.18`. Apply the hops in order.

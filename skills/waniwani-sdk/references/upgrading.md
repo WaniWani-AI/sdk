@@ -31,6 +31,21 @@ One behavioral note (not a break): `messageBorderRadius` / `--ww-msg-radius` is 
 
 This list mirrors the changelog so you can apply migrations without a network fetch. Always cross-check against the live changelog for anything newer than this file.
 
+### 0.18.0: quote and purchase events removed from the taxonomy
+
+The event names `quote.requested`, `quote.succeeded`, `quote.failed`, and `purchase.completed` are removed from `EVENT_TYPES` and the `TrackEvent` union. The typed revenue taxonomy covers these funnel stages. Removed with them: the `QuoteSucceededProperties` and `PurchaseCompletedProperties` type exports, and the legacy input fields `quoteAmount`, `quoteCurrency`, `purchaseAmount`, `purchaseCurrency` on `LegacyTrackEvent`. `link.clicked` (and `LinkClickedProperties`, legacy `linkUrl`) stays.
+
+Auto-fix, per call site:
+
+1. `track({ event: "quote.succeeded", properties: { amount, currency } })` (or legacy `eventType: "quote.succeeded"` with `quoteAmount`/`quoteCurrency`) becomes `track.priceShown({ amount, currency })`.
+2. `track({ event: "purchase.completed", properties: { amount, currency } })` (or legacy `purchaseAmount`/`purchaseCurrency`) becomes `track.converted({ amount, currency })`.
+3. `track({ event: "quote.requested" })` and `track({ event: "quote.failed" })`: delete the call. The funnel start is already covered by the auto-captured `tool.called` and `session.started`.
+4. Replace type imports: `QuoteSucceededProperties` with `PriceShownProperties`, `PurchaseCompletedProperties` with `ConvertedProperties`.
+
+No `@deprecated` shim: the removal is intentional cleanup of a surface superseded by the revenue taxonomy, so the names are gone outright and `tsc` surfaces every call site.
+
+After applying, run `bun run typecheck && bun test`.
+
 ### 0.17.0: `useWaniwani()` no longer auto-discovers its config
 
 `useWaniwani()` from `@waniwani/sdk/mcp/react` is now host-agnostic. It resolves config (endpoint, source, widget token, session id) only from **explicit options** or a **`toolResponseMetadata` object you pass**. It no longer reads a `WidgetProvider` context and no longer opens its own host connection to discover the config. A bare `useWaniwani()` that relied on that auto-discovery now returns a no-op widget.

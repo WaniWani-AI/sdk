@@ -16,11 +16,7 @@ export const EVENT_TYPES = [
 	"session.started",
 	"page.viewed",
 	"tool.called",
-	"quote.requested",
-	"quote.succeeded",
-	"quote.failed",
 	"link.clicked",
-	"purchase.completed",
 	// Emitted automatically by the frontend client once per widget mount.
 	"widget_render",
 	"user.identified",
@@ -67,18 +63,8 @@ export interface ToolCalledProperties {
 	kbSearch?: KbSearchTrace[];
 }
 
-export interface QuoteSucceededProperties {
-	amount?: number;
-	currency?: string;
-}
-
 export interface LinkClickedProperties {
 	url?: string;
-}
-
-export interface PurchaseCompletedProperties {
-	amount?: number;
-	currency?: string;
 }
 
 // ============================================
@@ -185,19 +171,9 @@ export type TrackEvent =
 			event: "tool.called";
 			properties?: ToolCalledProperties;
 	  } & BaseTrackEvent)
-	| ({ event: "quote.requested" } & BaseTrackEvent)
-	| ({
-			event: "quote.succeeded";
-			properties?: QuoteSucceededProperties;
-	  } & BaseTrackEvent)
-	| ({ event: "quote.failed" } & BaseTrackEvent)
 	| ({
 			event: "link.clicked";
 			properties?: LinkClickedProperties;
-	  } & BaseTrackEvent)
-	| ({
-			event: "purchase.completed";
-			properties?: PurchaseCompletedProperties;
 	  } & BaseTrackEvent)
 	| ({ event: "user.identified" } & BaseTrackEvent)
 	| ({ event: "widget_render" } & BaseTrackEvent)
@@ -230,11 +206,7 @@ export interface LegacyTrackEvent extends TrackingContext {
 	properties?: Record<string, unknown>;
 	toolName?: string;
 	toolType?: ToolCalledProperties["type"];
-	quoteAmount?: number;
-	quoteCurrency?: string;
 	linkUrl?: string;
-	purchaseAmount?: number;
-	purchaseCurrency?: string;
 }
 
 /**

@@ -35,7 +35,7 @@ describe("createFrontendClient", () => {
 			identity: () => ({ sessionId: "sess-1", traceId: "trace-1" }),
 		});
 
-		await client.track({ event: "quote.requested" });
+		await client.track({ event: "session.started" });
 		await client.flush();
 		await client.shutdown();
 
@@ -51,7 +51,7 @@ describe("createFrontendClient", () => {
 		const [batch] = sentBatches();
 		expect(batch.events).toHaveLength(1);
 		const event = batch.events[0];
-		expect(event?.name).toBe("quote.requested");
+		expect(event?.name).toBe("session.started");
 		expect(event?.source).toBe("chatgpt");
 		expect(event?.correlation.sessionId).toBe("sess-1");
 		expect(event?.correlation.traceId).toBe("trace-1");
@@ -97,7 +97,7 @@ describe("createFrontendClient", () => {
 
 		await client.track({ event: "page.viewed" });
 		sessionId = "sess-late";
-		await client.track({ event: "quote.requested" });
+		await client.track({ event: "session.started" });
 		await client.flush();
 		await client.shutdown();
 
@@ -116,7 +116,7 @@ describe("createFrontendClient", () => {
 		});
 
 		await client.identify("user-42", { plan: "pro" });
-		await client.track({ event: "quote.requested" });
+		await client.track({ event: "session.started" });
 		await client.flush();
 		await client.shutdown();
 
