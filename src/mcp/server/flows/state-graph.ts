@@ -45,7 +45,7 @@ function buildMermaidGraph(
  * })
  *   .addNode({
  *     id: "ask_name",
- *     run: ({ interrupt }) => interrupt({ question: "What's your name?", field: "name" }),
+ *     run: ({ interrupt }) => interrupt({ name: { question: "What's your name?" } }),
  *   })
  *   .addNode({
  *     id: "greet",
@@ -80,7 +80,7 @@ export class StateGraph<
 	 * .addNode({
 	 *   id: "ask_name",
 	 *   label: "Ask for name",
-	 *   run: ({ interrupt }) => interrupt({ question: "What's your name?", field: "name" }),
+	 *   run: ({ interrupt }) => interrupt({ name: { question: "What's your name?" } }),
 	 * })
 	 * ```
 	 */
