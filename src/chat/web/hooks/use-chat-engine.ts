@@ -8,6 +8,7 @@ import type { ModelContextUpdate } from "../../../shared/model-context";
 import { hasModelContext } from "../../../shared/model-context";
 import type { ChatBaseProps } from "../@types";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
+import { useWidgetEvents } from "../embed/widget-events-context";
 import { buildApiUrl } from "../lib/api-url";
 import { LenientChatTransport } from "../lib/lenient-chat-transport";
 import {
@@ -28,6 +29,7 @@ import {
 
 const SESSION_HEADER_NAME = "x-session-id";
 const THREAD_PERSIST_DEBOUNCE_MS = 250;
+const ERROR_MESSAGE_MAX_LENGTH = 200;
 
 function generateThreadId(): string {
 	if (
@@ -138,6 +140,10 @@ export function useChatEngine(props: ChatBaseProps) {
 	const propVisitorId = props.visitorId;
 	useEffect(() => applyVisitorId(propVisitorId), [propVisitorId]);
 
+	// The transport is constructed once at first render and captures that
+	// render's callbacks, so the provider must supply a per-mount-stable emitter.
+	const widgetEvents = useWidgetEvents();
+
 	const headersRef = useRef(userHeaders);
 	const bodyRef = useRef(body);
 	const enableThreadHistoryRef = useRef(enableThreadHistory);
@@ -180,13 +186,25 @@ export function useChatEngine(props: ChatBaseProps) {
 		onThreadChangeRef.current = onThreadChange;
 	}, [onThreadChange]);
 
-	const setActiveThreadId = useCallback((next: string | undefined) => {
-		activeThreadIdRef.current = next;
-		setActiveThreadIdState(next);
-		if (next) {
-			onThreadChangeRef.current?.(next);
-		}
-	}, []);
+	const setActiveThreadId = useCallback(
+		(next: string | undefined) => {
+			activeThreadIdRef.current = next;
+			setActiveThreadIdState(next);
+			if (next) {
+				onThreadChangeRef.current?.(next);
+				widgetEvents.emit({
+					name: "thread.changed",
+					// Explicit: the ref is mutated synchronously, while the live
+					// getter reads React state and would report the outgoing
+					// session after a same-tick restore (switchThread) or clear
+					// (startNewThread).
+					sessionId: sessionIdRef.current,
+					properties: { threadId: next },
+				});
+			}
+		},
+		[widgetEvents],
+	);
 
 	const refreshThreads = useCallback(async () => {
 		if (!enableThreadHistory) {
@@ -204,18 +222,28 @@ export function useChatEngine(props: ChatBaseProps) {
 		return sessionIdRef.current;
 	}, []);
 
-	const setSessionId = useCallback((value: unknown) => {
-		const sessionId = normalizeSessionId(value);
-		if (!sessionId) {
-			return;
-		}
-		if (sessionIdRef.current === sessionId) {
-			return;
-		}
+	const setSessionId = useCallback(
+		(value: unknown) => {
+			const sessionId = normalizeSessionId(value);
+			if (!sessionId) {
+				return;
+			}
+			if (sessionIdRef.current === sessionId) {
+				return;
+			}
 
-		sessionIdRef.current = sessionId;
-		setSessionIdState(sessionId);
-	}, []);
+			const isFirstAssignment = sessionIdRef.current === undefined;
+			sessionIdRef.current = sessionId;
+			setSessionIdState(sessionId);
+			if (isFirstAssignment) {
+				widgetEvents.emit({
+					name: "session.started",
+					properties: { sessionId },
+				});
+			}
+		},
+		[widgetEvents],
+	);
 
 	const clearSessionId = useCallback(() => {
 		sessionIdRef.current = undefined;
@@ -452,8 +480,14 @@ export function useChatEngine(props: ChatBaseProps) {
 	const { messages, sendMessage, setMessages, status } = useChat({
 		messages: props.initialMessages,
 		transport: transportRef.current,
-		onFinish({ message }) {
+		onFinish({ message, isAbort, isDisconnect, isError }) {
+			// `onFinish` also runs for aborted/disconnected/errored requests.
+			// `onResponseReceived` fires for all of them; the widget event is
+			// emitted only for a successful assistant reply.
 			onResponseReceived?.();
+			if (!isAbort && !isDisconnect && !isError) {
+				widgetEvents.emit({ name: "message.received" });
+			}
 			if (pendingWaitRef.current) {
 				// Stash the message — resolve only after React commits the
 				// messages state update (see useEffect on `status` below).
@@ -462,6 +496,12 @@ export function useChatEngine(props: ChatBaseProps) {
 		},
 		onError(error) {
 			console.warn("[Waniwani] Chat error:", error.message);
+			widgetEvents.emit({
+				name: "chat.error",
+				properties: {
+					message: error.message.slice(0, ERROR_MESSAGE_MAX_LENGTH),
+				},
+			});
 			if (pendingWaitRef.current) {
 				pendingWaitRef.current.reject(error);
 				pendingWaitRef.current = null;
@@ -611,9 +651,16 @@ export function useChatEngine(props: ChatBaseProps) {
 			});
 
 			onMessageSent?.(message.text || "");
+			widgetEvents.emit({ name: "message.sent" });
 			setText("");
 		},
-		[sendMessage, onMessageSent, isLoading, queuedMessages.length],
+		[
+			sendMessage,
+			onMessageSent,
+			isLoading,
+			queuedMessages.length,
+			widgetEvents,
+		],
 	);
 
 	const sendMessageAndWait = useCallback(
@@ -622,9 +669,10 @@ export function useChatEngine(props: ChatBaseProps) {
 				pendingWaitRef.current = { resolve, reject };
 				sendMessage({ text });
 				onMessageSent?.(text);
+				widgetEvents.emit({ name: "message.sent" });
 			});
 		},
-		[sendMessage, onMessageSent],
+		[sendMessage, onMessageSent, widgetEvents],
 	);
 
 	// Flush first queued message once the current response finishes
@@ -645,7 +693,8 @@ export function useChatEngine(props: ChatBaseProps) {
 			files: first.files.length > 0 ? first.files : undefined,
 		});
 		onMessageSent?.(first.text);
-	}, [status, sendMessage, onMessageSent, queuedMessages]);
+		widgetEvents.emit({ name: "message.sent" });
+	}, [status, sendMessage, onMessageSent, queuedMessages, widgetEvents]);
 
 	const reset = useCallback(() => {
 		setMessages([]);
@@ -808,15 +857,17 @@ export function useChatEngine(props: ChatBaseProps) {
 			if (!stored) {
 				return;
 			}
-			setActiveThreadId(stored.threadId);
-			threadCreatedAtRef.current = stored.createdAt;
-			threadTitleRef.current = stored.title;
+			// Restore the session before announcing the switch, so the
+			// `thread.changed` event carries the target thread's session id.
 			if (stored.sessionId) {
 				sessionIdRef.current = stored.sessionId;
 				setSessionIdState(stored.sessionId);
 			} else {
 				clearSessionId();
 			}
+			setActiveThreadId(stored.threadId);
+			threadCreatedAtRef.current = stored.createdAt;
+			threadTitleRef.current = stored.title;
 			setMessages(stored.messages);
 			setQueuedMessages([]);
 			setText("");

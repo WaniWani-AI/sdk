@@ -57,7 +57,14 @@ type Root = ReturnType<typeof createRoot>;
  * "submitted → streaming → ready" lifecycle.
  */
 let useChatStatus = "ready";
-let capturedOnFinish: ((payload: { message: unknown }) => void) | undefined;
+let capturedOnFinish:
+	| ((payload: {
+			message: unknown;
+			isAbort?: boolean;
+			isDisconnect?: boolean;
+			isError?: boolean;
+	  }) => void)
+	| undefined;
 let capturedOnError: ((error: Error) => void) | undefined;
 const mockSendMessage = mock(() => {});
 const mockSetMessages = mock(() => {});
@@ -104,6 +111,9 @@ afterEach(() => {
 
 // Now import the hook under test (after mocks are registered)
 const { useChatEngine } = await import("./use-chat-engine");
+const { WidgetEventsProvider } = await import("../embed/widget-events-context");
+const { createWidgetEventEmitter } = await import("../embed/widget-events");
+type WidgetEventType = import("../embed/widget-events").WidgetEvent;
 
 // ---------------------------------------------------------------------------
 // Test harness — a thin component that exposes the hook's return value via ref
@@ -111,8 +121,14 @@ const { useChatEngine } = await import("./use-chat-engine");
 
 type HookReturn = ReturnType<typeof useChatEngine>;
 
-function Harness({ resultRef }: { resultRef: { current: HookReturn | null } }) {
-	const engine = useChatEngine({ api: "/api/waniwani" });
+function Harness({
+	resultRef,
+	body,
+}: {
+	resultRef: { current: HookReturn | null };
+	body?: Record<string, unknown>;
+}) {
+	const engine = useChatEngine({ api: "/api/waniwani", body });
 	resultRef.current = engine;
 	return null;
 }
@@ -299,5 +315,233 @@ describe("useChatEngine – thread history", () => {
 		// Body builder now uses the new threadId
 		const secondBody = capturedTransportBody?.();
 		expect(secondBody?.threadId).toBe(nextId);
+	});
+});
+
+// Re-renders the shared root with Harness wrapped in a WidgetEventsProvider,
+// so the captured useChat/transport mocks belong to the provider-wrapped
+// engine (a second concurrent mount would race over them). Returns a
+// `rerender` bound to the same emitter for prop/status changes, and awaits
+// the mount-effect continuations so they settle inside act.
+async function mountWithEvents(options?: {
+	body?: Record<string, unknown>;
+	getSessionId?: () => string | undefined;
+}) {
+	const events: WidgetEventType[] = [];
+	const emitter = createWidgetEventEmitter({
+		mode: "inline",
+		getSessionId: options?.getSessionId,
+	});
+	emitter.subscribe((event) => {
+		events.push(event);
+	});
+	const rerender = (next?: { body?: Record<string, unknown> }) => {
+		act(() => {
+			root.render(
+				createElement(
+					WidgetEventsProvider,
+					{ value: emitter },
+					createElement(Harness, {
+						resultRef: hookRef,
+						body: next?.body ?? options?.body,
+					}),
+				),
+			);
+		});
+	};
+	rerender();
+	await flushAsync();
+	return { events, rerender };
+}
+
+describe("useChatEngine – widget events", () => {
+	test("message.sent fires on submit and never carries the text", async () => {
+		const { events } = await mountWithEvents();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		act(() => {
+			engine.handleSubmit({ text: "my secret question", files: [] });
+		});
+
+		const sent = events.filter((e) => e.name === "message.sent");
+		expect(sent.length).toBe(1);
+		expect(JSON.stringify(events)).not.toContain("my secret question");
+	});
+
+	test("message.sent fires exactly once for a queued message", async () => {
+		const { events, rerender } = await mountWithEvents();
+		useChatStatus = "streaming";
+		rerender();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		act(() => {
+			engine.handleSubmit({ text: "queued while streaming", files: [] });
+		});
+		expect(events.filter((e) => e.name === "message.sent").length).toBe(0);
+
+		useChatStatus = "ready";
+		rerender();
+
+		expect(events.filter((e) => e.name === "message.sent").length).toBe(1);
+	});
+
+	test("message.received fires on finish", async () => {
+		const { events } = await mountWithEvents();
+
+		act(() => {
+			capturedOnFinish?.({ message: { role: "assistant" } });
+		});
+
+		expect(events.some((e) => e.name === "message.received")).toBe(true);
+	});
+
+	test("message.received does not fire when the request errored", async () => {
+		const { events } = await mountWithEvents();
+
+		act(() => {
+			capturedOnError?.(new Error("boom"));
+			capturedOnFinish?.({ message: { role: "assistant" }, isError: true });
+		});
+
+		expect(events.filter((e) => e.name === "chat.error").length).toBe(1);
+		expect(events.filter((e) => e.name === "message.received").length).toBe(0);
+
+		act(() => {
+			capturedOnFinish?.({ message: { role: "assistant" } });
+		});
+		expect(events.filter((e) => e.name === "message.received").length).toBe(1);
+	});
+
+	test("chat.error fires with a truncated technical message", async () => {
+		const { events } = await mountWithEvents();
+
+		act(() => {
+			capturedOnError?.(new Error("x".repeat(500)));
+		});
+
+		const errors = events.filter((e) => e.name === "chat.error");
+		expect(errors.length).toBe(1);
+		for (const e of errors) {
+			if (e.name === "chat.error") {
+				expect(e.properties.message.length).toBe(200);
+			}
+		}
+	});
+
+	test("session.started fires once when the id is first assigned", async () => {
+		const { events, rerender } = await mountWithEvents({
+			body: { sessionId: "sess_1" },
+		});
+
+		act(() => {
+			capturedTransportBody?.();
+			capturedTransportBody?.();
+		});
+
+		// A rotated session id must not re-fire session.started.
+		rerender({ body: { sessionId: "sess_2" } });
+		act(() => {
+			capturedTransportBody?.();
+		});
+
+		const started = events.filter((e) => e.name === "session.started");
+		expect(started.length).toBe(1);
+		expect(started[0]?.sessionId).toBe("sess_1");
+	});
+
+	test("thread.changed fires when a thread becomes active", async () => {
+		const { events } = await mountWithEvents();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		let nextId = "";
+		act(() => {
+			nextId = engine.startNewThread();
+		});
+		expect(nextId.length).toBeGreaterThan(5);
+
+		const changed = events.filter((e) => e.name === "thread.changed");
+		expect(changed.length).toBe(1);
+		for (const e of changed) {
+			if (e.name === "thread.changed") {
+				expect(e.properties.threadId).toBe(nextId);
+			}
+		}
+	});
+
+	test("thread.changed on switchThread carries the target thread's session id", async () => {
+		const { upsertThread } = await import("../lib/thread-store");
+		const now = new Date().toISOString();
+		await upsertThread({
+			threadId: "thread_stored",
+			memoryUserId: "user_test",
+			title: "Stored thread",
+			messages: [],
+			sessionId: "sess_stored",
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		const { events } = await mountWithEvents({
+			getSessionId: () => "sess_outgoing",
+		});
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		await act(async () => {
+			await engine.switchThread("thread_stored");
+		});
+
+		const changed = events.filter(
+			(e) =>
+				e.name === "thread.changed" &&
+				e.properties.threadId === "thread_stored",
+		);
+		expect(changed).toHaveLength(1);
+		expect(changed[0]?.sessionId).toBe("sess_stored");
+	});
+
+	test("thread.changed on startNewThread does not report the outgoing session", async () => {
+		const { events } = await mountWithEvents({
+			getSessionId: () => "sess_stale",
+		});
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		let nextId = "";
+		act(() => {
+			nextId = engine.startNewThread();
+		});
+
+		const changed = events.filter(
+			(e) => e.name === "thread.changed" && e.properties.threadId === nextId,
+		);
+		expect(changed).toHaveLength(1);
+		expect(changed[0]?.sessionId).toBeUndefined();
+	});
+
+	test("emits are inert without a provider", () => {
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		expect(() => {
+			act(() => {
+				engine.handleSubmit({ text: "hello", files: [] });
+			});
+		}).not.toThrow();
 	});
 });
