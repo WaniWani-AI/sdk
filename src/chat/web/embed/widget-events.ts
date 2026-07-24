@@ -19,8 +19,8 @@ interface WidgetEventBase {
 	/** Surface the widget is mounted on. */
 	mode: WidgetMode;
 	/**
-	 * Conversation session id, when one exists. Assigned by the server on the
-	 * first exchange, so it is `undefined` for events that precede it.
+	 * Conversation session id, when one exists. Assigned on the first
+	 * exchange, so it is `undefined` for events that precede it.
 	 */
 	sessionId?: string;
 	/** Epoch milliseconds at emit time. */
@@ -54,8 +54,10 @@ export type WidgetEventName = WidgetEventDetail["name"];
 /**
  * `emit()` input: the event detail, plus an optional explicit session id for
  * call sites that hold a fresher value than the live getter (e.g. the engine
- * emitting `session.started` in the same tick the id is assigned).
- * `session.started` derives its top-level `sessionId` from
+ * emitting in the same tick a session id is assigned, restored, or cleared).
+ * A present `sessionId` key is authoritative even when its value is
+ * `undefined` — the live getter reads React state and lags same-tick
+ * mutations. `session.started` derives its top-level `sessionId` from
  * `properties.sessionId` when no explicit override is given.
  */
 export type WidgetEventInput = WidgetEventDetail & { sessionId?: string };
@@ -98,8 +100,9 @@ export function createWidgetEventEmitter(
 			const event: WidgetEvent = {
 				...detail,
 				mode: options.mode,
-				sessionId:
-					explicitSessionId ?? derivedSessionId ?? options.getSessionId?.(),
+				sessionId: Object.hasOwn(input, "sessionId")
+					? explicitSessionId
+					: (derivedSessionId ?? options.getSessionId?.()),
 				timestamp: Date.now(),
 			};
 			// Snapshot so listener-triggered subscribe/unsubscribe during emit

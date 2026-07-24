@@ -194,6 +194,11 @@ export function useChatEngine(props: ChatBaseProps) {
 				onThreadChangeRef.current?.(next);
 				widgetEvents.emit({
 					name: "thread.changed",
+					// Explicit: the ref is mutated synchronously, while the live
+					// getter reads React state and would report the outgoing
+					// session after a same-tick restore (switchThread) or clear
+					// (startNewThread).
+					sessionId: sessionIdRef.current,
 					properties: { threadId: next },
 				});
 			}
@@ -852,15 +857,17 @@ export function useChatEngine(props: ChatBaseProps) {
 			if (!stored) {
 				return;
 			}
-			setActiveThreadId(stored.threadId);
-			threadCreatedAtRef.current = stored.createdAt;
-			threadTitleRef.current = stored.title;
+			// Restore the session before announcing the switch, so the
+			// `thread.changed` event carries the target thread's session id.
 			if (stored.sessionId) {
 				sessionIdRef.current = stored.sessionId;
 				setSessionIdState(stored.sessionId);
 			} else {
 				clearSessionId();
 			}
+			setActiveThreadId(stored.threadId);
+			threadCreatedAtRef.current = stored.createdAt;
+			threadTitleRef.current = stored.title;
 			setMessages(stored.messages);
 			setQueuedMessages([]);
 			setText("");

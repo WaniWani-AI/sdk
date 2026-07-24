@@ -211,7 +211,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 		const trackClientRef = useRef<FrontendTrackingClient | null>(null);
 
 		// One emitter per mount. The session id getter reads through the chat
-		// handle so events pick up the server-assigned id as soon as it exists.
+		// handle so events pick up the session id as soon as it exists.
 		// WaniwaniChat is an in-page mount and reports "inline", matching the
 		// `mode` tag on its chat requests and page.viewed events.
 		const widgetEvents = useMemo(

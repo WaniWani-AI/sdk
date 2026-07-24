@@ -109,6 +109,24 @@ describe("createWidgetEventEmitter", () => {
 		expect(received).toEqual(["chat.ready"]);
 	});
 
+	test("an explicit undefined sessionId suppresses the live getter", () => {
+		const emitter = createWidgetEventEmitter({
+			mode: "inline",
+			getSessionId: () => "sess_stale",
+		});
+		const received: WidgetEvent[] = [];
+		emitter.subscribe((e) => received.push(e));
+
+		emitter.emit({
+			name: "thread.changed",
+			sessionId: undefined,
+			properties: { threadId: "t1" },
+		});
+
+		expect(received).toHaveLength(1);
+		expect(received[0]?.sessionId).toBeUndefined();
+	});
+
 	test("session.started derives its top-level id from properties", () => {
 		const emitter = createWidgetEventEmitter({
 			mode: "inline",

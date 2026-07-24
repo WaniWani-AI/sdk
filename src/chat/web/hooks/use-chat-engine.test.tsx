@@ -323,9 +323,15 @@ describe("useChatEngine – thread history", () => {
 // engine (a second concurrent mount would race over them). Returns a
 // `rerender` bound to the same emitter for prop/status changes, and awaits
 // the mount-effect continuations so they settle inside act.
-async function mountWithEvents(options?: { body?: Record<string, unknown> }) {
+async function mountWithEvents(options?: {
+	body?: Record<string, unknown>;
+	getSessionId?: () => string | undefined;
+}) {
 	const events: WidgetEventType[] = [];
-	const emitter = createWidgetEventEmitter({ mode: "inline" });
+	const emitter = createWidgetEventEmitter({
+		mode: "inline",
+		getSessionId: options?.getSessionId,
+	});
 	emitter.subscribe((event) => {
 		events.push(event);
 	});
@@ -469,6 +475,61 @@ describe("useChatEngine – widget events", () => {
 				expect(e.properties.threadId).toBe(nextId);
 			}
 		}
+	});
+
+	test("thread.changed on switchThread carries the target thread's session id", async () => {
+		const { upsertThread } = await import("../lib/thread-store");
+		const now = new Date().toISOString();
+		await upsertThread({
+			threadId: "thread_stored",
+			memoryUserId: "user_test",
+			title: "Stored thread",
+			messages: [],
+			sessionId: "sess_stored",
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		const { events } = await mountWithEvents({
+			getSessionId: () => "sess_outgoing",
+		});
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		await act(async () => {
+			await engine.switchThread("thread_stored");
+		});
+
+		const changed = events.filter(
+			(e) =>
+				e.name === "thread.changed" &&
+				e.properties.threadId === "thread_stored",
+		);
+		expect(changed).toHaveLength(1);
+		expect(changed[0]?.sessionId).toBe("sess_stored");
+	});
+
+	test("thread.changed on startNewThread does not report the outgoing session", async () => {
+		const { events } = await mountWithEvents({
+			getSessionId: () => "sess_stale",
+		});
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		let nextId = "";
+		act(() => {
+			nextId = engine.startNewThread();
+		});
+
+		const changed = events.filter(
+			(e) => e.name === "thread.changed" && e.properties.threadId === nextId,
+		);
+		expect(changed).toHaveLength(1);
+		expect(changed[0]?.sessionId).toBeUndefined();
 	});
 
 	test("emits are inert without a provider", () => {

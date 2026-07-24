@@ -761,7 +761,7 @@ Both hosted surfaces accept an `onEvent` callback — `WaniWani.chat.init({ onEv
 | `message.sent` | The visitor (or the imperative API, e.g. `sendMessage`) submits a message (never includes the message text) | — |
 | `message.received` | Assistant reply finished (never includes the message text) | — |
 | `session.started` | Server assigned the session id on the first exchange (restored threads don't re-fire) | `{ sessionId }` |
-| `thread.changed` | Thread created or switched (requires thread history) | `{ threadId }` |
+| `thread.changed` | Thread created or switched (requires thread history; the top-level `sessionId` is the target thread's session, `undefined` for a fresh thread) | `{ threadId }` |
 | `chat.error` | Chat request failed | `{ message }` (truncated to 200 chars) |
 | `suggestion.clicked` | Suggestion pill or welcome card clicked (dock pills, in-chat pills, welcome cards) | `{ text, index }` (`index` is `-1` when the origin is unknown) |
 | `link.clicked` | Anchor clicked inside the conversation | `{ url }` (absolute URL) |
