@@ -119,6 +119,16 @@ export interface EmbedConfig {
 	/** Initial suggestion chips displayed before the first message. */
 	suggestions?: string[];
 	/**
+	 * Fetch page-aware starter prompts from `{api}/suggestions` on mount and on
+	 * every SPA navigation, instead of always rendering the fixed
+	 * {@link EmbedConfig.suggestions} list (which stays the fallback whenever
+	 * that request fails or returns nothing).
+	 *
+	 * Normally delivered per channel by `/config` (no `data-*` attribute maps
+	 * to it). Absent everywhere reads as `false`.
+	 */
+	dynamicSuggestions?: boolean;
+	/**
 	 * AI transparency notice rendered under the input (EU AI Act compliance).
 	 * String overrides the default wording; `false` hides it. Surfaced as
 	 * `data-disclaimer` on the embed script tag (use `data-disclaimer="false"`

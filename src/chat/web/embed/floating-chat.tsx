@@ -37,6 +37,7 @@ import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
+import { usePageSuggestions } from "./use-page-suggestions";
 import { usePathname, useVisibilityGate } from "./use-pathname";
 import { useScrollAppearance } from "./use-scroll-appearance";
 import { appearTriggerForPath } from "./visibility";
@@ -164,7 +165,10 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			[userVars],
 		);
 
-		const suggestions = config.suggestions ?? [];
+		// Page-aware starter prompts when the channel opts in, otherwise exactly
+		// `config.suggestions`. Everything below (auto-expand, the card, the
+		// pills, the panel's initial set) reads this one resolved list.
+		const suggestions = usePageSuggestions(config);
 		// The dock is the chat's entry point, so it shows the configured input
 		// placeholder by default (`data-launcher-text` overrides it for a
 		// dock-specific prompt). Typed out like the in-chat input.
@@ -565,8 +569,8 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									welcomeMessage={config.welcomeMessage}
 									placeholder={config.placeholder}
 									suggestions={
-										config.suggestions
-											? { initial: config.suggestions }
+										suggestions.length > 0
+											? { initial: suggestions }
 											: undefined
 									}
 									enableThreadHistory={config.enableThreadHistory}

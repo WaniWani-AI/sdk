@@ -84,6 +84,12 @@ interface RemoteConfigResponse {
 	title: string | null;
 	placeholder: string | null;
 	suggestions: string[] | null;
+	/**
+	 * When true the widget fetches per-page starter prompts from
+	 * `/suggestions` and only uses `suggestions` as the fallback. Absent on
+	 * servers that predate the flag → `false`.
+	 */
+	dynamicSuggestions?: boolean | null;
 	enableThreadHistory?: boolean | null;
 	/**
 	 * Channel-specific event source (e.g. the integration/source this channel
@@ -170,6 +176,9 @@ function remoteToConfigPartial(
 	}
 	if (data.suggestions != null && data.suggestions.length > 0) {
 		out.suggestions = data.suggestions;
+	}
+	if (typeof data.dynamicSuggestions === "boolean") {
+		out.dynamicSuggestions = data.dynamicSuggestions;
 	}
 	if (typeof data.enableThreadHistory === "boolean") {
 		out.enableThreadHistory = data.enableThreadHistory;
