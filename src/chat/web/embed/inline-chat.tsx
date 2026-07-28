@@ -138,7 +138,13 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 					welcomeMessage={config.welcomeMessage}
 					placeholder={config.placeholder}
 					suggestions={
-						suggestions.length > 0 ? { initial: suggestions } : undefined
+						// `config.suggestions` may be an explicitly-set empty array;
+						// passing `{ initial: [] }` then (as before this hook existed)
+						// keeps useSuggestions' streamed follow-up extraction enabled
+						// for hosts that rely on it.
+						config.suggestions || suggestions.length > 0
+							? { initial: suggestions }
+							: undefined
 					}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}

@@ -569,7 +569,11 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									welcomeMessage={config.welcomeMessage}
 									placeholder={config.placeholder}
 									suggestions={
-										suggestions.length > 0
+										// `config.suggestions` may be an explicitly-set empty
+										// array; passing `{ initial: [] }` then (as before this
+										// hook existed) keeps useSuggestions' streamed follow-up
+										// extraction enabled for hosts that rely on it.
+										config.suggestions || suggestions.length > 0
 											? { initial: suggestions }
 											: undefined
 									}
