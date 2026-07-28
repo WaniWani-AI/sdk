@@ -18,9 +18,9 @@ import { usePathname } from "./use-pathname";
 /**
  * One starter prompt. `id` identifies an authored per-page prompt so a click
  * can be attributed back to it; it is `null` for prompts coming from the
- * channel's fixed `suggestions` list, which have no stored identity. Ids stop
- * at this hook's fetch state — the embeds render texts — parked there so click
- * attribution can pick them up without re-plumbing the fetch.
+ * channel's fixed `suggestions` list, which have no stored identity. The embed
+ * hosts render the texts and keep the objects around so a click can be
+ * resolved to its id (see `resolveClickAttribution` in `lib/suggestion-click`).
  */
 export interface PageSuggestion {
 	id: string | null;
@@ -71,10 +71,10 @@ export function resolveSuggestions(
 }
 
 /**
- * Resolved starter prompt texts for the current page, with a stable array
- * identity between fetches — `useSuggestions` (inside `ChatEmbed`) keys an
- * effect on the `initial` array identity and setStates it, so a fresh array
- * each render would loop.
+ * Resolved starter prompts for the current page, with a stable array identity
+ * between fetches — `useSuggestions` (inside `ChatEmbed`) keys an effect on the
+ * `initial` array identity and setStates it, so a fresh array each render would
+ * loop. Callers deriving the texts must memoize that map for the same reason.
  *
  * Inert unless the channel reported `dynamicSuggestions: true` — without it
  * (including against servers that predate the flag) this is exactly
@@ -84,7 +84,7 @@ export function resolveSuggestions(
  * rejects a missing or non-uuid `channel` with a 400, so an embed configured
  * without one stays on the fixed list.
  */
-export function usePageSuggestions(config: EmbedConfig): string[] {
+export function usePageSuggestions(config: EmbedConfig): PageSuggestion[] {
 	const { api, token, channelId, dynamicSuggestions } = config;
 	// Re-runs the fetch on client-side route changes, not just hard loads.
 	const pathname = usePathname();
@@ -136,7 +136,7 @@ export function usePageSuggestions(config: EmbedConfig): string[] {
 	}, [enabled, api, token, channelId, pathname]);
 
 	return useMemo(
-		() => resolveSuggestions(fetched, config.suggestions).map((s) => s.text),
+		() => resolveSuggestions(fetched, config.suggestions),
 		[fetched, config.suggestions],
 	);
 }

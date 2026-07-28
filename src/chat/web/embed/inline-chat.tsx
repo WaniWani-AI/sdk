@@ -15,6 +15,10 @@ import {
 } from "react";
 import type { ChatHandle } from "../@types";
 import { ChatEmbed } from "../layouts/chat-embed";
+import {
+	fireSuggestionClick,
+	resolveClickAttribution,
+} from "../lib/suggestion-click";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { usePageSuggestions } from "./use-page-suggestions";
@@ -111,8 +115,49 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		);
 
 		// Page-aware starter prompts when the channel opts in, otherwise exactly
-		// `config.suggestions`.
-		const suggestions = usePageSuggestions(config);
+		// `config.suggestions`. The objects carry the prompt ids for click
+		// attribution; `ChatEmbed` renders the texts — memoized because
+		// `useSuggestions` keys an effect on the `initial` array's identity.
+		const pageSuggestions = usePageSuggestions(config);
+		const suggestions = useMemo(
+			() => pageSuggestions.map((s) => s.text),
+			[pageSuggestions],
+		);
+
+		// Record every starter-prompt click server-side, attributed to the
+		// authored prompt it came from. Rides the same widget-event stream the
+		// host page subscribes to, so there is one click signal, not two.
+		useEffect(() => {
+			return widgetEvents.subscribe((event) => {
+				if (event.name !== "suggestion.clicked") {
+					return;
+				}
+				const { text } = event.properties;
+				const { promptId, kind } = resolveClickAttribution(
+					pageSuggestions,
+					text,
+				);
+				void fireSuggestionClick({
+					api: config.api ?? "",
+					token: config.token,
+					channelId: config.channelId,
+					mode: "inline",
+					source: config.source,
+					sessionId: chatRef.current?.sessionId,
+					promptId,
+					kind,
+					text,
+					index: event.properties.index,
+				});
+			});
+		}, [
+			widgetEvents,
+			pageSuggestions,
+			config.api,
+			config.token,
+			config.channelId,
+			config.source,
+		]);
 
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.

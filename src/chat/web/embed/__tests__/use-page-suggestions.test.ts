@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 // Type-only, so it doesn't pull the module in before the globals below exist.
 import type { EmbedConfig } from "../config";
+import type { PageSuggestion } from "../use-page-suggestions";
 
 const win = new Window({ url: "https://host.example/pricing" });
 for (const key of [
@@ -77,10 +78,10 @@ const BASE_CONFIG: EmbedConfig = {
 	suggestions: ["Static A", "Static B"],
 };
 
-/** Mount a probe that surfaces the hook's resolved texts. */
+/** Mount a probe that surfaces the hook's resolved prompts. */
 async function mount(config: EmbedConfig) {
 	const container = win.document.createElement("div");
-	let latest: string[] = [];
+	let latest: PageSuggestion[] = [];
 	function Probe() {
 		latest = usePageSuggestions(config);
 		return null;
@@ -91,8 +92,13 @@ async function mount(config: EmbedConfig) {
 		root.render(createElement(Probe));
 	});
 	return {
+		/** The resolved prompts, ids included. */
 		get value() {
 			return latest;
+		},
+		/** Just the rendered texts, which is what most cases care about. */
+		get texts() {
+			return latest.map((s) => s.text);
 		},
 		async settle(index: number, res: { ok: boolean; body: unknown }) {
 			await act(async () => {
@@ -214,7 +220,7 @@ describe("usePageSuggestions", () => {
 	test("is inert without the flag — no request, fixed list", async () => {
 		const h = await mount({ ...BASE_CONFIG });
 		expect(pending).toHaveLength(0);
-		expect(h.value).toEqual(["Static A", "Static B"]);
+		expect(h.texts).toEqual(["Static A", "Static B"]);
 		h.unmount();
 	});
 
@@ -225,7 +231,7 @@ describe("usePageSuggestions", () => {
 			dynamicSuggestions: true,
 		});
 		expect(pending).toHaveLength(0);
-		expect(h.value).toEqual(["Static A", "Static B"]);
+		expect(h.texts).toEqual(["Static A", "Static B"]);
 		h.unmount();
 	});
 
@@ -240,27 +246,40 @@ describe("usePageSuggestions", () => {
 		expect(pending[0].headers.Authorization).toBe("Bearer wwp_test");
 
 		// Fixed list until the response lands — never a blank card.
-		expect(h.value).toEqual(["Static A", "Static B"]);
+		expect(h.texts).toEqual(["Static A", "Static B"]);
 
 		await h.settle(0, {
 			ok: true,
 			body: envelope([{ id: "p1", text: "What does Pro cost?" }]),
 		});
-		expect(h.value).toEqual(["What does Pro cost?"]);
+		expect(h.texts).toEqual(["What does Pro cost?"]);
+		// The authored prompt's id reaches the caller, so a click on it can be
+		// attributed back to the prompt.
+		expect(h.value).toEqual([{ id: "p1", text: "What does Pro cost?" }]);
+		h.unmount();
+	});
+
+	test("hands back id-less prompts when it falls back", async () => {
+		const h = await mount({ ...BASE_CONFIG, dynamicSuggestions: true });
+		await h.settle(0, { ok: true, body: envelope([]) });
+		expect(h.value).toEqual([
+			{ id: null, text: "Static A" },
+			{ id: null, text: "Static B" },
+		]);
 		h.unmount();
 	});
 
 	test("falls back to the fixed list on a non-200", async () => {
 		const h = await mount({ ...BASE_CONFIG, dynamicSuggestions: true });
 		await h.settle(0, { ok: false, body: { error: "INVALID_CHANNEL" } });
-		expect(h.value).toEqual(["Static A", "Static B"]);
+		expect(h.texts).toEqual(["Static A", "Static B"]);
 		h.unmount();
 	});
 
 	test("falls back when the page has no authored prompts", async () => {
 		const h = await mount({ ...BASE_CONFIG, dynamicSuggestions: true });
 		await h.settle(0, { ok: true, body: envelope([]) });
-		expect(h.value).toEqual(["Static A", "Static B"]);
+		expect(h.texts).toEqual(["Static A", "Static B"]);
 		h.unmount();
 	});
 
@@ -270,7 +289,7 @@ describe("usePageSuggestions", () => {
 			ok: true,
 			body: envelope([{ id: "p1", text: "Pricing Q" }]),
 		});
-		expect(h.value).toEqual(["Pricing Q"]);
+		expect(h.texts).toEqual(["Pricing Q"]);
 
 		await h.navigate("/docs/getting-started");
 		expect(pending).toHaveLength(2);
@@ -282,7 +301,7 @@ describe("usePageSuggestions", () => {
 			ok: true,
 			body: envelope([{ id: "d1", text: "Docs Q" }]),
 		});
-		expect(h.value).toEqual(["Docs Q"]);
+		expect(h.texts).toEqual(["Docs Q"]);
 		h.unmount();
 	});
 
@@ -298,14 +317,14 @@ describe("usePageSuggestions", () => {
 			ok: true,
 			body: envelope([{ id: "d1", text: "Docs Q" }]),
 		});
-		expect(h.value).toEqual(["Docs Q"]);
+		expect(h.texts).toEqual(["Docs Q"]);
 
 		// /pricing answers late — must be ignored.
 		await h.settle(0, {
 			ok: true,
 			body: envelope([{ id: "p1", text: "Pricing Q" }]),
 		});
-		expect(h.value).toEqual(["Docs Q"]);
+		expect(h.texts).toEqual(["Docs Q"]);
 		h.unmount();
 	});
 });

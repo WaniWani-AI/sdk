@@ -33,6 +33,10 @@ import { Suggestions } from "../components/suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
+import {
+	fireSuggestionClick,
+	resolveClickAttribution,
+} from "../lib/suggestion-click";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
@@ -166,9 +170,51 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		);
 
 		// Page-aware starter prompts when the channel opts in, otherwise exactly
-		// `config.suggestions`. Everything below (auto-expand, the card, the
-		// pills, the panel's initial set) reads this one resolved list.
-		const suggestions = usePageSuggestions(config);
+		// `config.suggestions`. The objects carry the prompt ids for click
+		// attribution; everything below (auto-expand, the card, the pills, the
+		// panel's initial set) reads the texts — memoized because
+		// `useSuggestions` keys an effect on the `initial` array's identity.
+		const pageSuggestions = usePageSuggestions(config);
+		const suggestions = useMemo(
+			() => pageSuggestions.map((s) => s.text),
+			[pageSuggestions],
+		);
+
+		// Record every starter-prompt click server-side, attributed to the
+		// authored prompt it came from. Rides the same widget-event stream the
+		// host page subscribes to, so there is one click signal, not two — and it
+		// covers both the dock's CTAs and the panel's own pills.
+		useEffect(() => {
+			return widgetEvents.subscribe((event) => {
+				if (event.name !== "suggestion.clicked") {
+					return;
+				}
+				const { text } = event.properties;
+				const { promptId, kind } = resolveClickAttribution(
+					pageSuggestions,
+					text,
+				);
+				void fireSuggestionClick({
+					api: config.api ?? "",
+					token: config.token,
+					channelId: config.channelId,
+					mode: "floating",
+					source: config.source,
+					sessionId: chatRef.current?.sessionId,
+					promptId,
+					kind,
+					text,
+					index: event.properties.index,
+				});
+			});
+		}, [
+			widgetEvents,
+			pageSuggestions,
+			config.api,
+			config.token,
+			config.channelId,
+			config.source,
+		]);
 		// The dock is the chat's entry point, so it shows the configured input
 		// placeholder by default (`data-launcher-text` overrides it for a
 		// dock-specific prompt). Typed out like the in-chat input.
