@@ -2,11 +2,11 @@ import type { UIMessage } from "ai";
 import { SUGGESTIONS_META_KEY } from "../../../shared/meta-keys";
 
 /** Where the pills currently on screen came from. */
-export type TurnSuggestionsSource = "flow" | "streamed";
+export type TurnSuggestionOrigin = "flow" | "streamed";
 
 export type TurnSuggestions = {
 	suggestions: string[];
-	source: TurnSuggestionsSource;
+	source: TurnSuggestionOrigin;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
