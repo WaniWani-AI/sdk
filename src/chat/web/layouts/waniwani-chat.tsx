@@ -67,6 +67,14 @@ export interface WaniwaniChatOverrides {
 	placeholder?: string;
 	/** Initial suggestion chips. */
 	suggestions?: string[];
+	/**
+	 * Per-turn suggestion pills a flow drives via `interrupt({ suggestions })`.
+	 * Enabled by default — writing `suggestions` in a flow is itself the
+	 * opt-in, so most hosts never need to touch this. Set `false` to hide
+	 * flow-driven pills while still showing `suggestions` (the starter
+	 * prompts) at the start of the conversation.
+	 */
+	dynamicSuggestions?: boolean;
 	/** Persist conversations across reloads in IndexedDB. */
 	enableThreadHistory?: boolean;
 	/**
@@ -240,6 +248,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				welcomeMessage: overrides?.welcomeMessage,
 				placeholder: overrides?.placeholder,
 				suggestions: overrides?.suggestions,
+				dynamicSuggestions: overrides?.dynamicSuggestions,
 				enableThreadHistory: overrides?.enableThreadHistory,
 				showToolCalls: overrides?.showToolCalls,
 				appearance: overrides?.appearance,
@@ -256,6 +265,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				overrides?.welcomeMessage,
 				overrides?.placeholder,
 				overrides?.suggestions,
+				overrides?.dynamicSuggestions,
 				overrides?.enableThreadHistory,
 				overrides?.showToolCalls,
 				overrides?.appearance,
@@ -454,7 +464,12 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					welcome={overrides?.welcome}
 					placeholder={config.placeholder}
 					suggestions={
-						config.suggestions ? { initial: config.suggestions } : undefined
+						config.suggestions || config.dynamicSuggestions !== undefined
+							? {
+									initial: config.suggestions,
+									dynamic: config.dynamicSuggestions,
+								}
+							: undefined
 					}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}

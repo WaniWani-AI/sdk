@@ -119,6 +119,15 @@ export interface EmbedConfig {
 	/** Initial suggestion chips displayed before the first message. */
 	suggestions?: string[];
 	/**
+	 * Per-turn suggestion pills a flow drives via `interrupt({ suggestions })`.
+	 * Enabled by default — writing `suggestions` in a flow is itself the
+	 * opt-in, so most hosts never need to touch this. Set `false` to hide
+	 * flow-driven pills while still showing `suggestions` (the starter
+	 * prompts) at the start of the conversation. Surfaced as
+	 * `data-dynamic-suggestions` on the embed script tag.
+	 */
+	dynamicSuggestions?: boolean;
+	/**
 	 * AI transparency notice rendered under the input (EU AI Act compliance).
 	 * String overrides the default wording; `false` hides it. Surfaced as
 	 * `data-disclaimer` on the embed script tag (use `data-disclaimer="false"`
@@ -357,6 +366,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const enableThreadHistory = bool("data-enable-thread-history");
 	if (enableThreadHistory !== undefined) {
 		config.enableThreadHistory = enableThreadHistory;
+	}
+
+	const dynamicSuggestions = bool("data-dynamic-suggestions");
+	if (dynamicSuggestions !== undefined) {
+		config.dynamicSuggestions = dynamicSuggestions;
 	}
 
 	const disablePageView = bool("data-disable-page-view");

@@ -476,3 +476,51 @@ describe("resolveConfig — assistantBubble precedence", () => {
 		expect(config.appearance?.assistantBubble).toBe(false);
 	});
 });
+
+describe("resolveConfig — dynamicSuggestions", () => {
+	test("undefined when unspecified — consumers default to enabled", () => {
+		const config = resolveConfig({ token: "tok" });
+		expect(config.dynamicSuggestions).toBeUndefined();
+	});
+
+	test("programmatic false disables flow-driven pills", () => {
+		const config = resolveConfig({ token: "tok", dynamicSuggestions: false });
+		expect(config.dynamicSuggestions).toBe(false);
+	});
+
+	test("programmatic true keeps flow-driven pills enabled", () => {
+		const config = resolveConfig({ token: "tok", dynamicSuggestions: true });
+		expect(config.dynamicSuggestions).toBe(true);
+	});
+});
+
+describe("parseConfigFromScript — data-dynamic-suggestions", () => {
+	test("undefined when unspecified — pills stay enabled by default", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "tok" });
+		expect(cfg.dynamicSuggestions).toBeUndefined();
+	});
+
+	test("'false' opts out of flow-driven pills", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-dynamic-suggestions": "false",
+		});
+		expect(cfg.dynamicSuggestions).toBe(false);
+	});
+
+	test("'true' parses as true", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-dynamic-suggestions": "true",
+		});
+		expect(cfg.dynamicSuggestions).toBe(true);
+	});
+
+	test("bare attribute (empty value) opts in like sibling boolean attrs", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-dynamic-suggestions": "",
+		});
+		expect(cfg.dynamicSuggestions).toBe(true);
+	});
+});
