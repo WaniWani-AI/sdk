@@ -94,8 +94,10 @@ export interface SuggestionsConfig {
 	 */
 	initial?: string[];
 	/**
-	 * Enable AI-generated suggestions after each response.
-	 * Defaults to `true` when suggestions config is provided.
+	 * Per-turn suggestion pills driven by a flow's `interrupt({ suggestions })`.
+	 * Defaults to `true` — declaring `suggestions` in the flow is the opt-in,
+	 * so this stays enabled even when no suggestions config is passed at all.
+	 * Set `false` to keep only the `initial` starter prompts.
 	 */
 	dynamic?: boolean;
 }
@@ -184,8 +186,11 @@ export interface ChatBaseProps {
 	/** Callback fired when a response is received */
 	onResponseReceived?: () => void;
 	/**
-	 * Enable AI-generated suggestions after each response.
-	 * `true` enables with defaults (3 suggestions), object allows config, `false`/undefined disables.
+	 * Suggestion pill configuration. An object sets starter prompts
+	 * (`initial`) and the flow-driven per-turn pills (`dynamic`); `false`
+	 * hides the pill row entirely. Leaving it unset does NOT disable
+	 * flow-driven pills — they render whenever a connected flow declares
+	 * `suggestions` on a step with one open question.
 	 */
 	suggestions?: boolean | SuggestionsConfig;
 	/**
