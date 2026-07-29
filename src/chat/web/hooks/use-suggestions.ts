@@ -3,6 +3,7 @@
 import type { ChatStatus, UIMessage } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SuggestionsConfig } from "../@types";
+import { resolveTurnSuggestions } from "./turn-suggestions";
 
 export interface UseSuggestionsOptions {
 	messages: UIMessage[];
@@ -10,29 +11,29 @@ export interface UseSuggestionsOptions {
 	config?: boolean | SuggestionsConfig;
 }
 
-/**
- * Extract suggestions from the last assistant message's data part.
- * The API streams a `data-suggestions` part at the end of the response:
- * `{ type: "data-suggestions", data: { suggestions: string[] } }`
- */
-function extractSuggestions(message: UIMessage): string[] | null {
-	for (const part of message.parts) {
-		const p = part as Record<string, unknown>;
-		// Handle both "data-suggestions" and generic "data" part types
-		if (p.type === "data" || p.type === "data-suggestions") {
-			const data = p.data as Record<string, unknown> | undefined;
-			if (data && Array.isArray(data.suggestions)) {
-				return data.suggestions as string[];
-			}
-		}
-	}
-	return null;
-}
+/** Which pill row the visitor is looking at. */
+export type SuggestionsSource = "flow" | "initial";
 
 function isConfigObject(
 	config: boolean | SuggestionsConfig | undefined,
 ): config is SuggestionsConfig {
 	return typeof config === "object" && config !== null && "initial" in config;
+}
+
+/**
+ * Whether per-turn suggestions may render.
+ *
+ * Enabled unless the host explicitly turns them off, so a channel with no
+ * configured starter prompts still shows the pills a flow drives. Writing
+ * `suggestions` in a flow is itself the opt-in — nothing renders otherwise.
+ */
+export function isDynamicSuggestionsEnabled(
+	config: boolean | SuggestionsConfig | undefined,
+): boolean {
+	if (config === false) {
+		return false;
+	}
+	return !(isConfigObject(config) && config.dynamic === false);
 }
 
 export function useSuggestions(options: UseSuggestionsOptions) {
@@ -42,10 +43,10 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		isConfigObject(config) && config.initial ? config.initial : undefined;
 
 	const [suggestions, setSuggestions] = useState<string[]>(initial ?? []);
+	const [source, setSource] = useState<SuggestionsSource>("initial");
 	const prevStatusRef = useRef<ChatStatus>(status);
 
-	const isDynamicEnabled =
-		config === true || (isConfigObject(config) && config.dynamic !== false);
+	const isDynamicEnabled = isDynamicSuggestionsEnabled(config);
 
 	const clear = useCallback(() => {
 		setSuggestions([]);
@@ -58,6 +59,7 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 	useEffect(() => {
 		if (!hasMessages && initial && initial.length > 0) {
 			setSuggestions(initial);
+			setSource("initial");
 		}
 	}, [initial, hasMessages]);
 
@@ -69,7 +71,9 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		}
 	}, [lastMessage, clear]);
 
-	// Extract suggestions from message parts on streaming -> ready transition
+	// Recompute on every streaming -> ready transition. The pills always
+	// describe the reply the visitor just received, so a turn that carries no
+	// suggestions clears the row rather than leaving stale options on screen.
 	useEffect(() => {
 		const prevStatus = prevStatusRef.current;
 		prevStatusRef.current = status;
@@ -82,12 +86,13 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 				return;
 			}
 
-			const extracted = extractSuggestions(lastAssistant);
-			if (extracted) {
-				setSuggestions(extracted);
-			}
+			const resolved = resolveTurnSuggestions(lastAssistant);
+			setSuggestions(resolved?.suggestions ?? []);
+			// A streamed data part is reachable only from a self-hosted backend, so
+			// it is attributed alongside operator-authored prompts, not the flow.
+			setSource(resolved?.source === "flow" ? "flow" : "initial");
 		}
 	}, [status, isDynamicEnabled, messages]);
 
-	return { suggestions, isLoading: false, clear };
+	return { suggestions, source, isLoading: false, clear };
 }
