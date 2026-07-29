@@ -7,7 +7,12 @@ import type {
 import { z } from "zod";
 import type { ScopedWaniWaniClient } from "../scoped-client";
 import { extractScopedClient } from "../scoped-client";
-import { extractSessionId, FLOW_META_KEY } from "../utils";
+import {
+	extractSessionId,
+	FLOW_META_KEY,
+	SUGGESTIONS_META_KEY,
+	type SuggestionsMeta,
+} from "../utils";
 import type {
 	CompileInput,
 	FlowToolHandler,
@@ -436,6 +441,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				flowId: config.id,
 				nodesVisited: result.nodesVisited,
 			};
+		}
+
+		// Top-level `suggestions` only exists for the single-open-question shorthand.
+		if (contentObj.status === "interrupt" && contentObj.suggestions?.length) {
+			_meta[SUGGESTIONS_META_KEY] = {
+				suggestions: contentObj.suggestions,
+			} satisfies SuggestionsMeta;
 		}
 
 		return {
