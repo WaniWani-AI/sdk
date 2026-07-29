@@ -469,6 +469,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 															properties: {
 																text,
 																index: suggestions.indexOf(text),
+																source: "initial",
 															},
 														});
 														openWith(text);

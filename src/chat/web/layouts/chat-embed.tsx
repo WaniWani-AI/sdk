@@ -334,15 +334,19 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 					dynamicIndex >= 0
 						? dynamicIndex
 						: (welcome?.suggestions?.indexOf(suggestion) ?? -1);
+				// Welcome-screen cards are always operator-authored; only the live
+				// pill row can be flow-driven.
+				const source = dynamicIndex >= 0 ? suggestionsState.source : "initial";
 				widgetEvents.emit({
 					name: "suggestion.clicked",
-					properties: { text: suggestion, index },
+					properties: { text: suggestion, index, source },
 				});
 				suggestionsState.clear();
 				engine.handleSubmit({ text: suggestion, files: [] });
 			},
 			[
 				suggestionsState.suggestions,
+				suggestionsState.source,
 				suggestionsState.clear,
 				engine.handleSubmit,
 				welcome,

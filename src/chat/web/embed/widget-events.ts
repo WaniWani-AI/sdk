@@ -43,7 +43,15 @@ export type WidgetEventDetail =
 	| { name: "session.started"; properties: { sessionId: string } }
 	| { name: "thread.changed"; properties: { threadId: string } }
 	| { name: "chat.error"; properties: { message: string } }
-	| { name: "suggestion.clicked"; properties: { text: string; index: number } }
+	| {
+			name: "suggestion.clicked";
+			properties: {
+				text: string;
+				index: number;
+				/** `"flow"` when the MCP's flow drove these pills, `"initial"` for configured starter prompts. */
+				source: "flow" | "initial";
+			};
+	  }
 	| { name: "link.clicked"; properties: { url: string } };
 
 /** Payload handed to `onEvent` subscribers. Discriminated on `name`. */
