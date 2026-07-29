@@ -28,6 +28,7 @@ import { useVisibilityGate } from "../embed/use-pathname";
 import type { WidgetEvent } from "../embed/widget-events";
 import { createWidgetEventEmitter } from "../embed/widget-events";
 import { WidgetEventsProvider } from "../embed/widget-events-context";
+import { toSuggestionsConfig } from "../hooks/use-suggestions";
 import type { Locale, MessageOverrides } from "../i18n";
 import {
 	createChatTrackClient,
@@ -463,14 +464,10 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					welcomeMessage={config.welcomeMessage}
 					welcome={overrides?.welcome}
 					placeholder={config.placeholder}
-					suggestions={
-						config.suggestions || config.dynamicSuggestions !== undefined
-							? {
-									initial: config.suggestions,
-									dynamic: config.dynamicSuggestions,
-								}
-							: undefined
-					}
+					suggestions={toSuggestionsConfig({
+						suggestions: config.suggestions,
+						dynamicSuggestions: config.dynamicSuggestions,
+					})}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}
 					disclaimer={config.disclaimer}
