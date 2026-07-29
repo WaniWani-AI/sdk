@@ -38,8 +38,12 @@ export function Suggestions({
 								type="button"
 								onClick={() => onSelect(suggestion)}
 								className={cn(
-									"ww:rounded-full ww:border ww:border-border ww:bg-background ww:px-3.5 ww:py-1.5 ww:text-sm",
-									"ww:text-foreground ww:hover:bg-accent ww:hover:border-primary/30",
+									// `bg-accent`, not `bg-background`: inside the open panel the
+									// pills sit on the background color itself, where a
+									// background-filled pill with a hairline border is
+									// indistinguishable from plain text.
+									"ww:rounded-full ww:border ww:border-border ww:bg-accent ww:px-3.5 ww:py-1.5 ww:text-sm",
+									"ww:text-foreground ww:hover:bg-border ww:hover:border-primary/30",
 									"ww:transition-all ww:duration-200 ww:ease-out ww:cursor-pointer",
 									"ww:animate-[ww-fade-in_0.2s_ease-out_both]",
 								)}
