@@ -44,6 +44,7 @@ export type WidgetEventDetail =
 	| { name: "thread.changed"; properties: { threadId: string } }
 	| { name: "chat.error"; properties: { message: string } }
 	| { name: "suggestion.clicked"; properties: { text: string; index: number } }
+	| { name: "suggestions.shown"; properties: { texts: string[] } }
 	| { name: "link.clicked"; properties: { url: string } };
 
 /** Payload handed to `onEvent` subscribers. Discriminated on `name`. */

@@ -17,7 +17,9 @@ import type { ChatHandle } from "../@types";
 import { ChatEmbed } from "../layouts/chat-embed";
 import {
 	fireSuggestionClick,
+	fireSuggestionShown,
 	resolveClickAttribution,
+	resolveShownPrompts,
 } from "../lib/suggestion-click";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
@@ -124,31 +126,48 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			[pageSuggestions],
 		);
 
-		// Record every starter-prompt click server-side, attributed to the
-		// authored prompt it came from. Rides the same widget-event stream the
-		// host page subscribes to, so there is one click signal, not two.
+		// Record every starter-prompt click and every rendered pill set
+		// server-side, attributed to the authored prompts involved. Rides the
+		// same widget-event stream the host page subscribes to, so there is one
+		// signal per interaction, not two.
 		useEffect(() => {
 			return widgetEvents.subscribe((event) => {
-				if (event.name !== "suggestion.clicked") {
+				if (event.name === "suggestion.clicked") {
+					const { text } = event.properties;
+					const { promptId, kind } = resolveClickAttribution(
+						pageSuggestions,
+						text,
+					);
+					void fireSuggestionClick({
+						api: config.api ?? "",
+						token: config.token,
+						channelId: config.channelId,
+						mode: "inline",
+						source: config.source,
+						sessionId: chatRef.current?.sessionId,
+						promptId,
+						kind,
+						text,
+						index: event.properties.index,
+					});
 					return;
 				}
-				const { text } = event.properties;
-				const { promptId, kind } = resolveClickAttribution(
-					pageSuggestions,
-					text,
-				);
-				void fireSuggestionClick({
-					api: config.api ?? "",
-					token: config.token,
-					channelId: config.channelId,
-					mode: "inline",
-					source: config.source,
-					sessionId: chatRef.current?.sessionId,
-					promptId,
-					kind,
-					text,
-					index: event.properties.index,
-				});
+				if (event.name === "suggestions.shown") {
+					const { prompts, kind } = resolveShownPrompts(
+						pageSuggestions,
+						event.properties.texts,
+					);
+					void fireSuggestionShown({
+						api: config.api ?? "",
+						token: config.token,
+						channelId: config.channelId,
+						mode: "inline",
+						source: config.source,
+						sessionId: chatRef.current?.sessionId,
+						prompts,
+						kind,
+					});
+				}
 			});
 		}, [
 			widgetEvents,

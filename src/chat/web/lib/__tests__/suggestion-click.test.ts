@@ -17,7 +17,9 @@ for (const key of [
 
 import {
 	fireSuggestionClick,
+	fireSuggestionShown,
 	resolveClickAttribution,
+	resolveShownPrompts,
 } from "../suggestion-click";
 
 interface Captured {
@@ -217,6 +219,110 @@ describe("fireSuggestionClick", () => {
 			await fireSuggestionClick({ ...BASE });
 		} finally {
 			globalThis.fetch = real;
+		}
+	});
+});
+
+describe("resolveShownPrompts", () => {
+	const list = [
+		{ id: "p1", text: "Authored one" },
+		{ id: "p2", text: "Authored two" },
+	];
+
+	test("an authored set keeps every stored id and reads as page", () => {
+		expect(resolveShownPrompts(list, ["Authored one", "Authored two"])).toEqual(
+			{
+				prompts: [
+					{ id: "p1", text: "Authored one" },
+					{ id: "p2", text: "Authored two" },
+				],
+				kind: "page",
+			},
+		);
+	});
+
+	test("texts absent from the list read as a followup set with null ids", () => {
+		expect(resolveShownPrompts(list, ["Streamed A", "Streamed B"])).toEqual({
+			prompts: [
+				{ id: null, text: "Streamed A" },
+				{ id: null, text: "Streamed B" },
+			],
+			kind: "followup",
+		});
+	});
+
+	test("a fixed-list set has no ids and reads as fallback", () => {
+		const fallbackList = [{ id: null, text: "From the fixed list" }];
+		expect(resolveShownPrompts(fallbackList, ["From the fixed list"])).toEqual({
+			prompts: [{ id: null, text: "From the fixed list" }],
+			kind: "fallback",
+		});
+	});
+});
+
+describe("fireSuggestionShown", () => {
+	const SHOWN_BASE = {
+		api: BASE.api,
+		token: BASE.token,
+		channelId: BASE.channelId,
+		mode: BASE.mode,
+		source: BASE.source,
+		prompts: [
+			{ id: "p1", text: "Authored one" },
+			{ id: null, text: "From the fixed list" },
+		],
+		kind: "page",
+	} as const;
+
+	test("POSTs one suggestion.shown event carrying the whole set", async () => {
+		const { calls, restore } = mockFetch();
+		try {
+			await fireSuggestionShown({
+				...SHOWN_BASE,
+				prompts: [...SHOWN_BASE.prompts],
+			});
+			expect(calls).toHaveLength(1);
+			const [call] = calls;
+			expect(call.url).toBe("https://app.waniwani.ai/api/mcp/events/v2/batch");
+			const [ev] = JSON.parse(call.init.body as string).events;
+			expect(ev.name).toBe("suggestion.shown");
+			expect(ev.properties).toMatchObject({
+				prompts: [
+					{ id: "p1", text: "Authored one" },
+					{ id: null, text: "From the fixed list" },
+				],
+				count: 2,
+				kind: "page",
+				channelId: "chan_1",
+				mode: "inline",
+				url: "https://shop.example.com/pricing",
+			});
+		} finally {
+			restore();
+		}
+	});
+
+	test("an empty set is a no-op, not an event", async () => {
+		const { calls, restore } = mockFetch();
+		try {
+			await fireSuggestionShown({ ...SHOWN_BASE, prompts: [] });
+			expect(calls).toHaveLength(0);
+		} finally {
+			restore();
+		}
+	});
+
+	test("is a no-op without an api or token", async () => {
+		const { calls, restore } = mockFetch();
+		try {
+			await fireSuggestionShown({
+				...SHOWN_BASE,
+				prompts: [...SHOWN_BASE.prompts],
+				api: "",
+			});
+			expect(calls).toHaveLength(0);
+		} finally {
+			restore();
 		}
 	});
 });

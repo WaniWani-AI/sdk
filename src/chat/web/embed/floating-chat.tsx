@@ -35,13 +35,18 @@ import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
 import {
 	fireSuggestionClick,
+	fireSuggestionShown,
 	resolveClickAttribution,
+	resolveShownPrompts,
 } from "../lib/suggestion-click";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
-import { usePageSuggestions } from "./use-page-suggestions";
+import {
+	type PageSuggestion,
+	usePageSuggestions,
+} from "./use-page-suggestions";
 import { usePathname, useVisibilityGate } from "./use-pathname";
 import { useScrollAppearance } from "./use-scroll-appearance";
 import { appearTriggerForPath } from "./visibility";
@@ -180,32 +185,49 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			[pageSuggestions],
 		);
 
-		// Record every starter-prompt click server-side, attributed to the
-		// authored prompt it came from. Rides the same widget-event stream the
-		// host page subscribes to, so there is one click signal, not two — and it
-		// covers both the dock's CTAs and the panel's own pills.
+		// Record every starter-prompt click and every rendered pill set
+		// server-side, attributed to the authored prompts involved. Rides the
+		// same widget-event stream the host page subscribes to, so there is one
+		// signal per interaction, not two — and it covers both the dock's CTAs
+		// and the panel's own pills.
 		useEffect(() => {
 			return widgetEvents.subscribe((event) => {
-				if (event.name !== "suggestion.clicked") {
+				if (event.name === "suggestion.clicked") {
+					const { text } = event.properties;
+					const { promptId, kind } = resolveClickAttribution(
+						pageSuggestions,
+						text,
+					);
+					void fireSuggestionClick({
+						api: config.api ?? "",
+						token: config.token,
+						channelId: config.channelId,
+						mode: "floating",
+						source: config.source,
+						sessionId: chatRef.current?.sessionId,
+						promptId,
+						kind,
+						text,
+						index: event.properties.index,
+					});
 					return;
 				}
-				const { text } = event.properties;
-				const { promptId, kind } = resolveClickAttribution(
-					pageSuggestions,
-					text,
-				);
-				void fireSuggestionClick({
-					api: config.api ?? "",
-					token: config.token,
-					channelId: config.channelId,
-					mode: "floating",
-					source: config.source,
-					sessionId: chatRef.current?.sessionId,
-					promptId,
-					kind,
-					text,
-					index: event.properties.index,
-				});
+				if (event.name === "suggestions.shown") {
+					const { prompts, kind } = resolveShownPrompts(
+						pageSuggestions,
+						event.properties.texts,
+					);
+					void fireSuggestionShown({
+						api: config.api ?? "",
+						token: config.token,
+						channelId: config.channelId,
+						mode: "floating",
+						source: config.source,
+						sessionId: chatRef.current?.sessionId,
+						prompts,
+						kind,
+					});
+				}
 			});
 		}, [
 			widgetEvents,
@@ -215,6 +237,24 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			config.channelId,
 			config.source,
 		]);
+
+		// One impression per revealed dock set, keyed on the resolved array's
+		// identity — a new fetch (SPA navigation) is a new array and counts
+		// again; re-renders and collapse/expand cycles of the same set don't.
+		const shownSuggestionsRef = useRef<PageSuggestion[] | null>(null);
+		useEffect(() => {
+			if (!suggestionsVisible || pageSuggestions.length === 0) {
+				return;
+			}
+			if (shownSuggestionsRef.current === pageSuggestions) {
+				return;
+			}
+			shownSuggestionsRef.current = pageSuggestions;
+			widgetEvents.emit({
+				name: "suggestions.shown",
+				properties: { texts: suggestions },
+			});
+		}, [suggestionsVisible, pageSuggestions, suggestions, widgetEvents]);
 		// The dock is the chat's entry point, so it shows the configured input
 		// placeholder by default (`data-launcher-text` overrides it for a
 		// dock-specific prompt). Typed out like the in-chat input.
