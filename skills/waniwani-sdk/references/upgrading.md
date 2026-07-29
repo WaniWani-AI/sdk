@@ -31,36 +31,6 @@ One behavioral note (not a break): `messageBorderRadius` / `--ww-msg-radius` is 
 
 This list mirrors the changelog so you can apply migrations without a network fetch. Always cross-check against the live changelog for anything newer than this file.
 
-### 0.19.0: `suggestion.clicked` requires a `properties.source` field
-
-`suggestion.clicked` (part of `WidgetEventDetail` / `WidgetEvent` from `@waniwani/sdk/chat`) gained a required `properties.source: "flow" | "initial"` field. Consumers who only *read* the event through `onEvent` (the overwhelmingly common case) need no changes: it is a new, always-populated field. Only code that *constructs* a `suggestion.clicked` event literal (test fixtures, a custom adapter) needs updating.
-
-Auto-fix, per hand-constructed event literal:
-
-1. Add `source: "initial"` (or `"flow"`, if the fixture stands in for a flow-driven pill) to the `properties` of every `{ name: "suggestion.clicked", ... }` literal.
-
-```ts
-// Before
-const event: WidgetEvent = {
-  mode: "inline",
-  timestamp: Date.now(),
-  name: "suggestion.clicked",
-  properties: { text: "Book a demo", index: 0 },
-};
-
-// After
-const event: WidgetEvent = {
-  mode: "inline",
-  timestamp: Date.now(),
-  name: "suggestion.clicked",
-  properties: { text: "Book a demo", index: 0, source: "initial" },
-};
-```
-
-No `@deprecated` shim: `source` stays required rather than optional, since a guaranteed field is better DX for readers (the primary audience) than an optional one every reader would have to narrow.
-
-After applying, run `bun run typecheck && bun test`. `tsc` finds every construction site: any literal missing `properties.source` fails to typecheck against `WidgetEventDetail`.
-
 ### 0.18.0: quote and purchase events removed from the taxonomy
 
 The event names `quote.requested`, `quote.succeeded`, `quote.failed`, and `purchase.completed` are removed from `EVENT_TYPES` and the `TrackEvent` union. The typed revenue taxonomy covers these funnel stages. Removed with them: the `QuoteSucceededProperties` and `PurchaseCompletedProperties` type exports, and the legacy input fields `quoteAmount`, `quoteCurrency`, `purchaseAmount`, `purchaseCurrency` on `LegacyTrackEvent`. `link.clicked` (and `LinkClickedProperties`, legacy `linkUrl`) stays.
