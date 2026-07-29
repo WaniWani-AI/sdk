@@ -52,13 +52,17 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		setSuggestions([]);
 	}, []);
 
-	// Sync initial suggestions when the remote config arrives post-mount.
-	// Only applied while the conversation is empty; once the user has sent
-	// a message, suggestions are driven by streaming responses (or cleared).
+	// Sync initial suggestions when the remote config arrives post-mount, and
+	// clear whatever is on screen whenever the conversation goes back to
+	// empty — a `reset()` or `startNewThread()` clears `messages` without
+	// unmounting this hook, and a flow's pills from the previous conversation
+	// must not survive into the new one (they'd otherwise stay clickable and
+	// misattribute a click as `source: "flow"` for a flow that was never
+	// invoked in this conversation).
 	const hasMessages = messages.length > 0;
 	useEffect(() => {
-		if (!hasMessages && initial && initial.length > 0) {
-			setSuggestions(initial);
+		if (!hasMessages) {
+			setSuggestions(initial ?? []);
 			setSource("initial");
 		}
 	}, [initial, hasMessages]);
