@@ -2,11 +2,11 @@ import type { UIMessage } from "ai";
 import { SUGGESTIONS_META_KEY } from "../../../shared/meta-keys";
 
 /** Where the pills currently on screen came from. */
-export type SuggestionsSource = "flow" | "initial";
+export type TurnSuggestionsSource = "flow" | "streamed";
 
 export type TurnSuggestions = {
 	suggestions: string[];
-	source: SuggestionsSource;
+	source: TurnSuggestionsSource;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -20,36 +20,53 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 /**
+ * Read a well-formed `waniwani/suggestions` entry off a tool part's `_meta`,
+ * or `null` when the part carries no flow result or a malformed one.
+ * Malformed entries (non-array `suggestions`, non-string items, a non-object
+ * `_meta` entry) are never authoritative — they are garbage, not a clear.
+ */
+function readSuggestionsEntry(part: unknown): string[] | null {
+	if (!isRecord(part) || !("toolCallId" in part) || !("output" in part)) {
+		return null;
+	}
+	const output = part.output;
+	if (!isRecord(output) || !isRecord(output._meta)) {
+		return null;
+	}
+	const entry = output._meta[SUGGESTIONS_META_KEY];
+	if (!isRecord(entry) || !isStringArray(entry.suggestions)) {
+		return null;
+	}
+	return entry.suggestions;
+}
+
+/**
  * Read the suggestion pills the flow engine attached to a tool result.
  *
- * Tool parts are identified the way the renderer identifies them — by the
- * presence of `toolCallId` and `output` — rather than by a `tool-*` type
- * string, so this survives AI SDK part-type renames.
+ * Every flow tool result carries the `waniwani/suggestions` key — an empty
+ * array means "no pills for this step". Tool parts are identified the way
+ * the renderer identifies them — by the presence of `toolCallId` and
+ * `output` — rather than by a `tool-*` type string, so this survives AI SDK
+ * part-type renames. Non-flow tool parts (e.g. a KB search) carry no key at
+ * all and are skipped, leaving whatever the last flow part decided in place.
  *
  * A single turn can call the flow more than once (a `continue` that advances
- * through an action node into the next interrupt), so the last result wins:
- * it describes the step the visitor is now on.
+ * through an action node into the next interrupt), so the last well-formed
+ * flow entry wins — including an empty one — since it describes the step
+ * the visitor is now on.
  *
- * @returns the suggestions, or `null` when this turn carried none.
+ * @returns the suggestions, or `null` when the last flow entry was empty (or
+ * no part carried the key at all).
  */
 export function extractFlowSuggestions(message: UIMessage): string[] | null {
 	let found: string[] | null = null;
 
 	for (const part of message.parts) {
-		if (!isRecord(part) || !("toolCallId" in part) || !("output" in part)) {
+		const suggestions = readSuggestionsEntry(part);
+		if (suggestions === null) {
 			continue;
 		}
-		const output = part.output;
-		if (!isRecord(output) || !isRecord(output._meta)) {
-			continue;
-		}
-		const entry = output._meta[SUGGESTIONS_META_KEY];
-		if (!isRecord(entry)) {
-			continue;
-		}
-		if (isStringArray(entry.suggestions) && entry.suggestions.length > 0) {
-			found = entry.suggestions;
-		}
+		found = suggestions.length > 0 ? suggestions : null;
 	}
 
 	return found;
@@ -97,7 +114,7 @@ export function resolveTurnSuggestions(
 
 	const streamed = extractStreamedSuggestions(message);
 	if (streamed) {
-		return { suggestions: streamed, source: "initial" };
+		return { suggestions: streamed, source: "streamed" };
 	}
 
 	return null;

@@ -36,6 +36,19 @@ function dataSuggestionsPart(suggestions: string[]) {
 	return { type: "data-suggestions", data: { suggestions } };
 }
 
+/** A non-flow tool result (e.g. a KB search) — no `waniwani/suggestions` key at all. */
+function nonFlowToolPart(toolCallId = "call-kb") {
+	return {
+		type: "tool-kb_search",
+		toolCallId,
+		state: "output-available",
+		output: {
+			content: [{ type: "text", text: "{}" }],
+			_meta: { "waniwani/sessionId": "sess-1" },
+		},
+	};
+}
+
 describe("extractFlowSuggestions", () => {
 	test("returns the suggestions from a flow tool part", () => {
 		const message = assistantMessage([
@@ -114,6 +127,35 @@ describe("extractFlowSuggestions", () => {
 		expect(extractFlowSuggestions(message)).toBeNull();
 	});
 
+	// Regression test for the bug where a turn calling the flow twice — an
+	// interrupt-with-suggestions call followed by a complete/widget/error call
+	// carrying no `waniwani/suggestions` key — left the first call's pills on
+	// screen after the flow had moved on or finished. With the key made
+	// authoritative on every flow result (an empty array meaning "no pills for
+	// this step"), the second call's empty entry must win.
+	test("clears pills when a later flow call in the same turn carries an empty array", () => {
+		const message = assistantMessage([
+			flowToolPart(["Bronze", "Silver", "Gold"], "call-1"),
+			flowToolPart([], "call-2"),
+		]);
+
+		expect(extractFlowSuggestions(message)).toBeNull();
+		expect(resolveTurnSuggestions(message)).toBeNull();
+	});
+
+	test("does not let a non-flow tool part after a flow part clear the pills", () => {
+		const message = assistantMessage([
+			flowToolPart(["Bronze", "Silver", "Gold"], "call-1"),
+			nonFlowToolPart("call-2"),
+		]);
+
+		expect(extractFlowSuggestions(message)).toEqual([
+			"Bronze",
+			"Silver",
+			"Gold",
+		]);
+	});
+
 	test("ignores a tool part that has not produced output yet", () => {
 		const message = assistantMessage([
 			{ type: "tool-my_flow", toolCallId: "call-1", state: "input-streaming" },
@@ -153,7 +195,7 @@ describe("resolveTurnSuggestions", () => {
 
 		expect(resolveTurnSuggestions(message)).toEqual({
 			suggestions: ["From", "Stream"],
-			source: "initial",
+			source: "streamed",
 		});
 	});
 

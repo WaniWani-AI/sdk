@@ -130,7 +130,7 @@ describe("flow result _meta suggestions", () => {
 		expect(structured.suggestions).toEqual(["Bronze", "Gold"]);
 	});
 
-	test("omits the key when the single question declares no suggestions", async () => {
+	test("emits an empty array when the single question declares no suggestions", async () => {
 		const flow = createFlow({
 			id: "no_suggestions_flow",
 			title: "No suggestions",
@@ -149,10 +149,10 @@ describe("flow result _meta suggestions", () => {
 
 		const result = await runStart(flow);
 
-		expect(metaOf(result)[SUGGESTIONS_META_KEY]).toBeUndefined();
+		expect(metaOf(result)[SUGGESTIONS_META_KEY]).toEqual({ suggestions: [] });
 	});
 
-	test("omits the key when more than one question is open", async () => {
+	test("emits an empty array when more than one question is open", async () => {
 		const flow = createFlow({
 			id: "multi_question_flow",
 			title: "Multi question",
@@ -180,7 +180,7 @@ describe("flow result _meta suggestions", () => {
 
 		const result = await runStart(flow);
 
-		expect(metaOf(result)[SUGGESTIONS_META_KEY]).toBeUndefined();
+		expect(metaOf(result)[SUGGESTIONS_META_KEY]).toEqual({ suggestions: [] });
 	});
 
 	test("emits the key once a multi-question interrupt has one question left", async () => {
@@ -218,7 +218,7 @@ describe("flow result _meta suggestions", () => {
 		});
 	});
 
-	test("omits the key for a widget step", async () => {
+	test("emits an empty array for a widget step", async () => {
 		const flow = createFlow({
 			id: "widget_flow",
 			title: "Widget",
@@ -237,10 +237,10 @@ describe("flow result _meta suggestions", () => {
 
 		const result = await runStart(flow);
 
-		expect(metaOf(result)[SUGGESTIONS_META_KEY]).toBeUndefined();
+		expect(metaOf(result)[SUGGESTIONS_META_KEY]).toEqual({ suggestions: [] });
 	});
 
-	test("omits the key when the flow completes", async () => {
+	test("emits an empty array when the flow completes", async () => {
 		const flow = createFlow({
 			id: "complete_flow",
 			title: "Complete",
@@ -260,6 +260,61 @@ describe("flow result _meta suggestions", () => {
 		const structured = result.structuredContent as Record<string, unknown>;
 
 		expect(structured.status).toBe("complete");
-		expect(metaOf(result)[SUGGESTIONS_META_KEY]).toBeUndefined();
+		expect(metaOf(result)[SUGGESTIONS_META_KEY]).toEqual({ suggestions: [] });
+	});
+
+	test("always carries the suggestions key on a flow result, regardless of status", async () => {
+		const flows = [
+			createFlow({
+				id: "invariant_interrupt_flow",
+				title: "Invariant interrupt",
+				description: "Asks one open question",
+				state: { breed: z.string().describe("Pet breed") },
+			})
+				.addNode({
+					id: "ask_breed",
+					label: "Ask breed",
+					run: ({ interrupt }) =>
+						interrupt({ breed: { question: "What breed is your pet?" } }),
+				})
+				.addEdge(START, "ask_breed")
+				.addEdge("ask_breed", END)
+				.compile({ store: new TestFlowStateStore() }),
+			createFlow({
+				id: "invariant_complete_flow",
+				title: "Invariant complete",
+				description: "Completes immediately",
+				state: { done: z.boolean().describe("Whether the flow finished") },
+			})
+				.addNode({ id: "finish", label: "Finish", run: () => ({ done: true }) })
+				.addEdge(START, "finish")
+				.addEdge("finish", END)
+				.compile({ store: new TestFlowStateStore() }),
+			createFlow({
+				id: "invariant_widget_flow",
+				title: "Invariant widget",
+				description: "Shows a widget",
+				state: { plan: z.string().describe("Chosen plan") },
+			})
+				.addNode({
+					id: "show_plans",
+					label: "Show plans",
+					run: ({ showWidget }) =>
+						showWidget({ tool: mockPlanPickerTool, field: "plan" }),
+				})
+				.addEdge(START, "show_plans")
+				.addEdge("show_plans", END)
+				.compile({ store: new TestFlowStateStore() }),
+		];
+
+		for (const flow of flows) {
+			const result = await runStart(flow);
+			const meta = metaOf(result)[SUGGESTIONS_META_KEY];
+
+			expect(meta).toBeDefined();
+			expect(
+				Array.isArray((meta as { suggestions: unknown }).suggestions),
+			).toBe(true);
+		}
 	});
 });
