@@ -94,10 +94,11 @@ export interface SuggestionsConfig {
 	 */
 	initial?: string[];
 	/**
-	 * Per-turn suggestion pills driven by a flow's `interrupt({ suggestions })`.
-	 * Defaults to `true` — declaring `suggestions` in the flow is the opt-in,
-	 * so this stays enabled even when no suggestions config is passed at all.
-	 * Set `false` to keep only the `initial` starter prompts.
+	 * Per-turn suggestion behavior. `true` additionally enables flow-driven
+	 * pills (`interrupt({ suggestions })` rendered as clickable answers). Left
+	 * unset, an object config keeps streamed `data-suggestions` parts enabled
+	 * but flow-driven pills stay off. `false` disables all per-turn
+	 * suggestions.
 	 */
 	dynamic?: boolean;
 }
@@ -186,11 +187,10 @@ export interface ChatBaseProps {
 	/** Callback fired when a response is received */
 	onResponseReceived?: () => void;
 	/**
-	 * Suggestion pill configuration. An object sets starter prompts
-	 * (`initial`) and the flow-driven per-turn pills (`dynamic`); `false`
-	 * hides the pill row entirely. Leaving it unset does NOT disable
-	 * flow-driven pills — they render whenever a connected flow declares
-	 * `suggestions` on a step with one open question.
+	 * Suggestion pill configuration. Unset: no suggestions. An object sets
+	 * starter prompts (`initial`) and per-turn behavior (`dynamic`);
+	 * `dynamic: true` opts into flow-driven pills. `true` enables everything
+	 * with defaults; `false` hides the pill row entirely.
 	 */
 	suggestions?: boolean | SuggestionsConfig;
 	/**

@@ -69,11 +69,10 @@ export interface WaniwaniChatOverrides {
 	/** Initial suggestion chips. */
 	suggestions?: string[];
 	/**
-	 * Per-turn suggestion pills a flow drives via `interrupt({ suggestions })`.
-	 * Enabled by default — writing `suggestions` in a flow is itself the
-	 * opt-in, so most hosts never need to touch this. Set `false` to hide
-	 * flow-driven pills while still showing `suggestions` (the starter
-	 * prompts) at the start of the conversation.
+	 * Opt-in for the per-turn pills a flow drives via
+	 * `interrupt({ suggestions })`. Disabled by default — set `true` to render
+	 * them. Starter prompts (`suggestions`) are unaffected and show either
+	 * way.
 	 */
 	dynamicSuggestions?: boolean;
 	/** Persist conversations across reloads in IndexedDB. */

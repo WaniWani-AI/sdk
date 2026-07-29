@@ -119,12 +119,11 @@ export interface EmbedConfig {
 	/** Initial suggestion chips displayed before the first message. */
 	suggestions?: string[];
 	/**
-	 * Per-turn suggestion pills a flow drives via `interrupt({ suggestions })`.
-	 * Enabled by default — writing `suggestions` in a flow is itself the
-	 * opt-in, so most hosts never need to touch this. Set `false` to hide
-	 * flow-driven pills while still showing `suggestions` (the starter
-	 * prompts) at the start of the conversation. Surfaced as
-	 * `data-dynamic-suggestions` on the embed script tag.
+	 * Opt-in for the per-turn pills a flow drives via
+	 * `interrupt({ suggestions })`. Disabled by default — set `true` (or
+	 * `data-dynamic-suggestions="true"` on the embed script tag) to render
+	 * them. Starter prompts (`suggestions`) are unaffected and show either
+	 * way.
 	 */
 	dynamicSuggestions?: boolean;
 	/**

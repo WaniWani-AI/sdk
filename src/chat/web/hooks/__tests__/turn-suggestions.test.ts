@@ -204,4 +204,22 @@ describe("resolveTurnSuggestions", () => {
 
 		expect(resolveTurnSuggestions(message)).toBeNull();
 	});
+
+	test("ignores a flow entry when includeFlow is false", () => {
+		const message = assistantMessage([flowToolPart(["Oui", "Non"])]);
+
+		expect(resolveTurnSuggestions(message, { includeFlow: false })).toBeNull();
+	});
+
+	test("still returns the streamed part when includeFlow is false and both exist", () => {
+		const message = assistantMessage([
+			dataSuggestionsPart(["From", "Stream"]),
+			flowToolPart(["From", "Flow"]),
+		]);
+
+		expect(resolveTurnSuggestions(message, { includeFlow: false })).toEqual({
+			suggestions: ["From", "Stream"],
+			source: "streamed",
+		});
+	});
 });

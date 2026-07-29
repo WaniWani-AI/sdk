@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import type { ChatAppearance } from "../@types";
+import type { ChatAppearance, SuggestionsConfig } from "../@types";
 import { ChatEmbed } from "./chat-embed";
 
 // ============================================================================
@@ -256,6 +256,8 @@ interface EmbedArgs {
 	hideHeader: boolean;
 	/** Which widget the iframe loads. Swapped by the auto-fullscreen story. */
 	resourceEndpoint: string;
+	/** Suggestion pill config. The flow story opts into flow-driven pills. */
+	suggestions?: boolean | SuggestionsConfig;
 }
 
 // The embed itself, shared across every story's render so only the wrapping
@@ -271,6 +273,7 @@ function Embed(args: EmbedArgs) {
 			hideHeader={args.hideHeader}
 			welcomeMessage={args.welcomeMessage}
 			placeholder={args.placeholder}
+			suggestions={args.suggestions}
 		/>
 	);
 }
@@ -368,8 +371,10 @@ export const UnboundedParent: Story = {
  * tool result whose `_meta` carries the step's suggested answers, and the embed
  * renders them as pills above the composer. Clicking one sends it as the reply.
  *
- * The embed is given no `suggestions` prop at all, which is the case a channel
- * with no configured starter prompts produces. Pills must still appear.
+ * Flow-driven pills are opt-in: this story passes
+ * `suggestions={{ dynamic: true }}` (the `WaniwaniChat` / script-embed
+ * spellings are `dynamicSuggestions: true` / `data-dynamic-suggestions="true"`).
+ * Without the opt-in, the flow's suggestions render nothing.
  */
 export const FlowDrivenSuggestions: Story = {
 	render: (args) => {
@@ -382,6 +387,7 @@ export const FlowDrivenSuggestions: Story = {
 	},
 	args: {
 		welcomeMessage: "Hi! Ask me about plans to see the flow suggest answers.",
+		suggestions: { dynamic: true },
 	},
 };
 

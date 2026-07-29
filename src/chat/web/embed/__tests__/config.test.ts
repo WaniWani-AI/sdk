@@ -478,7 +478,7 @@ describe("resolveConfig — assistantBubble precedence", () => {
 });
 
 describe("resolveConfig — dynamicSuggestions", () => {
-	test("undefined when unspecified — consumers default to enabled", () => {
+	test("undefined when unspecified — flow pills stay off unless opted in", () => {
 		const config = resolveConfig({ token: "tok" });
 		expect(config.dynamicSuggestions).toBeUndefined();
 	});
@@ -488,19 +488,19 @@ describe("resolveConfig — dynamicSuggestions", () => {
 		expect(config.dynamicSuggestions).toBe(false);
 	});
 
-	test("programmatic true keeps flow-driven pills enabled", () => {
+	test("programmatic true opts into flow-driven pills", () => {
 		const config = resolveConfig({ token: "tok", dynamicSuggestions: true });
 		expect(config.dynamicSuggestions).toBe(true);
 	});
 });
 
 describe("parseConfigFromScript — data-dynamic-suggestions", () => {
-	test("undefined when unspecified — pills stay enabled by default", async () => {
+	test("undefined when unspecified — no opt-in", async () => {
 		const cfg = await parseWithAttrs({ "data-token": "tok" });
 		expect(cfg.dynamicSuggestions).toBeUndefined();
 	});
 
-	test("'false' opts out of flow-driven pills", async () => {
+	test("'false' explicitly keeps flow-driven pills off", async () => {
 		const cfg = await parseWithAttrs({
 			"data-token": "tok",
 			"data-dynamic-suggestions": "false",

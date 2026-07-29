@@ -21,27 +21,36 @@ function isConfigObject(
 }
 
 /**
- * Whether per-turn suggestions may render.
- *
- * Enabled unless the host explicitly turns them off, so a channel with no
- * configured starter prompts still shows the pills a flow drives. Writing
- * `suggestions` in a flow is itself the opt-in — nothing renders otherwise.
+ * Whether per-turn suggestion recomputation runs at all (the streamed
+ * `data-suggestions` path). Enabled when the host passes `true` or any config
+ * object not setting `dynamic: false`.
  */
 export function isDynamicSuggestionsEnabled(
 	config: boolean | SuggestionsConfig | undefined,
 ): boolean {
-	if (config === false) {
-		return false;
-	}
-	return !(isConfigObject(config) && config.dynamic === false);
+	return (
+		config === true || (isConfigObject(config) && config.dynamic !== false)
+	);
+}
+
+/**
+ * Whether flow-driven pills (a flow's `interrupt({ suggestions })`) may
+ * render. Opt-in: the host must pass `suggestions={true}` or an object with
+ * `dynamic: true`. Streamed `data-suggestions` parts are governed by
+ * `isDynamicSuggestionsEnabled` instead and keep working without this.
+ */
+export function isFlowSuggestionsEnabled(
+	config: boolean | SuggestionsConfig | undefined,
+): boolean {
+	return config === true || (isConfigObject(config) && config.dynamic === true);
 }
 
 /**
  * Map host-level config fields — `suggestions` (starter prompts) and
- * `dynamicSuggestions` (flow-pill opt-out) — to the `SuggestionsConfig`
+ * `dynamicSuggestions` (flow-pill opt-in) — to the `SuggestionsConfig`
  * consumed by `useSuggestions`. Every mount point (WaniwaniChat, the inline
  * and floating script embeds) must build its `ChatEmbed` suggestions prop
- * through this helper so the opt-out is never silently dropped.
+ * through this helper so the opt-in is never silently dropped.
  */
 export function toSuggestionsConfig(options: {
 	suggestions?: string[];
@@ -65,6 +74,7 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 	const prevStatusRef = useRef<ChatStatus>(status);
 
 	const isDynamicEnabled = isDynamicSuggestionsEnabled(config);
+	const isFlowEnabled = isFlowSuggestionsEnabled(config);
 
 	const clear = useCallback(() => {
 		setSuggestions([]);
@@ -108,13 +118,15 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 				return;
 			}
 
-			const resolved = resolveTurnSuggestions(lastAssistant);
+			const resolved = resolveTurnSuggestions(lastAssistant, {
+				includeFlow: isFlowEnabled,
+			});
 			setSuggestions(resolved?.suggestions ?? []);
 			// A streamed data part is reachable only from a self-hosted backend, so
 			// it is attributed alongside operator-authored prompts, not the flow.
 			setSource(resolved?.source === "flow" ? "flow" : "initial");
 		}
-	}, [status, isDynamicEnabled, messages]);
+	}, [status, isDynamicEnabled, isFlowEnabled, messages]);
 
 	return { suggestions, source, isLoading: false, clear };
 }

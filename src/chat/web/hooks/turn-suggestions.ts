@@ -102,12 +102,17 @@ function extractStreamedSuggestions(message: UIMessage): string[] | null {
  * streamed data part, which is reachable only from a self-hosted chat backend
  * and is therefore attributed like operator-authored config.
  *
+ * When `includeFlow` is `false`, the flow's `_meta` entries are ignored
+ * entirely and only the streamed `data-suggestions` part is considered.
+ *
  * @returns the pills and their origin, or `null` when the turn carried none.
  */
 export function resolveTurnSuggestions(
 	message: UIMessage,
+	options: { includeFlow?: boolean } = {},
 ): TurnSuggestions | null {
-	const fromFlow = extractFlowSuggestions(message);
+	const { includeFlow = true } = options;
+	const fromFlow = includeFlow ? extractFlowSuggestions(message) : null;
 	if (fromFlow) {
 		return { suggestions: fromFlow, source: "flow" };
 	}
