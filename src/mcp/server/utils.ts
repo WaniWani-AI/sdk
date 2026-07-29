@@ -60,6 +60,9 @@ const TURN_COUNT_KEYS = ["waniwani/turnCount"] as const;
 /** Meta key for flow execution path (nodesVisited, flowId). */
 export const FLOW_META_KEY = "waniwani/flow" as const;
 
+export type { SuggestionsMeta } from "../../shared/meta-keys";
+export { SUGGESTIONS_META_KEY } from "../../shared/meta-keys";
+
 /**
  * Meta key under which `withWaniwani` injects the widget tracking config
  * (`{ endpoint, token, sessionId, source, geoLocation }`) into tool response
