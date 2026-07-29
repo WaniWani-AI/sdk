@@ -17,7 +17,7 @@ export type SuggestionsSource = "flow" | "initial";
 function isConfigObject(
 	config: boolean | SuggestionsConfig | undefined,
 ): config is SuggestionsConfig {
-	return typeof config === "object" && config !== null && "initial" in config;
+	return typeof config === "object" && config !== null;
 }
 
 /**
@@ -34,6 +34,24 @@ export function isDynamicSuggestionsEnabled(
 		return false;
 	}
 	return !(isConfigObject(config) && config.dynamic === false);
+}
+
+/**
+ * Map host-level config fields — `suggestions` (starter prompts) and
+ * `dynamicSuggestions` (flow-pill opt-out) — to the `SuggestionsConfig`
+ * consumed by `useSuggestions`. Every mount point (WaniwaniChat, the inline
+ * and floating script embeds) must build its `ChatEmbed` suggestions prop
+ * through this helper so the opt-out is never silently dropped.
+ */
+export function toSuggestionsConfig(options: {
+	suggestions?: string[];
+	dynamicSuggestions?: boolean;
+}): SuggestionsConfig | undefined {
+	const { suggestions, dynamicSuggestions } = options;
+	if (!suggestions && dynamicSuggestions === undefined) {
+		return undefined;
+	}
+	return { initial: suggestions, dynamic: dynamicSuggestions };
 }
 
 export function useSuggestions(options: UseSuggestionsOptions) {
