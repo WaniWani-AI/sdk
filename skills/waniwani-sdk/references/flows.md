@@ -168,6 +168,17 @@ One field = single question. Multiple fields = multiple questions asked together
 )
 ```
 
+Suggestions serve two audiences at once. The assistant receives them as candidate
+answers on every host. In the Waniwani chat widget they also render as clickable
+pills above the input; clicking one sends it as the visitor's answer.
+
+Pills appear only when the step has **exactly one question still open**. That is
+evaluated at runtime, not from how you wrote the call: a four-question interrupt
+where three fields are already filled has one open question, so it gets pills. A
+step with two or more open questions gets none, because no single pill could
+answer them all. Other MCP hosts (ChatGPT, Claude) are unaffected either way:
+they have no pill row, and what they receive is unchanged.
+
 ### Multiple Questions
 
 ```ts
