@@ -18,6 +18,7 @@ import { toSuggestionsConfig } from "../hooks/use-suggestions";
 import { ChatEmbed } from "../layouts/chat-embed";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
+import { usePageSuggestions } from "./use-page-suggestions";
 import { useVisibilityGate } from "./use-pathname";
 import { createWidgetEventEmitter } from "./widget-events";
 import { WidgetEventsProvider } from "./widget-events-context";
@@ -110,6 +111,10 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			[],
 		);
 
+		// Page-aware starter prompts when the channel opts in, otherwise exactly
+		// `config.suggestions`.
+		const suggestions = usePageSuggestions(config);
+
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.
 		const body: Record<string, unknown> = { mode: "inline" };
@@ -134,7 +139,12 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 					welcomeMessage={config.welcomeMessage}
 					placeholder={config.placeholder}
 					suggestions={toSuggestionsConfig({
-						suggestions: config.suggestions,
+						// An explicitly-set empty `config.suggestions` keeps follow-up
+						// extraction enabled, so it passes through.
+						suggestions:
+							config.suggestions || suggestions.length > 0
+								? suggestions
+								: undefined,
 						suggestionOrigins: config.suggestionOrigins,
 					})}
 					enableThreadHistory={config.enableThreadHistory}

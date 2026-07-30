@@ -51,6 +51,25 @@ export interface ChatAppearance {
  */
 export type ShowToolCalls = boolean | "titles-only";
 
+/** Intent tier of a page prompt (discover/compare/act); one shown per tier. */
+export type PagePromptTier = "low" | "medium" | "high";
+
+/**
+ * One authored page prompt from `/config`. `id` is the entry's stable
+ * identity; untagged (`tier` absent) prompts fill any tier slot.
+ */
+export interface PagePrompt {
+	id: string | null;
+	text: string;
+	tier?: PagePromptTier;
+}
+
+/** Starter prompt set for one page, keyed by normalized pathname. */
+export interface PageSuggestionsEntry {
+	url: string;
+	prompts: PagePrompt[];
+}
+
 /**
  * Configuration for the embeddable chat widget.
  *
@@ -120,13 +139,20 @@ export interface EmbedConfig {
 	/** Initial suggestion chips displayed before the first message. */
 	suggestions?: string[];
 	/**
+	 * Per-page starter prompt sets from `/config`; the widget picks from the
+	 * entry matching its pathname, falling back to `suggestions`. No `data-*`
+	 * attribute maps to it.
+	 */
+	pageSuggestions?: PageSuggestionsEntry[];
+	/**
 	 * Which providers may fill the per-turn pill row. Defaults to
 	 * `["channel", "page", "followup"]` when unset: starter prompts and
 	 * generated follow-ups render, flow-driven pills stay opt-in — include
 	 * `"flow"` (or `data-suggestion-origins="channel,page,flow,followup"` on
 	 * the embed script tag) to render the pills a flow drives via
 	 * `interrupt({ suggestions })`. Starter prompts (`suggestions`) are
-	 * unaffected by this field and show either way.
+	 * unaffected by this field and show either way; page-aware sets respect
+	 * the `"page"` entry and fall back to `suggestions` without it.
 	 */
 	suggestionOrigins?: SuggestionOrigin[];
 	/**
