@@ -11,6 +11,7 @@ import { debugLog } from "../lib/debug";
 import { firePageView } from "../lib/page-view";
 import type { EmbedConfig } from "./config";
 import { resolveConfig } from "./config";
+import { parsePageSuggestions } from "./use-page-suggestions";
 import type { VisibilityRules } from "./visibility";
 
 // ---------------------------------------------------------------------------
@@ -85,11 +86,12 @@ interface RemoteConfigResponse {
 	placeholder: string | null;
 	suggestions: string[] | null;
 	/**
-	 * When true the widget fetches per-page starter prompts from
-	 * `/suggestions` and only uses `suggestions` as the fallback. Absent on
-	 * servers that predate the flag → `false`.
+	 * Per-page starter prompt sets, keyed by normalized pathname. Present only
+	 * while the channel has the feature switched on; the widget picks from the
+	 * matching entry locally and uses `suggestions` as the fallback. Absent on
+	 * servers that predate the field.
 	 */
-	dynamicSuggestions?: boolean | null;
+	pageSuggestions?: unknown;
 	enableThreadHistory?: boolean | null;
 	/**
 	 * Channel-specific event source (e.g. the integration/source this channel
@@ -177,8 +179,9 @@ function remoteToConfigPartial(
 	if (data.suggestions != null && data.suggestions.length > 0) {
 		out.suggestions = data.suggestions;
 	}
-	if (typeof data.dynamicSuggestions === "boolean") {
-		out.dynamicSuggestions = data.dynamicSuggestions;
+	const pageSuggestions = parsePageSuggestions(data.pageSuggestions);
+	if (pageSuggestions.length > 0) {
+		out.pageSuggestions = pageSuggestions;
 	}
 	if (typeof data.enableThreadHistory === "boolean") {
 		out.enableThreadHistory = data.enableThreadHistory;

@@ -51,6 +51,29 @@ export interface ChatAppearance {
 export type ShowToolCalls = boolean | "titles-only";
 
 /**
+ * Intent tier of one authored page prompt: low = discover, medium = compare,
+ * high = act. The widget shows one prompt per tier.
+ */
+export type PagePromptTier = "low" | "medium" | "high";
+
+/**
+ * One authored per-page starter prompt as delivered by `/config`. `id` is the
+ * authored entry's stable identity (click attribution); `tier` is absent on
+ * prompts stored before tiers existed — those fill any tier slot.
+ */
+export interface PagePrompt {
+	id: string | null;
+	text: string;
+	tier?: PagePromptTier;
+}
+
+/** Starter prompt set for one page, keyed by normalized pathname. */
+export interface PageSuggestionsEntry {
+	url: string;
+	prompts: PagePrompt[];
+}
+
+/**
  * Configuration for the embeddable chat widget.
  *
  * Resolution priority (later wins):
@@ -119,15 +142,15 @@ export interface EmbedConfig {
 	/** Initial suggestion chips displayed before the first message. */
 	suggestions?: string[];
 	/**
-	 * Fetch page-aware starter prompts from `{api}/suggestions` on mount and on
-	 * every SPA navigation, instead of always rendering the fixed
-	 * {@link EmbedConfig.suggestions} list (which stays the fallback whenever
-	 * that request fails or returns nothing).
+	 * Per-page starter prompt sets, keyed by normalized pathname. When the
+	 * current page matches an entry, the widget picks one prompt per intent
+	 * tier from it locally — re-picking on every SPA navigation — instead of
+	 * rendering the fixed {@link EmbedConfig.suggestions} list, which stays
+	 * the fallback for pages with no entry.
 	 *
-	 * Normally delivered per channel by `/config` (no `data-*` attribute maps
-	 * to it). Absent everywhere reads as `false`.
+	 * Delivered per channel by `/config` (no `data-*` attribute maps to it).
 	 */
-	dynamicSuggestions?: boolean;
+	pageSuggestions?: PageSuggestionsEntry[];
 	/**
 	 * AI transparency notice rendered under the input (EU AI Act compliance).
 	 * String overrides the default wording; `false` hides it. Surfaced as
