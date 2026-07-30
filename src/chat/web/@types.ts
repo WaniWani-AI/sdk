@@ -88,7 +88,20 @@ export interface WelcomeConfig {
 // ============================================================================
 
 /** Where a suggestion pill came from. */
-export type SuggestionOrigin = "channel" | "page" | "flow" | "followup";
+/**
+ * Every place a suggestion pill can come from. The single source of truth:
+ * {@link SuggestionOrigin} derives from it, and runtime validation reads it,
+ * so adding an origin is a one-line change.
+ */
+export const SUGGESTION_ORIGINS = [
+	"channel",
+	"page",
+	"flow",
+	"followup",
+] as const;
+
+/** Where a suggestion pill came from. */
+export type SuggestionOrigin = (typeof SUGGESTION_ORIGINS)[number];
 
 export interface SuggestionsConfig {
 	/**

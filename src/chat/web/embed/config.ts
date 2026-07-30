@@ -3,6 +3,7 @@
 // ============================================================================
 
 import type { ChatTheme, SuggestionOrigin } from "../@types";
+import { SUGGESTION_ORIGINS } from "../@types";
 import type { Locale } from "../i18n";
 import type { VisitorIdInput } from "../lib/visitor-context";
 import type { VisibilityRules } from "./visibility";
@@ -236,13 +237,6 @@ const DEFAULTS = {
 	api: DEFAULT_API_URL,
 };
 
-const KNOWN_SUGGESTION_ORIGINS = new Set<SuggestionOrigin>([
-	"channel",
-	"page",
-	"flow",
-	"followup",
-]);
-
 // ---------------------------------------------------------------------------
 // Script tag detection
 // ---------------------------------------------------------------------------
@@ -384,9 +378,8 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.suggestionOrigins = suggestionOriginsRaw
 			.split(",")
 			.map((s) => s.trim())
-			.filter(
-				(s): s is SuggestionOrigin =>
-					s !== "" && KNOWN_SUGGESTION_ORIGINS.has(s as SuggestionOrigin),
+			.filter((s): s is SuggestionOrigin =>
+				(SUGGESTION_ORIGINS as readonly string[]).includes(s),
 			);
 	}
 

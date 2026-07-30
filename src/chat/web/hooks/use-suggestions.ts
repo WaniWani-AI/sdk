@@ -3,6 +3,7 @@
 import type { ChatStatus, UIMessage } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SuggestionOrigin, SuggestionsConfig } from "../@types";
+import { SUGGESTION_ORIGINS } from "../@types";
 import { resolveTurnSuggestions } from "./turn-suggestions";
 
 export interface UseSuggestionsOptions {
@@ -28,13 +29,6 @@ export const DEFAULT_SUGGESTION_ORIGINS: readonly SuggestionOrigin[] = [
 	"followup",
 ];
 
-const ALL_SUGGESTION_ORIGINS: readonly SuggestionOrigin[] = [
-	"channel",
-	"page",
-	"flow",
-	"followup",
-];
-
 /**
  * Resolve which origins may fill the pill row for a given host config.
  *
@@ -50,14 +44,14 @@ export function resolveSuggestionOrigins(
 		return [];
 	}
 	if (config === true) {
-		return [...ALL_SUGGESTION_ORIGINS];
+		return [...SUGGESTION_ORIGINS];
 	}
 	if (isConfigObject(config)) {
 		if (config.origins !== undefined) {
 			return config.origins;
 		}
 		if (config.dynamic === true) {
-			return [...ALL_SUGGESTION_ORIGINS];
+			return [...SUGGESTION_ORIGINS];
 		}
 		if (config.dynamic === false) {
 			return [];
