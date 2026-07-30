@@ -50,7 +50,7 @@ const BASE = {
 	mode: "inline",
 	source: "acme-web",
 	promptId: "prompt_1",
-	kind: "page",
+	origin: "page",
 	text: "What does Pro cost?",
 	index: 0,
 } as const;
@@ -69,28 +69,26 @@ describe("resolveClickAttribution", () => {
 		{ id: null, text: "From the fixed list" },
 	];
 
-	test("an authored prompt keeps its stored id", () => {
-		expect(resolveClickAttribution(list, "Authored")).toEqual({
+	test("an authored prompt keeps its id and upgrades channel to page", () => {
+		expect(resolveClickAttribution(list, "Authored", "channel")).toEqual({
 			promptId: "p1",
-			kind: "page",
+			origin: "page",
 		});
 	});
 
-	test("a fallback prompt has no id to attribute to", () => {
-		expect(resolveClickAttribution(list, "From the fixed list")).toEqual({
-			promptId: null,
-			kind: "fallback",
-		});
+	test("a fixed-list prompt has no id and keeps the reported origin", () => {
+		expect(
+			resolveClickAttribution(list, "From the fixed list", "channel"),
+		).toEqual({ promptId: null, origin: "channel" });
 	});
 
-	test("a text that is not in the rendered list reads as a followup", () => {
-		expect(resolveClickAttribution(list, "Something streamed")).toEqual({
+	test("a text absent from the list keeps its reported origin", () => {
+		expect(
+			resolveClickAttribution(list, "Something streamed", "followup"),
+		).toEqual({ promptId: null, origin: "followup" });
+		expect(resolveClickAttribution([], "Anything", "flow")).toEqual({
 			promptId: null,
-			kind: "followup",
-		});
-		expect(resolveClickAttribution([], "Anything")).toEqual({
-			promptId: null,
-			kind: "followup",
+			origin: "flow",
 		});
 	});
 
@@ -102,8 +100,9 @@ describe("resolveClickAttribution", () => {
 					{ id: "second", text: "Same" },
 				],
 				"Same",
+				"channel",
 			),
-		).toEqual({ promptId: "first", kind: "page" });
+		).toEqual({ promptId: "first", origin: "page" });
 	});
 });
 
@@ -130,7 +129,7 @@ describe("fireSuggestionClick", () => {
 			expect(ev.correlation.visitorId.length).toBeGreaterThan(0);
 			expect(ev.properties).toMatchObject({
 				promptId: "prompt_1",
-				kind: "page",
+				origin: "page",
 				text: "What does Pro cost?",
 				index: 0,
 				channelId: "chan_1",
@@ -182,17 +181,17 @@ describe("fireSuggestionClick", () => {
 		}
 	});
 
-	test("sends a null promptId for a fallback prompt", async () => {
+	test("sends a null promptId for a channel prompt", async () => {
 		const { calls, restore } = mockFetch();
 		try {
 			await fireSuggestionClick({
 				...BASE,
 				promptId: null,
-				kind: "fallback",
+				origin: "channel",
 			});
 			const [ev] = JSON.parse(calls[0].init.body as string).events;
 			expect(ev.properties.promptId).toBe(null);
-			expect(ev.properties.kind).toBe("fallback");
+			expect(ev.properties.origin).toBe("channel");
 		} finally {
 			restore();
 		}
@@ -229,33 +228,44 @@ describe("resolveShownPrompts", () => {
 		{ id: "p2", text: "Authored two" },
 	];
 
-	test("an authored set keeps every stored id and reads as page", () => {
-		expect(resolveShownPrompts(list, ["Authored one", "Authored two"])).toEqual(
-			{
-				prompts: [
-					{ id: "p1", text: "Authored one" },
-					{ id: "p2", text: "Authored two" },
-				],
-				kind: "page",
-			},
-		);
+	test("an authored set keeps every id and upgrades channel to page", () => {
+		expect(
+			resolveShownPrompts(list, ["Authored one", "Authored two"], "channel"),
+		).toEqual({
+			prompts: [
+				{ id: "p1", text: "Authored one" },
+				{ id: "p2", text: "Authored two" },
+			],
+			origin: "page",
+		});
 	});
 
-	test("texts absent from the list read as a followup set with null ids", () => {
-		expect(resolveShownPrompts(list, ["Streamed A", "Streamed B"])).toEqual({
+	test("texts absent from the list keep the reported origin with null ids", () => {
+		expect(
+			resolveShownPrompts(list, ["Streamed A", "Streamed B"], "followup"),
+		).toEqual({
 			prompts: [
 				{ id: null, text: "Streamed A" },
 				{ id: null, text: "Streamed B" },
 			],
-			kind: "followup",
+			origin: "followup",
 		});
 	});
 
-	test("a fixed-list set has no ids and reads as fallback", () => {
+	test("a fixed-list set has no ids and stays channel", () => {
 		const fallbackList = [{ id: null, text: "From the fixed list" }];
-		expect(resolveShownPrompts(fallbackList, ["From the fixed list"])).toEqual({
+		expect(
+			resolveShownPrompts(fallbackList, ["From the fixed list"], "channel"),
+		).toEqual({
 			prompts: [{ id: null, text: "From the fixed list" }],
-			kind: "fallback",
+			origin: "channel",
+		});
+	});
+
+	test("an empty set keeps the reported origin", () => {
+		expect(resolveShownPrompts(list, [], "channel")).toEqual({
+			prompts: [],
+			origin: "channel",
 		});
 	});
 });
@@ -271,7 +281,7 @@ describe("fireSuggestionShown", () => {
 			{ id: "p1", text: "Authored one" },
 			{ id: null, text: "From the fixed list" },
 		],
-		kind: "page",
+		origin: "page",
 	} as const;
 
 	test("POSTs one suggestion.shown event carrying the whole set", async () => {
@@ -292,7 +302,7 @@ describe("fireSuggestionShown", () => {
 					{ id: null, text: "From the fixed list" },
 				],
 				count: 2,
-				kind: "page",
+				origin: "page",
 				channelId: "chan_1",
 				mode: "inline",
 				url: "https://shop.example.com/pricing",

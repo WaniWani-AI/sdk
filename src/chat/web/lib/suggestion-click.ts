@@ -17,14 +17,15 @@
 // resolved list's identity), and identity is the synchronous
 // `getOrCreateVisitorId()` — the device/referrer context rides on
 // `page.viewed` already, so there is nothing to await here.
+//
+// Both events carry `properties.origin`, the same `SuggestionOrigin` taxonomy
+// the `suggestion.clicked` widget event exposes to host pages.
 // ============================================================================
 
+import type { SuggestionOrigin } from "../@types";
 import type { PageSuggestion } from "../embed/use-page-suggestions";
 import { eventsEndpoint } from "./page-view";
 import { getOrCreateVisitorId } from "./visitor-context";
-
-/** Where the clicked prompt came from. */
-export type SuggestionKind = "page" | "fallback" | "followup";
 
 export interface FireSuggestionClickOptions {
 	/** Chat API base, e.g. `https://app.waniwani.ai/api/mcp/chat`. */
@@ -48,7 +49,7 @@ export interface FireSuggestionClickOptions {
 	sessionId?: string;
 	/** Stored id of the authored prompt, `null` when it has no identity. */
 	promptId: string | null;
-	kind: SuggestionKind;
+	origin: SuggestionOrigin;
 	/** The clicked prompt text. */
 	text: string;
 	/** Position in the rendered list, from the widget event. */
@@ -56,9 +57,12 @@ export interface FireSuggestionClickOptions {
 }
 
 /**
- * Attribute a clicked prompt text back to the list it was rendered from: an
- * authored per-page prompt keeps its stored id (`kind: "page"`), one from the
- * channel's fixed list has none (`kind: "fallback"`).
+ * Attribute a clicked prompt text back to the starter list it was rendered
+ * from — an authored per-page prompt keeps its stored id, one from the
+ * channel's fixed list has none — and correct the widget event's `origin` when
+ * that id proves the pill was per-page: `useSuggestions` reports the starter
+ * row as `"channel"` because it can't tell channel prompts from per-page ones,
+ * and only the embed host holds the resolved page list.
  *
  * Two identical texts on one page attribute to the first match. Duplicate
  * texts within a page are pathological authoring, not worth plumbing the
@@ -67,16 +71,10 @@ export interface FireSuggestionClickOptions {
 export function resolveClickAttribution(
 	list: PageSuggestion[],
 	text: string,
-): { promptId: string | null; kind: SuggestionKind } {
-	const match = list.find((s) => s.text === text);
-	if (!match) {
-		// ponytail: not in the current page list → treat as a followup. Today the
-		// WaniWani server never streams followups so this is near-unreachable
-		// (only a click racing an SPA-nav refetch); generated follow-ups make it
-		// real.
-		return { promptId: null, kind: "followup" };
-	}
-	return { promptId: match.id, kind: match.id ? "page" : "fallback" };
+	origin: SuggestionOrigin,
+): { promptId: string | null; origin: SuggestionOrigin } {
+	const promptId = list.find((s) => s.text === text)?.id ?? null;
+	return { promptId, origin: promptId ? "page" : origin };
 }
 
 interface PostSuggestionEventOptions {
@@ -155,7 +153,7 @@ export async function fireSuggestionClick(
 		source,
 		sessionId,
 		promptId,
-		kind,
+		origin,
 		text,
 		index,
 	} = opts;
@@ -167,7 +165,7 @@ export async function fireSuggestionClick(
 		sessionId,
 		properties: {
 			promptId,
-			kind,
+			origin,
 			// Org-authored copy, and DLP-redacted server-side regardless.
 			text,
 			index,
@@ -185,22 +183,25 @@ export interface ShownPrompt {
 
 /**
  * Attribute a rendered set back to the list it was resolved from, one entry
- * per pill. The set-level `kind` is the first pill's: rendered sets are
- * homogeneous (a page row is all-authored, the fixed list all-null, streamed
- * follow-ups absent from the list entirely), so a mixed set only arises from
- * a render racing an SPA-nav refetch and the first pill is as truthful as any.
+ * per pill. The set-level `origin` is the first pill's: rendered sets are
+ * homogeneous (a page row is all-authored, the fixed list all-null, flow and
+ * follow-up pills absent from the list entirely), so a mixed set only arises
+ * from a render racing an SPA navigation and the first pill is as truthful as
+ * any.
  */
 export function resolveShownPrompts(
 	list: PageSuggestion[],
 	texts: string[],
-): { prompts: ShownPrompt[]; kind: SuggestionKind } {
+	origin: SuggestionOrigin,
+): { prompts: ShownPrompt[]; origin: SuggestionOrigin } {
 	const prompts = texts.map((text) => ({
-		id: resolveClickAttribution(list, text).promptId,
+		id: resolveClickAttribution(list, text, origin).promptId,
 		text,
 	}));
-	const kind: SuggestionKind =
-		texts.length > 0 ? resolveClickAttribution(list, texts[0]).kind : "page";
-	return { prompts, kind };
+	return {
+		prompts,
+		origin: prompts[0]?.id ? "page" : origin,
+	};
 }
 
 export interface FireSuggestionShownOptions {
@@ -211,7 +212,7 @@ export interface FireSuggestionShownOptions {
 	source?: string;
 	sessionId?: string;
 	prompts: ShownPrompt[];
-	kind: SuggestionKind;
+	origin: SuggestionOrigin;
 }
 
 /**
@@ -223,7 +224,7 @@ export interface FireSuggestionShownOptions {
 export async function fireSuggestionShown(
 	opts: FireSuggestionShownOptions,
 ): Promise<void> {
-	const { api, token, channelId, mode, source, sessionId, prompts, kind } =
+	const { api, token, channelId, mode, source, sessionId, prompts, origin } =
 		opts;
 	if (prompts.length === 0) {
 		return;
@@ -237,7 +238,7 @@ export async function fireSuggestionShown(
 		properties: {
 			prompts,
 			count: prompts.length,
-			kind,
+			origin,
 			channelId,
 			mode,
 		},

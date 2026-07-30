@@ -30,6 +30,7 @@ import {
 import type { ChatHandle } from "../@types";
 import BorderGlow from "../components/border-glow";
 import { Suggestions } from "../components/suggestions";
+import { toSuggestionsConfig } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
@@ -194,9 +195,10 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			return widgetEvents.subscribe((event) => {
 				if (event.name === "suggestion.clicked") {
 					const { text } = event.properties;
-					const { promptId, kind } = resolveClickAttribution(
+					const { promptId, origin } = resolveClickAttribution(
 						pageSuggestions,
 						text,
+						event.properties.origin,
 					);
 					void fireSuggestionClick({
 						api: config.api ?? "",
@@ -206,16 +208,17 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 						source: config.source,
 						sessionId: chatRef.current?.sessionId,
 						promptId,
-						kind,
+						origin,
 						text,
 						index: event.properties.index,
 					});
 					return;
 				}
 				if (event.name === "suggestions.shown") {
-					const { prompts, kind } = resolveShownPrompts(
+					const { prompts, origin } = resolveShownPrompts(
 						pageSuggestions,
 						event.properties.texts,
+						event.properties.origin,
 					);
 					void fireSuggestionShown({
 						api: config.api ?? "",
@@ -225,7 +228,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 						source: config.source,
 						sessionId: chatRef.current?.sessionId,
 						prompts,
-						kind,
+						origin,
 					});
 				}
 			});
@@ -252,7 +255,9 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			shownSuggestionsRef.current = pageSuggestions;
 			widgetEvents.emit({
 				name: "suggestions.shown",
-				properties: { texts: suggestions },
+				// The dock only ever shows the starter row; `resolveShownPrompts`
+				// upgrades this to `"page"` when the pills carry authored ids.
+				properties: { texts: suggestions, origin: "channel" },
 			});
 		}, [suggestionsVisible, pageSuggestions, suggestions, widgetEvents]);
 		// The dock is the chat's entry point, so it shows the configured input
@@ -559,6 +564,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 															properties: {
 																text,
 																index: suggestions.indexOf(text),
+																origin: "channel",
 															},
 														});
 														openWith(text);
@@ -654,15 +660,15 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									hideHeader={false}
 									welcomeMessage={config.welcomeMessage}
 									placeholder={config.placeholder}
-									suggestions={
-										// `config.suggestions` may be an explicitly-set empty
-										// array; passing `{ initial: [] }` then (as before this
-										// hook existed) keeps useSuggestions' streamed follow-up
-										// extraction enabled for hosts that rely on it.
-										config.suggestions || suggestions.length > 0
-											? { initial: suggestions }
-											: undefined
-									}
+									suggestions={toSuggestionsConfig({
+										// An explicitly-set empty `config.suggestions` keeps
+										// follow-up extraction enabled, so it passes through.
+										suggestions:
+											config.suggestions || suggestions.length > 0
+												? suggestions
+												: undefined,
+										suggestionOrigins: config.suggestionOrigins,
+									})}
 									enableThreadHistory={config.enableThreadHistory}
 									showToolCalls={config.showToolCalls}
 									locale={config.locale}

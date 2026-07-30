@@ -1,7 +1,7 @@
-import { afterAll, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 // Type-only, so it doesn't pull the module in before the globals below exist.
-import type { EmbedConfig } from "../config";
+import type { EmbedConfig, PagePrompt } from "../config";
 import type { PageSuggestion } from "../use-page-suggestions";
 
 const win = new Window({ url: "https://host.example/pricing" });
@@ -31,51 +31,34 @@ for (const key of [
 // biome-ignore lint/suspicious/noExplicitAny: react act environment flag
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
-// ---------------------------------------------------------------------------
-// fetch stub — every call is parked until the test resolves it by hand, so a
-// response can be delivered *after* a navigation to prove the stale-overwrite
-// guard works. Deliberately does not reject on abort: what's under test is the
-// hook's own `signal.aborted` check, not AbortController itself.
-// ---------------------------------------------------------------------------
-
-interface PendingRequest {
-	url: string;
-	headers: Record<string, string>;
-	signal: AbortSignal | undefined;
-	resolve: (res: { ok: boolean; body: unknown }) => void;
-}
-
-let pending: PendingRequest[] = [];
-
-const originalFetch = globalThis.fetch;
-
-// biome-ignore lint/suspicious/noExplicitAny: minimal fetch stand-in
-(globalThis as any).fetch = (input: any, init: any) =>
-	new Promise((resolveFetch) => {
-		pending.push({
-			url: String(input),
-			headers: (init?.headers ?? {}) as Record<string, string>,
-			signal: init?.signal,
-			resolve: ({ ok, body }) => resolveFetch({ ok, json: async () => body }),
-		});
-	});
-
-// Bun shares one global scope across test files. This stub never settles on
-// its own, so leaving it installed would hang every later file that fetches.
-afterAll(() => {
-	globalThis.fetch = originalFetch;
-});
-
 const { act, createElement } = await import("react");
 const { createRoot } = await import("react-dom/client");
-const { parseSuggestionsResponse, resolveSuggestions, usePageSuggestions } =
-	await import("../use-page-suggestions");
+const {
+	normalizePathname,
+	parsePageSuggestions,
+	pickPagePrompts,
+	resolveSuggestions,
+	usePageSuggestions,
+} = await import("../use-page-suggestions");
+
+const PRICING_PROMPTS: PagePrompt[] = [
+	{ id: "pricing-1", text: "What plans do you offer?", tier: "low" },
+	{ id: "pricing-2", text: "How does per-seat billing work?", tier: "medium" },
+	{ id: "pricing-3", text: "Is there a free trial?", tier: "high" },
+	{ id: "pricing-4", text: "Can I switch plans mid-cycle?" },
+	{ id: "pricing-5", text: "Do you offer annual discounts?" },
+	{ id: "pricing-6", text: "What counts as an active user?" },
+];
 
 const BASE_CONFIG: EmbedConfig = {
 	api: "https://app.waniwani.ai/api/mcp/chat",
 	token: "wwp_test",
 	channelId: "0b3d5f2e-1c4a-4f8b-9d2e-6a7c8b9d0e1f",
 	suggestions: ["Static A", "Static B"],
+	pageSuggestions: [
+		{ url: "/pricing", prompts: PRICING_PROMPTS },
+		{ url: "/docs", prompts: [{ id: "d1", text: "Docs Q", tier: "low" }] },
+	],
 };
 
 /** Mount a probe that surfaces the hook's resolved prompts. */
@@ -100,11 +83,6 @@ async function mount(config: EmbedConfig) {
 		get texts() {
 			return latest.map((s) => s.text);
 		},
-		async settle(index: number, res: { ok: boolean; body: unknown }) {
-			await act(async () => {
-				pending[index]?.resolve(res);
-			});
-		},
 		async navigate(pathname: string) {
 			await act(async () => {
 				win.history.pushState({}, "", pathname);
@@ -116,73 +94,113 @@ async function mount(config: EmbedConfig) {
 	};
 }
 
-const envelope = (suggestions: unknown) => ({
-	success: true,
-	message: "success",
-	data: { suggestions },
-});
-
 beforeEach(async () => {
-	pending = [];
 	await act(async () => {
 		win.history.pushState({}, "", "/pricing");
 	});
 });
 
-describe("parseSuggestionsResponse", () => {
-	test("reads the enveloped `data.suggestions` shape the API returns", () => {
-		expect(
-			parseSuggestionsResponse(
-				envelope([{ id: "pricing-1", text: "How much?" }]),
-			),
-		).toEqual([{ id: "pricing-1", text: "How much?" }]);
+describe("normalizePathname", () => {
+	test("keeps a bare pathname and reduces a full URL to one", () => {
+		expect(normalizePathname("/pricing")).toBe("/pricing");
+		expect(normalizePathname("https://example.com/pricing")).toBe("/pricing");
 	});
 
-	test("accepts a bare `{ suggestions }` root too", () => {
-		expect(
-			parseSuggestionsResponse({ suggestions: [{ id: null, text: "Hi" }] }),
-		).toEqual([{ id: null, text: "Hi" }]);
+	test("drops query, hash and trailing slashes; root stays /", () => {
+		expect(normalizePathname("/pricing/?utm_source=x#plans")).toBe("/pricing");
+		expect(normalizePathname("https://example.com")).toBe("/");
+		expect(normalizePathname("/")).toBe("/");
 	});
 
-	test("keeps ids so a later click can be attributed", () => {
-		const parsed = parseSuggestionsResponse(
-			envelope([
-				{ id: "a", text: "one" },
-				{ id: null, text: "two" },
+	test("lowercases, so the authored key and the live pathname agree", () => {
+		expect(normalizePathname("/Pricing/Plans")).toBe("/pricing/plans");
+		expect(normalizePathname("https://Example.com/Pricing/?utm=1")).toBe(
+			normalizePathname("/pricing"),
+		);
+	});
+});
+
+describe("pickPagePrompts", () => {
+	test("shows exactly one prompt per tier, low → medium → high", () => {
+		const tiered = PRICING_PROMPTS.slice(0, 3);
+		for (let i = 0; i < 20; i++) {
+			const picked = pickPagePrompts([...tiered]);
+			expect(picked.map((p) => p.tier)).toEqual(["low", "medium", "high"]);
+		}
+	});
+
+	test("a tier with no tagged prompt is filled by an untagged wildcard", () => {
+		const pool: PagePrompt[] = [
+			{ id: "low-1", text: "a", tier: "low" },
+			{ id: "high-1", text: "b", tier: "high" },
+			{ id: "wild-1", text: "c" },
+		];
+		for (let i = 0; i < 10; i++) {
+			const picked = pickPagePrompts(pool);
+			expect(picked.map((p) => p.id).sort()).toEqual([
+				"high-1",
+				"low-1",
+				"wild-1",
+			]);
+		}
+	});
+
+	test("an all-untagged pool keeps the uniform random pick", () => {
+		const untagged = PRICING_PROMPTS.slice(3);
+		const seen = new Set<string | null>();
+		for (let i = 0; i < 40; i++) {
+			const picked = pickPagePrompts(untagged);
+			expect(picked).toHaveLength(3);
+			for (const p of picked) {
+				seen.add(p.id);
+			}
+		}
+		expect(seen.size).toBe(untagged.length);
+	});
+
+	test("fewer prompts than slots shows what exists", () => {
+		expect(
+			pickPagePrompts([{ id: "only", text: "One", tier: "high" }]),
+		).toHaveLength(1);
+	});
+});
+
+describe("parsePageSuggestions", () => {
+	test("reads well-formed entries, keeping ids and tiers", () => {
+		expect(
+			parsePageSuggestions([
+				{
+					url: "/pricing",
+					prompts: [{ id: "p1", text: "How much?", tier: "low" }],
+				},
 			]),
-		);
-		expect(parsed.map((s) => s.id)).toEqual(["a", null]);
+		).toEqual([
+			{
+				url: "/pricing",
+				prompts: [{ id: "p1", text: "How much?", tier: "low" }],
+			},
+		]);
 	});
 
-	test("coerces a non-string id to null rather than dropping the prompt", () => {
-		expect(parseSuggestionsResponse(envelope([{ id: 7, text: "ok" }]))).toEqual(
-			[{ id: null, text: "ok" }],
-		);
+	test("coerces a non-string id to null and drops an unknown tier", () => {
+		const [entry] = parsePageSuggestions([
+			{ url: "/a", prompts: [{ id: 7, text: "ok", tier: "urgent" }] },
+		]);
+		expect(entry.prompts).toEqual([{ id: null, text: "ok", tier: undefined }]);
 	});
 
-	test("drops entries with no usable text", () => {
+	test("drops prompts with no usable text, and entries left empty", () => {
 		expect(
-			parseSuggestionsResponse(
-				envelope([
-					{ id: "a", text: "" },
-					{ id: "b" },
-					null,
-					{ id: "c", text: "kept" },
-				]),
-			),
-		).toEqual([{ id: "c", text: "kept" }]);
+			parsePageSuggestions([
+				{ url: "/a", prompts: [{ id: "x", text: "" }, null] },
+				{ url: "/b", prompts: [{ id: "y", text: "kept" }] },
+			]),
+		).toEqual([{ url: "/b", prompts: [{ id: "y", text: "kept" }] }]);
 	});
 
-	test("degrades to [] on malformed bodies", () => {
-		for (const body of [
-			null,
-			undefined,
-			{},
-			{ data: null },
-			{ data: { suggestions: "nope" } },
-			"not json",
-		]) {
-			expect(parseSuggestionsResponse(body)).toEqual([]);
+	test("degrades to [] on malformed values", () => {
+		for (const value of [null, undefined, {}, "nope", [{ url: 3 }]]) {
+			expect(parsePageSuggestions(value)).toEqual([]);
 		}
 	});
 });
@@ -196,15 +214,8 @@ describe("resolveSuggestions", () => {
 		).toEqual([{ id: "p1", text: "Page prompt" }]);
 	});
 
-	test("falls back when nothing was fetched", () => {
+	test("falls back when the page has no entry", () => {
 		expect(resolveSuggestions(null, fallback)).toEqual([
-			{ id: null, text: "Static A" },
-			{ id: null, text: "Static B" },
-		]);
-	});
-
-	test("treats an empty fetched set as fall-back-client-side", () => {
-		expect(resolveSuggestions([], fallback)).toEqual([
 			{ id: null, text: "Static A" },
 			{ id: null, text: "Static B" },
 		]);
@@ -217,51 +228,51 @@ describe("resolveSuggestions", () => {
 });
 
 describe("usePageSuggestions", () => {
-	test("is inert without the flag — no request, fixed list", async () => {
-		const h = await mount({ ...BASE_CONFIG });
-		expect(pending).toHaveLength(0);
+	test("is inert without pageSuggestions — exactly the fixed list", async () => {
+		const h = await mount({ ...BASE_CONFIG, pageSuggestions: undefined });
 		expect(h.texts).toEqual(["Static A", "Static B"]);
 		h.unmount();
 	});
 
-	test("makes no request when the embed has no channelId", async () => {
+	test('suggestionOrigins without "page" gates authored pages off', async () => {
 		const h = await mount({
 			...BASE_CONFIG,
-			channelId: undefined,
-			dynamicSuggestions: true,
+			suggestionOrigins: ["channel", "followup"],
 		});
-		expect(pending).toHaveLength(0);
 		expect(h.texts).toEqual(["Static A", "Static B"]);
 		h.unmount();
 	});
 
-	test("fetches the current page's prompts and swaps the pills", async () => {
-		const h = await mount({ ...BASE_CONFIG, dynamicSuggestions: true });
-		expect(pending).toHaveLength(1);
-
-		const url = new URL(pending[0].url);
-		expect(url.pathname).toBe("/api/mcp/chat/suggestions");
-		expect(url.searchParams.get("channel")).toBe(BASE_CONFIG.channelId);
-		expect(url.searchParams.get("url")).toBe("/pricing");
-		expect(pending[0].headers.Authorization).toBe("Bearer wwp_test");
-
-		// Fixed list until the response lands — never a blank card.
-		expect(h.texts).toEqual(["Static A", "Static B"]);
-
-		await h.settle(0, {
-			ok: true,
-			body: envelope([{ id: "p1", text: "What does Pro cost?" }]),
+	test('suggestionOrigins including "page" keeps them on', async () => {
+		const h = await mount({
+			...BASE_CONFIG,
+			suggestionOrigins: ["channel", "page"],
 		});
-		expect(h.texts).toEqual(["What does Pro cost?"]);
-		// The authored prompt's id reaches the caller, so a click on it can be
-		// attributed back to the prompt.
-		expect(h.value).toEqual([{ id: "p1", text: "What does Pro cost?" }]);
+		expect(h.value).toHaveLength(3);
+		h.unmount();
+	});
+
+	test("shows three of the current page's prompts, one per tier first", async () => {
+		const h = await mount(BASE_CONFIG);
+		expect(h.value).toHaveLength(3);
+		const texts = PRICING_PROMPTS.map((p) => p.text);
+		for (const text of h.texts) {
+			expect(texts).toContain(text);
+		}
+		h.unmount();
+	});
+
+	test("carries each authored prompt's id, so a click can attribute to it", async () => {
+		const h = await mount(BASE_CONFIG);
+		const byText = new Map(PRICING_PROMPTS.map((p) => [p.text, p.id]));
+		for (const picked of h.value) {
+			expect(picked.id).toBe(byText.get(picked.text));
+		}
 		h.unmount();
 	});
 
 	test("hands back id-less prompts when it falls back", async () => {
-		const h = await mount({ ...BASE_CONFIG, dynamicSuggestions: true });
-		await h.settle(0, { ok: true, body: envelope([]) });
+		const h = await mount({ ...BASE_CONFIG, pageSuggestions: undefined });
 		expect(h.value).toEqual([
 			{ id: null, text: "Static A" },
 			{ id: null, text: "Static B" },
@@ -269,62 +280,31 @@ describe("usePageSuggestions", () => {
 		h.unmount();
 	});
 
-	test("falls back to the fixed list on a non-200", async () => {
-		const h = await mount({ ...BASE_CONFIG, dynamicSuggestions: true });
-		await h.settle(0, { ok: false, body: { error: "INVALID_CHANNEL" } });
-		expect(h.texts).toEqual(["Static A", "Static B"]);
-		h.unmount();
-	});
+	test("swaps the pills on SPA navigation and falls back on unseeded pages", async () => {
+		const h = await mount(BASE_CONFIG);
+		expect(h.value).toHaveLength(3);
 
-	test("falls back when the page has no authored prompts", async () => {
-		const h = await mount({ ...BASE_CONFIG, dynamicSuggestions: true });
-		await h.settle(0, { ok: true, body: envelope([]) });
-		expect(h.texts).toEqual(["Static A", "Static B"]);
-		h.unmount();
-	});
-
-	test("refetches with the new pathname on SPA navigation", async () => {
-		const h = await mount({ ...BASE_CONFIG, dynamicSuggestions: true });
-		await h.settle(0, {
-			ok: true,
-			body: envelope([{ id: "p1", text: "Pricing Q" }]),
-		});
-		expect(h.texts).toEqual(["Pricing Q"]);
-
-		await h.navigate("/docs/getting-started");
-		expect(pending).toHaveLength(2);
-		expect(new URL(pending[1].url).searchParams.get("url")).toBe(
-			"/docs/getting-started",
-		);
-
-		await h.settle(1, {
-			ok: true,
-			body: envelope([{ id: "d1", text: "Docs Q" }]),
-		});
-		expect(h.texts).toEqual(["Docs Q"]);
-		h.unmount();
-	});
-
-	test("a late response for the previous page never overwrites the current one", async () => {
-		const h = await mount({ ...BASE_CONFIG, dynamicSuggestions: true });
 		await h.navigate("/docs");
-
-		// The in-flight request for /pricing was aborted by the navigation.
-		expect(pending).toHaveLength(2);
-		expect(pending[0].signal?.aborted).toBe(true);
-
-		await h.settle(1, {
-			ok: true,
-			body: envelope([{ id: "d1", text: "Docs Q" }]),
-		});
 		expect(h.texts).toEqual(["Docs Q"]);
 
-		// /pricing answers late — must be ignored.
-		await h.settle(0, {
-			ok: true,
-			body: envelope([{ id: "p1", text: "Pricing Q" }]),
-		});
+		await h.navigate("/blog/hello");
+		expect(h.texts).toEqual(["Static A", "Static B"]);
+		h.unmount();
+	});
+
+	test("matches the authored entry regardless of casing or query noise", async () => {
+		const h = await mount(BASE_CONFIG);
+		await h.navigate("/Docs/?utm_source=x");
 		expect(h.texts).toEqual(["Docs Q"]);
+		h.unmount();
+	});
+
+	test("keeps one picked set stable until the visitor navigates", async () => {
+		const h = await mount(BASE_CONFIG);
+		const first = h.value;
+		await h.navigate("/pricing#anchor");
+		// Same normalized pathname → same memoized pick, no reshuffle.
+		expect(h.value).toEqual(first);
 		h.unmount();
 	});
 });

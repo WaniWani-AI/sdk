@@ -2,7 +2,8 @@
 // Embed Config — types and resolution
 // ============================================================================
 
-import type { ChatTheme } from "../@types";
+import type { ChatTheme, SuggestionOrigin } from "../@types";
+import { SUGGESTION_ORIGINS } from "../@types";
 import type { Locale } from "../i18n";
 import type { VisitorIdInput } from "../lib/visitor-context";
 import type { VisibilityRules } from "./visibility";
@@ -49,6 +50,25 @@ export interface ChatAppearance {
  *   a generic working indicator shows while the agent works.
  */
 export type ShowToolCalls = boolean | "titles-only";
+
+/** Intent tier of a page prompt (discover/compare/act); one shown per tier. */
+export type PagePromptTier = "low" | "medium" | "high";
+
+/**
+ * One authored page prompt from `/config`. `id` is the entry's stable
+ * identity; untagged (`tier` absent) prompts fill any tier slot.
+ */
+export interface PagePrompt {
+	id: string | null;
+	text: string;
+	tier?: PagePromptTier;
+}
+
+/** Starter prompt set for one page, keyed by normalized pathname. */
+export interface PageSuggestionsEntry {
+	url: string;
+	prompts: PagePrompt[];
+}
 
 /**
  * Configuration for the embeddable chat widget.
@@ -119,15 +139,22 @@ export interface EmbedConfig {
 	/** Initial suggestion chips displayed before the first message. */
 	suggestions?: string[];
 	/**
-	 * Fetch page-aware starter prompts from `{api}/suggestions` on mount and on
-	 * every SPA navigation, instead of always rendering the fixed
-	 * {@link EmbedConfig.suggestions} list (which stays the fallback whenever
-	 * that request fails or returns nothing).
-	 *
-	 * Normally delivered per channel by `/config` (no `data-*` attribute maps
-	 * to it). Absent everywhere reads as `false`.
+	 * Per-page starter prompt sets from `/config`; the widget picks from the
+	 * entry matching its pathname, falling back to `suggestions`. No `data-*`
+	 * attribute maps to it.
 	 */
-	dynamicSuggestions?: boolean;
+	pageSuggestions?: PageSuggestionsEntry[];
+	/**
+	 * Which providers may fill the per-turn pill row. Defaults to
+	 * `["channel", "page", "followup"]` when unset: starter prompts and
+	 * generated follow-ups render, flow-driven pills stay opt-in — include
+	 * `"flow"` (or `data-suggestion-origins="channel,page,flow,followup"` on
+	 * the embed script tag) to render the pills a flow drives via
+	 * `interrupt({ suggestions })`. Starter prompts (`suggestions`) are
+	 * unaffected by this field and show either way; page-aware sets respect
+	 * the `"page"` entry and fall back to `suggestions` without it.
+	 */
+	suggestionOrigins?: SuggestionOrigin[];
 	/**
 	 * AI transparency notice rendered under the input (EU AI Act compliance).
 	 * String overrides the default wording; `false` hides it. Surfaced as
@@ -212,7 +239,7 @@ export interface EmbedConfig {
 	 * Host-page callback fired on chat lifecycle events (`chat.ready`,
 	 * `chat.opened`/`chat.closed` in floating mode, `message.sent`,
 	 * `message.received`, `session.started`, `thread.changed`, `chat.error`,
-	 * `suggestion.clicked`, `link.clicked`). Message events never include the
+	 * `suggestion.clicked`, `suggestions.shown`, `link.clicked`). Message events never include the
 	 * message text. The embed runs in the host page's DOM, so the callback can
 	 * forward events directly into the page's analytics.
 	 *
@@ -367,6 +394,19 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const enableThreadHistory = bool("data-enable-thread-history");
 	if (enableThreadHistory !== undefined) {
 		config.enableThreadHistory = enableThreadHistory;
+	}
+
+	// An empty attribute (`data-suggestion-origins=""`) is a meaningful
+	// "render nothing" value, distinct from the attribute being absent —
+	// so this checks presence directly rather than going through `str()`.
+	const suggestionOriginsRaw = el.getAttribute("data-suggestion-origins");
+	if (suggestionOriginsRaw !== null) {
+		config.suggestionOrigins = suggestionOriginsRaw
+			.split(",")
+			.map((s) => s.trim())
+			.filter((s): s is SuggestionOrigin =>
+				(SUGGESTION_ORIGINS as readonly string[]).includes(s),
+			);
 	}
 
 	const disablePageView = bool("data-disable-page-view");

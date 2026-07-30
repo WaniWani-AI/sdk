@@ -14,6 +14,7 @@ import {
 	useRef,
 } from "react";
 import type { ChatHandle } from "../@types";
+import { toSuggestionsConfig } from "../hooks/use-suggestions";
 import { ChatEmbed } from "../layouts/chat-embed";
 import {
 	fireSuggestionClick,
@@ -134,9 +135,10 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			return widgetEvents.subscribe((event) => {
 				if (event.name === "suggestion.clicked") {
 					const { text } = event.properties;
-					const { promptId, kind } = resolveClickAttribution(
+					const { promptId, origin } = resolveClickAttribution(
 						pageSuggestions,
 						text,
+						event.properties.origin,
 					);
 					void fireSuggestionClick({
 						api: config.api ?? "",
@@ -146,16 +148,17 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 						source: config.source,
 						sessionId: chatRef.current?.sessionId,
 						promptId,
-						kind,
+						origin,
 						text,
 						index: event.properties.index,
 					});
 					return;
 				}
 				if (event.name === "suggestions.shown") {
-					const { prompts, kind } = resolveShownPrompts(
+					const { prompts, origin } = resolveShownPrompts(
 						pageSuggestions,
 						event.properties.texts,
+						event.properties.origin,
 					);
 					void fireSuggestionShown({
 						api: config.api ?? "",
@@ -165,7 +168,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 						source: config.source,
 						sessionId: chatRef.current?.sessionId,
 						prompts,
-						kind,
+						origin,
 					});
 				}
 			});
@@ -201,15 +204,15 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 					hideHeader={config.hideHeader}
 					welcomeMessage={config.welcomeMessage}
 					placeholder={config.placeholder}
-					suggestions={
-						// `config.suggestions` may be an explicitly-set empty array;
-						// passing `{ initial: [] }` then (as before this hook existed)
-						// keeps useSuggestions' streamed follow-up extraction enabled
-						// for hosts that rely on it.
-						config.suggestions || suggestions.length > 0
-							? { initial: suggestions }
-							: undefined
-					}
+					suggestions={toSuggestionsConfig({
+						// An explicitly-set empty `config.suggestions` keeps follow-up
+						// extraction enabled, so it passes through.
+						suggestions:
+							config.suggestions || suggestions.length > 0
+								? suggestions
+								: undefined,
+						suggestionOrigins: config.suggestionOrigins,
+					})}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}
 					locale={config.locale}
