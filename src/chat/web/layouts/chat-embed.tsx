@@ -306,6 +306,23 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			config: props.suggestions,
 		});
 
+		// Announce every pill set the visitor actually saw, once per set — keyed
+		// on the array identity `useSuggestions` returns (a new array per
+		// config load / streamed turn), so re-renders of the same set stay
+		// silent. The embed hosts subscribe and log one impression per set.
+		const announcedSuggestionsRef = useRef<string[] | null>(null);
+		useEffect(() => {
+			const current = suggestionsState.suggestions;
+			if (current.length === 0 || announcedSuggestionsRef.current === current) {
+				return;
+			}
+			announcedSuggestionsRef.current = current;
+			widgetEvents.emit({
+				name: "suggestions.shown",
+				properties: { texts: current, origin: suggestionsState.source },
+			});
+		}, [suggestionsState.suggestions, suggestionsState.source, widgetEvents]);
+
 		const handleWidgetMessage = useCallback(
 			(message: {
 				role: string;

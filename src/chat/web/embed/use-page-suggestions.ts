@@ -126,9 +126,10 @@ export function resolveSuggestions(
 	return (fallback ?? []).map((text) => ({ id: null, text }));
 }
 
-/** Starter prompt texts for the current page, else `config.suggestions`.
+/** Starter prompts for the current page, else `config.suggestions`. Objects,
+ *  not texts: the ids let a click attribute back to the authored prompt.
  *  @param config the resolved embed config (`pageSuggestions` opts in). */
-export function usePageSuggestions(config: EmbedConfig): string[] {
+export function usePageSuggestions(config: EmbedConfig): PageSuggestion[] {
 	const { pageSuggestions, suggestions, suggestionOrigins } = config;
 	const pathname = usePathname();
 	const pageEnabled = (
@@ -136,7 +137,8 @@ export function usePageSuggestions(config: EmbedConfig): string[] {
 	).includes("page");
 
 	// Memoized because the pick is random and the identity has to hold:
-	// `useSuggestions` keys an effect on this array and setStates it.
+	// `useSuggestions` keys an effect on this array and setStates it. Callers
+	// deriving the texts must memoize that map for the same reason.
 	return useMemo(() => {
 		const current = normalizePathname(pathname);
 		const page = pageEnabled
@@ -152,6 +154,6 @@ export function usePageSuggestions(config: EmbedConfig): string[] {
 			matched: Boolean(page),
 			count: picked?.length ?? 0,
 		});
-		return resolveSuggestions(picked, suggestions).map((s) => s.text);
+		return resolveSuggestions(picked, suggestions);
 	}, [pathname, pageEnabled, pageSuggestions, suggestions]);
 }

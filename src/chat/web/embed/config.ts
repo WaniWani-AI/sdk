@@ -239,7 +239,7 @@ export interface EmbedConfig {
 	 * Host-page callback fired on chat lifecycle events (`chat.ready`,
 	 * `chat.opened`/`chat.closed` in floating mode, `message.sent`,
 	 * `message.received`, `session.started`, `thread.changed`, `chat.error`,
-	 * `suggestion.clicked`, `link.clicked`). Message events never include the
+	 * `suggestion.clicked`, `suggestions.shown`, `link.clicked`). Message events never include the
 	 * message text. The embed runs in the host page's DOM, so the callback can
 	 * forward events directly into the page's analytics.
 	 *

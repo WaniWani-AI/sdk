@@ -200,7 +200,7 @@ export interface WaniwaniChatProps {
 	/**
 	 * Callback fired on chat lifecycle events (`chat.ready`, `message.sent`,
 	 * `message.received`, `session.started`, `thread.changed`, `chat.error`,
-	 * `suggestion.clicked`, `link.clicked`; `chat.opened`/`chat.closed` are
+	 * `suggestion.clicked`, `suggestions.shown`, `link.clicked`; `chat.opened`/`chat.closed` are
 	 * floating-embed-only and never fire here). Message events never include
 	 * the message text. Use it to mirror widget activity into the host page's
 	 * analytics. Exceptions thrown by the callback are swallowed and never

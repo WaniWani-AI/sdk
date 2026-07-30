@@ -16,6 +16,12 @@ import {
 import type { ChatHandle } from "../@types";
 import { toSuggestionsConfig } from "../hooks/use-suggestions";
 import { ChatEmbed } from "../layouts/chat-embed";
+import {
+	fireSuggestionClick,
+	fireSuggestionShown,
+	resolveClickAttribution,
+	resolveShownPrompts,
+} from "../lib/suggestion-click";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { usePageSuggestions } from "./use-page-suggestions";
@@ -112,8 +118,68 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		);
 
 		// Page-aware starter prompts when the channel opts in, otherwise exactly
-		// `config.suggestions`.
-		const suggestions = usePageSuggestions(config);
+		// `config.suggestions`. The objects carry the prompt ids for click
+		// attribution; `ChatEmbed` renders the texts — memoized because
+		// `useSuggestions` keys an effect on the `initial` array's identity.
+		const pageSuggestions = usePageSuggestions(config);
+		const suggestions = useMemo(
+			() => pageSuggestions.map((s) => s.text),
+			[pageSuggestions],
+		);
+
+		// Record every starter-prompt click and every rendered pill set
+		// server-side, attributed to the authored prompts involved. Rides the
+		// same widget-event stream the host page subscribes to, so there is one
+		// signal per interaction, not two.
+		useEffect(() => {
+			return widgetEvents.subscribe((event) => {
+				if (event.name === "suggestion.clicked") {
+					const { text } = event.properties;
+					const { promptId, origin } = resolveClickAttribution(
+						pageSuggestions,
+						text,
+						event.properties.origin,
+					);
+					void fireSuggestionClick({
+						api: config.api ?? "",
+						token: config.token,
+						channelId: config.channelId,
+						mode: "inline",
+						source: config.source,
+						sessionId: chatRef.current?.sessionId,
+						promptId,
+						origin,
+						text,
+						index: event.properties.index,
+					});
+					return;
+				}
+				if (event.name === "suggestions.shown") {
+					const { prompts, origin } = resolveShownPrompts(
+						pageSuggestions,
+						event.properties.texts,
+						event.properties.origin,
+					);
+					void fireSuggestionShown({
+						api: config.api ?? "",
+						token: config.token,
+						channelId: config.channelId,
+						mode: "inline",
+						source: config.source,
+						sessionId: chatRef.current?.sessionId,
+						prompts,
+						origin,
+					});
+				}
+			});
+		}, [
+			widgetEvents,
+			pageSuggestions,
+			config.api,
+			config.token,
+			config.channelId,
+			config.source,
+		]);
 
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.

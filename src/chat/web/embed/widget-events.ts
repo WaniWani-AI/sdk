@@ -54,6 +54,14 @@ export type WidgetEventDetail =
 				origin: SuggestionOrigin;
 			};
 	  }
+	| {
+			name: "suggestions.shown";
+			properties: {
+				texts: string[];
+				/** Origin of the rendered set, same taxonomy as `suggestion.clicked`. */
+				origin: SuggestionOrigin;
+			};
+	  }
 	| { name: "link.clicked"; properties: { url: string } };
 
 /** Payload handed to `onEvent` subscribers. Discriminated on `name`. */

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 // Type-only, so it doesn't pull the module in before the globals below exist.
 import type { EmbedConfig, PagePrompt } from "../config";
+import type { PageSuggestion } from "../use-page-suggestions";
 
 const win = new Window({ url: "https://host.example/pricing" });
 for (const key of [
@@ -60,10 +61,10 @@ const BASE_CONFIG: EmbedConfig = {
 	],
 };
 
-/** Mount a probe that surfaces the hook's resolved texts. */
+/** Mount a probe that surfaces the hook's resolved prompts. */
 async function mount(config: EmbedConfig) {
 	const container = win.document.createElement("div");
-	let latest: string[] = [];
+	let latest: PageSuggestion[] = [];
 	function Probe() {
 		latest = usePageSuggestions(config);
 		return null;
@@ -74,8 +75,13 @@ async function mount(config: EmbedConfig) {
 		root.render(createElement(Probe));
 	});
 	return {
+		/** The resolved prompts, ids included. */
 		get value() {
 			return latest;
+		},
+		/** Just the rendered texts, which is what most cases care about. */
+		get texts() {
+			return latest.map((s) => s.text);
 		},
 		async navigate(pathname: string) {
 			await act(async () => {
@@ -224,7 +230,7 @@ describe("resolveSuggestions", () => {
 describe("usePageSuggestions", () => {
 	test("is inert without pageSuggestions — exactly the fixed list", async () => {
 		const h = await mount({ ...BASE_CONFIG, pageSuggestions: undefined });
-		expect(h.value).toEqual(["Static A", "Static B"]);
+		expect(h.texts).toEqual(["Static A", "Static B"]);
 		h.unmount();
 	});
 
@@ -233,7 +239,7 @@ describe("usePageSuggestions", () => {
 			...BASE_CONFIG,
 			suggestionOrigins: ["channel", "followup"],
 		});
-		expect(h.value).toEqual(["Static A", "Static B"]);
+		expect(h.texts).toEqual(["Static A", "Static B"]);
 		h.unmount();
 	});
 
@@ -250,9 +256,27 @@ describe("usePageSuggestions", () => {
 		const h = await mount(BASE_CONFIG);
 		expect(h.value).toHaveLength(3);
 		const texts = PRICING_PROMPTS.map((p) => p.text);
-		for (const text of h.value) {
+		for (const text of h.texts) {
 			expect(texts).toContain(text);
 		}
+		h.unmount();
+	});
+
+	test("carries each authored prompt's id, so a click can attribute to it", async () => {
+		const h = await mount(BASE_CONFIG);
+		const byText = new Map(PRICING_PROMPTS.map((p) => [p.text, p.id]));
+		for (const picked of h.value) {
+			expect(picked.id).toBe(byText.get(picked.text));
+		}
+		h.unmount();
+	});
+
+	test("hands back id-less prompts when it falls back", async () => {
+		const h = await mount({ ...BASE_CONFIG, pageSuggestions: undefined });
+		expect(h.value).toEqual([
+			{ id: null, text: "Static A" },
+			{ id: null, text: "Static B" },
+		]);
 		h.unmount();
 	});
 
@@ -261,17 +285,17 @@ describe("usePageSuggestions", () => {
 		expect(h.value).toHaveLength(3);
 
 		await h.navigate("/docs");
-		expect(h.value).toEqual(["Docs Q"]);
+		expect(h.texts).toEqual(["Docs Q"]);
 
 		await h.navigate("/blog/hello");
-		expect(h.value).toEqual(["Static A", "Static B"]);
+		expect(h.texts).toEqual(["Static A", "Static B"]);
 		h.unmount();
 	});
 
 	test("matches the authored entry regardless of casing or query noise", async () => {
 		const h = await mount(BASE_CONFIG);
 		await h.navigate("/Docs/?utm_source=x");
-		expect(h.value).toEqual(["Docs Q"]);
+		expect(h.texts).toEqual(["Docs Q"]);
 		h.unmount();
 	});
 
