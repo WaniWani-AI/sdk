@@ -2,7 +2,8 @@
 // Embed Config — types and resolution
 // ============================================================================
 
-import type { ChatTheme } from "../@types";
+import type { ChatTheme, SuggestionOrigin } from "../@types";
+import { SUGGESTION_ORIGINS } from "../@types";
 import type { Locale } from "../i18n";
 import type { VisitorIdInput } from "../lib/visitor-context";
 import type { VisibilityRules } from "./visibility";
@@ -143,6 +144,17 @@ export interface EmbedConfig {
 	 * attribute maps to it.
 	 */
 	pageSuggestions?: PageSuggestionsEntry[];
+	/**
+	 * Which providers may fill the per-turn pill row. Defaults to
+	 * `["channel", "page", "followup"]` when unset: starter prompts and
+	 * generated follow-ups render, flow-driven pills stay opt-in — include
+	 * `"flow"` (or `data-suggestion-origins="channel,page,flow,followup"` on
+	 * the embed script tag) to render the pills a flow drives via
+	 * `interrupt({ suggestions })`. Starter prompts (`suggestions`) are
+	 * unaffected by this field and show either way; page-aware sets respect
+	 * the `"page"` entry and fall back to `suggestions` without it.
+	 */
+	suggestionOrigins?: SuggestionOrigin[];
 	/**
 	 * AI transparency notice rendered under the input (EU AI Act compliance).
 	 * String overrides the default wording; `false` hides it. Surfaced as
@@ -382,6 +394,19 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const enableThreadHistory = bool("data-enable-thread-history");
 	if (enableThreadHistory !== undefined) {
 		config.enableThreadHistory = enableThreadHistory;
+	}
+
+	// An empty attribute (`data-suggestion-origins=""`) is a meaningful
+	// "render nothing" value, distinct from the attribute being absent —
+	// so this checks presence directly rather than going through `str()`.
+	const suggestionOriginsRaw = el.getAttribute("data-suggestion-origins");
+	if (suggestionOriginsRaw !== null) {
+		config.suggestionOrigins = suggestionOriginsRaw
+			.split(",")
+			.map((s) => s.trim())
+			.filter((s): s is SuggestionOrigin =>
+				(SUGGESTION_ORIGINS as readonly string[]).includes(s),
+			);
 	}
 
 	const disablePageView = bool("data-disable-page-view");

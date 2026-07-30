@@ -12,6 +12,8 @@
 // a message was exchanged, never what was said.
 // ============================================================================
 
+import type { SuggestionOrigin } from "../@types";
+
 /** Surface the widget is mounted on. */
 export type WidgetMode = "inline" | "floating";
 
@@ -43,7 +45,15 @@ export type WidgetEventDetail =
 	| { name: "session.started"; properties: { sessionId: string } }
 	| { name: "thread.changed"; properties: { threadId: string } }
 	| { name: "chat.error"; properties: { message: string } }
-	| { name: "suggestion.clicked"; properties: { text: string; index: number } }
+	| {
+			name: "suggestion.clicked";
+			properties: {
+				text: string;
+				index: number;
+				/** Which provider supplied the clicked pill: `"channel"` (starter prompts), `"page"` (per-URL starter prompts), `"flow"` (an MCP flow's `interrupt({ suggestions })`), or `"followup"` (generated from the conversation). */
+				origin: SuggestionOrigin;
+			};
+	  }
 	| { name: "link.clicked"; properties: { url: string } };
 
 /** Payload handed to `onEvent` subscribers. Discriminated on `name`. */

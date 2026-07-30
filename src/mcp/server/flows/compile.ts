@@ -7,7 +7,12 @@ import type {
 import { z } from "zod";
 import type { ScopedWaniWaniClient } from "../scoped-client";
 import { extractScopedClient } from "../scoped-client";
-import { extractSessionId, FLOW_META_KEY } from "../utils";
+import {
+	extractSessionId,
+	FLOW_META_KEY,
+	SUGGESTIONS_META_KEY,
+	type SuggestionsMeta,
+} from "../utils";
 import type {
 	CompileInput,
 	FlowToolHandler,
@@ -385,6 +390,22 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 		const result = await handleToolCall(args, sessionId, _meta, waniwani);
 
+		// Echo sessionId in response when not sourced from _meta (client must pass it back)
+		const contentObj =
+			!metaSessionId && sessionId
+				? { ...result.content, sessionId }
+				: result.content;
+
+		// Authoritative for the turn: an empty array clears pills an earlier flow
+		// call in the same turn set. Only the single-open-question shorthand
+		// carries a top-level `suggestions`. Set before both return paths below
+		// so every flow tool result — including the state-persistence failure —
+		// carries the key.
+		_meta[SUGGESTIONS_META_KEY] = {
+			suggestions:
+				contentObj.status === "interrupt" ? (contentObj.suggestions ?? []) : [],
+		} satisfies SuggestionsMeta;
+
 		// Persist flow state under session ID. On completion we store the final
 		// `{ state }` (no `step`) so customers can read the final state until
 		// the KV TTL expires; a stale `continue` falls into the "already
@@ -416,12 +437,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 		}
-
-		// Echo sessionId in response when not sourced from _meta (client must pass it back)
-		const contentObj =
-			!metaSessionId && sessionId
-				? { ...result.content, sessionId }
-				: result.content;
 
 		const content = [
 			{

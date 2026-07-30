@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WAN-702 page-aware prompts — local test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 4rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.2rem; }
+    #path { font-family: monospace; background: #f2f1ee; padding: 2px 6px; border-radius: 4px; }
+    button { font-size: 1rem; padding: 8px 14px; margin-right: 8px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+    button:hover { background: #f6f6f4; }
+    p { color: #555; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <h1>WAN-702 — page-aware starter prompts</h1>
+  <p>Current pathname: <span id="path"></span></p>
+  <p>
+    <button onclick="go('/pricing')">Go to /pricing</button>
+    <button onclick="go('/docs')">Go to /docs</button>
+    <button onclick="go('/blog/hello')">Go to /blog/hello (unseeded → fallback)</button>
+  </p>
+  <p>
+    /pricing and /docs each have 6 seeded prompts — the floating bar shows 3 of them
+    (set varies per visit). /blog/hello has none, so the pills fall back to the channel's
+    fixed list ("What is WaniWani?", "Show me the docs"). Open the console for
+    <code>[Waniwani]</code> debug logs of each <code>/suggestions</code> response.
+  </p>
+
+  <script>
+    window.WANIWANI_DEBUG = true;
+    function go(pathname) {
+      history.pushState({}, "", pathname);
+      document.getElementById("path").textContent = location.pathname;
+    }
+    document.getElementById("path").textContent = location.pathname;
+  </script>
+  <script
+    src="/dist/chat/embed.js"
+    defer
+    data-token="wwp_EGH1pFRzdzIorkPURGUAFEAntiq4YiHP"
+    data-channel-id="0d761df5-1500-449e-ba73-47f1667bcb0f"
+    data-api="http://localhost:3000/api/mcp/chat"
+    data-mode="floating"
+  ></script>
+</body>
+</html>

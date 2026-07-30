@@ -14,6 +14,7 @@ import {
 	useRef,
 } from "react";
 import type { ChatHandle } from "../@types";
+import { toSuggestionsConfig } from "../hooks/use-suggestions";
 import { ChatEmbed } from "../layouts/chat-embed";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
@@ -137,15 +138,15 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 					hideHeader={config.hideHeader}
 					welcomeMessage={config.welcomeMessage}
 					placeholder={config.placeholder}
-					suggestions={
-						// `config.suggestions` may be an explicitly-set empty array;
-						// passing `{ initial: [] }` then (as before this hook existed)
-						// keeps useSuggestions' streamed follow-up extraction enabled
-						// for hosts that rely on it.
-						config.suggestions || suggestions.length > 0
-							? { initial: suggestions }
-							: undefined
-					}
+					suggestions={toSuggestionsConfig({
+						// An explicitly-set empty `config.suggestions` keeps follow-up
+						// extraction enabled, so it passes through.
+						suggestions:
+							config.suggestions || suggestions.length > 0
+								? suggestions
+								: undefined,
+						suggestionOrigins: config.suggestionOrigins,
+					})}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}
 					locale={config.locale}

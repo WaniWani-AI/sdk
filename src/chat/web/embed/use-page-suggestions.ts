@@ -1,11 +1,9 @@
-// ============================================================================
-// usePageSuggestions — starter prompts for the page the widget sits on.
-// `/config` delivers per-page sets (`pageSuggestions`, keyed by normalized
-// pathname); the widget matches its location locally and re-picks on SPA
-// navigation. Unmatched pages fall back to the fixed `suggestions`.
-// ============================================================================
+// Starter prompts for the page the widget sits on: `/config` delivers
+// per-page sets keyed by normalized pathname; the widget matches its location
+// locally, re-picks on SPA navigation, and falls back to the fixed list.
 
 import { useMemo } from "react";
+import { DEFAULT_SUGGESTION_ORIGINS } from "../hooks/use-suggestions";
 import { debugLog } from "../lib/debug";
 import type {
 	EmbedConfig,
@@ -15,19 +13,16 @@ import type {
 } from "./config";
 import { usePathname } from "./use-pathname";
 
-/**
- * One starter prompt. `id` is the authored entry's identity (click
- * attribution later); `null` for prompts from the fixed list.
- */
+/** One starter prompt; `id` is null for fixed-list prompts (no stored identity). */
 export interface PageSuggestion {
 	id: string | null;
 	text: string;
 }
 
-/** How many of a page's authored prompts the widget shows at a time. */
+/** How many of a page's prompts the widget shows at a time. */
 const SHOWN_PROMPT_COUNT = 3;
 
-/** Tier display order. One prompt is shown per tier. */
+/** Tier display order; one prompt is shown per tier. */
 const TIER_ORDER: PagePromptTier[] = ["low", "medium", "high"];
 
 function takeRandom<T>(pool: T[]): T | undefined {
@@ -76,9 +71,8 @@ export function pickPagePrompts(prompts: PagePrompt[]): PagePrompt[] {
 }
 
 /**
- * URL or pathname → the key `pageSuggestions` entries use: pathname only, no
- * query/hash/trailing slash, lowercased. Mirrors the server's authoring-side
- * normalization; unparseable input becomes `/`.
+ * URL or pathname → the entry key: pathname only, no query/hash/trailing
+ * slash, lowercased (mirrors the server's normalization); unparseable → `/`.
  */
 export function normalizePathname(url: string): string {
 	let pathname: string;
@@ -91,11 +85,7 @@ export function normalizePathname(url: string): string {
 	return (trimmed === "" ? "/" : trimmed).toLowerCase();
 }
 
-/**
- * Validate a raw `pageSuggestions` value into typed entries. Malformed
- * entries/prompts drop out instead of throwing; an entry left empty is
- * dropped whole.
- */
+/** Validate a raw `pageSuggestions` value; malformed entries drop out. */
 export function parsePageSuggestions(value: unknown): PageSuggestionsEntry[] {
 	if (!Array.isArray(value)) {
 		return [];
@@ -146,19 +136,25 @@ export function resolveSuggestions(
 }
 
 /**
- * Starter prompt texts for the current page. Memoized so the pick is stable
- * per pathname and the array identity doesn't loop `useSuggestions`' effect.
- * Without `config.pageSuggestions` this is exactly `config.suggestions`.
+ * Starter prompt texts for the current page. Memoized: one pick per pathname,
+ * stable array identity (useSuggestions keys an effect on it). Inert — exactly
+ * `config.suggestions` — without `pageSuggestions` or when the host's
+ * `suggestionOrigins` excludes `"page"`.
  */
 export function usePageSuggestions(config: EmbedConfig): string[] {
-	const { pageSuggestions, suggestions } = config;
+	const { pageSuggestions, suggestions, suggestionOrigins } = config;
 	const pathname = usePathname();
+	const pageEnabled = (
+		suggestionOrigins ?? DEFAULT_SUGGESTION_ORIGINS
+	).includes("page");
 
 	return useMemo(() => {
 		const current = normalizePathname(pathname);
-		const page = pageSuggestions?.find(
-			(entry) => normalizePathname(entry.url) === current,
-		);
+		const page = pageEnabled
+			? pageSuggestions?.find(
+					(entry) => normalizePathname(entry.url) === current,
+				)
+			: undefined;
 		const picked = page
 			? pickPagePrompts(page.prompts).map(({ id, text }) => ({ id, text }))
 			: null;
@@ -168,5 +164,5 @@ export function usePageSuggestions(config: EmbedConfig): string[] {
 			count: picked?.length ?? 0,
 		});
 		return resolveSuggestions(picked, suggestions).map((s) => s.text);
-	}, [pathname, pageSuggestions, suggestions]);
+	}, [pathname, pageEnabled, pageSuggestions, suggestions]);
 }

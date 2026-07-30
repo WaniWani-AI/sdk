@@ -228,6 +228,24 @@ describe("usePageSuggestions", () => {
 		h.unmount();
 	});
 
+	test('suggestionOrigins without "page" gates authored pages off', async () => {
+		const h = await mount({
+			...BASE_CONFIG,
+			suggestionOrigins: ["channel", "followup"],
+		});
+		expect(h.value).toEqual(["Static A", "Static B"]);
+		h.unmount();
+	});
+
+	test('suggestionOrigins including "page" keeps them on', async () => {
+		const h = await mount({
+			...BASE_CONFIG,
+			suggestionOrigins: ["channel", "page"],
+		});
+		expect(h.value).toHaveLength(3);
+		h.unmount();
+	});
+
 	test("shows three of the current page's prompts, one per tier first", async () => {
 		const h = await mount(BASE_CONFIG);
 		expect(h.value).toHaveLength(3);

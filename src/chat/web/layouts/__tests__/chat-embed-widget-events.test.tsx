@@ -167,7 +167,11 @@ describe("ChatEmbed widget events", () => {
 		expect(clicks[0]).toMatchObject({
 			name: "suggestion.clicked",
 			mode: "inline",
-			properties: { text: "Second suggestion", index: 1 },
+			properties: {
+				text: "Second suggestion",
+				index: 1,
+				origin: "channel",
+			},
 		});
 	});
 
