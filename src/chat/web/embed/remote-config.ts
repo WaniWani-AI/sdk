@@ -86,10 +86,8 @@ interface RemoteConfigResponse {
 	placeholder: string | null;
 	suggestions: string[] | null;
 	/**
-	 * Per-page starter prompt sets, keyed by normalized pathname. Present only
-	 * while the channel has the feature switched on; the widget picks from the
-	 * matching entry locally and uses `suggestions` as the fallback. Absent on
-	 * servers that predate the field.
+	 * Per-page starter prompt sets; present only while the channel has the
+	 * feature on. Absent on servers that predate the field.
 	 */
 	pageSuggestions?: unknown;
 	enableThreadHistory?: boolean | null;

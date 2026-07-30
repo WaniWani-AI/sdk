@@ -1,12 +1,8 @@
 // ============================================================================
 // usePageSuggestions — starter prompts for the page the widget sits on.
-//
-// A channel with page-aware prompts delivers them in `/config` as
-// `pageSuggestions` entries keyed by normalized pathname. The widget matches
-// its location against those entries locally — no per-page request — and
-// re-picks on every SPA navigation (via `usePathname`). Pages with no entry
-// (or a channel with none) fall back to the channel's fixed `suggestions` —
-// the pills are decoration on the entry point, never a hard dependency.
+// `/config` delivers per-page sets (`pageSuggestions`, keyed by normalized
+// pathname); the widget matches its location locally and re-picks on SPA
+// navigation. Unmatched pages fall back to the fixed `suggestions`.
 // ============================================================================
 
 import { useMemo } from "react";
@@ -20,11 +16,8 @@ import type {
 import { usePathname } from "./use-pathname";
 
 /**
- * One starter prompt. `id` identifies an authored per-page prompt so a click
- * can be attributed back to it; it is `null` for prompts coming from the
- * channel's fixed `suggestions` list, which have no stored identity. Ids stop
- * at this hook's resolve state — the embeds render texts — parked there so
- * click attribution can pick them up without re-plumbing the resolve.
+ * One starter prompt. `id` is the authored entry's identity (click
+ * attribution later); `null` for prompts from the fixed list.
  */
 export interface PageSuggestion {
 	id: string | null;
@@ -34,11 +27,7 @@ export interface PageSuggestion {
 /** How many of a page's authored prompts the widget shows at a time. */
 const SHOWN_PROMPT_COUNT = 3;
 
-/**
- * Intent tiers in display order: educational / discovery first, action last.
- * One prompt is shown per tier, so a visitor sees a next step for every level
- * of buying intent.
- */
+/** Tier display order. One prompt is shown per tier. */
 const TIER_ORDER: PagePromptTier[] = ["low", "medium", "high"];
 
 function takeRandom<T>(pool: T[]): T | undefined {
@@ -51,12 +40,8 @@ function takeRandom<T>(pool: T[]): T | undefined {
 }
 
 /**
- * Pick up to {@link SHOWN_PROMPT_COUNT} prompts, one per intent tier in
- * {@link TIER_ORDER}. A tier with no tagged prompt borrows from the untagged
- * (wildcard) pool, and any slot still empty is filled from whatever remains —
- * so a page with at least {@link SHOWN_PROMPT_COUNT} stored prompts always
- * shows exactly that many, and an all-untagged pool degrades to a uniform
- * random pick. Random within each pool so exposure spreads across visits.
+ * Pick up to {@link SHOWN_PROMPT_COUNT} prompts, one per tier; untagged
+ * prompts fill any slot, leftovers top up short slots. Random within pools.
  */
 export function pickPagePrompts(prompts: PagePrompt[]): PagePrompt[] {
 	const byTier = new Map<PagePromptTier, PagePrompt[]>();
@@ -73,8 +58,7 @@ export function pickPagePrompts(prompts: PagePrompt[]): PagePrompt[] {
 
 	const picked: PagePrompt[] = [];
 	for (const tier of TIER_ORDER) {
-		const fromTier = takeRandom(byTier.get(tier) ?? []);
-		const choice = fromTier ?? takeRandom(wildcards);
+		const choice = takeRandom(byTier.get(tier) ?? []) ?? takeRandom(wildcards);
 		if (choice) {
 			picked.push(choice);
 		}
@@ -92,17 +76,13 @@ export function pickPagePrompts(prompts: PagePrompt[]): PagePrompt[] {
 }
 
 /**
- * Reduce a URL or pathname to the form `pageSuggestions` entries are keyed
- * by: pathname only, query and hash dropped, no trailing slash (root stays
- * `/`), lowercased. Mirrors the server's authoring-side normalization, so a
- * set authored for `https://site.com/Pricing/` is the one a widget on
- * `/pricing` picks up. Anything unparseable normalizes to `/`.
+ * URL or pathname → the key `pageSuggestions` entries use: pathname only, no
+ * query/hash/trailing slash, lowercased. Mirrors the server's authoring-side
+ * normalization; unparseable input becomes `/`.
  */
 export function normalizePathname(url: string): string {
 	let pathname: string;
 	try {
-		// A base is required to parse a bare pathname; only the pathname
-		// survives, so the base itself is discarded.
 		pathname = new URL(url, "http://localhost").pathname;
 	} catch {
 		pathname = "/";
@@ -112,12 +92,9 @@ export function normalizePathname(url: string): string {
 }
 
 /**
- * Validate a `pageSuggestions` value from `/config` into typed entries.
- *
- * Malformed entries and prompts degrade by dropping out rather than throwing —
- * remote config is a convenience layer, never required for the widget to
- * function. An entry left with no usable prompts is dropped whole, so the
- * page it named falls back to the fixed list.
+ * Validate a raw `pageSuggestions` value into typed entries. Malformed
+ * entries/prompts drop out instead of throwing; an entry left empty is
+ * dropped whole.
  */
 export function parsePageSuggestions(value: unknown): PageSuggestionsEntry[] {
 	if (!Array.isArray(value)) {
@@ -157,10 +134,7 @@ export function parsePageSuggestions(value: unknown): PageSuggestionsEntry[] {
 	});
 }
 
-/**
- * The list to render: the page's own picked prompts when we have any,
- * otherwise the channel's fixed `suggestions`.
- */
+/** The page's picked prompts when there are any, else the fixed fallback. */
 export function resolveSuggestions(
 	picked: PageSuggestion[] | null,
 	fallback: string[] | undefined,
@@ -172,19 +146,12 @@ export function resolveSuggestions(
 }
 
 /**
- * Resolved starter prompt texts for the current page, with a stable array
- * identity between navigations — `useSuggestions` (inside `ChatEmbed`) keys an
- * effect on the `initial` array identity and setStates it, so a fresh array
- * each render would loop. The random per-tier pick happens inside the memo,
- * so one set stays up until the visitor navigates.
- *
- * Inert without `config.pageSuggestions` — against servers that predate the
- * field (or a channel with the feature off, which never receives it) this is
- * exactly `config.suggestions`.
+ * Starter prompt texts for the current page. Memoized so the pick is stable
+ * per pathname and the array identity doesn't loop `useSuggestions`' effect.
+ * Without `config.pageSuggestions` this is exactly `config.suggestions`.
  */
 export function usePageSuggestions(config: EmbedConfig): string[] {
 	const { pageSuggestions, suggestions } = config;
-	// Re-picks on client-side route changes, not just hard loads.
 	const pathname = usePathname();
 
 	return useMemo(() => {

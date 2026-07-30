@@ -50,16 +50,12 @@ export interface ChatAppearance {
  */
 export type ShowToolCalls = boolean | "titles-only";
 
-/**
- * Intent tier of one authored page prompt: low = discover, medium = compare,
- * high = act. The widget shows one prompt per tier.
- */
+/** Intent tier of a page prompt (discover/compare/act); one shown per tier. */
 export type PagePromptTier = "low" | "medium" | "high";
 
 /**
- * One authored per-page starter prompt as delivered by `/config`. `id` is the
- * authored entry's stable identity (click attribution); `tier` is absent on
- * prompts stored before tiers existed — those fill any tier slot.
+ * One authored page prompt from `/config`. `id` is the entry's stable
+ * identity; untagged (`tier` absent) prompts fill any tier slot.
  */
 export interface PagePrompt {
 	id: string | null;
@@ -142,13 +138,9 @@ export interface EmbedConfig {
 	/** Initial suggestion chips displayed before the first message. */
 	suggestions?: string[];
 	/**
-	 * Per-page starter prompt sets, keyed by normalized pathname. When the
-	 * current page matches an entry, the widget picks one prompt per intent
-	 * tier from it locally — re-picking on every SPA navigation — instead of
-	 * rendering the fixed {@link EmbedConfig.suggestions} list, which stays
-	 * the fallback for pages with no entry.
-	 *
-	 * Delivered per channel by `/config` (no `data-*` attribute maps to it).
+	 * Per-page starter prompt sets from `/config`; the widget picks from the
+	 * entry matching its pathname, falling back to `suggestions`. No `data-*`
+	 * attribute maps to it.
 	 */
 	pageSuggestions?: PageSuggestionsEntry[];
 	/**
