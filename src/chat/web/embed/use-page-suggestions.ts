@@ -1,7 +1,3 @@
-// Starter prompts for the page the widget sits on: `/config` delivers
-// per-page sets keyed by normalized pathname; the widget matches its location
-// locally, re-picks on SPA navigation, and falls back to the fixed list.
-
 import { useMemo } from "react";
 import { DEFAULT_SUGGESTION_ORIGINS } from "../hooks/use-suggestions";
 import { debugLog } from "../lib/debug";
@@ -34,10 +30,8 @@ function takeRandom<T>(pool: T[]): T | undefined {
 	return taken;
 }
 
-/**
- * Pick up to {@link SHOWN_PROMPT_COUNT} prompts, one per tier; untagged
- * prompts fill any slot, leftovers top up short slots. Random within pools.
- */
+/** Up to {@link SHOWN_PROMPT_COUNT} prompts, one per tier, random within pools;
+ *  untagged prompts fill any slot and leftovers top up short slots. */
 export function pickPagePrompts(prompts: PagePrompt[]): PagePrompt[] {
 	const byTier = new Map<PagePromptTier, PagePrompt[]>();
 	const wildcards: PagePrompt[] = [];
@@ -70,10 +64,7 @@ export function pickPagePrompts(prompts: PagePrompt[]): PagePrompt[] {
 	return picked;
 }
 
-/**
- * URL or pathname → the entry key: pathname only, no query/hash/trailing
- * slash, lowercased (mirrors the server's normalization); unparseable → `/`.
- */
+/** URL → entry key: pathname only, lowercased, no query/hash/trailing slash. */
 export function normalizePathname(url: string): string {
 	let pathname: string;
 	try {
@@ -135,12 +126,8 @@ export function resolveSuggestions(
 	return (fallback ?? []).map((text) => ({ id: null, text }));
 }
 
-/**
- * Starter prompt texts for the current page. Memoized: one pick per pathname,
- * stable array identity (useSuggestions keys an effect on it). Inert — exactly
- * `config.suggestions` — without `pageSuggestions` or when the host's
- * `suggestionOrigins` excludes `"page"`.
- */
+/** Starter prompt texts for the current page, else `config.suggestions`.
+ *  @param config the resolved embed config (`pageSuggestions` opts in). */
 export function usePageSuggestions(config: EmbedConfig): string[] {
 	const { pageSuggestions, suggestions, suggestionOrigins } = config;
 	const pathname = usePathname();
@@ -148,6 +135,8 @@ export function usePageSuggestions(config: EmbedConfig): string[] {
 		suggestionOrigins ?? DEFAULT_SUGGESTION_ORIGINS
 	).includes("page");
 
+	// Memoized because the pick is random and the identity has to hold:
+	// `useSuggestions` keys an effect on this array and setStates it.
 	return useMemo(() => {
 		const current = normalizePathname(pathname);
 		const page = pageEnabled
