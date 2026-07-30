@@ -965,4 +965,31 @@ describe("withWaniwani", () => {
 			stateUpdates: { ages: "35,32" },
 		});
 	});
+
+	test("preserves unknown namespaced _meta keys on the tool result", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool(
+			"flow_like",
+			{ description: "Returns _meta" },
+			async () => ({
+				content: [{ type: "text", text: "{}" }],
+				_meta: {
+					"waniwani/suggestions": { suggestions: ["Bronze", "Gold"] },
+				},
+			}),
+		);
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.({}, { _meta: { requestId: "req-1" } })) as {
+			_meta?: Record<string, unknown>;
+		};
+
+		expect(result._meta?.["waniwani/suggestions"]).toEqual({
+			suggestions: ["Bronze", "Gold"],
+		});
+	});
 });

@@ -79,7 +79,8 @@ The dashboard owns the agent's display and behavior config. Use `overrides` only
 | `welcomeMessage` | `string` | Greeting shown before the first user message |
 | `welcome` | `WelcomeConfig` | Rich welcome screen (icon, title, suggestion cards). Takes precedence over `welcomeMessage` |
 | `placeholder` | `string` | Input placeholder |
-| `suggestions` | `string[]` | Initial suggestion chips |
+| `suggestions` | `string[]` | Starter suggestion chips, shown before the first message |
+| `suggestionOrigins` | `SuggestionOrigin[]` | Which providers may fill the per-turn pill row (`"channel"`, `"page"`, `"flow"`, `"followup"`). Defaults to `["channel", "page", "followup"]` — include `"flow"` to render the pills a flow drives via `interrupt({ suggestions })`. `suggestions` (the starter prompts) are unaffected and show either way. See [Where the suggestion pills come from](#where-the-suggestion-pills-come-from) |
 | `enableThreadHistory` | `boolean` | Persist conversations across reloads in IndexedDB |
 | `showToolCalls` | `boolean \| "titles-only"` | How the agent's tool-call activity renders, grouped into one collapsible "chain of thought". `true` (default) — each step expandable to its request/response JSON. `"titles-only"` — step labels only, no JSON. `false` — hides the chain entirely (including the reasoning trace); only the generic "On it…" indicator shows while the agent works. MCP App widgets always render regardless. |
 | `allowAttachments` | `boolean` | Enable file attachments in the input |
@@ -89,6 +90,41 @@ The dashboard owns the agent's display and behavior config. Use `overrides` only
 | `locale` | `"en" \| "fr" \| "es"` | UI language for built-in labels. Auto-detected from `<html lang>` / `navigator.language` when omitted; falls back to English |
 | `messages` | `MessageOverrides` | Per-key overrides on top of the resolved locale catalog — see [Languages](#languages) |
 | `disablePageView` | `boolean` | Opt out of the top-of-funnel `page.viewed` event fired once on mount. Defaults to `false`. Set `true` on surfaces where a page view is noise — an already-authenticated app shell, an internal tool, a preview — so it doesn't pollute the funnel. See [Tracked events](#event-tracking) |
+
+#### Where the suggestion pills come from
+
+The pill row above the input can be filled by up to four origins, each gated
+independently by `suggestionOrigins`:
+
+- **`"channel"`**: the `suggestions` above, configured per channel in the
+  dashboard. Shown only until the visitor's first message.
+- **`"page"`**: per-URL starter prompts configured in the dashboard for the
+  current page.
+- **`"flow"`**: a connected MCP's flow declaring `suggestions` on a step with
+  one open question. These refresh after each reply and describe the question
+  the agent just asked.
+- **`"followup"`**: pills generated from the conversation and streamed as a
+  `data-suggestions` part (self-hosted backends only).
+
+`suggestionOrigins` defaults to `["channel", "page", "followup"]` when unset:
+starter prompts and generated follow-ups render, and flow-driven pills stay
+opt-in. Once `"flow"` is enabled, pills recompute every turn, so a reply that
+carries none clears the row. To opt in:
+
+- `<WaniwaniChat>`: `overrides={{ suggestionOrigins: ["channel", "page", "flow", "followup"] }}`
+  (or any subset including `"flow"`)
+- `<script>` embed: `data-suggestion-origins="channel,page,flow,followup"`
+- `<ChatEmbed>` (self-hosted primitive only): `suggestions={{ origins: ["flow"] }}`
+  (optionally alongside `initial: [...]` starter prompts), or
+  `suggestions={false}` to hide the pill row entirely
+
+Without `"flow"` enabled, the flow still sends its suggestions to the
+assistant as candidate answers — only the clickable pill row is withheld.
+
+`<WaniwaniChat>` and the `<script>` embed have no equivalent of `ChatEmbed`'s
+`suggestions={false}`: there is always a pill row once at least one enabled
+origin supplies pills, and `suggestionOrigins` only controls which origins are
+allowed to fill it.
 
 Overrides win over dashboard config when both are set.
 
@@ -248,6 +284,7 @@ The chat fits within whatever bound you set and scrolls internally — no need t
 | `data-welcome-message` | No | Greeting shown before first message |
 | `data-placeholder` | No | Input field placeholder text |
 | `data-suggestions` | No | Comma-separated suggestion chips |
+| `data-suggestion-origins` | No | Comma-separated list of `channel`, `page`, `flow`, `followup` — which providers may fill the per-turn pill row. Defaults to `channel,page,followup` when unset (`flow` stays opt-in); an empty attribute means no origins render. Unknown values are dropped. `data-suggestions` (starter prompts) show either way. See [Where the suggestion pills come from](#where-the-suggestion-pills-come-from) |
 | `data-enable-thread-history` | No | `"true"`/`"false"` — persist threads in IndexedDB, show thread menu in header |
 | `data-show-tool-calls` | No | Tool-call activity rendering (grouped into one collapsible chain). `"true"` (default) — steps expandable to request/response JSON. `"titles-only"` — step labels only. `"false"` — hides the chain and the reasoning trace; only the "On it…" indicator shows |
 | `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |
@@ -763,7 +800,7 @@ Both hosted surfaces accept an `onEvent` callback — `WaniWani.chat.init({ onEv
 | `session.started` | Server assigned the session id on the first exchange (restored threads don't re-fire) | `{ sessionId }` |
 | `thread.changed` | Thread created or switched (requires thread history; the top-level `sessionId` is the target thread's session, `undefined` for a fresh thread) | `{ threadId }` |
 | `chat.error` | Chat request failed | `{ message }` (truncated to 200 chars) |
-| `suggestion.clicked` | Suggestion pill or welcome card clicked (dock pills, in-chat pills, welcome cards) | `{ text, index }` (`index` is `-1` when the origin is unknown) |
+| `suggestion.clicked` | Suggestion pill or welcome card clicked (dock pills, in-chat pills, welcome cards) | `{ text, index, origin }` (`index` is `-1` when the position is unknown; `origin` is one of `"channel"`, `"page"`, `"flow"`, `"followup"` — see [Where the suggestion pills come from](#where-the-suggestion-pills-come-from)) |
 | `link.clicked` | Anchor clicked inside the conversation | `{ url }` (absolute URL) |
 
 Do not assume `chat.opened` precedes the first `message.sent`: a send from the docked bar opens the panel and sends in one action, and the open transition is reported after the send.
@@ -800,7 +837,7 @@ Notes:
 
 - **Programmatic-only on the script embed.** A function cannot be expressed as a `data-*` attribute, so `onEvent` has no declarative equivalent — pass it to `WaniWani.chat.init()`.
 - **Exceptions are swallowed.** An error thrown by your callback is caught and logged as a console warning; it never breaks the widget.
-- **Privacy.** Message content never passes through this channel — the host learns *that* a message was exchanged, never what was said. Suggestion text is operator-authored config, so `suggestion.clicked` may carry it.
+- **Privacy.** Message content never passes through this channel — the host learns *that* a message was exchanged, never what was said. Suggestion text is always author-controlled configuration or agent-generated (operator-authored starter prompts, developer-authored flow suggestions, or conversation-driven follow-ups), never visitor-typed content, which is why `suggestion.clicked` can safely carry it.
 - **Separate from the `track()` taxonomy.** Some `onEvent` names (`session.started`, `link.clicked`) also exist as event names in the hosted `track()` funnel taxonomy ([events.md](./events.md)) — same concepts, but a separate client-side channel with different payload shapes. `onEvent` events are not `client.track()` events, do not feed the platform funnel dashboard, and should not be forwarded into `client.track()` as-is even where names coincide.
 - **`ChatEmbed` does not expose `onEvent`** — like `track`/`identify`, it is a hosted-surface feature.
 

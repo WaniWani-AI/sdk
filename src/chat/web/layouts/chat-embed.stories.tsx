@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import type { ChatAppearance } from "../@types";
+import type { ChatAppearance, SuggestionsConfig } from "../@types";
 import { ChatEmbed } from "./chat-embed";
 
 // ============================================================================
@@ -41,10 +41,24 @@ interface ReplyOptions {
 	autoHeight?: boolean;
 	/** Stream a reasoning part first (2+ activity parts → chain-of-thought). */
 	withReasoning?: boolean;
+	/**
+	 * Stream a flow tool result carrying these as the step's suggested answers,
+	 * so the embed renders them as pills above the composer.
+	 */
+	flowSuggestions?: string[];
 }
 
 const WIDGET_TOOL = "showActivity";
 const WIDGET_URI = "ui://widget/activity";
+const FLOW_TOOL = "plan_qualification";
+
+// The fetch shim is installed once at module scope and cannot read story args,
+// so the flow story flips this and every other story's render clears it.
+let flowSuggestions: string[] | null = null;
+
+export function setFlowSuggestions(next: string[] | null): void {
+	flowSuggestions = next;
+}
 
 // A fresh id per streamed turn, so multiple tool calls in one conversation
 // don't collide (a shared id would make the fullscreen match hit every turn's
@@ -114,6 +128,43 @@ function mockChatResponse(opts: ReplyOptions): Response {
 				});
 			}
 
+			if (opts.flowSuggestions) {
+				const flowCallId = `flow_${turnCounter}`;
+				send({
+					type: "tool-input-start",
+					toolCallId: flowCallId,
+					toolName: FLOW_TOOL,
+					dynamic: true,
+				});
+				send({
+					type: "tool-input-available",
+					toolCallId: flowCallId,
+					toolName: FLOW_TOOL,
+					dynamic: true,
+					input: { action: "continue" },
+				});
+				// Mirrors what the flow engine returns: the suggested answers ride on
+				// `_meta`, while `structuredContent` stays the LLM-facing contract.
+				send({
+					type: "tool-output-available",
+					toolCallId: flowCallId,
+					dynamic: true,
+					output: {
+						content: [{ type: "text", text: "Which plan fits you?" }],
+						structuredContent: {
+							status: "interrupt",
+							question: "Which plan fits you?",
+							field: "plan",
+							suggestions: opts.flowSuggestions,
+						},
+						_meta: {
+							"waniwani/sessionId": "story-session",
+							"waniwani/suggestions": { suggestions: opts.flowSuggestions },
+						},
+					},
+				});
+			}
+
 			send({ type: "finish" });
 			controller.enqueue(encoder.encode("data: [DONE]\n\n"));
 			controller.close();
@@ -150,6 +201,11 @@ function installMockBackend(): void {
 			// Every mocked chat turn streams a widget so any story that opens
 			// the chat can reach the fullscreen path. Reasoning is streamed too
 			// so the tool sits inside a chain-of-thought (the realistic shape).
+			if (flowSuggestions) {
+				return Promise.resolve(
+					mockChatResponse({ withReasoning: true, flowSuggestions }),
+				);
+			}
 			return Promise.resolve(
 				mockChatResponse({ withWidget: true, withReasoning: true }),
 			);
@@ -200,6 +256,8 @@ interface EmbedArgs {
 	hideHeader: boolean;
 	/** Which widget the iframe loads. Swapped by the auto-fullscreen story. */
 	resourceEndpoint: string;
+	/** Suggestion pill config. The flow story opts into flow-driven pills. */
+	suggestions?: boolean | SuggestionsConfig;
 }
 
 // The embed itself, shared across every story's render so only the wrapping
@@ -215,6 +273,7 @@ function Embed(args: EmbedArgs) {
 			hideHeader={args.hideHeader}
 			welcomeMessage={args.welcomeMessage}
 			placeholder={args.placeholder}
+			suggestions={args.suggestions}
 		/>
 	);
 }
@@ -225,11 +284,14 @@ const meta: Meta<EmbedArgs> = {
 	// channel page places it (`<div class="h-dvh">`), which is the realistic
 	// deployment. The chat scrolls internally. `FixedSize` is the one story
 	// that puts it in a bounded card instead.
-	render: (args) => (
-		<div style={{ height: "100dvh", width: "100%" }}>
-			<Embed {...args} />
-		</div>
-	),
+	render: (args) => {
+		setFlowSuggestions(null);
+		return (
+			<div style={{ height: "100dvh", width: "100%" }}>
+				<Embed {...args} />
+			</div>
+		);
+	},
 	args: {
 		title: "Support Assistant",
 		welcomeMessage: "Hi! Ask me anything, or say “show me the widget”.",
@@ -294,11 +356,40 @@ export const AutoFullscreenWidget: Story = {
  * to nothing.
  */
 export const UnboundedParent: Story = {
-	render: (args) => (
-		<div style={{ maxWidth: 560, margin: "0 auto" }}>
-			<Embed {...args} />
-		</div>
-	),
+	render: (args) => {
+		setFlowSuggestions(null);
+		return (
+			<div style={{ maxWidth: 560, margin: "0 auto" }}>
+				<Embed {...args} />
+			</div>
+		);
+	},
+};
+
+/**
+ * Flow-driven suggestion pills. Send any message: the mocked turn streams a flow
+ * tool result whose `_meta` carries the step's suggested answers, and the embed
+ * renders them as pills above the composer. Clicking one sends it as the reply.
+ *
+ * Flow-driven pills are opt-in: this story passes
+ * `suggestions={{ origins: ["flow"] }}` (the `WaniwaniChat` / script-embed
+ * spellings are `overrides={{ suggestionOrigins: ["flow"] }}` /
+ * `data-suggestion-origins="flow"`). Without the opt-in, the flow's
+ * suggestions render nothing.
+ */
+export const FlowDrivenSuggestions: Story = {
+	render: (args) => {
+		setFlowSuggestions(["Bronze", "Silver", "Gold"]);
+		return (
+			<div style={{ height: "100dvh", width: "100%" }}>
+				<Embed {...args} />
+			</div>
+		);
+	},
+	args: {
+		welcomeMessage: "Hi! Ask me about plans to see the flow suggest answers.",
+		suggestions: { origins: ["flow"] },
+	},
 };
 
 /**
@@ -307,18 +398,21 @@ export const UnboundedParent: Story = {
  * within the card and a fullscreen widget fills just the card, not the page.
  */
 export const FixedSize: Story = {
-	render: (args) => (
-		<div
-			style={{
-				height: 640,
-				width: 400,
-				margin: "24px auto",
-				border: "1px solid var(--ww-color-border)",
-				borderRadius: 12,
-				overflow: "hidden",
-			}}
-		>
-			<Embed {...args} />
-		</div>
-	),
+	render: (args) => {
+		setFlowSuggestions(null);
+		return (
+			<div
+				style={{
+					height: 640,
+					width: 400,
+					margin: "24px auto",
+					border: "1px solid var(--ww-color-border)",
+					borderRadius: 12,
+					overflow: "hidden",
+				}}
+			>
+				<Embed {...args} />
+			</div>
+		);
+	},
 };

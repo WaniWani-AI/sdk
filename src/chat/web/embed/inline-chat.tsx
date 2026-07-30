@@ -14,6 +14,7 @@ import {
 	useRef,
 } from "react";
 import type { ChatHandle } from "../@types";
+import { toSuggestionsConfig } from "../hooks/use-suggestions";
 import { ChatEmbed } from "../layouts/chat-embed";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
@@ -132,9 +133,10 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 					hideHeader={config.hideHeader}
 					welcomeMessage={config.welcomeMessage}
 					placeholder={config.placeholder}
-					suggestions={
-						config.suggestions ? { initial: config.suggestions } : undefined
-					}
+					suggestions={toSuggestionsConfig({
+						suggestions: config.suggestions,
+						suggestionOrigins: config.suggestionOrigins,
+					})}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}
 					locale={config.locale}

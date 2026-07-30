@@ -30,6 +30,7 @@ import {
 import type { ChatHandle } from "../@types";
 import BorderGlow from "../components/border-glow";
 import { Suggestions } from "../components/suggestions";
+import { toSuggestionsConfig } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
@@ -469,6 +470,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 															properties: {
 																text,
 																index: suggestions.indexOf(text),
+																origin: "channel",
 															},
 														});
 														openWith(text);
@@ -564,11 +566,10 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									hideHeader={false}
 									welcomeMessage={config.welcomeMessage}
 									placeholder={config.placeholder}
-									suggestions={
-										config.suggestions
-											? { initial: config.suggestions }
-											: undefined
-									}
+									suggestions={toSuggestionsConfig({
+										suggestions: config.suggestions,
+										suggestionOrigins: config.suggestionOrigins,
+									})}
 									enableThreadHistory={config.enableThreadHistory}
 									showToolCalls={config.showToolCalls}
 									locale={config.locale}
