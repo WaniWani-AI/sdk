@@ -74,7 +74,7 @@ export interface WaniwaniChatOverrides {
 	 * them. Starter prompts (`suggestions`) are unaffected and show either
 	 * way.
 	 */
-	dynamicSuggestions?: boolean;
+	flowSuggestions?: boolean;
 	/** Persist conversations across reloads in IndexedDB. */
 	enableThreadHistory?: boolean;
 	/**
@@ -248,7 +248,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				welcomeMessage: overrides?.welcomeMessage,
 				placeholder: overrides?.placeholder,
 				suggestions: overrides?.suggestions,
-				dynamicSuggestions: overrides?.dynamicSuggestions,
+				flowSuggestions: overrides?.flowSuggestions,
 				enableThreadHistory: overrides?.enableThreadHistory,
 				showToolCalls: overrides?.showToolCalls,
 				appearance: overrides?.appearance,
@@ -265,7 +265,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				overrides?.welcomeMessage,
 				overrides?.placeholder,
 				overrides?.suggestions,
-				overrides?.dynamicSuggestions,
+				overrides?.flowSuggestions,
 				overrides?.enableThreadHistory,
 				overrides?.showToolCalls,
 				overrides?.appearance,
@@ -465,7 +465,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					placeholder={config.placeholder}
 					suggestions={toSuggestionsConfig({
 						suggestions: config.suggestions,
-						dynamicSuggestions: config.dynamicSuggestions,
+						flowSuggestions: config.flowSuggestions,
 					})}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}

@@ -80,7 +80,7 @@ The dashboard owns the agent's display and behavior config. Use `overrides` only
 | `welcome` | `WelcomeConfig` | Rich welcome screen (icon, title, suggestion cards). Takes precedence over `welcomeMessage` |
 | `placeholder` | `string` | Input placeholder |
 | `suggestions` | `string[]` | Starter suggestion chips, shown before the first message |
-| `dynamicSuggestions` | `boolean` | Opt-in for the per-turn pills a flow drives via `interrupt({ suggestions })`. Disabled by default — set `true` to render them; `suggestions` (the starter prompts) show either way. See [Where the suggestion pills come from](#where-the-suggestion-pills-come-from) |
+| `flowSuggestions` | `boolean` | Opt-in for the per-turn pills a flow drives via `interrupt({ suggestions })`. Disabled by default — set `true` to render them; `suggestions` (the starter prompts) show either way. See [Where the suggestion pills come from](#where-the-suggestion-pills-come-from) |
 | `enableThreadHistory` | `boolean` | Persist conversations across reloads in IndexedDB |
 | `showToolCalls` | `boolean \| "titles-only"` | How the agent's tool-call activity renders, grouped into one collapsible "chain of thought". `true` (default) — each step expandable to its request/response JSON. `"titles-only"` — step labels only, no JSON. `false` — hides the chain entirely (including the reasoning trace); only the generic "On it…" indicator shows while the agent works. MCP App widgets always render regardless. |
 | `allowAttachments` | `boolean` | Enable file attachments in the input |
@@ -106,8 +106,8 @@ its own — the host chat surface must enable them too. Once enabled, they
 recompute every turn, so a reply that carries none clears the row. To enable
 them:
 
-- `<WaniwaniChat>`: `overrides={{ dynamicSuggestions: true }}`
-- `<script>` embed: `data-dynamic-suggestions="true"`
+- `<WaniwaniChat>`: `overrides={{ flowSuggestions: true }}`
+- `<script>` embed: `data-flow-suggestions="true"`
 - `<ChatEmbed>` (self-hosted primitive only): `suggestions={{ dynamic: true }}`
   (optionally alongside `initial: [...]` starter prompts), or
   `suggestions={false}` to hide the pill row entirely
@@ -117,7 +117,7 @@ candidate answers — only the clickable pill row is withheld.
 
 `<WaniwaniChat>` and the `<script>` embed have no equivalent of `ChatEmbed`'s
 `suggestions={false}`: there is always a pill row once starter prompts (or an
-opted-in flow) supply pills, and `dynamicSuggestions` only controls the
+opted-in flow) supply pills, and `flowSuggestions` only controls the
 flow-driven ones.
 
 Overrides win over dashboard config when both are set.
@@ -278,7 +278,7 @@ The chat fits within whatever bound you set and scrolls internally — no need t
 | `data-welcome-message` | No | Greeting shown before first message |
 | `data-placeholder` | No | Input field placeholder text |
 | `data-suggestions` | No | Comma-separated suggestion chips |
-| `data-dynamic-suggestions` | No | `"false"` (default)/`"true"`: opt-in for the per-turn pills a flow drives via `interrupt({ suggestions })`. Set `"true"` to render them; `data-suggestions` (starter prompts) show either way. See [Where the suggestion pills come from](#where-the-suggestion-pills-come-from) |
+| `data-flow-suggestions` | No | `"false"` (default)/`"true"`: opt-in for the per-turn pills a flow drives via `interrupt({ suggestions })`. Set `"true"` to render them; `data-suggestions` (starter prompts) show either way. See [Where the suggestion pills come from](#where-the-suggestion-pills-come-from) |
 | `data-enable-thread-history` | No | `"true"`/`"false"` — persist threads in IndexedDB, show thread menu in header |
 | `data-show-tool-calls` | No | Tool-call activity rendering (grouped into one collapsible chain). `"true"` (default) — steps expandable to request/response JSON. `"titles-only"` — step labels only. `"false"` — hides the chain and the reasoning trace; only the "On it…" indicator shows |
 | `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |

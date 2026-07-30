@@ -47,20 +47,20 @@ export function isFlowSuggestionsEnabled(
 
 /**
  * Map host-level config fields — `suggestions` (starter prompts) and
- * `dynamicSuggestions` (flow-pill opt-in) — to the `SuggestionsConfig`
+ * `flowSuggestions` (flow-pill opt-in) — to the `SuggestionsConfig`
  * consumed by `useSuggestions`. Every mount point (WaniwaniChat, the inline
  * and floating script embeds) must build its `ChatEmbed` suggestions prop
  * through this helper so the opt-in is never silently dropped.
  */
 export function toSuggestionsConfig(options: {
 	suggestions?: string[];
-	dynamicSuggestions?: boolean;
+	flowSuggestions?: boolean;
 }): SuggestionsConfig | undefined {
-	const { suggestions, dynamicSuggestions } = options;
-	if (!suggestions && dynamicSuggestions === undefined) {
+	const { suggestions, flowSuggestions } = options;
+	if (!suggestions && flowSuggestions === undefined) {
 		return undefined;
 	}
-	return { initial: suggestions, dynamic: dynamicSuggestions };
+	return { initial: suggestions, dynamic: flowSuggestions };
 }
 
 export function useSuggestions(options: UseSuggestionsOptions) {

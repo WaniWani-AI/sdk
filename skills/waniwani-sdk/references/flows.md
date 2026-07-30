@@ -172,8 +172,8 @@ Suggestions serve two audiences at once. The assistant receives them as candidat
 answers on every host, regardless of any configuration. In the Waniwani chat
 widget they can also render as clickable pills above the input — clicking one
 sends it as the visitor's answer — but only when the host chat surface opts in:
-`overrides={{ dynamicSuggestions: true }}` on `<WaniwaniChat>`,
-`data-dynamic-suggestions="true"` on the `<script>` embed, or
+`overrides={{ flowSuggestions: true }}` on `<WaniwaniChat>`,
+`data-flow-suggestions="true"` on the `<script>` embed, or
 `suggestions={{ dynamic: true }}` on `<ChatEmbed>`.
 
 Pills appear only when the step has **exactly one question still open**. That is

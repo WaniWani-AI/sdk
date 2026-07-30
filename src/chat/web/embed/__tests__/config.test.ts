@@ -477,50 +477,50 @@ describe("resolveConfig — assistantBubble precedence", () => {
 	});
 });
 
-describe("resolveConfig — dynamicSuggestions", () => {
+describe("resolveConfig — flowSuggestions", () => {
 	test("undefined when unspecified — flow pills stay off unless opted in", () => {
 		const config = resolveConfig({ token: "tok" });
-		expect(config.dynamicSuggestions).toBeUndefined();
+		expect(config.flowSuggestions).toBeUndefined();
 	});
 
 	test("programmatic false disables flow-driven pills", () => {
-		const config = resolveConfig({ token: "tok", dynamicSuggestions: false });
-		expect(config.dynamicSuggestions).toBe(false);
+		const config = resolveConfig({ token: "tok", flowSuggestions: false });
+		expect(config.flowSuggestions).toBe(false);
 	});
 
 	test("programmatic true opts into flow-driven pills", () => {
-		const config = resolveConfig({ token: "tok", dynamicSuggestions: true });
-		expect(config.dynamicSuggestions).toBe(true);
+		const config = resolveConfig({ token: "tok", flowSuggestions: true });
+		expect(config.flowSuggestions).toBe(true);
 	});
 });
 
-describe("parseConfigFromScript — data-dynamic-suggestions", () => {
+describe("parseConfigFromScript — data-flow-suggestions", () => {
 	test("undefined when unspecified — no opt-in", async () => {
 		const cfg = await parseWithAttrs({ "data-token": "tok" });
-		expect(cfg.dynamicSuggestions).toBeUndefined();
+		expect(cfg.flowSuggestions).toBeUndefined();
 	});
 
 	test("'false' explicitly keeps flow-driven pills off", async () => {
 		const cfg = await parseWithAttrs({
 			"data-token": "tok",
-			"data-dynamic-suggestions": "false",
+			"data-flow-suggestions": "false",
 		});
-		expect(cfg.dynamicSuggestions).toBe(false);
+		expect(cfg.flowSuggestions).toBe(false);
 	});
 
 	test("'true' parses as true", async () => {
 		const cfg = await parseWithAttrs({
 			"data-token": "tok",
-			"data-dynamic-suggestions": "true",
+			"data-flow-suggestions": "true",
 		});
-		expect(cfg.dynamicSuggestions).toBe(true);
+		expect(cfg.flowSuggestions).toBe(true);
 	});
 
 	test("bare attribute (empty value) opts in like sibling boolean attrs", async () => {
 		const cfg = await parseWithAttrs({
 			"data-token": "tok",
-			"data-dynamic-suggestions": "",
+			"data-flow-suggestions": "",
 		});
-		expect(cfg.dynamicSuggestions).toBe(true);
+		expect(cfg.flowSuggestions).toBe(true);
 	});
 });

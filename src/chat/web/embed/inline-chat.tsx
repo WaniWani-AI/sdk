@@ -135,7 +135,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 					placeholder={config.placeholder}
 					suggestions={toSuggestionsConfig({
 						suggestions: config.suggestions,
-						dynamicSuggestions: config.dynamicSuggestions,
+						flowSuggestions: config.flowSuggestions,
 					})}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}

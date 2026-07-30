@@ -86,7 +86,7 @@ describe("toSuggestionsConfig", () => {
 	});
 
 	test("forwards a dynamic false even without starter prompts", () => {
-		expect(toSuggestionsConfig({ dynamicSuggestions: false })).toEqual({
+		expect(toSuggestionsConfig({ flowSuggestions: false })).toEqual({
 			initial: undefined,
 			dynamic: false,
 		});
@@ -94,23 +94,21 @@ describe("toSuggestionsConfig", () => {
 
 	test("forwards both fields together", () => {
 		expect(
-			toSuggestionsConfig({ suggestions: ["Hi"], dynamicSuggestions: false }),
+			toSuggestionsConfig({ suggestions: ["Hi"], flowSuggestions: false }),
 		).toEqual({ initial: ["Hi"], dynamic: false });
 	});
 
 	test("composes with the gate: dynamic false without starter prompts disables per-turn suggestions", () => {
 		expect(
 			isDynamicSuggestionsEnabled(
-				toSuggestionsConfig({ dynamicSuggestions: false }),
+				toSuggestionsConfig({ flowSuggestions: false }),
 			),
 		).toBe(false);
 	});
 
 	test("composes with the flow gate: the opt-in enables flow pills", () => {
 		expect(
-			isFlowSuggestionsEnabled(
-				toSuggestionsConfig({ dynamicSuggestions: true }),
-			),
+			isFlowSuggestionsEnabled(toSuggestionsConfig({ flowSuggestions: true })),
 		).toBe(true);
 	});
 

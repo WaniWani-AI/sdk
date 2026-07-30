@@ -373,7 +373,7 @@ export const UnboundedParent: Story = {
  *
  * Flow-driven pills are opt-in: this story passes
  * `suggestions={{ dynamic: true }}` (the `WaniwaniChat` / script-embed
- * spellings are `dynamicSuggestions: true` / `data-dynamic-suggestions="true"`).
+ * spellings are `flowSuggestions: true` / `data-flow-suggestions="true"`).
  * Without the opt-in, the flow's suggestions render nothing.
  */
 export const FlowDrivenSuggestions: Story = {

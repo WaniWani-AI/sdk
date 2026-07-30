@@ -121,11 +121,11 @@ export interface EmbedConfig {
 	/**
 	 * Opt-in for the per-turn pills a flow drives via
 	 * `interrupt({ suggestions })`. Disabled by default — set `true` (or
-	 * `data-dynamic-suggestions="true"` on the embed script tag) to render
+	 * `data-flow-suggestions="true"` on the embed script tag) to render
 	 * them. Starter prompts (`suggestions`) are unaffected and show either
 	 * way.
 	 */
-	dynamicSuggestions?: boolean;
+	flowSuggestions?: boolean;
 	/**
 	 * AI transparency notice rendered under the input (EU AI Act compliance).
 	 * String overrides the default wording; `false` hides it. Surfaced as
@@ -367,9 +367,9 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.enableThreadHistory = enableThreadHistory;
 	}
 
-	const dynamicSuggestions = bool("data-dynamic-suggestions");
-	if (dynamicSuggestions !== undefined) {
-		config.dynamicSuggestions = dynamicSuggestions;
+	const flowSuggestions = bool("data-flow-suggestions");
+	if (flowSuggestions !== undefined) {
+		config.flowSuggestions = flowSuggestions;
 	}
 
 	const disablePageView = bool("data-disable-page-view");

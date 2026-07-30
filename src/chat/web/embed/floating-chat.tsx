@@ -568,7 +568,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									placeholder={config.placeholder}
 									suggestions={toSuggestionsConfig({
 										suggestions: config.suggestions,
-										dynamicSuggestions: config.dynamicSuggestions,
+										flowSuggestions: config.flowSuggestions,
 									})}
 									enableThreadHistory={config.enableThreadHistory}
 									showToolCalls={config.showToolCalls}
