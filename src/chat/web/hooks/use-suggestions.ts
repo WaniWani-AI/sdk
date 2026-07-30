@@ -2,7 +2,7 @@
 
 import type { ChatStatus, UIMessage } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SuggestionsConfig } from "../@types";
+import type { SuggestionOrigin, SuggestionsConfig } from "../@types";
 import { resolveTurnSuggestions } from "./turn-suggestions";
 
 export interface UseSuggestionsOptions {
@@ -11,9 +11,6 @@ export interface UseSuggestionsOptions {
 	config?: boolean | SuggestionsConfig;
 }
 
-/** Which pill row the visitor is looking at. */
-export type SuggestionsSource = "flow" | "initial";
-
 function isConfigObject(
 	config: boolean | SuggestionsConfig | undefined,
 ): config is SuggestionsConfig {
@@ -21,46 +18,79 @@ function isConfigObject(
 }
 
 /**
- * Whether per-turn suggestion recomputation runs at all (the streamed
- * `data-suggestions` path). Enabled when the host passes `true` or any config
- * object not setting `dynamic: false`.
+ * Default origins allowed to fill the pill row when the host passes no
+ * config at all: starter prompts and generated follow-ups render, flow-driven
+ * pills stay opt-in.
  */
-export function isDynamicSuggestionsEnabled(
-	config: boolean | SuggestionsConfig | undefined,
-): boolean {
-	return (
-		config === true || (isConfigObject(config) && config.dynamic !== false)
-	);
-}
+export const DEFAULT_SUGGESTION_ORIGINS: readonly SuggestionOrigin[] = [
+	"channel",
+	"page",
+	"followup",
+];
+
+const ALL_SUGGESTION_ORIGINS: readonly SuggestionOrigin[] = [
+	"channel",
+	"page",
+	"flow",
+	"followup",
+];
 
 /**
- * Whether flow-driven pills (a flow's `interrupt({ suggestions })`) may
- * render. Opt-in: the host must pass `suggestions={true}` or an object with
- * `dynamic: true`. Streamed `data-suggestions` parts are governed by
- * `isDynamicSuggestionsEnabled` instead and keep working without this.
+ * Resolve which origins may fill the pill row for a given host config.
+ *
+ * Priority: `false` → none; `true` → every origin; an object's `origins`
+ * (when present, even empty) wins outright; otherwise the legacy `dynamic`
+ * boolean (`true` → every origin, `false` → none); anything else (including
+ * `undefined`) falls back to {@link DEFAULT_SUGGESTION_ORIGINS}.
  */
-export function isFlowSuggestionsEnabled(
+export function resolveSuggestionOrigins(
 	config: boolean | SuggestionsConfig | undefined,
+): SuggestionOrigin[] {
+	if (config === false) {
+		return [];
+	}
+	if (config === true) {
+		return [...ALL_SUGGESTION_ORIGINS];
+	}
+	if (isConfigObject(config)) {
+		if (config.origins !== undefined) {
+			return config.origins;
+		}
+		if (config.dynamic === true) {
+			return [...ALL_SUGGESTION_ORIGINS];
+		}
+		if (config.dynamic === false) {
+			return [];
+		}
+	}
+	return [...DEFAULT_SUGGESTION_ORIGINS];
+}
+
+/** Whether a given origin may fill the pill row for a given host config. */
+export function isOriginEnabled(
+	config: boolean | SuggestionsConfig | undefined,
+	origin: SuggestionOrigin,
 ): boolean {
-	return config === true || (isConfigObject(config) && config.dynamic === true);
+	return resolveSuggestionOrigins(config).includes(origin);
 }
 
 /**
  * Map host-level config fields — `suggestions` (starter prompts) and
- * `flowSuggestions` (flow-pill opt-in) — to the `SuggestionsConfig`
- * consumed by `useSuggestions`. Every mount point (WaniwaniChat, the inline
- * and floating script embeds) must build its `ChatEmbed` suggestions prop
- * through this helper so the opt-in is never silently dropped.
+ * `suggestionOrigins` (which providers may fill the per-turn pill row) — to
+ * the `SuggestionsConfig` consumed by `useSuggestions`. Every mount point
+ * (WaniwaniChat, the inline and floating script embeds) must build its
+ * `ChatEmbed` suggestions prop through this helper so the origin config is
+ * never silently dropped.
  */
 export function toSuggestionsConfig(options: {
 	suggestions?: string[];
-	flowSuggestions?: boolean;
+	suggestionOrigins?: SuggestionOrigin[];
 }): SuggestionsConfig | undefined {
-	const { suggestions, flowSuggestions } = options;
-	if (!suggestions && flowSuggestions === undefined) {
+	const { suggestions, suggestionOrigins } = options;
+	if (!suggestions && suggestionOrigins === undefined) {
 		return undefined;
 	}
-	return { initial: suggestions, dynamic: flowSuggestions };
+	return { initial: suggestions, origins: suggestionOrigins };
 }
 
 export function useSuggestions(options: UseSuggestionsOptions) {
@@ -70,11 +100,12 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		isConfigObject(config) && config.initial ? config.initial : undefined;
 
 	const [suggestions, setSuggestions] = useState<string[]>(initial ?? []);
-	const [source, setSource] = useState<SuggestionsSource>("initial");
+	const [source, setSource] = useState<SuggestionOrigin>("channel");
 	const prevStatusRef = useRef<ChatStatus>(status);
 
-	const isDynamicEnabled = isDynamicSuggestionsEnabled(config);
-	const isFlowEnabled = isFlowSuggestionsEnabled(config);
+	const origins = resolveSuggestionOrigins(config);
+	const isFlowEnabled = origins.includes("flow");
+	const isFollowupEnabled = origins.includes("followup");
 
 	const clear = useCallback(() => {
 		setSuggestions([]);
@@ -85,13 +116,13 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 	// empty — a `reset()` or `startNewThread()` clears `messages` without
 	// unmounting this hook, and a flow's pills from the previous conversation
 	// must not survive into the new one (they'd otherwise stay clickable and
-	// misattribute a click as `source: "flow"` for a flow that was never
+	// misattribute a click as origin `"flow"` for a flow that was never
 	// invoked in this conversation).
 	const hasMessages = messages.length > 0;
 	useEffect(() => {
 		if (!hasMessages) {
 			setSuggestions(initial ?? []);
-			setSource("initial");
+			setSource("channel");
 		}
 	}, [initial, hasMessages]);
 
@@ -110,7 +141,11 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		const prevStatus = prevStatusRef.current;
 		prevStatusRef.current = status;
 
-		if (prevStatus === "streaming" && status === "ready" && isDynamicEnabled) {
+		if (
+			prevStatus === "streaming" &&
+			status === "ready" &&
+			(isFlowEnabled || isFollowupEnabled)
+		) {
 			const lastAssistant = [...messages]
 				.reverse()
 				.find((m) => m.role === "assistant");
@@ -121,12 +156,16 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 			const resolved = resolveTurnSuggestions(lastAssistant, {
 				includeFlow: isFlowEnabled,
 			});
-			setSuggestions(resolved?.suggestions ?? []);
-			// A streamed data part is reachable only from a self-hosted backend, so
-			// it is attributed alongside operator-authored prompts, not the flow.
-			setSource(resolved?.source === "flow" ? "flow" : "initial");
+			// A resolved origin not enabled for this host (e.g. a flow result
+			// when only `followup` is enabled) is treated as no suggestions.
+			const enabled =
+				resolved &&
+				((resolved.source === "flow" && isFlowEnabled) ||
+					(resolved.source === "followup" && isFollowupEnabled));
+			setSuggestions(enabled ? resolved.suggestions : []);
+			setSource(enabled ? resolved.source : "channel");
 		}
-	}, [status, isDynamicEnabled, isFlowEnabled, messages]);
+	}, [status, isFlowEnabled, isFollowupEnabled, messages]);
 
 	return { suggestions, source, isLoading: false, clear };
 }

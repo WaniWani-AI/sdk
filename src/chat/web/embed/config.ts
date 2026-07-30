@@ -2,7 +2,7 @@
 // Embed Config — types and resolution
 // ============================================================================
 
-import type { ChatTheme } from "../@types";
+import type { ChatTheme, SuggestionOrigin } from "../@types";
 import type { Locale } from "../i18n";
 import type { VisitorIdInput } from "../lib/visitor-context";
 import type { VisibilityRules } from "./visibility";
@@ -119,13 +119,15 @@ export interface EmbedConfig {
 	/** Initial suggestion chips displayed before the first message. */
 	suggestions?: string[];
 	/**
-	 * Opt-in for the per-turn pills a flow drives via
-	 * `interrupt({ suggestions })`. Disabled by default — set `true` (or
-	 * `data-flow-suggestions="true"` on the embed script tag) to render
-	 * them. Starter prompts (`suggestions`) are unaffected and show either
-	 * way.
+	 * Which providers may fill the per-turn pill row. Defaults to
+	 * `["channel", "page", "followup"]` when unset: starter prompts and
+	 * generated follow-ups render, flow-driven pills stay opt-in — include
+	 * `"flow"` (or `data-suggestion-origins="channel,page,flow,followup"` on
+	 * the embed script tag) to render the pills a flow drives via
+	 * `interrupt({ suggestions })`. Starter prompts (`suggestions`) are
+	 * unaffected by this field and show either way.
 	 */
-	flowSuggestions?: boolean;
+	suggestionOrigins?: SuggestionOrigin[];
 	/**
 	 * AI transparency notice rendered under the input (EU AI Act compliance).
 	 * String overrides the default wording; `false` hides it. Surfaced as
@@ -233,6 +235,13 @@ const DEFAULT_API_URL = "https://app.waniwani.ai/api/mcp/chat";
 const DEFAULTS = {
 	api: DEFAULT_API_URL,
 };
+
+const KNOWN_SUGGESTION_ORIGINS = new Set<SuggestionOrigin>([
+	"channel",
+	"page",
+	"flow",
+	"followup",
+]);
 
 // ---------------------------------------------------------------------------
 // Script tag detection
@@ -367,9 +376,18 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.enableThreadHistory = enableThreadHistory;
 	}
 
-	const flowSuggestions = bool("data-flow-suggestions");
-	if (flowSuggestions !== undefined) {
-		config.flowSuggestions = flowSuggestions;
+	// An empty attribute (`data-suggestion-origins=""`) is a meaningful
+	// "render nothing" value, distinct from the attribute being absent —
+	// so this checks presence directly rather than going through `str()`.
+	const suggestionOriginsRaw = el.getAttribute("data-suggestion-origins");
+	if (suggestionOriginsRaw !== null) {
+		config.suggestionOrigins = suggestionOriginsRaw
+			.split(",")
+			.map((s) => s.trim())
+			.filter(
+				(s): s is SuggestionOrigin =>
+					s !== "" && KNOWN_SUGGESTION_ORIGINS.has(s as SuggestionOrigin),
+			);
 	}
 
 	const disablePageView = bool("data-disable-page-view");

@@ -1,75 +1,87 @@
 import { describe, expect, test } from "bun:test";
 import {
-	isDynamicSuggestionsEnabled,
-	isFlowSuggestionsEnabled,
+	DEFAULT_SUGGESTION_ORIGINS,
+	isOriginEnabled,
+	resolveSuggestionOrigins,
 	toSuggestionsConfig,
 } from "../use-suggestions";
 
-describe("isDynamicSuggestionsEnabled", () => {
-	test("disabled when the host passes no suggestions config at all", () => {
-		expect(isDynamicSuggestionsEnabled(undefined)).toBe(false);
+describe("resolveSuggestionOrigins", () => {
+	test("rule 1: `false` disables every origin", () => {
+		expect(resolveSuggestionOrigins(false)).toEqual([]);
 	});
 
-	test("enabled for `true`", () => {
-		expect(isDynamicSuggestionsEnabled(true)).toBe(true);
+	test("rule 2: `true` enables every origin", () => {
+		expect(resolveSuggestionOrigins(true)).toEqual([
+			"channel",
+			"page",
+			"flow",
+			"followup",
+		]);
 	});
 
-	test("enabled when only initial prompts are configured", () => {
-		expect(isDynamicSuggestionsEnabled({ initial: ["Hi"] })).toBe(true);
+	test("rule 3: an object's `origins` is used exactly as given", () => {
+		expect(resolveSuggestionOrigins({ origins: ["flow"] })).toEqual(["flow"]);
+		expect(resolveSuggestionOrigins({ origins: ["channel", "page"] })).toEqual([
+			"channel",
+			"page",
+		]);
 	});
 
-	test("enabled for an empty config object", () => {
-		expect(isDynamicSuggestionsEnabled({})).toBe(true);
+	test("rule 3: an empty `origins` array means nothing renders", () => {
+		expect(resolveSuggestionOrigins({ origins: [] })).toEqual([]);
 	});
 
-	test("enabled for an explicit dynamic opt-in", () => {
-		expect(isDynamicSuggestionsEnabled({ dynamic: true })).toBe(true);
-	});
-
-	test("disabled for `false`", () => {
-		expect(isDynamicSuggestionsEnabled(false)).toBe(false);
-	});
-
-	test("disabled when dynamic is explicitly turned off", () => {
+	test("rule 3 beats rule 4: `origins` wins even when legacy `dynamic` is also set", () => {
 		expect(
-			isDynamicSuggestionsEnabled({ initial: ["Hi"], dynamic: false }),
-		).toBe(false);
-	});
-
-	test("returns false for a dynamic-only config object", () => {
-		expect(isDynamicSuggestionsEnabled({ dynamic: false })).toBe(false);
-	});
-});
-
-describe("isFlowSuggestionsEnabled", () => {
-	test("disabled when the host passes no suggestions config at all", () => {
-		expect(isFlowSuggestionsEnabled(undefined)).toBe(false);
-	});
-
-	test("enabled for `true`", () => {
-		expect(isFlowSuggestionsEnabled(true)).toBe(true);
-	});
-
-	test("disabled for `false`", () => {
-		expect(isFlowSuggestionsEnabled(false)).toBe(false);
-	});
-
-	test("disabled when only initial prompts are configured", () => {
-		expect(isFlowSuggestionsEnabled({ initial: ["Hi"] })).toBe(false);
-	});
-
-	test("enabled for a dynamic-only opt-in", () => {
-		expect(isFlowSuggestionsEnabled({ dynamic: true })).toBe(true);
-	});
-
-	test("enabled when initial prompts and the opt-in are combined", () => {
-		expect(isFlowSuggestionsEnabled({ initial: ["Hi"], dynamic: true })).toBe(
-			true,
+			resolveSuggestionOrigins({ origins: ["flow"], dynamic: false }),
+		).toEqual(["flow"]);
+		expect(resolveSuggestionOrigins({ origins: [], dynamic: true })).toEqual(
+			[],
 		);
 	});
 
-	test("disabled when dynamic is explicitly turned off", () => {
-		expect(isFlowSuggestionsEnabled({ dynamic: false })).toBe(false);
+	test("rule 4: legacy `dynamic: true` enables every origin", () => {
+		expect(resolveSuggestionOrigins({ dynamic: true })).toEqual([
+			"channel",
+			"page",
+			"flow",
+			"followup",
+		]);
+	});
+
+	test("rule 5: legacy `dynamic: false` disables every origin", () => {
+		expect(resolveSuggestionOrigins({ dynamic: false })).toEqual([]);
+	});
+
+	test("rule 6: `undefined` falls back to the default origins", () => {
+		expect(resolveSuggestionOrigins(undefined)).toEqual([
+			...DEFAULT_SUGGESTION_ORIGINS,
+		]);
+	});
+
+	test("rule 6: an object with neither `origins` nor `dynamic` falls back to the default origins", () => {
+		expect(resolveSuggestionOrigins({ initial: ["Hi"] })).toEqual([
+			...DEFAULT_SUGGESTION_ORIGINS,
+		]);
+		expect(resolveSuggestionOrigins({})).toEqual([
+			...DEFAULT_SUGGESTION_ORIGINS,
+		]);
+	});
+
+	test("default origins are channel, page, and followup — flow stays opt-in", () => {
+		expect(DEFAULT_SUGGESTION_ORIGINS).toEqual(["channel", "page", "followup"]);
+	});
+});
+
+describe("isOriginEnabled", () => {
+	test("reflects the resolved origin list", () => {
+		expect(isOriginEnabled(undefined, "channel")).toBe(true);
+		expect(isOriginEnabled(undefined, "flow")).toBe(false);
+		expect(isOriginEnabled(true, "flow")).toBe(true);
+		expect(isOriginEnabled(false, "channel")).toBe(false);
+		expect(isOriginEnabled({ origins: ["flow"] }, "flow")).toBe(true);
+		expect(isOriginEnabled({ origins: ["flow"] }, "channel")).toBe(false);
 	});
 });
 
@@ -81,40 +93,44 @@ describe("toSuggestionsConfig", () => {
 	test("maps starter prompts to initial", () => {
 		expect(toSuggestionsConfig({ suggestions: ["Hi"] })).toEqual({
 			initial: ["Hi"],
-			dynamic: undefined,
+			origins: undefined,
 		});
 	});
 
-	test("forwards a dynamic false even without starter prompts", () => {
-		expect(toSuggestionsConfig({ flowSuggestions: false })).toEqual({
+	test("forwards suggestionOrigins even without starter prompts", () => {
+		expect(toSuggestionsConfig({ suggestionOrigins: ["flow"] })).toEqual({
 			initial: undefined,
-			dynamic: false,
+			origins: ["flow"],
 		});
 	});
 
 	test("forwards both fields together", () => {
 		expect(
-			toSuggestionsConfig({ suggestions: ["Hi"], flowSuggestions: false }),
-		).toEqual({ initial: ["Hi"], dynamic: false });
+			toSuggestionsConfig({
+				suggestions: ["Hi"],
+				suggestionOrigins: ["channel", "flow"],
+			}),
+		).toEqual({ initial: ["Hi"], origins: ["channel", "flow"] });
 	});
 
-	test("composes with the gate: dynamic false without starter prompts disables per-turn suggestions", () => {
+	test("composes with the gate: an empty suggestionOrigins disables per-turn suggestions", () => {
 		expect(
-			isDynamicSuggestionsEnabled(
-				toSuggestionsConfig({ flowSuggestions: false }),
+			resolveSuggestionOrigins(toSuggestionsConfig({ suggestionOrigins: [] })),
+		).toEqual([]);
+	});
+
+	test("composes with the gate: `flow` in suggestionOrigins enables flow pills", () => {
+		expect(
+			isOriginEnabled(
+				toSuggestionsConfig({ suggestionOrigins: ["flow"] }),
+				"flow",
 			),
-		).toBe(false);
-	});
-
-	test("composes with the flow gate: the opt-in enables flow pills", () => {
-		expect(
-			isFlowSuggestionsEnabled(toSuggestionsConfig({ flowSuggestions: true })),
 		).toBe(true);
 	});
 
-	test("composes with the flow gate: starter prompts alone leave flow pills off", () => {
+	test("composes with the gate: starter prompts alone leave flow pills off (falls back to defaults)", () => {
 		expect(
-			isFlowSuggestionsEnabled(toSuggestionsConfig({ suggestions: ["Hi"] })),
+			isOriginEnabled(toSuggestionsConfig({ suggestions: ["Hi"] }), "flow"),
 		).toBe(false);
 	});
 });

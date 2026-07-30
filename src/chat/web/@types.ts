@@ -87,6 +87,9 @@ export interface WelcomeConfig {
 // Suggestions
 // ============================================================================
 
+/** Where a suggestion pill came from. */
+export type SuggestionOrigin = "channel" | "page" | "flow" | "followup";
+
 export interface SuggestionsConfig {
 	/**
 	 * Initial suggestions to show before the user sends their first message.
@@ -94,11 +97,13 @@ export interface SuggestionsConfig {
 	 */
 	initial?: string[];
 	/**
-	 * Per-turn suggestion behavior. `true` additionally enables flow-driven
-	 * pills (`interrupt({ suggestions })` rendered as clickable answers). Left
-	 * unset, an object config keeps streamed `data-suggestions` parts enabled
-	 * but flow-driven pills stay off. `false` disables all per-turn
-	 * suggestions.
+	 * Which providers may fill the pill row. Omitted, this defaults to
+	 * `["channel", "page", "followup"]`: starter prompts and generated
+	 * follow-ups render, flow-driven pills stay opt-in.
+	 */
+	origins?: SuggestionOrigin[];
+	/**
+	 * @deprecated Use `origins`. `true` maps to every origin, `false` to none.
 	 */
 	dynamic?: boolean;
 }
@@ -188,9 +193,10 @@ export interface ChatBaseProps {
 	onResponseReceived?: () => void;
 	/**
 	 * Suggestion pill configuration. Unset: no suggestions. An object sets
-	 * starter prompts (`initial`) and per-turn behavior (`dynamic`);
-	 * `dynamic: true` opts into flow-driven pills. `true` enables everything
-	 * with defaults; `false` hides the pill row entirely.
+	 * starter prompts (`initial`) and which origins may fill the per-turn
+	 * pill row (`origins`); `origins: ["flow"]` (or any list including
+	 * `"flow"`) opts into flow-driven pills. `true` enables every origin with
+	 * defaults; `false` hides the pill row entirely.
 	 */
 	suggestions?: boolean | SuggestionsConfig;
 	/**

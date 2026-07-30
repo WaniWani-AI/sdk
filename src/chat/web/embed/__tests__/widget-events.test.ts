@@ -162,7 +162,7 @@ describe("createWidgetEventEmitter", () => {
 
 		emitter.emit({
 			name: "suggestion.clicked",
-			properties: { text: "What are your prices?", index: 2, source: "flow" },
+			properties: { text: "What are your prices?", index: 2, origin: "flow" },
 		});
 		emitter.emit({
 			name: "link.clicked",
@@ -181,7 +181,7 @@ describe("createWidgetEventEmitter", () => {
 			expect(received[0].properties).toEqual({
 				text: "What are your prices?",
 				index: 2,
-				source: "flow",
+				origin: "flow",
 			});
 		}
 	});

@@ -1,12 +1,10 @@
 import type { UIMessage } from "ai";
 import { SUGGESTIONS_META_KEY } from "../../../shared/meta-keys";
-
-/** Where the pills currently on screen came from. */
-export type TurnSuggestionOrigin = "flow" | "streamed";
+import type { SuggestionOrigin } from "../@types";
 
 export type TurnSuggestions = {
 	suggestions: string[];
-	source: TurnSuggestionOrigin;
+	source: SuggestionOrigin;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -77,7 +75,7 @@ export function extractFlowSuggestions(message: UIMessage): string[] | null {
  * `{ type: "data-suggestions", data: { suggestions: string[] } }`.
  * Only a bring-your-own-backend host emits this; the Waniwani chat API does not.
  */
-function extractStreamedSuggestions(message: UIMessage): string[] | null {
+function extractFollowupSuggestions(message: UIMessage): string[] | null {
 	for (const part of message.parts) {
 		if (!isRecord(part)) {
 			continue;
@@ -100,7 +98,7 @@ function extractStreamedSuggestions(message: UIMessage): string[] | null {
 /**
  * Resolve the pills for a completed turn. Flow-driven suggestions win over the
  * streamed data part, which is reachable only from a self-hosted chat backend
- * and is therefore attributed like operator-authored config.
+ * and is therefore attributed as a generated follow-up.
  *
  * When `includeFlow` is `false`, the flow's `_meta` entries are ignored
  * entirely and only the streamed `data-suggestions` part is considered.
@@ -117,9 +115,9 @@ export function resolveTurnSuggestions(
 		return { suggestions: fromFlow, source: "flow" };
 	}
 
-	const streamed = extractStreamedSuggestions(message);
-	if (streamed) {
-		return { suggestions: streamed, source: "streamed" };
+	const followup = extractFollowupSuggestions(message);
+	if (followup) {
+		return { suggestions: followup, source: "followup" };
 	}
 
 	return null;

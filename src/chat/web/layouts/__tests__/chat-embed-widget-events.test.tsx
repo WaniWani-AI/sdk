@@ -170,7 +170,7 @@ describe("ChatEmbed widget events", () => {
 			properties: {
 				text: "Second suggestion",
 				index: 1,
-				source: "initial",
+				origin: "channel",
 			},
 		});
 	});

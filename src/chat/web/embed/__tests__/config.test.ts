@@ -477,50 +477,74 @@ describe("resolveConfig — assistantBubble precedence", () => {
 	});
 });
 
-describe("resolveConfig — flowSuggestions", () => {
-	test("undefined when unspecified — flow pills stay off unless opted in", () => {
+describe("resolveConfig — suggestionOrigins", () => {
+	test("undefined when unspecified — defaults apply downstream", () => {
 		const config = resolveConfig({ token: "tok" });
-		expect(config.flowSuggestions).toBeUndefined();
+		expect(config.suggestionOrigins).toBeUndefined();
 	});
 
-	test("programmatic false disables flow-driven pills", () => {
-		const config = resolveConfig({ token: "tok", flowSuggestions: false });
-		expect(config.flowSuggestions).toBe(false);
+	test("programmatic empty array disables every origin", () => {
+		const config = resolveConfig({ token: "tok", suggestionOrigins: [] });
+		expect(config.suggestionOrigins).toEqual([]);
 	});
 
-	test("programmatic true opts into flow-driven pills", () => {
-		const config = resolveConfig({ token: "tok", flowSuggestions: true });
-		expect(config.flowSuggestions).toBe(true);
+	test("programmatic list opts into specific origins", () => {
+		const config = resolveConfig({
+			token: "tok",
+			suggestionOrigins: ["channel", "flow"],
+		});
+		expect(config.suggestionOrigins).toEqual(["channel", "flow"]);
 	});
 });
 
-describe("parseConfigFromScript — data-flow-suggestions", () => {
-	test("undefined when unspecified — no opt-in", async () => {
+describe("parseConfigFromScript — data-suggestion-origins", () => {
+	test("undefined when unspecified — no opt-in, defaults apply downstream", async () => {
 		const cfg = await parseWithAttrs({ "data-token": "tok" });
-		expect(cfg.flowSuggestions).toBeUndefined();
+		expect(cfg.suggestionOrigins).toBeUndefined();
 	});
 
-	test("'false' explicitly keeps flow-driven pills off", async () => {
+	test("comma-separated list parses to an array", async () => {
 		const cfg = await parseWithAttrs({
 			"data-token": "tok",
-			"data-flow-suggestions": "false",
+			"data-suggestion-origins": "channel,flow",
 		});
-		expect(cfg.flowSuggestions).toBe(false);
+		expect(cfg.suggestionOrigins).toEqual(["channel", "flow"]);
 	});
 
-	test("'true' parses as true", async () => {
+	test("whitespace around entries is trimmed", async () => {
 		const cfg = await parseWithAttrs({
 			"data-token": "tok",
-			"data-flow-suggestions": "true",
+			"data-suggestion-origins": " channel , flow ",
 		});
-		expect(cfg.flowSuggestions).toBe(true);
+		expect(cfg.suggestionOrigins).toEqual(["channel", "flow"]);
 	});
 
-	test("bare attribute (empty value) opts in like sibling boolean attrs", async () => {
+	test("unknown values are silently dropped", async () => {
 		const cfg = await parseWithAttrs({
 			"data-token": "tok",
-			"data-flow-suggestions": "",
+			"data-suggestion-origins": "channel,bogus,flow",
 		});
-		expect(cfg.flowSuggestions).toBe(true);
+		expect(cfg.suggestionOrigins).toEqual(["channel", "flow"]);
+	});
+
+	test("all four known origins parse", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-suggestion-origins": "channel,page,flow,followup",
+		});
+		expect(cfg.suggestionOrigins).toEqual([
+			"channel",
+			"page",
+			"flow",
+			"followup",
+		]);
+	});
+
+	test("attribute present but empty resolves to an empty array — a meaningful 'render nothing', not absent", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-suggestion-origins": "",
+		});
+		expect(cfg.suggestionOrigins).toEqual([]);
 	});
 });

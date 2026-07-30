@@ -470,7 +470,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 															properties: {
 																text,
 																index: suggestions.indexOf(text),
-																source: "initial",
+																origin: "channel",
 															},
 														});
 														openWith(text);
@@ -568,7 +568,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									placeholder={config.placeholder}
 									suggestions={toSuggestionsConfig({
 										suggestions: config.suggestions,
-										flowSuggestions: config.flowSuggestions,
+										suggestionOrigins: config.suggestionOrigins,
 									})}
 									enableThreadHistory={config.enableThreadHistory}
 									showToolCalls={config.showToolCalls}

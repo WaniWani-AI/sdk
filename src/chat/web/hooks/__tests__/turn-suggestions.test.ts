@@ -195,7 +195,7 @@ describe("resolveTurnSuggestions", () => {
 
 		expect(resolveTurnSuggestions(message)).toEqual({
 			suggestions: ["From", "Stream"],
-			source: "streamed",
+			source: "followup",
 		});
 	});
 
@@ -219,7 +219,7 @@ describe("resolveTurnSuggestions", () => {
 
 		expect(resolveTurnSuggestions(message, { includeFlow: false })).toEqual({
 			suggestions: ["From", "Stream"],
-			source: "streamed",
+			source: "followup",
 		});
 	});
 });

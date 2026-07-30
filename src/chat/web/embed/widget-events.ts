@@ -12,6 +12,8 @@
 // a message was exchanged, never what was said.
 // ============================================================================
 
+import type { SuggestionOrigin } from "../@types";
+
 /** Surface the widget is mounted on. */
 export type WidgetMode = "inline" | "floating";
 
@@ -48,8 +50,8 @@ export type WidgetEventDetail =
 			properties: {
 				text: string;
 				index: number;
-				/** `"flow"` when the MCP's flow drove these pills, `"initial"` for configured starter prompts. */
-				source: "flow" | "initial";
+				/** Which provider supplied the clicked pill: `"channel"` (starter prompts), `"page"` (per-URL starter prompts), `"flow"` (an MCP flow's `interrupt({ suggestions })`), or `"followup"` (generated from the conversation). */
+				origin: SuggestionOrigin;
 			};
 	  }
 	| { name: "link.clicked"; properties: { url: string } };

@@ -372,9 +372,10 @@ export const UnboundedParent: Story = {
  * renders them as pills above the composer. Clicking one sends it as the reply.
  *
  * Flow-driven pills are opt-in: this story passes
- * `suggestions={{ dynamic: true }}` (the `WaniwaniChat` / script-embed
- * spellings are `flowSuggestions: true` / `data-flow-suggestions="true"`).
- * Without the opt-in, the flow's suggestions render nothing.
+ * `suggestions={{ origins: ["flow"] }}` (the `WaniwaniChat` / script-embed
+ * spellings are `overrides={{ suggestionOrigins: ["flow"] }}` /
+ * `data-suggestion-origins="flow"`). Without the opt-in, the flow's
+ * suggestions render nothing.
  */
 export const FlowDrivenSuggestions: Story = {
 	render: (args) => {
@@ -387,7 +388,7 @@ export const FlowDrivenSuggestions: Story = {
 	},
 	args: {
 		welcomeMessage: "Hi! Ask me about plans to see the flow suggest answers.",
-		suggestions: { dynamic: true },
+		suggestions: { origins: ["flow"] },
 	},
 };
 

@@ -14,6 +14,7 @@ import type {
 	ChatClassNames,
 	ChatHandle,
 	ShowToolCalls,
+	SuggestionOrigin,
 	VisitorIdInput,
 	WelcomeConfig,
 } from "../@types";
@@ -69,12 +70,14 @@ export interface WaniwaniChatOverrides {
 	/** Initial suggestion chips. */
 	suggestions?: string[];
 	/**
-	 * Opt-in for the per-turn pills a flow drives via
-	 * `interrupt({ suggestions })`. Disabled by default — set `true` to render
-	 * them. Starter prompts (`suggestions`) are unaffected and show either
-	 * way.
+	 * Which providers may fill the per-turn pill row. Defaults to
+	 * `["channel", "page", "followup"]` when unset: starter prompts and
+	 * generated follow-ups render, flow-driven pills stay opt-in — include
+	 * `"flow"` to render the pills a flow drives via
+	 * `interrupt({ suggestions })`. Starter prompts (`suggestions`) are
+	 * unaffected by this field and show either way.
 	 */
-	flowSuggestions?: boolean;
+	suggestionOrigins?: SuggestionOrigin[];
 	/** Persist conversations across reloads in IndexedDB. */
 	enableThreadHistory?: boolean;
 	/**
@@ -248,7 +251,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				welcomeMessage: overrides?.welcomeMessage,
 				placeholder: overrides?.placeholder,
 				suggestions: overrides?.suggestions,
-				flowSuggestions: overrides?.flowSuggestions,
+				suggestionOrigins: overrides?.suggestionOrigins,
 				enableThreadHistory: overrides?.enableThreadHistory,
 				showToolCalls: overrides?.showToolCalls,
 				appearance: overrides?.appearance,
@@ -265,7 +268,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				overrides?.welcomeMessage,
 				overrides?.placeholder,
 				overrides?.suggestions,
-				overrides?.flowSuggestions,
+				overrides?.suggestionOrigins,
 				overrides?.enableThreadHistory,
 				overrides?.showToolCalls,
 				overrides?.appearance,
@@ -465,7 +468,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					placeholder={config.placeholder}
 					suggestions={toSuggestionsConfig({
 						suggestions: config.suggestions,
-						flowSuggestions: config.flowSuggestions,
+						suggestionOrigins: config.suggestionOrigins,
 					})}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}

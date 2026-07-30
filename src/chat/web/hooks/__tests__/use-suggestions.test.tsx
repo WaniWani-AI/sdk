@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
+import type { SuggestionOrigin } from "../../@types";
 
 // ---------------------------------------------------------------------------
 // Minimal DOM globals so react-dom/client can mount a hook harness. Unlike
@@ -111,10 +112,10 @@ function assistantMessageWithFlowSuggestions(suggestions: string[]) {
 	};
 }
 
-/** An assistant message carrying a streamed `data-suggestions` part. */
-function assistantMessageWithStreamedSuggestions(
+/** An assistant message carrying a streamed `data-suggestions` (followup) part. */
+function assistantMessageWithFollowupSuggestions(
 	suggestions: string[],
-	id = "a-streamed",
+	id = "a-followup",
 ) {
 	return {
 		id,
@@ -137,8 +138,12 @@ describe("useSuggestions — conversation reset clears stale pills", () => {
 	test("clears flow-driven pills once messages go back to empty, with no `initial` configured", () => {
 		// Mount mid-flight so the streaming -> ready transition below fires the
 		// hook's recompute effect. Flow pills are opt-in, so the host passes
-		// `dynamic: true`.
-		render({ messages: [], status: "streaming", config: { dynamic: true } });
+		// `origins: ["flow"]`.
+		render({
+			messages: [],
+			status: "streaming",
+			config: { origins: ["flow"] },
+		});
 
 		const turnMessages: Msg[] = [
 			userMessage("Which plan?"),
@@ -147,24 +152,24 @@ describe("useSuggestions — conversation reset clears stale pills", () => {
 		render({
 			messages: turnMessages,
 			status: "ready",
-			config: { dynamic: true },
+			config: { origins: ["flow"] },
 		});
 
 		expect(hookRef.current?.suggestions).toEqual(["Bronze", "Silver", "Gold"]);
 
 		// Simulate `reset()` / `startNewThread()`: messages go back to empty
 		// while status stays "ready". No `initial` was ever configured.
-		render({ messages: [], status: "ready", config: { dynamic: true } });
+		render({ messages: [], status: "ready", config: { origins: ["flow"] } });
 
 		expect(hookRef.current?.suggestions).toEqual([]);
-		expect(hookRef.current?.source).toBe("initial");
+		expect(hookRef.current?.source).toBe("channel");
 	});
 
 	test("resets to the configured `initial` pills (not last flow pills) once messages go back to empty", () => {
 		render({
 			messages: [],
 			status: "streaming",
-			config: { initial: ["Book a demo"], dynamic: true },
+			config: { initial: ["Book a demo"], origins: ["flow"] },
 		});
 
 		const turnMessages: Msg[] = [
@@ -174,7 +179,7 @@ describe("useSuggestions — conversation reset clears stale pills", () => {
 		render({
 			messages: turnMessages,
 			status: "ready",
-			config: { initial: ["Book a demo"], dynamic: true },
+			config: { initial: ["Book a demo"], origins: ["flow"] },
 		});
 
 		expect(hookRef.current?.suggestions).toEqual(["Bronze", "Silver", "Gold"]);
@@ -183,11 +188,11 @@ describe("useSuggestions — conversation reset clears stale pills", () => {
 		render({
 			messages: [],
 			status: "ready",
-			config: { initial: ["Book a demo"], dynamic: true },
+			config: { initial: ["Book a demo"], origins: ["flow"] },
 		});
 
 		expect(hookRef.current?.suggestions).toEqual(["Book a demo"]);
-		expect(hookRef.current?.source).toBe("initial");
+		expect(hookRef.current?.source).toBe("channel");
 	});
 });
 
@@ -202,21 +207,21 @@ describe("useSuggestions — flow pills are opt-in", () => {
 		render({ messages: turnMessages, status: "ready" });
 
 		expect(hookRef.current?.suggestions).toEqual([]);
-		expect(hookRef.current?.source).toBe("initial");
+		expect(hookRef.current?.source).toBe("channel");
 	});
 
-	test("with only `initial` configured, streamed pills render while flow pills do not", () => {
+	test("with only `initial` configured, followup pills render (default origins) while flow pills do not", () => {
 		const config = { initial: ["Hi"] };
 		render({ messages: [], status: "streaming", config });
 
-		const streamedTurn: Msg[] = [
+		const followupTurn: Msg[] = [
 			userMessage("Anything else?"),
-			assistantMessageWithStreamedSuggestions(["From", "Stream"]),
+			assistantMessageWithFollowupSuggestions(["From", "Followup"]),
 		];
-		render({ messages: streamedTurn, status: "ready", config });
+		render({ messages: followupTurn, status: "ready", config });
 
-		expect(hookRef.current?.suggestions).toEqual(["From", "Stream"]);
-		expect(hookRef.current?.source).toBe("initial");
+		expect(hookRef.current?.suggestions).toEqual(["From", "Followup"]);
+		expect(hookRef.current?.source).toBe("followup");
 
 		const secondUser: Msg = {
 			id: "u2",
@@ -224,19 +229,49 @@ describe("useSuggestions — flow pills are opt-in", () => {
 			parts: [{ type: "text", text: "Which plan?" }],
 		};
 		render({
-			messages: [...streamedTurn, secondUser],
+			messages: [...followupTurn, secondUser],
 			status: "streaming",
 			config,
 		});
 
 		const flowTurn: Msg[] = [
-			...streamedTurn,
+			...followupTurn,
 			secondUser,
 			assistantMessageWithFlowSuggestions(["Bronze", "Silver", "Gold"]),
 		];
 		render({ messages: flowTurn, status: "ready", config });
 
 		expect(hookRef.current?.suggestions).toEqual([]);
-		expect(hookRef.current?.source).toBe("initial");
+		expect(hookRef.current?.source).toBe("channel");
+	});
+});
+
+describe("useSuggestions — origin filtering", () => {
+	test("filters out a followup result when only `flow` is enabled", () => {
+		const config: { origins: SuggestionOrigin[] } = { origins: ["flow"] };
+		render({ messages: [], status: "streaming", config });
+
+		const turnMessages: Msg[] = [
+			userMessage("Anything else?"),
+			assistantMessageWithFollowupSuggestions(["From", "Followup"]),
+		];
+		render({ messages: turnMessages, status: "ready", config });
+
+		expect(hookRef.current?.suggestions).toEqual([]);
+		expect(hookRef.current?.source).toBe("channel");
+	});
+
+	test("filters out a flow result when only `followup` is enabled", () => {
+		const config: { origins: SuggestionOrigin[] } = { origins: ["followup"] };
+		render({ messages: [], status: "streaming", config });
+
+		const turnMessages: Msg[] = [
+			userMessage("Which plan?"),
+			assistantMessageWithFlowSuggestions(["Bronze", "Silver", "Gold"]),
+		];
+		render({ messages: turnMessages, status: "ready", config });
+
+		expect(hookRef.current?.suggestions).toEqual([]);
+		expect(hookRef.current?.source).toBe("channel");
 	});
 });
