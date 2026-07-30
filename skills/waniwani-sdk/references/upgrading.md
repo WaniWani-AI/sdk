@@ -31,6 +31,38 @@ One behavioral note (not a break): `messageBorderRadius` / `--ww-msg-radius` is 
 
 This list mirrors the changelog so you can apply migrations without a network fetch. Always cross-check against the live changelog for anything newer than this file.
 
+### 0.19.0: `suggestion.clicked` requires a `properties.origin` field
+
+`suggestion.clicked` (part of `WidgetEventDetail` / `WidgetEvent` from `@waniwani/sdk/chat`) gained a required `properties.origin: "channel" | "page" | "flow" | "followup"` field, reporting which provider supplied the clicked pill. On 0.18.x the payload was `{ text, index }`. Consumers who only *read* the event through `onEvent` (the overwhelmingly common case) need no changes: it is a new, always-populated field. Only code that *constructs* a `suggestion.clicked` event literal (test fixtures, a custom adapter) needs updating.
+
+Auto-fix, per hand-constructed event literal:
+
+1. Add `origin` to the `properties` of every `{ name: "suggestion.clicked", ... }` literal: `"channel"` for a starter-prompt fixture, `"page"` for a per-URL starter prompt, `"flow"` for a flow-driven pill, `"followup"` for a generated follow-up. When the fixture doesn't care, use `"channel"`.
+
+```ts
+// Before
+const event: WidgetEvent = {
+  mode: "inline",
+  timestamp: Date.now(),
+  name: "suggestion.clicked",
+  properties: { text: "Book a demo", index: 0 },
+};
+
+// After
+const event: WidgetEvent = {
+  mode: "inline",
+  timestamp: Date.now(),
+  name: "suggestion.clicked",
+  properties: { text: "Book a demo", index: 0, origin: "channel" },
+};
+```
+
+No `@deprecated` shim: `origin` stays required rather than optional, since a guaranteed field is better DX for readers (the primary audience) than an optional one every reader would have to narrow.
+
+Related deprecation (not a break): `SuggestionsConfig.dynamic` on the `<ChatEmbed>` primitive is deprecated in favor of `origins` (`SuggestionOrigin[]`). `dynamic: true` maps to every origin, `false` to none; `origins` wins when both are set. Migrate opportunistically: `dynamic: true` → `origins: ["channel", "page", "flow", "followup"]`, `dynamic: false` → `origins: []`.
+
+After applying, run `bun run typecheck && bun test`. `tsc` finds every construction site: any literal missing `properties.origin` fails to typecheck against `WidgetEventDetail`.
+
 ### 0.18.0: quote and purchase events removed from the taxonomy
 
 The event names `quote.requested`, `quote.succeeded`, `quote.failed`, and `purchase.completed` are removed from `EVENT_TYPES` and the `TrackEvent` union. The typed revenue taxonomy covers these funnel stages. Removed with them: the `QuoteSucceededProperties` and `PurchaseCompletedProperties` type exports, and the legacy input fields `quoteAmount`, `quoteCurrency`, `purchaseAmount`, `purchaseCurrency` on `LegacyTrackEvent`. `link.clicked` (and `LinkClickedProperties`, legacy `linkUrl`) stays.

@@ -117,6 +117,7 @@ export interface SuggestionsConfig {
 	origins?: SuggestionOrigin[];
 	/**
 	 * @deprecated Use `origins`. `true` maps to every origin, `false` to none.
+	 * Will be removed in a future minor release.
 	 */
 	dynamic?: boolean;
 }
