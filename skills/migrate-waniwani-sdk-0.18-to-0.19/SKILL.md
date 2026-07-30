@@ -1,13 +1,13 @@
 ---
 name: migrate-waniwani-sdk-0.18-to-0.19
-description: "Migrate a project from @waniwani/sdk 0.18.x to 0.19.0 and auto-apply its breaking change: suggestion.clicked (WidgetEvent / WidgetEventDetail from @waniwani/sdk/chat) gained a required properties.origin field (channel | page | flow | followup). Reading events through onEvent needs no changes; only code constructing a suggestion.clicked event literal must add origin. Also covers the SuggestionsConfig.dynamic deprecation (use origins) and how to opt in to flow-driven suggestion pills. Trigger when the user is on @waniwani/sdk 0.18.x and wants to move to 0.19, asks to migrate to 0.19, or hits type errors on suggestion.clicked literals after bumping @waniwani/sdk."
+description: "Migrate a project from @waniwani/sdk 0.18.x to 0.19.x (first published: 0.19.1) and auto-apply its breaking change: suggestion.clicked (WidgetEvent / WidgetEventDetail from @waniwani/sdk/chat) gained a required properties.origin field (channel | page | flow | followup). Reading events through onEvent needs no changes; only code constructing a suggestion.clicked event literal must add origin. Also covers the SuggestionsConfig.dynamic deprecation (use origins) and how to opt in to flow-driven suggestion pills. Trigger when the user is on @waniwani/sdk 0.18.x and wants to move to 0.19, asks to migrate to 0.19, or hits type errors on suggestion.clicked literals after bumping @waniwani/sdk."
 metadata:
   author: Waniwani
 ---
 
 # Migrate `@waniwani/sdk` 0.18 → 0.19
 
-A self-contained migration for the single hop from `0.18.x` to `0.19.0`. Apply it when a project on 0.18 is moving to 0.19. It covers only that jump; for other version boundaries use the matching `migrate-waniwani-sdk-<from>-to-<to>` skill, or the general procedure in the SDK's [changelog](https://docs.waniwani.ai/sdk/changelog).
+A self-contained migration for the single hop from `0.18.x` to `0.19.x` (the first published 0.19 release is `0.19.1`; `0.19.0` was never published to npm). Apply it when a project on 0.18 is moving to 0.19. It covers only that jump; for other version boundaries use the matching `migrate-waniwani-sdk-<from>-to-<to>` skill, or the general procedure in the SDK's [changelog](https://docs.waniwani.ai/sdk/changelog).
 
 **Precondition:** the project is on `@waniwani/sdk@0.18.x`. If it is on an older version, migrate up to 0.18 first (each jump ships its own migration skill); if it is already on 0.19+, there is nothing to do here.
 
@@ -31,7 +31,7 @@ This break **is** visible to `tsc`: every hand-constructed `suggestion.clicked` 
 
 1. **Bump the dependency.**
    ```bash
-   bun add @waniwani/sdk@^0.19.0
+   bun add @waniwani/sdk@^0.19.1
    ```
 2. **Collect the call sites.** Run the type checker and/or grep:
    ```bash

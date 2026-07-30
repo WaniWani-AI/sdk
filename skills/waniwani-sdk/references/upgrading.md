@@ -31,7 +31,7 @@ One behavioral note (not a break): `messageBorderRadius` / `--ww-msg-radius` is 
 
 This list mirrors the changelog so you can apply migrations without a network fetch. Always cross-check against the live changelog for anything newer than this file.
 
-### 0.19.0: `suggestion.clicked` requires a `properties.origin` field
+### 0.19.1: `suggestion.clicked` requires a `properties.origin` field
 
 `suggestion.clicked` (part of `WidgetEventDetail` / `WidgetEvent` from `@waniwani/sdk/chat`) gained a required `properties.origin: "channel" | "page" | "flow" | "followup"` field, reporting which provider supplied the clicked pill. On 0.18.x the payload was `{ text, index }`. Consumers who only *read* the event through `onEvent` (the overwhelmingly common case) need no changes: it is a new, always-populated field. Only code that *constructs* a `suggestion.clicked` event literal (test fixtures, a custom adapter) needs updating.
 
