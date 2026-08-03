@@ -66,6 +66,13 @@ export interface ChatTheme {
 	fontSize?: number;
 	/** Base line height for message text (unitless string, e.g. `"1.5"`). Defaults to `"1.5"`. */
 	lineHeight?: string;
+	/** Frosted-glass tint color for the floating bar's suggestion card, layered
+	 *  over the backdrop blur. Programmatic-only via appearance.variables.
+	 *  Unset = the default neutral glass (unchanged). */
+	glassTint?: string;
+	/** Strength of the glass tint, 0–1 as a unitless string (e.g. "0.5").
+	 *  Unset/"0" = no tint (default rendering). */
+	glassTintStrength?: string;
 }
 
 // ============================================================================

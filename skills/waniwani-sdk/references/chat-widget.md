@@ -652,6 +652,27 @@ window.WaniWani.chat.init({
 
 `variables` accepts the same keys as `ChatTheme`. The helpers `DEFAULT_THEME`, `DARK_THEME`, and `mergeTheme(base, overrides)` are exported from `@waniwani/sdk/chat` for assembling custom variable sets.
 
+##### Frosted-glass tint (floating bar)
+
+The floating bar's suggestion card sits on a frosted-glass surface — a translucent neutral tint layered over the backdrop blur. You can tint that glass a color so the bar pops out more against the page. These two keys are **programmatic-only** (pass them via `appearance.variables`; there is no `data-*` attribute), floating-bar-specific, and **layered over the blur** — they don't affect the chat panel itself.
+
+| `variables` key | Type | Default | Effect |
+|-----------------|------|---------|--------|
+| `glassTint` | `string` (CSS color) | `transparent` | Color mixed into the glass surface |
+| `glassTintStrength` | `string` (unitless `0`–`1`) | `"0"` | How strongly the tint is mixed in (`"0"` = none, `"1"` = full) |
+
+```js
+// embed.js
+window.WaniWani.chat.init({
+  token: "wwp_...",
+  appearance: {
+    variables: { glassTint: "#6366f1", glassTintStrength: "0.4" },
+  },
+});
+```
+
+Leave both unset (the default) and the glass keeps its current neutral tint — existing widgets render exactly as before.
+
 #### 4. Assistant message bubble (opt-in)
 
 Assistant replies render as plain text by default. Turn them into filled bubbles — styled by `assistantBubbleColor` / `assistantBubbleTextColor`, sharing the user bubble's radius and padding — with `assistantBubble`:

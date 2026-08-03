@@ -26,6 +26,8 @@ export const DEFAULT_THEME: Required<ChatTheme> = {
 	messageMaxWidth: "80%",
 	fontSize: 16,
 	lineHeight: "1.5",
+	glassTint: "transparent",
+	glassTintStrength: "0",
 };
 
 export const DARK_THEME: ChatTheme = {
@@ -76,6 +78,8 @@ const CSS_VAR_MAP: Record<keyof ChatTheme, string[]> = {
 	messageMaxWidth: ["--ww-msg-max-width"],
 	fontSize: ["--ww-font-size"],
 	lineHeight: ["--ww-line-height"],
+	glassTint: ["--ww-glass-tint"],
+	glassTintStrength: ["--ww-glass-tint-opacity"],
 };
 
 export function mergeTheme(userTheme?: ChatTheme): Required<ChatTheme> {

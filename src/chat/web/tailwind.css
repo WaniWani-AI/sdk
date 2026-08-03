@@ -201,8 +201,12 @@
 
 	/* Frosted-glass tint for the floating bar's suggestion card. Neutral by
 	   default — not white, a soft translucent surface that reads over any
-	   page. Internal for now (not a public theme option). */
-	--ww-glass: rgba(236, 238, 244, 0.6);
+	   page. The neutral base can now be tinted a color to make the bar pop,
+	   configurable via `glassTint` / `glassTintStrength` in
+	   `appearance.variables` (programmatic-only). With the defaults
+	   (`--ww-glass-tint: transparent` at 0%) the color-mix resolves to the
+	   neutral base below — identical to the previous rendering. */
+	--ww-glass: color-mix(in srgb, var(--ww-glass-tint, transparent) calc(var(--ww-glass-tint-opacity, 0) * 100%), rgba(236, 238, 244, 0.6));
 	--ww-glass-border: rgba(0, 0, 0, 0.06);
 
 	/* Opt-in panel chrome. Defaults are no-ops so customers who slot
@@ -248,7 +252,7 @@
 	--ww-color-tool-card: var(--ww-tool-card, #262626);
 	--ww-color-user-bubble-text: var(--ww-user-bubble-text, #ffffff);
 	--ww-color-assistant-bubble-text: var(--ww-assistant-bubble-text, var(--ww-color-foreground));
-	--ww-glass: rgba(40, 42, 52, 0.5);
+	--ww-glass: color-mix(in srgb, var(--ww-glass-tint, transparent) calc(var(--ww-glass-tint-opacity, 0) * 100%), rgba(40, 42, 52, 0.5));
 	--ww-glass-border: rgba(255, 255, 255, 0.12);
 }
 
@@ -275,7 +279,7 @@
 		--ww-color-tool-card: var(--ww-tool-card, #262626);
 		--ww-color-user-bubble-text: var(--ww-user-bubble-text, #ffffff);
 		--ww-color-assistant-bubble-text: var(--ww-assistant-bubble-text, var(--ww-color-foreground));
-		--ww-glass: rgba(40, 42, 52, 0.5);
+		--ww-glass: color-mix(in srgb, var(--ww-glass-tint, transparent) calc(var(--ww-glass-tint-opacity, 0) * 100%), rgba(40, 42, 52, 0.5));
 		--ww-glass-border: rgba(255, 255, 255, 0.12);
 	}
 }
