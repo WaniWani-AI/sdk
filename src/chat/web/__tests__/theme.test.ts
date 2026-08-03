@@ -43,4 +43,19 @@ describe("themeToCSSProperties", () => {
 		expect(vars["--ww-font-size"]).toBe("15px");
 		expect(vars["--ww-line-height"]).toBe("1.6");
 	});
+
+	test("emits glass tint vars when set", () => {
+		const vars = themeToCSSProperties({
+			glassTint: "#6366f1",
+			glassTintStrength: "0.5",
+		});
+		expect(vars["--ww-glass-tint"]).toBe("#6366f1");
+		expect(vars["--ww-glass-tint-opacity"]).toBe("0.5");
+	});
+
+	test("omits glass tint vars when unset", () => {
+		const vars = themeToCSSProperties({ primaryColor: "#000" });
+		expect(vars["--ww-glass-tint"]).toBeUndefined();
+		expect(vars["--ww-glass-tint-opacity"]).toBeUndefined();
+	});
 });
