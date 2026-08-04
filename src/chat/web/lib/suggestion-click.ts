@@ -1,30 +1,16 @@
 // ============================================================================
-// Suggestion events — `suggestion.clicked` for every starter-prompt click and
-// `suggestion.shown` for every pill set the visitor actually saw.
+// `suggestion.clicked` per pill click, `suggestion.shown` per rendered set (one
+// event carrying all its pills). Together they give per-prompt CTR:
+// clicks(id) ÷ shown sets containing that id.
 //
-// Together they make authored per-page prompts measurable per prompt id: a
-// click attributes back to the prompt that earned it (`properties.promptId`),
-// a shown set records which prompts had the chance to earn one
-// (`properties.prompts`), and per-prompt CTR is clicks(id) ÷ shown sets
-// containing that id. A shown set is one event carrying all its pills, not an
-// event per pill.
-//
-// Same canonical ingest, envelope, and auth as `page.viewed`
-// (`POST /api/mcp/events/v2/batch` with the public `wwp_` token) — see
-// `page-view.ts` for why no widget JWT is involved. Two differences: there is
-// no once-per-page guard (the render/click sites own their own dedupe — a
-// click submits the message and clears the pills, a shown set is keyed on the
-// resolved list's identity), and identity is the synchronous
-// `getOrCreateVisitorId()` — the device/referrer context rides on
-// `page.viewed` already, so there is nothing to await here.
-//
-// Both events carry `properties.origin`, the same `SuggestionOrigin` taxonomy
-// the `suggestion.clicked` widget event exposes to host pages.
+// Same ingest, envelope and auth as `page.viewed` — see `page-view.ts`. No
+// once-per-page guard here: the render and click sites own their own dedupe.
+// `properties.origin` comes from the pill row, which resolves it exactly at
+// render time.
 // ============================================================================
 
-import type { SuggestionOrigin } from "../@types";
-import type { PageSuggestion } from "../embed/use-page-suggestions";
 import { eventsEndpoint } from "./page-view";
+import type { Suggestion, SuggestionOrigin } from "./resolve-suggestions";
 import { getOrCreateVisitorId } from "./visitor-context";
 
 export interface FireSuggestionClickOptions {
@@ -57,24 +43,17 @@ export interface FireSuggestionClickOptions {
 }
 
 /**
- * Attribute a clicked prompt text back to the starter list it was rendered
- * from — an authored per-page prompt keeps its stored id, one from the
- * channel's fixed list has none — and correct the widget event's `origin` when
- * that id proves the pill was per-page: `useSuggestions` reports the starter
- * row as `"channel"` because it can't tell channel prompts from per-page ones,
- * and only the embed host holds the resolved page list.
- *
- * Two identical texts on one page attribute to the first match. Duplicate
- * texts within a page are pathological authoring, not worth plumbing the
- * rendered index through for.
+ * Attribute a pill text back to the list that rendered it: an
+ * authored per-page prompt keeps its stored id, a fixed-list prompt has
+ * none. Two identical texts attribute to the first match — duplicate texts
+ * within a page are pathological authoring, not worth plumbing the rendered
+ * index through for.
  */
-export function resolveClickAttribution(
-	list: PageSuggestion[],
+export function resolveSuggestionId(
+	list: Suggestion[],
 	text: string,
-	origin: SuggestionOrigin,
-): { promptId: string | null; origin: SuggestionOrigin } {
-	const promptId = list.find((s) => s.text === text)?.id ?? null;
-	return { promptId, origin: promptId ? "page" : origin };
+): string | null {
+	return list.find((s) => s.text === text)?.id ?? null;
 }
 
 interface PostSuggestionEventOptions {
@@ -140,7 +119,7 @@ async function postSuggestionEvent(
 }
 
 /**
- * Emit a `suggestion.clicked` event for one starter-prompt click.
+ * Emit a `suggestion.clicked` event for one pill click.
  */
 export async function fireSuggestionClick(
 	opts: FireSuggestionClickOptions,
@@ -175,33 +154,16 @@ export async function fireSuggestionClick(
 	});
 }
 
-/** A prompt as it appeared in a rendered set, for impression logging. */
-export interface ShownPrompt {
-	id: string | null;
-	text: string;
-}
-
 /**
- * Attribute a rendered set back to the list it was resolved from, one entry
- * per pill. The set-level `origin` is the first pill's: rendered sets are
- * homogeneous (a page row is all-authored, the fixed list all-null, flow and
- * follow-up pills absent from the list entirely), so a mixed set only arises
- * from a render racing an SPA navigation and the first pill is as truthful as
- * any.
+ * Attribute a rendered set back to the list that resolved it, one entry
+ * per pill. The set's origin rides on the widget event that reported it —
+ * the pill row resolves its origin exactly at render time.
  */
-export function resolveShownPrompts(
-	list: PageSuggestion[],
+export function resolveShownSuggestions(
+	list: Suggestion[],
 	texts: string[],
-	origin: SuggestionOrigin,
-): { prompts: ShownPrompt[]; origin: SuggestionOrigin } {
-	const prompts = texts.map((text) => ({
-		id: resolveClickAttribution(list, text, origin).promptId,
-		text,
-	}));
-	return {
-		prompts,
-		origin: prompts[0]?.id ? "page" : origin,
-	};
+): Suggestion[] {
+	return texts.map((text) => ({ id: resolveSuggestionId(list, text), text }));
 }
 
 export interface FireSuggestionShownOptions {
@@ -211,7 +173,7 @@ export interface FireSuggestionShownOptions {
 	mode?: "inline" | "floating";
 	source?: string;
 	sessionId?: string;
-	prompts: ShownPrompt[];
+	prompts: Suggestion[];
 	origin: SuggestionOrigin;
 }
 

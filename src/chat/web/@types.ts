@@ -4,6 +4,7 @@
 
 import type { ChatAppearance, ShowToolCalls } from "./embed/config";
 import type { MessageOverrides } from "./i18n";
+import type { PreChatSuggestions } from "./lib/resolve-suggestions";
 import type { VisitorIdInput } from "./lib/visitor-context";
 
 export type {
@@ -94,39 +95,12 @@ export interface WelcomeConfig {
 // Suggestions
 // ============================================================================
 
-/** Where a suggestion pill came from. */
-/**
- * Every place a suggestion pill can come from. The single source of truth:
- * {@link SuggestionOrigin} derives from it, and runtime validation reads it,
- * so adding an origin is a one-line change.
- */
-export const SUGGESTION_ORIGINS = [
-	"channel",
-	"page",
-	"flow",
-	"followup",
-] as const;
-
-/** Where a suggestion pill came from. */
-export type SuggestionOrigin = (typeof SUGGESTION_ORIGINS)[number];
-
 export interface SuggestionsConfig {
 	/**
-	 * Initial suggestions to show before the user sends their first message.
+	 * Starter prompts shown before the user sends their first message.
 	 * Defaults to an empty array.
 	 */
 	initial?: string[];
-	/**
-	 * Which providers may fill the pill row. Omitted, this defaults to
-	 * `["channel", "page", "followup"]`: starter prompts and generated
-	 * follow-ups render, flow-driven pills stay opt-in.
-	 */
-	origins?: SuggestionOrigin[];
-	/**
-	 * @deprecated Use `origins`. `true` maps to every origin, `false` to none.
-	 * Will be removed in a future minor release.
-	 */
-	dynamic?: boolean;
 }
 
 /**
@@ -213,13 +187,15 @@ export interface ChatBaseProps {
 	/** Callback fired when a response is received */
 	onResponseReceived?: () => void;
 	/**
-	 * Suggestion pill configuration. Unset: no suggestions. An object sets
-	 * starter prompts (`initial`) and which origins may fill the per-turn
-	 * pill row (`origins`); `origins: ["flow"]` (or any list including
-	 * `"flow"`) opts into flow-driven pills. `true` enables every origin with
-	 * defaults; `false` hides the pill row entirely.
+	 * Suggestion pills. The row obeys a fixed hierarchy — flow > followup >
+	 * page > channel — and every origin is always active.
+	 *
+	 * `false` hides the row; `true` / unset is the default. `{ initial: [...] }`
+	 * sets starter prompts. Embed hosts pass the resolved
+	 * {@link PreChatSuggestions} from `useSuggestions(config)` instead, which
+	 * carries the prompt ids needed for click attribution.
 	 */
-	suggestions?: boolean | SuggestionsConfig;
+	suggestions?: boolean | SuggestionsConfig | PreChatSuggestions;
 	/**
 	 * Handler for MCP tool calls from widgets.
 	 * Called when a widget uses `callServerTool` (MCP Apps standard).

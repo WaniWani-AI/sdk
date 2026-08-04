@@ -1,11 +1,5 @@
 import type { UIMessage } from "ai";
 import { SUGGESTIONS_META_KEY } from "../../../shared/meta-keys";
-import type { SuggestionOrigin } from "../@types";
-
-export type TurnSuggestions = {
-	suggestions: string[];
-	source: SuggestionOrigin;
-};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
@@ -18,10 +12,8 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 /**
- * Read a well-formed `waniwani/suggestions` entry off a tool part's `_meta`,
- * or `null` when the part carries no flow result or a malformed one.
- * Malformed entries (non-array `suggestions`, non-string items, a non-object
- * `_meta` entry) are never authoritative — they are garbage, not a clear.
+ * A well-formed `waniwani/suggestions` entry off a tool part's `_meta`, else
+ * `null`. Malformed entries are garbage, not an authoritative clear.
  */
 function readSuggestionsEntry(part: unknown): string[] | null {
 	if (!isRecord(part) || !("toolCallId" in part) || !("output" in part)) {
@@ -39,22 +31,14 @@ function readSuggestionsEntry(part: unknown): string[] | null {
 }
 
 /**
- * Read the suggestion pills the flow engine attached to a tool result.
+ * The pills the flow engine attached to a tool result. Parts are matched on
+ * `toolCallId` + `output` like the renderer does, not on a `tool-*` type
+ * string, so AI SDK part renames don't break this.
  *
- * Every flow tool result carries the `waniwani/suggestions` key — an empty
- * array means "no pills for this step". Tool parts are identified the way
- * the renderer identifies them — by the presence of `toolCallId` and
- * `output` — rather than by a `tool-*` type string, so this survives AI SDK
- * part-type renames. Non-flow tool parts (e.g. a KB search) carry no key at
- * all and are skipped, leaving whatever the last flow part decided in place.
+ * One turn can hit the flow twice (a `continue` through an action node), so the
+ * last well-formed entry wins.
  *
- * A single turn can call the flow more than once (a `continue` that advances
- * through an action node into the next interrupt), so the last well-formed
- * flow entry wins — including an empty one — since it describes the step
- * the visitor is now on.
- *
- * @returns the suggestions, or `null` when the last flow entry was empty (or
- * no part carried the key at all).
+ * @returns `[]` for an authoritative clear, `null` when no part carried the key.
  */
 export function extractFlowSuggestions(message: UIMessage): string[] | null {
 	let found: string[] | null = null;
@@ -64,7 +48,7 @@ export function extractFlowSuggestions(message: UIMessage): string[] | null {
 		if (suggestions === null) {
 			continue;
 		}
-		found = suggestions.length > 0 ? suggestions : null;
+		found = suggestions;
 	}
 
 	return found;
@@ -75,7 +59,9 @@ export function extractFlowSuggestions(message: UIMessage): string[] | null {
  * `{ type: "data-suggestions", data: { suggestions: string[] } }`.
  * Only a bring-your-own-backend host emits this; the Waniwani chat API does not.
  */
-function extractFollowupSuggestions(message: UIMessage): string[] | null {
+export function extractFollowupSuggestions(
+	message: UIMessage,
+): string[] | null {
 	for (const part of message.parts) {
 		if (!isRecord(part)) {
 			continue;
@@ -92,33 +78,5 @@ function extractFollowupSuggestions(message: UIMessage): string[] | null {
 			return data.suggestions;
 		}
 	}
-	return null;
-}
-
-/**
- * Resolve the pills for a completed turn. Flow-driven suggestions win over the
- * streamed data part, which is reachable only from a self-hosted chat backend
- * and is therefore attributed as a generated follow-up.
- *
- * When `includeFlow` is `false`, the flow's `_meta` entries are ignored
- * entirely and only the streamed `data-suggestions` part is considered.
- *
- * @returns the pills and their origin, or `null` when the turn carried none.
- */
-export function resolveTurnSuggestions(
-	message: UIMessage,
-	options: { includeFlow?: boolean } = {},
-): TurnSuggestions | null {
-	const { includeFlow = true } = options;
-	const fromFlow = includeFlow ? extractFlowSuggestions(message) : null;
-	if (fromFlow) {
-		return { suggestions: fromFlow, source: "flow" };
-	}
-
-	const followup = extractFollowupSuggestions(message);
-	if (followup) {
-		return { suggestions: followup, source: "followup" };
-	}
-
 	return null;
 }

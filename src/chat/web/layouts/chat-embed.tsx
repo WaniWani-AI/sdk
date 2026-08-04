@@ -26,7 +26,7 @@ import { ThreadMenu } from "../components/thread-menu";
 import { useWidgetEvents } from "../embed/widget-events-context";
 import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
-import { useSuggestions } from "../hooks/use-suggestions";
+import { useSuggestionRow } from "../hooks/use-suggestion-row";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
@@ -300,14 +300,14 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			return () => observer.disconnect();
 		}, [scrollToBottom]);
 
-		const suggestionsState = useSuggestions({
+		const suggestionsState = useSuggestionRow({
 			messages: engine.messages,
 			status: engine.status,
-			config: props.suggestions,
+			suggestions: props.suggestions,
 		});
 
 		// Announce every pill set the visitor actually saw, once per set — keyed
-		// on the array identity `useSuggestions` returns (a new array per
+		// on the array identity `useSuggestionRow` returns (a new array per
 		// config load / streamed turn), so re-renders of the same set stay
 		// silent. The embed hosts subscribe and log one impression per set.
 		const announcedSuggestionsRef = useRef<string[] | null>(null);
@@ -351,7 +351,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 					dynamicIndex >= 0
 						? dynamicIndex
 						: (welcome?.suggestions?.indexOf(suggestion) ?? -1);
-				// Welcome-screen cards are always operator-authored starter prompts;
+				// Welcome-screen cards are always operator-authored channel prompts;
 				// only the live pill row can carry another origin.
 				const origin = dynamicIndex >= 0 ? suggestionsState.source : "channel";
 				widgetEvents.emit({

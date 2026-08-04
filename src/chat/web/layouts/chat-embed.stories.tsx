@@ -371,11 +371,10 @@ export const UnboundedParent: Story = {
  * tool result whose `_meta` carries the step's suggested answers, and the embed
  * renders them as pills above the composer. Clicking one sends it as the reply.
  *
- * Flow-driven pills are opt-in: this story passes
- * `suggestions={{ origins: ["flow"] }}` (the `WaniwaniChat` / script-embed
- * spellings are `overrides={{ suggestionOrigins: ["flow"] }}` /
- * `data-suggestion-origins="flow"`). Without the opt-in, the flow's
- * suggestions render nothing.
+ * The pill row obeys a fixed hierarchy, strongest first: flow > followup >
+ * page > channel. Flow pills render automatically whenever a turn carries a
+ * flow entry — no opt-in config on `suggestions` (or `WaniwaniChat` /
+ * script-embed equivalents) selects them.
  */
 export const FlowDrivenSuggestions: Story = {
 	render: (args) => {
@@ -388,7 +387,6 @@ export const FlowDrivenSuggestions: Story = {
 	},
 	args: {
 		welcomeMessage: "Hi! Ask me about plans to see the flow suggest answers.",
-		suggestions: { origins: ["flow"] },
 	},
 };
 

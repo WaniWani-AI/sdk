@@ -170,14 +170,10 @@ One field = single question. Multiple fields = multiple questions asked together
 
 Suggestions serve two audiences at once. The assistant receives them as candidate
 answers on every host, regardless of any configuration. In the Waniwani chat
-widget they can also render as clickable pills above the input — clicking one
-sends it as the visitor's answer — but only when the host chat surface's
-suggestion origins include `"flow"` (one of four origins: `"channel"`,
-`"page"`, `"flow"`, `"followup"`; `"flow"` stays opt-in by default):
-`overrides={{ suggestionOrigins: ["channel", "page", "flow", "followup"] }}`
-on `<WaniwaniChat>`, `data-suggestion-origins="channel,page,flow,followup"` on
-the `<script>` embed, or `suggestions={{ origins: ["flow"] }}` on
-`<ChatEmbed>`.
+widget they can also render as clickable pills above the input, and clicking one
+sends it as the visitor's answer: rendering is automatic, the pill row resolves a
+fixed priority hierarchy (flow > followup > page > channel), and flow-driven
+pills need no host configuration.
 
 Pills appear only when the step has **exactly one question still open**. That is
 evaluated at runtime, not from how you wrote the call: a four-question interrupt
