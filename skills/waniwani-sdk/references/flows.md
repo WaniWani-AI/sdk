@@ -198,8 +198,10 @@ the interrupt carries a hidden instruction telling the assistant to advance
 the flow with `continue` in the same turn instead of re-asking.
 
 A `start` for a session that is already parked mid-flow executes as a
-`continue`: state merges instead of resetting, and a parked widget re-emits
-its display instruction. After a flow completes, `start` begins a fresh run.
+`continue`, provided the parked record was written by the same flow: state
+merges instead of resetting, and a parked widget re-emits its display
+instruction. A different flow's `start` on the same session always begins
+fresh. After a flow completes, `start` begins a fresh run.
 
 ### Multiple Questions
 

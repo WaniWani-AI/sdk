@@ -28,7 +28,8 @@ No code changes required. The generated flow tool schema now demands
 extract), start-interrupts carry a self-heal instruction when the opening
 message already answers the parked question, and a `start` on a session
 parked mid-flow executes as a `continue` instead of restarting with fresh
-state. Flows that relied on `start` to wipe a live session mid-conversation
+state, provided the parked record belongs to the same flow (a different
+flow's `start` on a shared session begins fresh). Flows that relied on `start` to wipe a live session mid-conversation
 must use `reset` (corrections) or let the flow complete (fresh run).
 
 ### Chat widget customization tokens + escape hatch
