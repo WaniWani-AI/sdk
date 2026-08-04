@@ -568,6 +568,11 @@ export type FlowTokenContent = {
 	state: Record<string, unknown>;
 	field?: string;
 	widgetId?: string;
+	/**
+	 * Identifies the flow that wrote this record; a start redirect resumes
+	 * only records written by the same flow.
+	 */
+	flowId?: string;
 };
 
 export type InterruptQuestionData = {
@@ -643,6 +648,6 @@ export type ExecutionResult = {
 	flowTokenContent?: FlowTokenContent;
 	/** Nodes visited during this execution (excludes nodes with hideFromFunnel). */
 	nodesVisited?: NodeVisit[];
-	/** Set when a start on a live session was executed as a continue. */
+	/** True when a start redirected into a live session's current step instead of restarting. */
 	redirected?: boolean;
 };

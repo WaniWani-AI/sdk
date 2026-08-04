@@ -143,10 +143,15 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				} catch {
 					existing = null;
 				}
-				// A stored step unknown to this graph belongs to a different flow
-				// sharing the store and session id; such a start runs fresh instead
-				// of resuming another flow's state.
-				if (existing?.step && nodes.has(existing.step)) {
+				// A record written by a different flow sharing the store and session
+				// id never redirects, even when its step name happens to also exist
+				// in this flow's graph. Records that predate the flowId field fall
+				// back to the node-name check so they still redirect once.
+				if (
+					existing?.step &&
+					(existing.flowId === config.id ||
+						(existing.flowId === undefined && nodes.has(existing.step)))
+				) {
 					const mergedState = deepMerge(
 						existing.state as Record<string, unknown>,
 						expandDotPaths(args.stateUpdates ?? {}),
@@ -477,7 +482,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		// want the prior behavior (drop the session as soon as END is reached).
 		if (sessionId && result.flowTokenContent) {
 			try {
-				await store.set(sessionId, result.flowTokenContent);
+				await store.set(sessionId, {
+					...result.flowTokenContent,
+					flowId: config.id,
+				});
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
 				const errorContent = [

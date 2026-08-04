@@ -271,4 +271,83 @@ describe("idempotent start across flows sharing a session id", () => {
 		);
 		expect(resultB.isError).toBeUndefined();
 	});
+
+	test("a start with a session id parked by another flow's same-named step still runs fresh with no state bleed", async () => {
+		const store = new TestFlowStateStore();
+		const extra = { _meta: { sessionId: "shared-session-same-node-name" } };
+
+		// Both flows name their first (and only) node "confirm", so a guard
+		// keyed on node-name presence alone would treat flow A's record as
+		// belonging to flow B too.
+		const flowA = createFlow({
+			id: "idempotent_same_name_a",
+			title: "p",
+			description: "d",
+			state: { topic: z.string().optional(), note: z.string().optional() },
+		})
+			.addNode("confirm", ({ interrupt }) =>
+				interrupt({ topic: { question: "What's the topic?" } }),
+			)
+			.addEdge(START, "confirm")
+			.addEdge("confirm", END)
+			.compile({ store });
+
+		const mockA = mockServer();
+		await flowA.register(mockA.server);
+		const handlerA = mockA.registered[0]?.[2];
+		if (!handlerA) {
+			throw new Error(
+				'flow "idempotent_same_name_a" did not register a handler',
+			);
+		}
+
+		// Park flow A on "confirm" carrying a field ("note") flow B never
+		// declares, without answering "topic" (so the flow stays parked there).
+		await handlerA(
+			{
+				action: "start",
+				intent: "park flow A",
+				stateUpdates: { note: "A's private note" },
+			},
+			extra,
+		);
+
+		const flowB = createFlow({
+			id: "idempotent_same_name_b",
+			title: "p",
+			description: "d",
+			state: { nickname: z.string().optional() },
+		})
+			.addNode("confirm", ({ interrupt }) =>
+				interrupt({ nickname: { question: "What should we call you?" } }),
+			)
+			.addEdge(START, "confirm")
+			.addEdge("confirm", END)
+			.compile({ store });
+
+		const mockB = mockServer();
+		await flowB.register(mockB.server);
+		const handlerB = mockB.registered[0]?.[2];
+		if (!handlerB) {
+			throw new Error(
+				'flow "idempotent_same_name_b" did not register a handler',
+			);
+		}
+
+		const resultB = (await handlerB(
+			{ action: "start", intent: "start flow B" },
+			extra,
+		)) as Record<string, unknown>;
+		const parsedB = parsePayload(resultB);
+
+		expect(parsedB.status).toBe("interrupt");
+		expect(parsedB.field).toBe("nickname");
+		expect((parsedB.context as string | undefined) ?? "").not.toContain(
+			"already in progress",
+		);
+		expect(resultB.isError).toBeUndefined();
+
+		const decoded = await store.get("shared-session-same-node-name");
+		expect(decoded?.state).not.toHaveProperty("note");
+	});
 });
