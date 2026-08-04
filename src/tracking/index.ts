@@ -1,6 +1,7 @@
 // Tracking Module
 
 import type { InternalConfig } from "../types.js";
+import { createLogger } from "../utils/logger.js";
 import type {
 	TrackFn,
 	TrackInput,
@@ -9,7 +10,27 @@ import type {
 } from "./@types.js";
 import { mapTrackEventToV2 } from "./mapper.js";
 import { createRevenueApi } from "./revenue.js";
-import { createV2BatchTransport } from "./transport.js";
+import { createV2BatchTransport, type Logger } from "./transport.js";
+
+const log = createLogger("tracking");
+const transportLog = createLogger("transport");
+
+/**
+ * Describe the credential kind without leaking its value. `wwk_` = secret key,
+ * `wwp_` = public token, anything else present = an opaque token (e.g. widget JWT).
+ */
+function describeCredential(apiKey: string | undefined): string {
+	if (!apiKey) {
+		return "none";
+	}
+	if (apiKey.startsWith("wwk_")) {
+		return "secret-key";
+	}
+	if (apiKey.startsWith("wwp_")) {
+		return "public-token";
+	}
+	return "token";
+}
 
 // Re-export types
 export type {
@@ -59,6 +80,14 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 		return apiKey;
 	}
 
+	// Level-aware logger for the transport: debug diagnostics route through
+	// WANIWANI_LOG_LEVEL (createLogger, stderr), warn/error stay unconditional.
+	const transportLogger: Logger = {
+		debug: (message, ...args) => transportLog(message, ...args),
+		warn: (message, ...args) => console.warn(message, ...args),
+		error: (message, ...args) => console.error(message, ...args),
+	};
+
 	const transport = apiKey
 		? createV2BatchTransport({
 				apiUrl,
@@ -71,8 +100,17 @@ export function createTrackingClient(config: InternalConfig): TrackingClient {
 				retryBaseDelayMs: tracking.retryBaseDelayMs,
 				retryMaxDelayMs: tracking.retryMaxDelayMs,
 				shutdownTimeoutMs: tracking.shutdownTimeoutMs,
+				logger: transportLogger,
 			})
 		: undefined;
+
+	log(
+		`tracking client created: transport=${
+			transport ? "enabled" : "disabled (no API key)"
+		}, credential=${describeCredential(apiKey)}, endpoint=${apiUrl}${
+			tracking.endpointPath
+		}`,
+	);
 
 	// Single enqueue path shared by track(), track.* revenue helpers, and identify().
 	function emit(event: TrackInput): { eventId: string } {

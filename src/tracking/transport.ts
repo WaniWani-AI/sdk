@@ -29,10 +29,26 @@ const TEARDOWN_MAX_BODY_BYTES = 60_000;
 const AUTH_FAILURE_STATUS = new Set([401, 403]);
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 
-interface Logger {
+export interface Logger {
 	warn: (message: string, ...args: unknown[]) => void;
 	error: (message: string, ...args: unknown[]) => void;
+	/**
+	 * Verbose diagnostics (HTTP req/resp, retries, backoff, flush lifecycle).
+	 * Optional so existing `{ warn, error }` loggers stay compatible; when a
+	 * level-aware logger is wired in, it gates this on `WANIWANI_LOG_LEVEL`.
+	 */
+	debug?: (message: string, ...args: unknown[]) => void;
 }
+
+/**
+ * Default logger when none is supplied: warn/error go to the console (stderr),
+ * debug is a no-op. Debug diagnostics are opt-in and wired via `createLogger`
+ * where the transport is constructed, so they route through `WANIWANI_LOG_LEVEL`.
+ */
+const DEFAULT_LOGGER: Logger = {
+	warn: (message, ...args) => console.warn(message, ...args),
+	error: (message, ...args) => console.error(message, ...args),
+};
 
 export interface V2TransportOptions {
 	apiUrl: string;
@@ -123,7 +139,7 @@ class BatchingV2Transport implements V2BatchTransport {
 		this.shutdownTimeoutMs =
 			options.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
 		this.fetchFn = options.fetchFn ?? fetch;
-		this.logger = options.logger ?? console;
+		this.logger = options.logger ?? DEFAULT_LOGGER;
 		this.now = options.now ?? (() => new Date());
 		this.sleep =
 			options.sleep ??
@@ -213,6 +229,9 @@ class BatchingV2Transport implements V2BatchTransport {
 
 		if (result === timeoutSignal) {
 			this.isStopped = true;
+			this.logger.debug?.(
+				`shutdown flush timed out after ${timeoutMs}ms with ${this.pendingEvents()} event(s) still pending`,
+			);
 			return { timedOut: true, pendingEvents: this.pendingEvents() };
 		}
 
@@ -294,6 +313,9 @@ class BatchingV2Transport implements V2BatchTransport {
 	private async flushLoop(): Promise<void> {
 		while (this.buffer.length > 0 && !this.isStopped) {
 			const batch = this.buffer.splice(0, this.maxBatchSize);
+			this.logger.debug?.(
+				`flushing batch of ${batch.length} event(s), ${this.buffer.length} still buffered`,
+			);
 			await this.sendBatchWithRetry(batch);
 		}
 	}
@@ -309,6 +331,11 @@ class BatchingV2Transport implements V2BatchTransport {
 
 			switch (result.kind) {
 				case "success":
+					this.logger.debug?.(
+						`batch of ${pendingBatch.length} event(s) delivered${
+							attempt > 0 ? ` after ${attempt} retry(ies)` : ""
+						}`,
+					);
 					return;
 				case "auth":
 					this.stopTransportForAuthFailure(result.status, pendingBatch.length);
@@ -320,7 +347,7 @@ class BatchingV2Transport implements V2BatchTransport {
 						result.reason,
 					);
 					return;
-				case "retryable":
+				case "retryable": {
 					if (attempt >= this.maxRetries) {
 						this.logger.error(
 							"[Waniwani] Dropping %d event(s) after retry exhaustion: %s",
@@ -329,10 +356,17 @@ class BatchingV2Transport implements V2BatchTransport {
 						);
 						return;
 					}
-					await this.sleep(this.backoffDelayMs(attempt));
+					const delayMs = this.backoffDelayMs(attempt);
+					this.logger.debug?.(
+						`retryable failure (attempt ${attempt + 1}/${this.maxRetries}): ${
+							result.reason
+						}; backing off ${delayMs}ms before retrying ${pendingBatch.length} event(s)`,
+					);
+					await this.sleep(delayMs);
 					attempt += 1;
 					continue;
-				case "partial":
+				}
+				case "partial": {
 					if (result.permanent.length > 0) {
 						this.logger.error(
 							"[Waniwani] Dropping %d event(s) rejected as permanent",
@@ -350,9 +384,16 @@ class BatchingV2Transport implements V2BatchTransport {
 						return;
 					}
 					pendingBatch = result.retryable;
-					await this.sleep(this.backoffDelayMs(attempt));
+					const partialDelayMs = this.backoffDelayMs(attempt);
+					this.logger.debug?.(
+						`partial rejection (attempt ${attempt + 1}/${
+							this.maxRetries
+						}): retrying ${pendingBatch.length} event(s) after ${partialDelayMs}ms backoff`,
+					);
+					await this.sleep(partialDelayMs);
 					attempt += 1;
 					continue;
+				}
 			}
 		}
 	}
@@ -362,6 +403,8 @@ class BatchingV2Transport implements V2BatchTransport {
 	): Promise<SendBatchResult> {
 		let response: Response;
 
+		const startedAt = Date.now();
+		this.logger.debug?.(`POST ${this.endpointUrl} (${events.length} event(s))`);
 		try {
 			response = await this.fetchFn(this.endpointUrl, {
 				method: "POST",
@@ -369,11 +412,22 @@ class BatchingV2Transport implements V2BatchTransport {
 				body: JSON.stringify(this.makeBatchRequest(events)),
 			});
 		} catch (error) {
+			this.logger.debug?.(
+				`POST ${this.endpointUrl} failed after ${
+					Date.now() - startedAt
+				}ms (retryable): ${getErrorMessage(error)}`,
+			);
 			return {
 				kind: "retryable",
 				reason: getErrorMessage(error),
 			};
 		}
+
+		this.logger.debug?.(
+			`POST ${this.endpointUrl} -> ${response.status} in ${
+				Date.now() - startedAt
+			}ms`,
+		);
 
 		if (AUTH_FAILURE_STATUS.has(response.status)) {
 			return { kind: "auth", status: response.status };
