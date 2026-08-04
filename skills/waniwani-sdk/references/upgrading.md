@@ -61,8 +61,6 @@ No `@deprecated` shim: `origin` stays required rather than optional, since a gua
 
 Related deprecation (not a break): `SuggestionsConfig.dynamic` on the `<ChatEmbed>` primitive is deprecated in favor of `origins` (`SuggestionOrigin[]`). `dynamic: true` maps to every origin, `false` to none; `origins` wins when both are set. Migrate opportunistically: `dynamic: true` → `origins: ["channel", "page", "flow", "followup"]`, `dynamic: false` → `origins: []`.
 
-Do not adopt `origins` if you are upgrading past 0.19: the next minor replaces the configurable origin list with a fixed, non-configurable hierarchy (flow > followup > page > channel), leaving `origins` and `dynamic` accepted-and-ignored and removing `suggestionOrigins` / `data-suggestion-origins` outright. `suggestions={false}` remains the way to hide the pill row.
-
 After applying, run `bun run typecheck && bun test`. `tsc` finds every construction site: any literal missing `properties.origin` fails to typecheck against `WidgetEventDetail`.
 
 ### 0.18.0: quote and purchase events removed from the taxonomy

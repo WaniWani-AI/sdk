@@ -35,7 +35,6 @@ import {
 	createNoopChatTrackClient,
 } from "../lib/chat-track";
 import { firePageView } from "../lib/page-view";
-import type { SuggestionOrigin } from "../lib/resolve-suggestions";
 import { ChatEmbed } from "./chat-embed";
 
 /**
@@ -69,13 +68,6 @@ export interface WaniwaniChatOverrides {
 	placeholder?: string;
 	/** Initial suggestion chips. */
 	suggestions?: string[];
-	/**
-	 * @deprecated Accepted and ignored. The pill row resolves a fixed
-	 * hierarchy internally — flow > followup > page > channel — so there is
-	 * nothing to select, and flow-driven pills need no opt-in. Drop the field.
-	 * Removed in a future minor release.
-	 */
-	suggestionOrigins?: SuggestionOrigin[];
 	/** Persist conversations across reloads in IndexedDB. */
 	enableThreadHistory?: boolean;
 	/**
