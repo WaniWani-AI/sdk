@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import type { StarterSuggestions } from "../../lib/resolve-suggestions";
+import type { ConfiguredSuggestions } from "../../lib/resolve-suggestions";
+// Safe to import eagerly: pure, no DOM.
+import { toSuggestions } from "../../lib/resolve-suggestions";
 // Type-only, so it doesn't pull the module in before the globals below exist.
 import type { EmbedConfig, PagePrompt } from "../config";
 
@@ -37,8 +39,8 @@ const {
 	normalizePathname,
 	parsePageSuggestions,
 	pickPagePrompts,
-	useStarterSuggestions,
-} = await import("../use-starter-suggestions");
+	useConfiguredSuggestions,
+} = await import("../use-configured-suggestions");
 
 const PRICING_PROMPTS: PagePrompt[] = [
 	{ id: "pricing-1", text: "What plans do you offer?", tier: "low" },
@@ -60,12 +62,12 @@ const BASE_CONFIG: EmbedConfig = {
 	],
 };
 
-/** Mount a probe that surfaces the hook's resolved starter candidates. */
+/** Mount a probe that surfaces the hook's resolved rungs. */
 async function mount(config: EmbedConfig) {
 	const container = win.document.createElement("div");
-	let latest: StarterSuggestions = { page: null, channel: [] };
+	let latest: ConfiguredSuggestions = { page: null, channel: [] };
 	function Probe() {
-		latest = useStarterSuggestions(config);
+		latest = useConfiguredSuggestions(config);
 		return null;
 	}
 	// biome-ignore lint/suspicious/noExplicitAny: happy-dom Element vs DOM Element
@@ -74,7 +76,7 @@ async function mount(config: EmbedConfig) {
 		root.render(createElement(Probe));
 	});
 	return {
-		/** The resolved starter candidates: `page` (ids included) and `channel`. */
+		/** The resolved rungs: `page` (ids included) and `channel`. */
 		get value() {
 			return latest;
 		},
@@ -96,14 +98,14 @@ async function mount(config: EmbedConfig) {
 }
 
 /**
- * Mount a probe and return the resolved starter candidates directly. Carries
+ * Mount a probe and return the resolved rungs directly. Carries
  * only the required connection fields from `BASE_CONFIG` — `suggestions` and
  * `pageSuggestions` come solely from `overrides`, so an omitted one is
  * genuinely absent rather than inherited.
  */
-async function renderStarterSuggestions(
+async function renderConfigured(
 	overrides: Pick<EmbedConfig, "suggestions" | "pageSuggestions">,
-): Promise<StarterSuggestions> {
+): Promise<ConfiguredSuggestions> {
 	const h = await mount({
 		api: BASE_CONFIG.api,
 		token: BASE_CONFIG.token,
@@ -226,37 +228,40 @@ describe("parsePageSuggestions", () => {
 	});
 });
 
-describe("useStarterSuggestions", () => {
+describe("useConfiguredSuggestions", () => {
 	test("is inert without pageSuggestions — page is null, channel is the fixed list", async () => {
 		const h = await mount({ ...BASE_CONFIG, pageSuggestions: undefined });
-		expect(h.value).toEqual({ page: null, channel: ["Static A", "Static B"] });
+		expect(h.value).toEqual({
+			page: null,
+			channel: toSuggestions(["Static A", "Static B"]),
+		});
 		h.unmount();
 	});
 
 	test("returns picked page prompts and the fixed channel list separately", async () => {
-		const result = await renderStarterSuggestions({
+		const result = await renderConfigured({
 			suggestions: ["Fixed one"],
 			pageSuggestions: [
 				{ url: "/pricing", prompts: [{ id: "p1", text: "Page one" }] },
 			],
 		});
 		expect(result.page).toEqual([{ id: "p1", text: "Page one" }]);
-		expect(result.channel).toEqual(["Fixed one"]);
+		expect(result.channel).toEqual(toSuggestions(["Fixed one"]));
 	});
 
 	test("page is null when no entry matches the pathname", async () => {
-		const result = await renderStarterSuggestions({
+		const result = await renderConfigured({
 			suggestions: ["Fixed one"],
 			pageSuggestions: [
 				{ url: "/other", prompts: [{ id: "p1", text: "Page one" }] },
 			],
 		});
 		expect(result.page).toBeNull();
-		expect(result.channel).toEqual(["Fixed one"]);
+		expect(result.channel).toEqual(toSuggestions(["Fixed one"]));
 	});
 
 	test("channel is empty when the config has no fixed suggestions", async () => {
-		const result = await renderStarterSuggestions({});
+		const result = await renderConfigured({});
 		expect(result.page).toBeNull();
 		expect(result.channel).toEqual([]);
 	});
@@ -304,7 +309,7 @@ describe("useStarterSuggestions", () => {
 		const first = h.value;
 		await h.navigate("/pricing#anchor");
 		// Same normalized pathname → same memoized pick, no reshuffle. `useMemo`'s
-		// identity is the actual contract here — `useSuggestions`'s starter effect
+		// identity is the actual contract here — `useSuggestions`'s pre-chat effect
 		// and `FloatingChat`'s `dockRow` memo both key on this object's identity.
 		expect(h.value).toBe(first);
 		h.unmount();

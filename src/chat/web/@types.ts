@@ -5,7 +5,7 @@
 import type { ChatAppearance, ShowToolCalls } from "./embed/config";
 import type { MessageOverrides } from "./i18n";
 import type {
-	StarterSuggestions,
+	ConfiguredSuggestions,
 	SuggestionOrigin,
 } from "./lib/resolve-suggestions";
 import type { VisitorIdInput } from "./lib/visitor-context";
@@ -378,11 +378,12 @@ export interface ChatEmbedProps
 	initializing?: boolean;
 	/**
 	 * @internal
-	 * Page-aware starter candidates resolved by an embed host (`InlineChat`,
-	 * `FloatingChat`, `WaniwaniChat`). Wins over `suggestions.initial`. Must be
-	 * referentially stable (memoized) — the pill row keys an effect on it.
+	 * The page-aware `page` and `channel` rungs resolved by an embed host
+	 * (`InlineChat`, `FloatingChat`, `WaniwaniChat`) from its `/config`
+	 * payload. Wins over `suggestions.initial`. Must be referentially stable
+	 * (memoized) — the pill row keys an effect on it.
 	 */
-	starterSuggestions?: StarterSuggestions;
+	configuredSuggestions?: ConfiguredSuggestions;
 }
 
 // `ChatCardProps` moved to `src/legacy/chat/web/chat-card.tsx` alongside the

@@ -26,7 +26,7 @@ import { ThreadMenu } from "../components/thread-menu";
 import { useWidgetEvents } from "../embed/widget-events-context";
 import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
-import { useConfigStarters, useSuggestions } from "../hooks/use-suggestions";
+import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
@@ -300,12 +300,11 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			return () => observer.disconnect();
 		}, [scrollToBottom]);
 
-		const configStarters = useConfigStarters(props.suggestions);
 		const suggestionsState = useSuggestions({
 			messages: engine.messages,
 			status: engine.status,
-			enabled: props.suggestions !== false,
-			starters: props.starterSuggestions ?? configStarters,
+			suggestions: props.suggestions,
+			configured: props.configuredSuggestions,
 		});
 
 		// Announce every pill set the visitor actually saw, once per set — keyed
@@ -353,7 +352,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 					dynamicIndex >= 0
 						? dynamicIndex
 						: (welcome?.suggestions?.indexOf(suggestion) ?? -1);
-				// Welcome-screen cards are always operator-authored starter prompts;
+				// Welcome-screen cards are always operator-authored channel prompts;
 				// only the live pill row can carry another origin.
 				const origin = dynamicIndex >= 0 ? suggestionsState.source : "channel";
 				widgetEvents.emit({

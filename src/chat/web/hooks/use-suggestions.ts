@@ -4,13 +4,10 @@ import type { ChatStatus, UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SuggestionsConfig } from "../@types";
 import type {
-	StarterSuggestions,
+	ConfiguredSuggestions,
 	SuggestionOrigin,
 } from "../lib/resolve-suggestions";
-import {
-	resolveStarters,
-	resolveSuggestions,
-} from "../lib/resolve-suggestions";
+import { resolveSuggestions, toSuggestions } from "../lib/resolve-suggestions";
 import {
 	extractFlowSuggestions,
 	extractFollowupSuggestions,
@@ -19,64 +16,45 @@ import {
 export interface UseSuggestionsOptions {
 	messages: UIMessage[];
 	status: ChatStatus;
-	/** `false` renders no pill row at all. Defaults to `true`. */
-	enabled?: boolean;
+	/** `false` renders no pill row; an object's `initial` seeds `channel`. */
+	suggestions?: boolean | SuggestionsConfig;
 	/**
-	 * Starter candidates shown until the first message. Must be referentially
-	 * stable across renders (memoize in the caller) — an effect keys on it.
+	 * Page-aware rungs from an embed host's `/config`. Wins over
+	 * `suggestions.initial`. Must be referentially stable — an effect keys on it.
 	 */
-	starters?: StarterSuggestions;
+	configured?: ConfiguredSuggestions;
 }
 
-const EMPTY_STARTERS: StarterSuggestions = { page: null, channel: [] };
+/** Pill row state, driven entirely by `resolveSuggestions`. */
+export function useSuggestions(options: UseSuggestionsOptions) {
+	const { messages, status, suggestions: config, configured } = options;
+	const enabled = config !== false;
 
-/**
- * Starter candidates from a host's own `suggestions` prop, for surfaces with
- * no page-aware set to pass — the bare `ChatEmbed` primitive and `ChatCard`.
- * Memoized because {@link useSuggestions} keys an effect on the object's
- * identity. Embed hosts pass `useStarterSuggestions(config)` instead.
- */
-export function useConfigStarters(
-	config: boolean | SuggestionsConfig | undefined,
-): StarterSuggestions {
 	const initial =
 		typeof config === "object" && config !== null ? config.initial : undefined;
-	return useMemo(() => ({ page: null, channel: initial ?? [] }), [initial]);
-}
-
-/**
- * The pill row's state. Which pills render is decided exclusively by
- * `resolveSuggestions` — the fixed flow > followup > page > channel
- * hierarchy — fed with the starters while the conversation is empty and
- * with the last assistant turn's flow/followup candidates after each
- * completed exchange.
- */
-export function useSuggestions(options: UseSuggestionsOptions) {
-	const {
-		messages,
-		status,
-		enabled = true,
-		starters = EMPTY_STARTERS,
-	} = options;
-
-	// Memoized so the initializer below and the starter effect resolve to the
-	// same array reference. Without this, `useState`'s initializer and the
-	// effect's first run (mount always runs effects once) each build their own
-	// `.map()` result: content-equal but reference-different, so
-	// `setSuggestions` never bails out and the row fires an extra render —
-	// double-counting the `suggestions.shown` impression it drives in
-	// `chat-embed.tsx`.
-	const starterRow = useMemo(
-		() => (enabled ? resolveStarters(starters) : null),
-		[enabled, starters],
+	const fromProp = useMemo<ConfiguredSuggestions>(
+		() => ({ page: null, channel: toSuggestions(initial ?? []) }),
+		[initial],
 	);
-	const starterTexts = useMemo(
-		() => starterRow?.suggestions.map((s) => s.text) ?? [],
-		[starterRow],
+	const preChat = configured ?? fromProp;
+
+	// Memoized so the `useState` initializer and the effect below share one array
+	// reference. Two content-equal arrays would defeat `setSuggestions`' bail-out
+	// and double-count the `suggestions.shown` impression in `chat-embed.tsx`.
+	const preChatRow = useMemo(
+		() =>
+			enabled
+				? resolveSuggestions({ flow: null, followup: null, ...preChat })
+				: null,
+		[enabled, preChat],
 	);
-	const [suggestions, setSuggestions] = useState<string[]>(starterTexts);
+	const preChatTexts = useMemo(
+		() => preChatRow?.suggestions.map((s) => s.text) ?? [],
+		[preChatRow],
+	);
+	const [suggestions, setSuggestions] = useState<string[]>(preChatTexts);
 	const [source, setSource] = useState<SuggestionOrigin>(
-		starterRow?.origin ?? "channel",
+		preChatRow?.origin ?? "channel",
 	);
 	const prevStatusRef = useRef<ChatStatus>(status);
 
@@ -84,19 +62,17 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		setSuggestions([]);
 	}, []);
 
-	// Starter row while the conversation is empty. Also runs when a `reset()`
-	// or `startNewThread()` clears `messages` without unmounting this hook —
-	// a flow's pills from the previous conversation must not survive into the
-	// new one (they'd stay clickable and misattribute a click as origin
-	// `"flow"` for a flow that was never invoked in this conversation).
+	// Also covers `reset()` / `startNewThread()`, which empty `messages` without
+	// unmounting: a previous conversation's flow pills would otherwise stay
+	// clickable and misattribute the click to a flow never invoked here.
 	const hasMessages = messages.length > 0;
 	useEffect(() => {
 		if (hasMessages) {
 			return;
 		}
-		setSuggestions(starterTexts);
-		setSource(starterRow?.origin ?? "channel");
-	}, [starterTexts, starterRow, hasMessages]);
+		setSuggestions(preChatTexts);
+		setSource(preChatRow?.origin ?? "channel");
+	}, [preChatTexts, preChatRow, hasMessages]);
 
 	// Clear when a new user message arrives
 	const lastMessage = messages[messages.length - 1];
@@ -106,9 +82,8 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		}
 	}, [lastMessage, clear]);
 
-	// Recompute on every streaming -> ready transition. The pills always
-	// describe the reply the visitor just received, so a turn that carries no
-	// suggestions clears the row rather than leaving stale options on screen.
+	// Recompute on every streaming -> ready transition: the pills describe the
+	// reply just received, so a turn carrying none clears the row.
 	useEffect(() => {
 		const prevStatus = prevStatusRef.current;
 		prevStatusRef.current = status;
@@ -123,10 +98,13 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 			return;
 		}
 
+		const flow = extractFlowSuggestions(lastAssistant);
+		const followup = extractFollowupSuggestions(lastAssistant);
 		const resolved = resolveSuggestions({
-			flow: extractFlowSuggestions(lastAssistant),
-			followup: extractFollowupSuggestions(lastAssistant),
-			starters: null,
+			flow: flow === null ? null : toSuggestions(flow),
+			followup: followup === null ? null : toSuggestions(followup),
+			page: null,
+			channel: null,
 		});
 		setSuggestions(resolved ? resolved.suggestions.map((s) => s.text) : []);
 		setSource(resolved?.origin ?? "channel");

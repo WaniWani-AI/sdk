@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { debugLog } from "../lib/debug";
-import type { StarterSuggestions } from "../lib/resolve-suggestions";
+import type { ConfiguredSuggestions } from "../lib/resolve-suggestions";
+import { toSuggestions } from "../lib/resolve-suggestions";
 import type {
 	EmbedConfig,
 	PagePrompt,
@@ -110,13 +111,15 @@ export function parsePageSuggestions(value: unknown): PageSuggestionsEntry[] {
 }
 
 /**
- * Starter candidates for the current page: the matched entry's picked
- * prompts (page) and the channel's fixed list (channel), kept separate so
- * the pill row can attribute its origin exactly. Memoized because the pick
- * is random and the identity has to hold: `useSuggestions` keys an effect
- * on this object.
+ * The dashboard-configured rungs for the current page: the matched entry's
+ * picked prompts (`page`) and the channel's fixed list (`channel`), kept
+ * separate so the pill row can attribute its origin exactly. Memoized because
+ * the pick is random and the identity has to hold: `useSuggestions` keys an
+ * effect on this object.
  */
-export function useStarterSuggestions(config: EmbedConfig): StarterSuggestions {
+export function useConfiguredSuggestions(
+	config: EmbedConfig,
+): ConfiguredSuggestions {
 	const { pageSuggestions, suggestions } = config;
 	const pathname = usePathname();
 
@@ -125,14 +128,14 @@ export function useStarterSuggestions(config: EmbedConfig): StarterSuggestions {
 		const entry = pageSuggestions?.find(
 			(candidate) => normalizePathname(candidate.url) === current,
 		);
-		const picked = entry
+		const page = entry
 			? pickPagePrompts(entry.prompts).map(({ id, text }) => ({ id, text }))
 			: null;
-		debugLog("starter candidates resolve", {
+		debugLog("configured suggestions resolve", {
 			pathname: current,
 			matched: Boolean(entry),
-			count: picked?.length ?? 0,
+			count: page?.length ?? 0,
 		});
-		return { page: picked, channel: suggestions ?? [] };
+		return { page, channel: toSuggestions(suggestions ?? []) };
 	}, [pathname, pageSuggestions, suggestions]);
 }

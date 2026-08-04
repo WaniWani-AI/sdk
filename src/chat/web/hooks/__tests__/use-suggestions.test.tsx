@@ -72,8 +72,8 @@ function render(options: UseSuggestionsOptions) {
 
 /**
  * Like {@link Harness}, but records the `suggestions` array returned on
- * every render — proves the starter row settles in a single commit, i.e.
- * the `useState` initializer and the starter effect share one array
+ * every render — proves the pre-chat row settles in a single commit, i.e.
+ * the `useState` initializer and the pre-chat effect share one array
  * reference instead of each building their own `.map()` result.
  */
 function RenderTrackingHarness({
@@ -155,47 +155,47 @@ type Msg = any;
 // ---------------------------------------------------------------------------
 
 const PAGE = [{ id: "p1", text: "Page one" }];
-const STARTERS = { page: PAGE, channel: ["Fixed one"] };
-const CHANNEL_ONLY = { page: null, channel: ["Fixed one"] };
+const CONFIGURED = { page: PAGE, channel: [{ id: null, text: "Fixed one" }] };
+const CHANNEL_ONLY = { page: null, channel: [{ id: null, text: "Fixed one" }] };
 
-describe("starter row", () => {
-	test("page starters render with origin page while the conversation is empty", () => {
-		render({ messages: [], status: "ready", starters: STARTERS });
+describe("pre-chat row", () => {
+	test("page prompts render with origin page while the conversation is empty", () => {
+		render({ messages: [], status: "ready", configured: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual(["Page one"]);
 		expect(hookRef.current?.source).toBe("page");
 	});
 
-	test("channel starters render when no page matches", () => {
-		render({ messages: [], status: "ready", starters: CHANNEL_ONLY });
+	test("channel prompts render when no page matches", () => {
+		render({ messages: [], status: "ready", configured: CHANNEL_ONLY });
 		expect(hookRef.current?.suggestions).toEqual(["Fixed one"]);
 		expect(hookRef.current?.source).toBe("channel");
 	});
 
-	test("no starters and no messages renders nothing", () => {
+	test("no candidates and no messages renders nothing", () => {
 		render({ messages: [], status: "ready" });
 		expect(hookRef.current?.suggestions).toEqual([]);
 	});
 
-	test("enabled: false renders nothing even with starters", () => {
+	test("suggestions: false renders nothing even with candidates", () => {
 		render({
 			messages: [],
 			status: "ready",
-			enabled: false,
-			starters: STARTERS,
+			suggestions: false,
+			configured: CONFIGURED,
 		});
 		expect(hookRef.current?.suggestions).toEqual([]);
 	});
 });
 
-describe("starter row identity", () => {
-	test("settles in a single render — no phantom re-render from the starter effect", () => {
+describe("pre-chat row identity", () => {
+	test("settles in a single render — no phantom re-render from the pre-chat effect", () => {
 		const renderedSuggestionsRef: { current: string[][] } = { current: [] };
 		act(() => {
 			root.render(
 				createElement(RenderTrackingHarness, {
 					resultRef: hookRef,
 					renderedSuggestionsRef,
-					options: { messages: [], status: "ready", starters: STARTERS },
+					options: { messages: [], status: "ready", configured: CONFIGURED },
 				}),
 			);
 		});
@@ -205,11 +205,11 @@ describe("starter row identity", () => {
 		);
 	});
 
-	test("keeps the same suggestions array reference across a re-render with unchanged starters", () => {
+	test("keeps the same suggestions array reference when the candidates are unchanged", () => {
 		const options: UseSuggestionsOptions = {
 			messages: [],
 			status: "ready",
-			starters: STARTERS,
+			configured: CONFIGURED,
 		};
 		render(options);
 		const first = hookRef.current?.suggestions;
@@ -220,9 +220,9 @@ describe("starter row identity", () => {
 
 describe("per-turn resolution", () => {
 	test("a user message clears the row", () => {
-		render({ messages: [], status: "ready", starters: STARTERS });
+		render({ messages: [], status: "ready", configured: CONFIGURED });
 		const messages: Msg[] = [userMessage("Hi")];
-		render({ messages, status: "submitted", starters: STARTERS });
+		render({ messages, status: "submitted", configured: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual([]);
 	});
 
@@ -231,8 +231,8 @@ describe("per-turn resolution", () => {
 			userMessage("Hi"),
 			assistantMessageWithFlowSuggestions(["Flow A", "Flow B"]),
 		];
-		render({ messages, status: "streaming", starters: STARTERS });
-		render({ messages, status: "ready", starters: STARTERS });
+		render({ messages, status: "streaming", configured: CONFIGURED });
+		render({ messages, status: "ready", configured: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual(["Flow A", "Flow B"]);
 		expect(hookRef.current?.source).toBe("flow");
 	});
@@ -242,8 +242,8 @@ describe("per-turn resolution", () => {
 			userMessage("Hi"),
 			assistantMessageWithFollowupSuggestions(["F1"]),
 		];
-		render({ messages, status: "streaming", starters: STARTERS });
-		render({ messages, status: "ready", starters: STARTERS });
+		render({ messages, status: "streaming", configured: CONFIGURED });
+		render({ messages, status: "ready", configured: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual(["F1"]);
 		expect(hookRef.current?.source).toBe("followup");
 	});
@@ -257,8 +257,8 @@ describe("per-turn resolution", () => {
 			userMessage("Hi"),
 			{ id: "a1", role: "assistant", parts },
 		];
-		render({ messages, status: "streaming", starters: STARTERS });
-		render({ messages, status: "ready", starters: STARTERS });
+		render({ messages, status: "streaming", configured: CONFIGURED });
+		render({ messages, status: "ready", configured: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual([]);
 	});
 
@@ -267,12 +267,12 @@ describe("per-turn resolution", () => {
 			userMessage("Hi"),
 			{ id: "a1", role: "assistant", parts: [{ type: "text", text: "Hello" }] },
 		];
-		render({ messages, status: "streaming", starters: STARTERS });
-		render({ messages, status: "ready", starters: STARTERS });
+		render({ messages, status: "streaming", configured: CONFIGURED });
+		render({ messages, status: "ready", configured: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual([]);
 	});
 
-	test("enabled: false suppresses flow pills too", () => {
+	test("suggestions: false suppresses flow pills too", () => {
 		const messages: Msg[] = [
 			userMessage("Hi"),
 			assistantMessageWithFlowSuggestions(["Flow A"]),
@@ -280,24 +280,29 @@ describe("per-turn resolution", () => {
 		render({
 			messages,
 			status: "streaming",
-			enabled: false,
-			starters: STARTERS,
+			suggestions: false,
+			configured: CONFIGURED,
 		});
-		render({ messages, status: "ready", enabled: false, starters: STARTERS });
+		render({
+			messages,
+			status: "ready",
+			suggestions: false,
+			configured: CONFIGURED,
+		});
 		expect(hookRef.current?.suggestions).toEqual([]);
 	});
 });
 
 describe("reset", () => {
-	test("emptying messages restores the starter row and drops leftover flow pills", () => {
+	test("emptying messages restores the pre-chat row and drops leftover flow pills", () => {
 		const messages: Msg[] = [
 			userMessage("Hi"),
 			assistantMessageWithFlowSuggestions(["Flow A"]),
 		];
-		render({ messages, status: "streaming", starters: STARTERS });
-		render({ messages, status: "ready", starters: STARTERS });
+		render({ messages, status: "streaming", configured: CONFIGURED });
+		render({ messages, status: "ready", configured: CONFIGURED });
 		expect(hookRef.current?.source).toBe("flow");
-		render({ messages: [], status: "ready", starters: STARTERS });
+		render({ messages: [], status: "ready", configured: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual(["Page one"]);
 		expect(hookRef.current?.source).toBe("page");
 	});

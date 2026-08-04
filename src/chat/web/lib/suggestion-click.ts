@@ -1,27 +1,12 @@
 // ============================================================================
-// Suggestion events — `suggestion.clicked` for every starter-prompt click and
-// `suggestion.shown` for every pill set the visitor actually saw.
+// `suggestion.clicked` per pill click, `suggestion.shown` per rendered set (one
+// event carrying all its pills). Together they give per-prompt CTR:
+// clicks(id) ÷ shown sets containing that id.
 //
-// Together they make authored per-page prompts measurable per prompt id: a
-// click attributes back to the prompt that earned it (`properties.promptId`),
-// a shown set records which prompts had the chance to earn one
-// (`properties.prompts`), and per-prompt CTR is clicks(id) ÷ shown sets
-// containing that id. A shown set is one event carrying all its pills, not an
-// event per pill.
-//
-// Same canonical ingest, envelope, and auth as `page.viewed`
-// (`POST /api/mcp/events/v2/batch` with the public `wwp_` token) — see
-// `page-view.ts` for why no widget JWT is involved. Two differences: there is
-// no once-per-page guard (the render/click sites own their own dedupe — a
-// click submits the message and clears the pills, a shown set is keyed on the
-// resolved list's identity), and identity is the synchronous
-// `getOrCreateVisitorId()` — the device/referrer context rides on
-// `page.viewed` already, so there is nothing to await here.
-//
-// Both events carry `properties.origin`, the same `SuggestionOrigin` taxonomy
-// the `suggestion.clicked` widget event exposes to host pages. The pill row
-// resolves that origin exactly at render time (flow > followup > page >
-// channel), so it rides straight through from the widget event.
+// Same ingest, envelope and auth as `page.viewed` — see `page-view.ts`. No
+// once-per-page guard here: the render and click sites own their own dedupe.
+// `properties.origin` comes from the pill row, which resolves it exactly at
+// render time.
 // ============================================================================
 
 import { eventsEndpoint } from "./page-view";
@@ -58,7 +43,7 @@ export interface FireSuggestionClickOptions {
 }
 
 /**
- * Attribute a prompt text back to the starter list that rendered it: an
+ * Attribute a pill text back to the list that rendered it: an
  * authored per-page prompt keeps its stored id, a fixed-list prompt has
  * none. Two identical texts attribute to the first match — duplicate texts
  * within a page are pathological authoring, not worth plumbing the rendered
@@ -134,7 +119,7 @@ async function postSuggestionEvent(
 }
 
 /**
- * Emit a `suggestion.clicked` event for one starter-prompt click.
+ * Emit a `suggestion.clicked` event for one pill click.
  */
 export async function fireSuggestionClick(
 	opts: FireSuggestionClickOptions,

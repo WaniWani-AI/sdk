@@ -1,16 +1,25 @@
 import { describe, expect, test } from "bun:test";
-import { resolveStarters, resolveSuggestions } from "../resolve-suggestions";
+import type { SuggestionCandidates } from "../resolve-suggestions";
+import { resolveSuggestions, toSuggestions } from "../resolve-suggestions";
 
 const page = [{ id: "p1", text: "Page one" }];
-const channel = ["Fixed one", "Fixed two"];
+const channel = toSuggestions(["Fixed one", "Fixed two"]);
 
-describe("resolveSuggestions — fixed hierarchy flow > followup > page > channel", () => {
+/** Nothing anywhere; each test fills in the rungs it cares about. */
+const NONE: SuggestionCandidates = {
+	flow: null,
+	followup: null,
+	page: null,
+	channel: null,
+};
+
+describe("resolveSuggestions — flow > followup > page > channel", () => {
 	test("flow wins over followup", () => {
 		expect(
 			resolveSuggestions({
-				flow: ["From flow"],
-				followup: ["From followup"],
-				starters: null,
+				...NONE,
+				flow: toSuggestions(["From flow"]),
+				followup: toSuggestions(["From followup"]),
 			}),
 		).toEqual({
 			origin: "flow",
@@ -18,22 +27,33 @@ describe("resolveSuggestions — fixed hierarchy flow > followup > page > channe
 		});
 	});
 
-	test("an empty flow entry is an authoritative clear — followup is suppressed", () => {
+	test("flow wins over the configured rungs", () => {
+		expect(
+			resolveSuggestions({
+				...NONE,
+				flow: toSuggestions(["From flow"]),
+				page,
+				channel,
+			})?.origin,
+		).toBe("flow");
+	});
+
+	test("an empty flow entry clears the row and suppresses every weaker rung", () => {
 		expect(
 			resolveSuggestions({
 				flow: [],
-				followup: ["From followup"],
-				starters: null,
+				followup: toSuggestions(["From followup"]),
+				page,
+				channel,
 			}),
 		).toEqual({ origin: "flow", suggestions: [] });
 	});
 
-	test("no flow entry lets followup fill the row", () => {
+	test("followup fills the row when there is no flow entry", () => {
 		expect(
 			resolveSuggestions({
-				flow: null,
-				followup: ["From followup"],
-				starters: null,
+				...NONE,
+				followup: toSuggestions(["From followup"]),
 			}),
 		).toEqual({
 			origin: "followup",
@@ -41,88 +61,50 @@ describe("resolveSuggestions — fixed hierarchy flow > followup > page > channe
 		});
 	});
 
-	test("a turn with neither flow nor followup resolves to null", () => {
-		expect(
-			resolveSuggestions({ flow: null, followup: null, starters: null }),
-		).toBeNull();
-	});
-
-	test("an empty followup with no flow entry resolves to null", () => {
-		expect(
-			resolveSuggestions({ flow: null, followup: [], starters: null }),
-		).toBeNull();
-	});
-
-	test("pre-conversation: page starters win over channel", () => {
-		expect(
-			resolveSuggestions({
-				flow: null,
-				followup: null,
-				starters: { page, channel },
-			}),
-		).toEqual({ origin: "page", suggestions: page });
-	});
-
-	test("pre-conversation: channel fills when no page matches", () => {
-		expect(
-			resolveSuggestions({
-				flow: null,
-				followup: null,
-				starters: { page: null, channel },
-			}),
-		).toEqual({
-			origin: "channel",
-			suggestions: [
-				{ id: null, text: "Fixed one" },
-				{ id: null, text: "Fixed two" },
-			],
-		});
-	});
-
-	test("pre-conversation: an empty page match falls back to channel", () => {
-		expect(
-			resolveSuggestions({
-				flow: null,
-				followup: null,
-				starters: { page: [], channel },
-			})?.origin,
-		).toBe("channel");
-	});
-
-	test("nothing anywhere resolves to null", () => {
-		expect(
-			resolveSuggestions({
-				flow: null,
-				followup: null,
-				starters: { page: null, channel: [] },
-			}),
-		).toBeNull();
-	});
-
-	test("flow wins even over starters (defensive: these never co-occur in practice)", () => {
-		expect(
-			resolveSuggestions({
-				flow: ["From flow"],
-				followup: null,
-				starters: { page, channel },
-			})?.origin,
-		).toBe("flow");
-	});
-});
-
-describe("resolveStarters", () => {
-	test("page prompts win when present", () => {
-		expect(resolveStarters({ page, channel })).toEqual({
+	test("page wins over channel", () => {
+		expect(resolveSuggestions({ ...NONE, page, channel })).toEqual({
 			origin: "page",
 			suggestions: page,
 		});
 	});
 
-	test("channel is the fallback", () => {
-		expect(resolveStarters({ page: null, channel })?.origin).toBe("channel");
+	test("channel fills the row when no page matched", () => {
+		expect(resolveSuggestions({ ...NONE, channel })).toEqual({
+			origin: "channel",
+			suggestions: channel,
+		});
 	});
 
-	test("no starters at all resolves to null", () => {
-		expect(resolveStarters({ page: null, channel: [] })).toBeNull();
+	test("an empty page match falls through to channel", () => {
+		expect(resolveSuggestions({ ...NONE, page: [], channel })?.origin).toBe(
+			"channel",
+		);
+	});
+});
+
+describe("resolveSuggestions — empty is only authoritative for flow", () => {
+	test("no candidates at all resolves to null", () => {
+		expect(resolveSuggestions(NONE)).toBeNull();
+	});
+
+	test("every rung empty resolves to null", () => {
+		expect(
+			resolveSuggestions({ flow: null, followup: [], page: [], channel: [] }),
+		).toBeNull();
+	});
+
+	test("an empty followup falls through instead of clearing", () => {
+		expect(resolveSuggestions({ ...NONE, followup: [], channel })?.origin).toBe(
+			"channel",
+		);
+	});
+});
+
+describe("toSuggestions", () => {
+	test("raw texts carry no stored identity", () => {
+		expect(toSuggestions(["a", "b"])).toEqual([
+			{ id: null, text: "a" },
+			{ id: null, text: "b" },
+		]);
 	});
 });

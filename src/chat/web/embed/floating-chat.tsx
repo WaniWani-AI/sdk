@@ -5,7 +5,7 @@
 // input** animates into view at the bottom of the screen — not a launcher
 // button. A beat after it settles the bar widens on its own, wraps itself in a
 // frosted-glass card (translucent + blurred, so the host page reads through
-// it), and reveals the agent's starter suggestions (CTAs) as pills *inside
+// it), and reveals the agent's configured suggestions as pills *inside
 // that card*, above the input — without opening the chat yet. (Clicking/
 // focusing the resting bar does the same thing immediately.) As soon as the
 // visitor sends their first message (typed or a suggestion), the full chat
@@ -33,7 +33,7 @@ import { Suggestions } from "../components/suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
-import { resolveStarters } from "../lib/resolve-suggestions";
+import { resolveSuggestions } from "../lib/resolve-suggestions";
 import {
 	fireSuggestionClick,
 	fireSuggestionShown,
@@ -44,9 +44,9 @@ import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
+import { useConfiguredSuggestions } from "./use-configured-suggestions";
 import { usePathname, useVisibilityGate } from "./use-pathname";
 import { useScrollAppearance } from "./use-scroll-appearance";
-import { useStarterSuggestions } from "./use-starter-suggestions";
 import { appearTriggerForPath } from "./visibility";
 import { createWidgetEventEmitter } from "./widget-events";
 import { WidgetEventsProvider } from "./widget-events-context";
@@ -172,19 +172,24 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			[userVars],
 		);
 
-		// Starter candidates for the current page; ids ride along for click
-		// attribution. Memoized inside the hook — `useSuggestions` keys an effect
-		// on the object's identity.
-		const starters = useStarterSuggestions(config);
-		// The dock renders the same starter row the panel would, resolved through
-		// the same ladder so its impression event carries the exact origin.
-		const dockRow = useMemo(() => resolveStarters(starters), [starters]);
+		// The dashboard-configured page and channel rungs; ids ride along for
+		// click attribution. Memoized inside the hook — `useSuggestions` keys an
+		// effect on the object's identity.
+		const configured = useConfiguredSuggestions(config);
+		// The dock renders the same pre-chat row the panel would, resolved through
+		// the same hierarchy so its impression event carries the exact origin. No
+		// turn has happened yet at the dock, so the two turn-derived rungs are
+		// absent by construction.
+		const dockRow = useMemo(
+			() => resolveSuggestions({ flow: null, followup: null, ...configured }),
+			[configured],
+		);
 		const suggestions = useMemo(
 			() => dockRow?.suggestions.map((s) => s.text) ?? [],
 			[dockRow],
 		);
 
-		// Record every starter-prompt click and every rendered pill set
+		// Record every suggestion click and every rendered pill set
 		// server-side, attributed to the authored prompts involved. Rides the
 		// same widget-event stream the host page subscribes to, so there is one
 		// signal per interaction, not two — and it covers both the dock's CTAs
@@ -193,7 +198,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			return widgetEvents.subscribe((event) => {
 				if (event.name === "suggestion.clicked") {
 					const { text, origin } = event.properties;
-					const promptId = resolvePromptId(starters.page ?? [], text);
+					const promptId = resolvePromptId(configured.page ?? [], text);
 					void fireSuggestionClick({
 						api: config.api ?? "",
 						token: config.token,
@@ -210,7 +215,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				}
 				if (event.name === "suggestions.shown") {
 					const { texts, origin } = event.properties;
-					const prompts = resolveShownPrompts(starters.page ?? [], texts);
+					const prompts = resolveShownPrompts(configured.page ?? [], texts);
 					void fireSuggestionShown({
 						api: config.api ?? "",
 						token: config.token,
@@ -225,7 +230,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			});
 		}, [
 			widgetEvents,
-			starters,
+			configured,
 			config.api,
 			config.token,
 			config.channelId,
@@ -423,7 +428,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		const onComposerFocus = useCallback(() => {
 			// Once a conversation exists, the visitor has history they can't see
 			// while minimized — refocusing the dock reopens the full chat rather
-			// than re-offering the starter CTAs. Focusing the chat input happens
+			// than re-offering the suggestion pills. Focusing the chat input happens
 			// in the focus effect, once the panel is painted.
 			if ((chatRef.current?.messages.length ?? 0) > 0) {
 				setPhase("open");
@@ -649,7 +654,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									hideHeader={false}
 									welcomeMessage={config.welcomeMessage}
 									placeholder={config.placeholder}
-									starterSuggestions={starters}
+									configuredSuggestions={configured}
 									enableThreadHistory={config.enableThreadHistory}
 									showToolCalls={config.showToolCalls}
 									locale={config.locale}

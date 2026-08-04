@@ -23,8 +23,8 @@ import {
 } from "../lib/suggestion-click";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
+import { useConfiguredSuggestions } from "./use-configured-suggestions";
 import { useVisibilityGate } from "./use-pathname";
-import { useStarterSuggestions } from "./use-starter-suggestions";
 import { createWidgetEventEmitter } from "./widget-events";
 import { WidgetEventsProvider } from "./widget-events-context";
 
@@ -116,12 +116,12 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			[],
 		);
 
-		// Starter candidates for the current page; ids ride along for click
-		// attribution. Memoized inside the hook — `useSuggestions` keys an effect
-		// on the object's identity.
-		const starters = useStarterSuggestions(config);
+		// The dashboard-configured page and channel rungs; ids ride along for
+		// click attribution. Memoized inside the hook — `useSuggestions` keys an
+		// effect on the object's identity.
+		const configured = useConfiguredSuggestions(config);
 
-		// Record every starter-prompt click and every rendered pill set
+		// Record every suggestion click and every rendered pill set
 		// server-side, attributed to the authored prompts involved. Rides the
 		// same widget-event stream the host page subscribes to, so there is one
 		// signal per interaction, not two.
@@ -129,7 +129,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			return widgetEvents.subscribe((event) => {
 				if (event.name === "suggestion.clicked") {
 					const { text, origin } = event.properties;
-					const promptId = resolvePromptId(starters.page ?? [], text);
+					const promptId = resolvePromptId(configured.page ?? [], text);
 					void fireSuggestionClick({
 						api: config.api ?? "",
 						token: config.token,
@@ -146,7 +146,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 				}
 				if (event.name === "suggestions.shown") {
 					const { texts, origin } = event.properties;
-					const prompts = resolveShownPrompts(starters.page ?? [], texts);
+					const prompts = resolveShownPrompts(configured.page ?? [], texts);
 					void fireSuggestionShown({
 						api: config.api ?? "",
 						token: config.token,
@@ -161,7 +161,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			});
 		}, [
 			widgetEvents,
-			starters,
+			configured,
 			config.api,
 			config.token,
 			config.channelId,
@@ -191,7 +191,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 					hideHeader={config.hideHeader}
 					welcomeMessage={config.welcomeMessage}
 					placeholder={config.placeholder}
-					starterSuggestions={starters}
+					configuredSuggestions={configured}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}
 					locale={config.locale}
