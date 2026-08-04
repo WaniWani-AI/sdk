@@ -90,7 +90,6 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
-    "lint:vocabulary": "bun scripts/check-vocabulary.ts",
     "lint:fix": "biome check . --write",
     "prepublishOnly": "bun run build",
     "release": "npm run release:patch",

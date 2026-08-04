@@ -63,7 +63,7 @@ export function eventsEndpoint(api: string): string {
  * resolves once the request is dispatched (or skipped) and never throws —
  * tracking must never break the host page or the widget.
  */
-export async function trackPageView(opts: FirePageViewOptions): Promise<void> {
+export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 	const { api, token, channelId, mode, source } = opts;
 	if (typeof window === "undefined" || !api || !token) {
 		return;

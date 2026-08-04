@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { buildApiUrl } from "../lib/api-url";
 import { debugLog } from "../lib/debug";
-import { trackPageView } from "../lib/page-view";
+import { firePageView } from "../lib/page-view";
 import type { EmbedConfig } from "./config";
 import { resolveConfig } from "./config";
 import { parsePageSuggestions } from "./use-suggestions";
@@ -241,12 +241,12 @@ export function useRemoteEmbedConfig(
 		}
 		// Top-of-funnel signal, fired once the channel's `/config` is in hand so
 		// the event carries the channel's source. Guarded once per page inside
-		// `trackPageView`; skippable per surface via `disablePageView`.
+		// `firePageView`; skippable per surface via `disablePageView`.
 		const pageView = (source: string | undefined) => {
 			if (initialConfig.disablePageView) {
 				return;
 			}
-			void trackPageView({
+			void firePageView({
 				api,
 				token,
 				channelId,

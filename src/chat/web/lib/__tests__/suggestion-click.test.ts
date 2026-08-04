@@ -16,10 +16,10 @@ for (const key of [
 (globalThis as any).window = win;
 
 import {
+	fireSuggestionClick,
+	fireSuggestionShown,
 	resolveShownSuggestions,
 	resolveSuggestionId,
-	trackSuggestionClick,
-	trackSuggestionShown,
 } from "../suggestion-click";
 
 interface Captured {
@@ -91,11 +91,11 @@ describe("resolveSuggestionId", () => {
 	});
 });
 
-describe("trackSuggestionClick", () => {
+describe("fireSuggestionClick", () => {
 	test("POSTs a suggestion.clicked event to the canonical ingest with the prompt id", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await trackSuggestionClick({ ...BASE });
+			await fireSuggestionClick({ ...BASE });
 			expect(calls).toHaveLength(1);
 			const [call] = calls;
 			// Same canonical V2 batch ingest `page.viewed` uses.
@@ -130,8 +130,8 @@ describe("trackSuggestionClick", () => {
 		const { calls, restore } = mockFetch();
 		try {
 			// The usual case: the starter click is what starts the conversation.
-			await trackSuggestionClick({ ...BASE });
-			await trackSuggestionClick({ ...BASE, sessionId: "sess_1" });
+			await fireSuggestionClick({ ...BASE });
+			await fireSuggestionClick({ ...BASE, sessionId: "sess_1" });
 			expect(calls).toHaveLength(2);
 			const first = JSON.parse(calls[0].init.body as string).events[0];
 			const second = JSON.parse(calls[1].init.body as string).events[0];
@@ -145,8 +145,8 @@ describe("trackSuggestionClick", () => {
 	test("fires on every click — no once-per-page guard", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await trackSuggestionClick({ ...BASE });
-			await trackSuggestionClick({ ...BASE });
+			await fireSuggestionClick({ ...BASE });
+			await fireSuggestionClick({ ...BASE });
 			expect(calls).toHaveLength(2);
 		} finally {
 			restore();
@@ -156,7 +156,7 @@ describe("trackSuggestionClick", () => {
 	test("fires without a source tag when the channel has no configured source", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await trackSuggestionClick({ ...BASE, source: undefined });
+			await fireSuggestionClick({ ...BASE, source: undefined });
 			expect(calls).toHaveLength(1);
 			const [ev] = JSON.parse(calls[0].init.body as string).events;
 			expect("source" in ev).toBe(false);
@@ -169,7 +169,7 @@ describe("trackSuggestionClick", () => {
 	test("sends a null promptId for a channel prompt", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await trackSuggestionClick({
+			await fireSuggestionClick({
 				...BASE,
 				promptId: null,
 				origin: "channel",
@@ -185,8 +185,8 @@ describe("trackSuggestionClick", () => {
 	test("is a no-op without an api or token", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await trackSuggestionClick({ ...BASE, api: "" });
-			await trackSuggestionClick({ ...BASE, token: "" });
+			await fireSuggestionClick({ ...BASE, api: "" });
+			await fireSuggestionClick({ ...BASE, token: "" });
 			expect(calls).toHaveLength(0);
 		} finally {
 			restore();
@@ -200,7 +200,7 @@ describe("trackSuggestionClick", () => {
 			throw new Error("network down");
 		};
 		try {
-			await trackSuggestionClick({ ...BASE });
+			await fireSuggestionClick({ ...BASE });
 		} finally {
 			globalThis.fetch = real;
 		}
@@ -223,7 +223,7 @@ describe("resolveShownSuggestions", () => {
 	});
 });
 
-describe("trackSuggestionShown", () => {
+describe("fireSuggestionShown", () => {
 	const SHOWN_BASE = {
 		api: BASE.api,
 		token: BASE.token,
@@ -240,7 +240,7 @@ describe("trackSuggestionShown", () => {
 	test("POSTs one suggestion.shown event carrying the whole set", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await trackSuggestionShown({
+			await fireSuggestionShown({
 				...SHOWN_BASE,
 				prompts: [...SHOWN_BASE.prompts],
 			});
@@ -268,7 +268,7 @@ describe("trackSuggestionShown", () => {
 	test("an empty set is a no-op, not an event", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await trackSuggestionShown({ ...SHOWN_BASE, prompts: [] });
+			await fireSuggestionShown({ ...SHOWN_BASE, prompts: [] });
 			expect(calls).toHaveLength(0);
 		} finally {
 			restore();
@@ -278,7 +278,7 @@ describe("trackSuggestionShown", () => {
 	test("is a no-op without an api or token", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await trackSuggestionShown({
+			await fireSuggestionShown({
 				...SHOWN_BASE,
 				prompts: [...SHOWN_BASE.prompts],
 				api: "",

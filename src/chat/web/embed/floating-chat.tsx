@@ -35,10 +35,10 @@ import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
 import {
+	fireSuggestionClick,
+	fireSuggestionShown,
 	resolveShownSuggestions,
 	resolveSuggestionId,
-	trackSuggestionClick,
-	trackSuggestionShown,
 } from "../lib/suggestion-click";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
@@ -199,7 +199,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				if (event.name === "suggestion.clicked") {
 					const { text, origin } = event.properties;
 					const promptId = resolveSuggestionId(suggestions.page ?? [], text);
-					void trackSuggestionClick({
+					void fireSuggestionClick({
 						api: config.api ?? "",
 						token: config.token,
 						channelId: config.channelId,
@@ -219,7 +219,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 						suggestions.page ?? [],
 						texts,
 					);
-					void trackSuggestionShown({
+					void fireSuggestionShown({
 						api: config.api ?? "",
 						token: config.token,
 						channelId: config.channelId,

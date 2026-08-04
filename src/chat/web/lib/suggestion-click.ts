@@ -13,7 +13,7 @@ import { eventsEndpoint } from "./page-view";
 import type { Suggestion, SuggestionOrigin } from "./resolve-suggestions";
 import { getOrCreateVisitorId } from "./visitor-context";
 
-export interface TrackSuggestionClickOptions {
+export interface FireSuggestionClickOptions {
 	/** Chat API base, e.g. `https://app.waniwani.ai/api/mcp/chat`. */
 	api: string;
 	/** Public token (`wwp_...`). */
@@ -121,8 +121,8 @@ async function postSuggestionEvent(
 /**
  * Emit a `suggestion.clicked` event for one pill click.
  */
-export async function trackSuggestionClick(
-	opts: TrackSuggestionClickOptions,
+export async function fireSuggestionClick(
+	opts: FireSuggestionClickOptions,
 ): Promise<void> {
 	const {
 		api,
@@ -166,7 +166,7 @@ export function resolveShownSuggestions(
 	return texts.map((text) => ({ id: resolveSuggestionId(list, text), text }));
 }
 
-export interface TrackSuggestionShownOptions {
+export interface FireSuggestionShownOptions {
 	api: string;
 	token: string;
 	channelId?: string;
@@ -183,8 +183,8 @@ export interface TrackSuggestionShownOptions {
  * per-prompt impressions stay queryable while a three-pill render costs one
  * row.
  */
-export async function trackSuggestionShown(
-	opts: TrackSuggestionShownOptions,
+export async function fireSuggestionShown(
+	opts: FireSuggestionShownOptions,
 ): Promise<void> {
 	const { api, token, channelId, mode, source, sessionId, prompts, origin } =
 		opts;

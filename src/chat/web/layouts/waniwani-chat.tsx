@@ -34,7 +34,7 @@ import {
 	createChatTrackClient,
 	createNoopChatTrackClient,
 } from "../lib/chat-track";
-import { trackPageView } from "../lib/page-view";
+import { firePageView } from "../lib/page-view";
 import type { SuggestionOrigin } from "../lib/resolve-suggestions";
 import { ChatEmbed } from "./chat-embed";
 
@@ -298,7 +298,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 
 		// Top-of-funnel signal, fired once the channel's `/config` resolves so
 		// the event carries the channel's source. Guarded once per page inside
-		// `trackPageView`; skippable via `overrides.disablePageView` on surfaces
+		// `firePageView`; skippable via `overrides.disablePageView` on surfaces
 		// where a landing event is noise.
 		const disablePageView = overrides?.disablePageView;
 		useEffect(() => {
@@ -310,7 +310,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				if (disablePageView) {
 					return;
 				}
-				void trackPageView({
+				void firePageView({
 					api: resolvedApi,
 					token,
 					channelId,

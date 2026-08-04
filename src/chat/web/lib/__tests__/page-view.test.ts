@@ -15,7 +15,7 @@ for (const key of [
 // biome-ignore lint/suspicious/noExplicitAny: test setup
 (globalThis as any).window = win;
 
-import { __resetPageViewGuard, trackPageView } from "../page-view";
+import { __resetPageViewGuard, firePageView } from "../page-view";
 
 interface Captured {
 	url: string;
@@ -47,11 +47,11 @@ beforeEach(() => {
 	}
 });
 
-describe("trackPageView", () => {
+describe("firePageView", () => {
 	test("POSTs a page.viewed event to the canonical ingest with bearer auth and visitor attribution", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await trackPageView({
+			await firePageView({
 				api: "https://app.waniwani.ai/api/mcp/chat",
 				token: "wwp_test",
 				channelId: "chan_1",
@@ -94,9 +94,9 @@ describe("trackPageView", () => {
 				channelId: "chan_1",
 				source: "acme-web",
 			} as const;
-			await trackPageView(opts);
-			await trackPageView(opts);
-			await trackPageView(opts);
+			await firePageView(opts);
+			await firePageView(opts);
+			await firePageView(opts);
 			expect(calls).toHaveLength(1);
 		} finally {
 			restore();
@@ -106,8 +106,8 @@ describe("trackPageView", () => {
 	test("is a no-op without an api or token", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await trackPageView({ api: "", token: "wwp_test", source: "acme-web" });
-			await trackPageView({
+			await firePageView({ api: "", token: "wwp_test", source: "acme-web" });
+			await firePageView({
 				api: "https://app.waniwani.ai/api/mcp/chat",
 				token: "",
 				source: "acme-web",
@@ -124,7 +124,7 @@ describe("trackPageView", () => {
 			// A channel with a blank Analytics source still records page views;
 			// attribution rides on `properties.channelId`. No source tag is sent,
 			// and none is invented.
-			await trackPageView({
+			await firePageView({
 				api: "https://app.waniwani.ai/api/mcp/chat",
 				token: "wwp_test",
 				channelId: "chan_1",
@@ -157,8 +157,8 @@ describe("trackPageView", () => {
 				token: "wwp_test",
 				source: "acme-web",
 			} as const;
-			await trackPageView(opts); // fails, guard rolled back
-			await trackPageView(opts); // succeeds
+			await firePageView(opts); // fails, guard rolled back
+			await firePageView(opts); // succeeds
 			expect(attempts).toBe(2);
 		} finally {
 			globalThis.fetch = real;
