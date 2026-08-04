@@ -148,6 +148,44 @@ describe("idempotent start on a live session", () => {
 		assertInterruptResult(r);
 		expect(r.field).toBe("color");
 	});
+
+	test("a legacy record without flowId still redirects via the node-name fallback", async () => {
+		const store = new TestFlowStateStore();
+		const sessionId = "legacy-session-without-flow-id";
+
+		// Seed the store with a legacy record (no flowId field)
+		await store.set(sessionId, { step: "ask_size", state: { color: "Red" } });
+
+		const flow = buildTwoStepFlow(store);
+		const mock = mockServer();
+		await flow.register(mock.server);
+		const handler = mock.registered[0]?.[2];
+		if (!handler) {
+			throw new Error('flow "idempotent_probe" did not register a handler');
+		}
+
+		// Call start with the seeded sessionId
+		const resultPayload = (await handler(
+			{ action: "start", intent: "resume session" },
+			{ _meta: { sessionId } },
+		)) as Record<string, unknown>;
+
+		const parsed = parsePayload(resultPayload);
+		expect(parsed.status).toBe("interrupt");
+		if (parsed.status !== "interrupt") {
+			throw new Error(
+				`expected interrupt result, got status "${parsed.status}"`,
+			);
+		}
+		expect(parsed.field).toBe("size");
+		expect(parsed.context ?? "").toContain(
+			"already in progress; resumed at the current step",
+		);
+
+		// Verify the stored record now has flowId stamped
+		const updated = await store.get(sessionId);
+		expect(updated?.flowId).toBe("idempotent_probe");
+	});
 });
 
 const mockPlanPickerTool: RegisteredTool = {
