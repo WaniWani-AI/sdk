@@ -275,3 +275,61 @@ describe("useSuggestions — origin filtering", () => {
 		expect(hookRef.current?.source).toBe("channel");
 	});
 });
+
+describe("useSuggestions — full origin set (regression)", () => {
+	const OPENER = ["Option A", "Option B", "Option C"];
+	const NEXT_STEP = ["Choice X", "Choice Y"];
+	const config = {
+		initial: ["Starter 1", "Starter 2"],
+		origins: ["channel", "page", "flow", "followup"] as SuggestionOrigin[],
+	};
+
+	function assistantWithTwoFlowResults(id: string) {
+		const first = assistantMessageWithFlowSuggestions(OPENER);
+		const second = assistantMessageWithFlowSuggestions(NEXT_STEP);
+		return {
+			id,
+			role: "assistant" as const,
+			parts: [...first.parts, ...second.parts],
+		} as Msg;
+	}
+
+	test("starter prompts do not survive the first user message", () => {
+		render({ messages: [], status: "ready", config });
+		expect(hookRef.current?.suggestions).toEqual(["Starter 1", "Starter 2"]);
+		const turn: Msg[] = [userMessage("hello")];
+		render({ messages: turn, status: "streaming", config });
+		expect(hookRef.current?.suggestions).toEqual([]);
+	});
+
+	test("flow pills win over starters when every origin is enabled", () => {
+		render({ messages: [], status: "streaming", config });
+		const turn: Msg[] = [
+			userMessage("hello"),
+			assistantMessageWithFlowSuggestions(OPENER),
+		];
+		render({ messages: turn, status: "ready", config });
+		expect(hookRef.current?.suggestions).toEqual(OPENER);
+		expect(hookRef.current?.source).toBe("flow");
+	});
+
+	test("the last flow result of the turn drives the pills", () => {
+		render({ messages: [], status: "streaming", config });
+		const turn: Msg[] = [
+			userMessage("hello"),
+			assistantWithTwoFlowResults("a1"),
+		];
+		render({ messages: turn, status: "ready", config });
+		expect(hookRef.current?.suggestions).toEqual(NEXT_STEP);
+	});
+
+	test("an un-advanced start keeps its step's pills (residual the engine self-heal addresses)", () => {
+		render({ messages: [], status: "streaming", config });
+		const turn1: Msg[] = [
+			userMessage("I just did the thing"),
+			assistantMessageWithFlowSuggestions(OPENER),
+		];
+		render({ messages: turn1, status: "ready", config });
+		expect(hookRef.current?.suggestions).toEqual(OPENER);
+	});
+});
