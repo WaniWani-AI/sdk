@@ -31,6 +31,7 @@ import {
 	collectRedactedStateFields,
 	REDACTED_STATE_UPDATE_FIELDS_META_KEY,
 } from "./redacted";
+import { withStartSelfHeal } from "./start-self-heal";
 
 // ============================================================================
 // Input schema
@@ -391,10 +392,20 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		const result = await handleToolCall(args, sessionId, _meta, waniwani);
 
 		// Echo sessionId in response when not sourced from _meta (client must pass it back)
-		const contentObj =
+		let contentObj =
 			!metaSessionId && sessionId
 				? { ...result.content, sessionId }
 				: result.content;
+
+		// A start that parks on a question the visitor's opening message already
+		// answered is the widest desync path: the agent replies past the parked
+		// step and the pill row describes the wrong question. The appended check
+		// tells the agent to advance the flow in the same turn instead.
+		if (args.action === "start") {
+			contentObj = withStartSelfHeal(contentObj, {
+				sessionIdEchoed: !metaSessionId && sessionId !== undefined,
+			});
+		}
 
 		// Authoritative for the turn: an empty array clears pills an earlier flow
 		// call in the same turn set. Only the single-open-question shorthand

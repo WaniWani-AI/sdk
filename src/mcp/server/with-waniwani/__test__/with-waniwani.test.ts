@@ -1,6 +1,23 @@
 import { describe, expect, test } from "bun:test";
+import { z } from "zod";
 import type { TrackInput } from "../../../../tracking/@types.js";
+import type { FlowTokenContent } from "../../flows/@types.js";
+import { END, START } from "../../flows/@types.js";
+import { createFlow } from "../../flows/create-flow.js";
 import { withWaniwani } from "../index.js";
+
+class TestFlowStateStore {
+	private readonly map = new Map<string, FlowTokenContent>();
+	async get(key: string): Promise<FlowTokenContent | null> {
+		return this.map.get(key) ?? null;
+	}
+	async set(key: string, value: FlowTokenContent): Promise<void> {
+		this.map.set(key, value);
+	}
+	async delete(key: string): Promise<void> {
+		this.map.delete(key);
+	}
+}
 
 function mockClient() {
 	const tracked: TrackInput[] = [];
@@ -991,5 +1008,36 @@ describe("withWaniwani", () => {
 		expect(result._meta?.["waniwani/suggestions"]).toEqual({
 			suggestions: ["Bronze", "Gold"],
 		});
+	});
+
+	test("preserves the start-interrupt self-heal instruction on a flow tool result", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		const flow = createFlow({
+			id: "self_heal_flow",
+			title: "Self heal flow",
+			description: "Asks one question",
+			state: { color: z.string().optional() },
+		})
+			.addNode("ask_color", ({ interrupt }) =>
+				interrupt({ color: { question: "Favorite color?" } }),
+			)
+			.addEdge(START, "ask_color")
+			.addEdge("ask_color", END)
+			.compile({ store: new TestFlowStateStore() });
+
+		await flow.register(mock.server);
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.(
+			{ action: "start", intent: "visitor wants a recommendation" },
+			{ _meta: { sessionId: "test-session-self-heal" } },
+		)) as Record<string, unknown>;
+
+		const structured = result.structuredContent as Record<string, unknown>;
+		expect(structured.context).toContain("BEFORE asking");
 	});
 });
