@@ -21,7 +21,7 @@ Deprecations (struck-through signatures, `@deprecated` JSDoc) are **not** breaki
 
 These entries add capability without changing existing behavior — listed so the surface is discoverable, not because an upgrade needs action.
 
-### 0.20.0: first-turn extraction and idempotent `start` (flow engine)
+### 0.19.4: first-turn extraction and idempotent `start` (flow engine)
 
 No code changes required. The generated flow tool schema now demands
 `stateUpdates` extraction on every call (`{}` when there is nothing to
