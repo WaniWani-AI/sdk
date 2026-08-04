@@ -1,124 +1,87 @@
 "use client";
 
 import type { ChatStatus, UIMessage } from "ai";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { SuggestionOrigin, SuggestionsConfig } from "../@types";
-import { SUGGESTION_ORIGINS } from "../@types";
-import { resolveTurnSuggestions } from "./turn-suggestions";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type {
+	StarterSuggestions,
+	SuggestionOrigin,
+} from "../lib/resolve-suggestions";
+import {
+	resolveStarters,
+	resolveSuggestions,
+} from "../lib/resolve-suggestions";
+import {
+	extractFlowSuggestions,
+	extractFollowupSuggestions,
+} from "./turn-suggestions";
 
 export interface UseSuggestionsOptions {
 	messages: UIMessage[];
 	status: ChatStatus;
-	config?: boolean | SuggestionsConfig;
+	/** `false` renders no pill row at all. Defaults to `true`. */
+	enabled?: boolean;
+	/**
+	 * Starter candidates shown until the first message. Must be referentially
+	 * stable across renders (memoize in the caller) — an effect keys on it.
+	 */
+	starters?: StarterSuggestions;
 }
 
-function isConfigObject(
-	config: boolean | SuggestionsConfig | undefined,
-): config is SuggestionsConfig {
-	return typeof config === "object" && config !== null;
-}
+const EMPTY_STARTERS: StarterSuggestions = { page: null, channel: [] };
 
 /**
- * Default origins allowed to fill the pill row when the host passes no
- * config at all: starter prompts and generated follow-ups render, flow-driven
- * pills stay opt-in.
+ * The pill row's state. Which pills render is decided exclusively by
+ * `resolveSuggestions` — the fixed flow > followup > page > channel
+ * hierarchy — fed with the starters while the conversation is empty and
+ * with the last assistant turn's flow/followup candidates after each
+ * completed exchange.
  */
-export const DEFAULT_SUGGESTION_ORIGINS: readonly SuggestionOrigin[] = [
-	"channel",
-	"page",
-	"followup",
-];
-
-/**
- * Resolve which origins may fill the pill row for a given host config.
- *
- * Priority: `false` → none; `true` → every origin; an object's `origins`
- * (when present, even empty) wins outright; otherwise the legacy `dynamic`
- * boolean (`true` → every origin, `false` → none); anything else (including
- * `undefined`) falls back to {@link DEFAULT_SUGGESTION_ORIGINS}.
- */
-export function resolveSuggestionOrigins(
-	config: boolean | SuggestionsConfig | undefined,
-): SuggestionOrigin[] {
-	if (config === false) {
-		return [];
-	}
-	if (config === true) {
-		return [...SUGGESTION_ORIGINS];
-	}
-	if (isConfigObject(config)) {
-		if (config.origins !== undefined) {
-			return config.origins;
-		}
-		if (config.dynamic === true) {
-			return [...SUGGESTION_ORIGINS];
-		}
-		if (config.dynamic === false) {
-			return [];
-		}
-	}
-	return [...DEFAULT_SUGGESTION_ORIGINS];
-}
-
-/** Whether a given origin may fill the pill row for a given host config. */
-export function isOriginEnabled(
-	config: boolean | SuggestionsConfig | undefined,
-	origin: SuggestionOrigin,
-): boolean {
-	return resolveSuggestionOrigins(config).includes(origin);
-}
-
-/**
- * Map host-level config fields — `suggestions` (starter prompts) and
- * `suggestionOrigins` (which providers may fill the per-turn pill row) — to
- * the `SuggestionsConfig` consumed by `useSuggestions`. Every mount point
- * (WaniwaniChat, the inline and floating script embeds) must build its
- * `ChatEmbed` suggestions prop through this helper so the origin config is
- * never silently dropped.
- */
-export function toSuggestionsConfig(options: {
-	suggestions?: string[];
-	suggestionOrigins?: SuggestionOrigin[];
-}): SuggestionsConfig | undefined {
-	const { suggestions, suggestionOrigins } = options;
-	if (!suggestions && suggestionOrigins === undefined) {
-		return undefined;
-	}
-	return { initial: suggestions, origins: suggestionOrigins };
-}
-
 export function useSuggestions(options: UseSuggestionsOptions) {
-	const { messages, status, config } = options;
+	const {
+		messages,
+		status,
+		enabled = true,
+		starters = EMPTY_STARTERS,
+	} = options;
 
-	const initial =
-		isConfigObject(config) && config.initial ? config.initial : undefined;
-
-	const [suggestions, setSuggestions] = useState<string[]>(initial ?? []);
-	const [source, setSource] = useState<SuggestionOrigin>("channel");
+	// Memoized so the initializer below and the starter effect resolve to the
+	// same array reference. Without this, `useState`'s initializer and the
+	// effect's first run (mount always runs effects once) each build their own
+	// `.map()` result: content-equal but reference-different, so
+	// `setSuggestions` never bails out and the row fires an extra render —
+	// double-counting the `suggestions.shown` impression it drives in
+	// `chat-embed.tsx`.
+	const starterRow = useMemo(
+		() => (enabled ? resolveStarters(starters) : null),
+		[enabled, starters],
+	);
+	const starterTexts = useMemo(
+		() => starterRow?.suggestions.map((s) => s.text) ?? [],
+		[starterRow],
+	);
+	const [suggestions, setSuggestions] = useState<string[]>(starterTexts);
+	const [source, setSource] = useState<SuggestionOrigin>(
+		starterRow?.origin ?? "channel",
+	);
 	const prevStatusRef = useRef<ChatStatus>(status);
-
-	const origins = resolveSuggestionOrigins(config);
-	const isFlowEnabled = origins.includes("flow");
-	const isFollowupEnabled = origins.includes("followup");
 
 	const clear = useCallback(() => {
 		setSuggestions([]);
 	}, []);
 
-	// Sync initial suggestions when the remote config arrives post-mount, and
-	// clear whatever is on screen whenever the conversation goes back to
-	// empty — a `reset()` or `startNewThread()` clears `messages` without
-	// unmounting this hook, and a flow's pills from the previous conversation
-	// must not survive into the new one (they'd otherwise stay clickable and
-	// misattribute a click as origin `"flow"` for a flow that was never
-	// invoked in this conversation).
+	// Starter row while the conversation is empty. Also runs when a `reset()`
+	// or `startNewThread()` clears `messages` without unmounting this hook —
+	// a flow's pills from the previous conversation must not survive into the
+	// new one (they'd stay clickable and misattribute a click as origin
+	// `"flow"` for a flow that was never invoked in this conversation).
 	const hasMessages = messages.length > 0;
 	useEffect(() => {
-		if (!hasMessages) {
-			setSuggestions(initial ?? []);
-			setSource("channel");
+		if (hasMessages) {
+			return;
 		}
-	}, [initial, hasMessages]);
+		setSuggestions(starterTexts);
+		setSource(starterRow?.origin ?? "channel");
+	}, [starterTexts, starterRow, hasMessages]);
 
 	// Clear when a new user message arrives
 	const lastMessage = messages[messages.length - 1];
@@ -135,31 +98,24 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		const prevStatus = prevStatusRef.current;
 		prevStatusRef.current = status;
 
-		if (
-			prevStatus === "streaming" &&
-			status === "ready" &&
-			(isFlowEnabled || isFollowupEnabled)
-		) {
-			const lastAssistant = [...messages]
-				.reverse()
-				.find((m) => m.role === "assistant");
-			if (!lastAssistant) {
-				return;
-			}
-
-			const resolved = resolveTurnSuggestions(lastAssistant, {
-				includeFlow: isFlowEnabled,
-			});
-			// A resolved origin not enabled for this host (e.g. a flow result
-			// when only `followup` is enabled) is treated as no suggestions.
-			const enabled =
-				resolved &&
-				((resolved.source === "flow" && isFlowEnabled) ||
-					(resolved.source === "followup" && isFollowupEnabled));
-			setSuggestions(enabled ? resolved.suggestions : []);
-			setSource(enabled ? resolved.source : "channel");
+		if (prevStatus !== "streaming" || status !== "ready" || !enabled) {
+			return;
 		}
-	}, [status, isFlowEnabled, isFollowupEnabled, messages]);
+		const lastAssistant = [...messages]
+			.reverse()
+			.find((m) => m.role === "assistant");
+		if (!lastAssistant) {
+			return;
+		}
+
+		const resolved = resolveSuggestions({
+			flow: extractFlowSuggestions(lastAssistant),
+			followup: extractFollowupSuggestions(lastAssistant),
+			starters: null,
+		});
+		setSuggestions(resolved ? resolved.suggestions.map((s) => s.text) : []);
+		setSource(resolved?.origin ?? "channel");
+	}, [status, enabled, messages]);
 
 	return { suggestions, source, isLoading: false, clear };
 }

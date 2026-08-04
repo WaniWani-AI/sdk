@@ -18,7 +18,7 @@ for (const key of [
 import {
 	fireSuggestionClick,
 	fireSuggestionShown,
-	resolveClickAttribution,
+	resolvePromptId,
 	resolveShownPrompts,
 } from "../suggestion-click";
 
@@ -63,46 +63,31 @@ beforeEach(() => {
 	}
 });
 
-describe("resolveClickAttribution", () => {
+describe("resolvePromptId", () => {
 	const list = [
-		{ id: "p1", text: "Authored" },
-		{ id: null, text: "From the fixed list" },
+		{ id: "p1", text: "Page one" },
+		{ id: null, text: "Fixed one" },
 	];
 
-	test("an authored prompt keeps its id and upgrades channel to page", () => {
-		expect(resolveClickAttribution(list, "Authored", "channel")).toEqual({
-			promptId: "p1",
-			origin: "page",
-		});
+	test("finds the authored prompt's id by text", () => {
+		expect(resolvePromptId(list, "Page one")).toBe("p1");
 	});
 
-	test("a fixed-list prompt has no id and keeps the reported origin", () => {
-		expect(
-			resolveClickAttribution(list, "From the fixed list", "channel"),
-		).toEqual({ promptId: null, origin: "channel" });
-	});
-
-	test("a text absent from the list keeps its reported origin", () => {
-		expect(
-			resolveClickAttribution(list, "Something streamed", "followup"),
-		).toEqual({ promptId: null, origin: "followup" });
-		expect(resolveClickAttribution([], "Anything", "flow")).toEqual({
-			promptId: null,
-			origin: "flow",
-		});
+	test("returns null for fixed-list prompts and unknown texts", () => {
+		expect(resolvePromptId(list, "Fixed one")).toBeNull();
+		expect(resolvePromptId(list, "Nope")).toBeNull();
 	});
 
 	test("duplicate texts attribute to the first match", () => {
 		expect(
-			resolveClickAttribution(
+			resolvePromptId(
 				[
 					{ id: "first", text: "Same" },
 					{ id: "second", text: "Same" },
 				],
 				"Same",
-				"channel",
 			),
-		).toEqual({ promptId: "first", origin: "page" });
+		).toBe("first");
 	});
 });
 
@@ -223,50 +208,18 @@ describe("fireSuggestionClick", () => {
 });
 
 describe("resolveShownPrompts", () => {
-	const list = [
-		{ id: "p1", text: "Authored one" },
-		{ id: "p2", text: "Authored two" },
-	];
-
-	test("an authored set keeps every id and upgrades channel to page", () => {
-		expect(
-			resolveShownPrompts(list, ["Authored one", "Authored two"], "channel"),
-		).toEqual({
-			prompts: [
-				{ id: "p1", text: "Authored one" },
-				{ id: "p2", text: "Authored two" },
-			],
-			origin: "page",
-		});
+	test("maps texts to prompts with their stored ids", () => {
+		const list = [{ id: "p1", text: "Page one" }];
+		expect(resolveShownPrompts(list, ["Page one", "Other"])).toEqual([
+			{ id: "p1", text: "Page one" },
+			{ id: null, text: "Other" },
+		]);
 	});
 
-	test("texts absent from the list keep the reported origin with null ids", () => {
-		expect(
-			resolveShownPrompts(list, ["Streamed A", "Streamed B"], "followup"),
-		).toEqual({
-			prompts: [
-				{ id: null, text: "Streamed A" },
-				{ id: null, text: "Streamed B" },
-			],
-			origin: "followup",
-		});
-	});
-
-	test("a fixed-list set has no ids and stays channel", () => {
-		const fallbackList = [{ id: null, text: "From the fixed list" }];
-		expect(
-			resolveShownPrompts(fallbackList, ["From the fixed list"], "channel"),
-		).toEqual({
-			prompts: [{ id: null, text: "From the fixed list" }],
-			origin: "channel",
-		});
-	});
-
-	test("an empty set keeps the reported origin", () => {
-		expect(resolveShownPrompts(list, [], "channel")).toEqual({
-			prompts: [],
-			origin: "channel",
-		});
+	test("an empty text list resolves to an empty prompt list", () => {
+		expect(resolveShownPrompts([{ id: "p1", text: "Page one" }], [])).toEqual(
+			[],
+		);
 	});
 });
 

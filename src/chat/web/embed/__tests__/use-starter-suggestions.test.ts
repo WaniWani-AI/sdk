@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
+import type { StarterSuggestions } from "../../lib/resolve-suggestions";
 // Type-only, so it doesn't pull the module in before the globals below exist.
 import type { EmbedConfig, PagePrompt } from "../config";
-import type { PageSuggestion } from "../use-page-suggestions";
 
 const win = new Window({ url: "https://host.example/pricing" });
 for (const key of [
@@ -37,9 +37,8 @@ const {
 	normalizePathname,
 	parsePageSuggestions,
 	pickPagePrompts,
-	resolveSuggestions,
-	usePageSuggestions,
-} = await import("../use-page-suggestions");
+	useStarterSuggestions,
+} = await import("../use-starter-suggestions");
 
 const PRICING_PROMPTS: PagePrompt[] = [
 	{ id: "pricing-1", text: "What plans do you offer?", tier: "low" },
@@ -61,12 +60,12 @@ const BASE_CONFIG: EmbedConfig = {
 	],
 };
 
-/** Mount a probe that surfaces the hook's resolved prompts. */
+/** Mount a probe that surfaces the hook's resolved starter candidates. */
 async function mount(config: EmbedConfig) {
 	const container = win.document.createElement("div");
-	let latest: PageSuggestion[] = [];
+	let latest: StarterSuggestions = { page: null, channel: [] };
 	function Probe() {
-		latest = usePageSuggestions(config);
+		latest = useStarterSuggestions(config);
 		return null;
 	}
 	// biome-ignore lint/suspicious/noExplicitAny: happy-dom Element vs DOM Element
@@ -75,23 +74,45 @@ async function mount(config: EmbedConfig) {
 		root.render(createElement(Probe));
 	});
 	return {
-		/** The resolved prompts, ids included. */
+		/** The resolved starter candidates: `page` (ids included) and `channel`. */
 		get value() {
 			return latest;
-		},
-		/** Just the rendered texts, which is what most cases care about. */
-		get texts() {
-			return latest.map((s) => s.text);
 		},
 		async navigate(pathname: string) {
 			await act(async () => {
 				win.history.pushState({}, "", pathname);
 			});
 		},
+		/** Re-render the probe without navigating, e.g. a parent-driven update. */
+		async rerender() {
+			await act(async () => {
+				root.render(createElement(Probe));
+			});
+		},
 		unmount() {
 			act(() => root.unmount());
 		},
 	};
+}
+
+/**
+ * Mount a probe and return the resolved starter candidates directly. Carries
+ * only the required connection fields from `BASE_CONFIG` — `suggestions` and
+ * `pageSuggestions` come solely from `overrides`, so an omitted one is
+ * genuinely absent rather than inherited.
+ */
+async function renderStarterSuggestions(
+	overrides: Pick<EmbedConfig, "suggestions" | "pageSuggestions">,
+): Promise<StarterSuggestions> {
+	const h = await mount({
+		api: BASE_CONFIG.api,
+		token: BASE_CONFIG.token,
+		channelId: BASE_CONFIG.channelId,
+		...overrides,
+	});
+	const value = h.value;
+	h.unmount();
+	return value;
 }
 
 beforeEach(async () => {
@@ -205,59 +226,47 @@ describe("parsePageSuggestions", () => {
 	});
 });
 
-describe("resolveSuggestions", () => {
-	const fallback = ["Static A", "Static B"];
-
-	test("prefers the page's own prompts", () => {
-		expect(
-			resolveSuggestions([{ id: "p1", text: "Page prompt" }], fallback),
-		).toEqual([{ id: "p1", text: "Page prompt" }]);
-	});
-
-	test("falls back when the page has no entry", () => {
-		expect(resolveSuggestions(null, fallback)).toEqual([
-			{ id: null, text: "Static A" },
-			{ id: null, text: "Static B" },
-		]);
-	});
-
-	test("is empty when there is nothing on either side", () => {
-		expect(resolveSuggestions(null, undefined)).toEqual([]);
-		expect(resolveSuggestions([], [])).toEqual([]);
-	});
-});
-
-describe("usePageSuggestions", () => {
-	test("is inert without pageSuggestions — exactly the fixed list", async () => {
+describe("useStarterSuggestions", () => {
+	test("is inert without pageSuggestions — page is null, channel is the fixed list", async () => {
 		const h = await mount({ ...BASE_CONFIG, pageSuggestions: undefined });
-		expect(h.texts).toEqual(["Static A", "Static B"]);
+		expect(h.value).toEqual({ page: null, channel: ["Static A", "Static B"] });
 		h.unmount();
 	});
 
-	test('suggestionOrigins without "page" gates authored pages off', async () => {
-		const h = await mount({
-			...BASE_CONFIG,
-			suggestionOrigins: ["channel", "followup"],
+	test("returns picked page prompts and the fixed channel list separately", async () => {
+		const result = await renderStarterSuggestions({
+			suggestions: ["Fixed one"],
+			pageSuggestions: [
+				{ url: "/pricing", prompts: [{ id: "p1", text: "Page one" }] },
+			],
 		});
-		expect(h.texts).toEqual(["Static A", "Static B"]);
-		h.unmount();
+		expect(result.page).toEqual([{ id: "p1", text: "Page one" }]);
+		expect(result.channel).toEqual(["Fixed one"]);
 	});
 
-	test('suggestionOrigins including "page" keeps them on', async () => {
-		const h = await mount({
-			...BASE_CONFIG,
-			suggestionOrigins: ["channel", "page"],
+	test("page is null when no entry matches the pathname", async () => {
+		const result = await renderStarterSuggestions({
+			suggestions: ["Fixed one"],
+			pageSuggestions: [
+				{ url: "/other", prompts: [{ id: "p1", text: "Page one" }] },
+			],
 		});
-		expect(h.value).toHaveLength(3);
-		h.unmount();
+		expect(result.page).toBeNull();
+		expect(result.channel).toEqual(["Fixed one"]);
 	});
 
-	test("shows three of the current page's prompts, one per tier first", async () => {
+	test("channel is empty when the config has no fixed suggestions", async () => {
+		const result = await renderStarterSuggestions({});
+		expect(result.page).toBeNull();
+		expect(result.channel).toEqual([]);
+	});
+
+	test("shows up to three of the current page's prompts, one per tier first", async () => {
 		const h = await mount(BASE_CONFIG);
-		expect(h.value).toHaveLength(3);
+		expect(h.value.page).toHaveLength(3);
 		const texts = PRICING_PROMPTS.map((p) => p.text);
-		for (const text of h.texts) {
-			expect(texts).toContain(text);
+		for (const picked of h.value.page ?? []) {
+			expect(texts).toContain(picked.text);
 		}
 		h.unmount();
 	});
@@ -265,37 +274,28 @@ describe("usePageSuggestions", () => {
 	test("carries each authored prompt's id, so a click can attribute to it", async () => {
 		const h = await mount(BASE_CONFIG);
 		const byText = new Map(PRICING_PROMPTS.map((p) => [p.text, p.id]));
-		for (const picked of h.value) {
+		for (const picked of h.value.page ?? []) {
 			expect(picked.id).toBe(byText.get(picked.text));
 		}
 		h.unmount();
 	});
 
-	test("hands back id-less prompts when it falls back", async () => {
-		const h = await mount({ ...BASE_CONFIG, pageSuggestions: undefined });
-		expect(h.value).toEqual([
-			{ id: null, text: "Static A" },
-			{ id: null, text: "Static B" },
-		]);
-		h.unmount();
-	});
-
-	test("swaps the pills on SPA navigation and falls back on unseeded pages", async () => {
+	test("swaps the page candidates on SPA navigation and clears on unseeded pages", async () => {
 		const h = await mount(BASE_CONFIG);
-		expect(h.value).toHaveLength(3);
+		expect(h.value.page).toHaveLength(3);
 
 		await h.navigate("/docs");
-		expect(h.texts).toEqual(["Docs Q"]);
+		expect(h.value.page).toEqual([{ id: "d1", text: "Docs Q" }]);
 
 		await h.navigate("/blog/hello");
-		expect(h.texts).toEqual(["Static A", "Static B"]);
+		expect(h.value.page).toBeNull();
 		h.unmount();
 	});
 
 	test("matches the authored entry regardless of casing or query noise", async () => {
 		const h = await mount(BASE_CONFIG);
 		await h.navigate("/Docs/?utm_source=x");
-		expect(h.texts).toEqual(["Docs Q"]);
+		expect(h.value.page).toEqual([{ id: "d1", text: "Docs Q" }]);
 		h.unmount();
 	});
 
@@ -303,8 +303,18 @@ describe("usePageSuggestions", () => {
 		const h = await mount(BASE_CONFIG);
 		const first = h.value;
 		await h.navigate("/pricing#anchor");
-		// Same normalized pathname → same memoized pick, no reshuffle.
-		expect(h.value).toEqual(first);
+		// Same normalized pathname → same memoized pick, no reshuffle. `useMemo`'s
+		// identity is the actual contract here — `useSuggestions`'s starter effect
+		// and `FloatingChat`'s `dockRow` memo both key on this object's identity.
+		expect(h.value).toBe(first);
+		h.unmount();
+	});
+
+	test("keeps page's array reference stable across a re-render that does not navigate", async () => {
+		const h = await mount(BASE_CONFIG);
+		const firstPage = h.value.page;
+		await h.rerender();
+		expect(h.value.page).toBe(firstPage);
 		h.unmount();
 	});
 });

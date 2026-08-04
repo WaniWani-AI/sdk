@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { UIMessage } from "ai";
 import {
 	extractFlowSuggestions,
-	resolveTurnSuggestions,
+	extractFollowupSuggestions,
 } from "../turn-suggestions";
 
 /** Build an assistant message from raw parts. */
@@ -121,26 +121,25 @@ describe("extractFlowSuggestions", () => {
 		expect(extractFlowSuggestions(message)).toBeNull();
 	});
 
-	test("ignores an empty suggestions array", () => {
+	test("preserves an explicit empty entry as []", () => {
 		const message = assistantMessage([flowToolPart([])]);
 
-		expect(extractFlowSuggestions(message)).toBeNull();
+		expect(extractFlowSuggestions(message)).toEqual([]);
 	});
 
 	// Regression test for the bug where a turn calling the flow twice — an
 	// interrupt-with-suggestions call followed by a complete/widget/error call
 	// carrying no `waniwani/suggestions` key — left the first call's pills on
-	// screen after the flow had moved on or finished. With the key made
-	// authoritative on every flow result (an empty array meaning "no pills for
-	// this step"), the second call's empty entry must win.
+	// screen after the flow had moved on or finished. The key is authoritative
+	// on every flow result (an empty array meaning "no pills for this step"),
+	// so the second call's empty entry wins and clears the row.
 	test("clears pills when a later flow call in the same turn carries an empty array", () => {
 		const message = assistantMessage([
 			flowToolPart(["Bronze", "Silver", "Gold"], "call-1"),
 			flowToolPart([], "call-2"),
 		]);
 
-		expect(extractFlowSuggestions(message)).toBeNull();
-		expect(resolveTurnSuggestions(message)).toBeNull();
+		expect(extractFlowSuggestions(message)).toEqual([]);
 	});
 
 	test("does not let a non-flow tool part after a flow part clear the pills", () => {
@@ -165,61 +164,17 @@ describe("extractFlowSuggestions", () => {
 	});
 });
 
-describe("resolveTurnSuggestions", () => {
-	test("reports flow suggestions with source flow", () => {
-		const message = assistantMessage([flowToolPart(["Oui", "Non"])]);
+describe("extractFollowupSuggestions", () => {
+	test("reads the data-suggestions part", () => {
+		const message = assistantMessage([dataSuggestionsPart(["F1", "F2"])]);
 
-		expect(resolveTurnSuggestions(message)).toEqual({
-			suggestions: ["Oui", "Non"],
-			source: "flow",
-		});
+		expect(extractFollowupSuggestions(message)).toEqual(["F1", "F2"]);
 	});
 
-	test("flow suggestions win over a streamed data part", () => {
-		const message = assistantMessage([
-			dataSuggestionsPart(["From", "Stream"]),
-			flowToolPart(["From", "Flow"]),
-		]);
-
-		expect(resolveTurnSuggestions(message)).toEqual({
-			suggestions: ["From", "Flow"],
-			source: "flow",
-		});
-	});
-
-	test("falls back to a streamed data part when no flow result carries the key", () => {
-		const message = assistantMessage([
-			{ type: "text", text: "Here you go." },
-			dataSuggestionsPart(["From", "Stream"]),
-		]);
-
-		expect(resolveTurnSuggestions(message)).toEqual({
-			suggestions: ["From", "Stream"],
-			source: "followup",
-		});
-	});
-
-	test("returns null when the turn carries neither", () => {
-		const message = assistantMessage([{ type: "text", text: "All done." }]);
-
-		expect(resolveTurnSuggestions(message)).toBeNull();
-	});
-
-	test("ignores a flow entry when includeFlow is false", () => {
-		const message = assistantMessage([flowToolPart(["Oui", "Non"])]);
-
-		expect(resolveTurnSuggestions(message, { includeFlow: false })).toBeNull();
-	});
-
-	test("still returns the streamed part when includeFlow is false and both exist", () => {
-		const message = assistantMessage([
-			dataSuggestionsPart(["From", "Stream"]),
-			flowToolPart(["From", "Flow"]),
-		]);
-
-		expect(resolveTurnSuggestions(message, { includeFlow: false })).toEqual({
-			suggestions: ["From", "Stream"],
-			source: "followup",
-		});
+	test("returns null for an absent or empty part", () => {
+		expect(extractFollowupSuggestions(assistantMessage([]))).toBeNull();
+		expect(
+			extractFollowupSuggestions(assistantMessage([dataSuggestionsPart([])])),
+		).toBeNull();
 	});
 });

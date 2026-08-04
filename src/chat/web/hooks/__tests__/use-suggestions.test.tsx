@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import type { SuggestionOrigin } from "../../@types";
 
 // ---------------------------------------------------------------------------
 // Minimal DOM globals so react-dom/client can mount a hook harness. Unlike
@@ -71,6 +70,27 @@ function render(options: UseSuggestionsOptions) {
 	});
 }
 
+/**
+ * Like {@link Harness}, but records the `suggestions` array returned on
+ * every render — proves the starter row settles in a single commit, i.e.
+ * the `useState` initializer and the starter effect share one array
+ * reference instead of each building their own `.map()` result.
+ */
+function RenderTrackingHarness({
+	resultRef,
+	renderedSuggestionsRef,
+	options,
+}: {
+	resultRef: { current: UseSuggestionsReturn | null };
+	renderedSuggestionsRef: { current: string[][] };
+	options: UseSuggestionsOptions;
+}) {
+	const result = useSuggestions(options);
+	renderedSuggestionsRef.current.push(result.suggestions);
+	resultRef.current = result;
+	return null;
+}
+
 beforeEach(() => {
 	container = document.createElement("div");
 	document.body.appendChild(container);
@@ -134,144 +154,151 @@ type Msg = any;
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("useSuggestions — conversation reset clears stale pills", () => {
-	test("clears flow-driven pills once messages go back to empty, with no `initial` configured", () => {
-		// Mount mid-flight so the streaming -> ready transition below fires the
-		// hook's recompute effect. Flow pills are opt-in, so the host passes
-		// `origins: ["flow"]`.
-		render({
-			messages: [],
-			status: "streaming",
-			config: { origins: ["flow"] },
-		});
+const PAGE = [{ id: "p1", text: "Page one" }];
+const STARTERS = { page: PAGE, channel: ["Fixed one"] };
+const CHANNEL_ONLY = { page: null, channel: ["Fixed one"] };
 
-		const turnMessages: Msg[] = [
-			userMessage("Which plan?"),
-			assistantMessageWithFlowSuggestions(["Bronze", "Silver", "Gold"]),
-		];
-		render({
-			messages: turnMessages,
-			status: "ready",
-			config: { origins: ["flow"] },
-		});
+describe("starter row", () => {
+	test("page starters render with origin page while the conversation is empty", () => {
+		render({ messages: [], status: "ready", starters: STARTERS });
+		expect(hookRef.current?.suggestions).toEqual(["Page one"]);
+		expect(hookRef.current?.source).toBe("page");
+	});
 
-		expect(hookRef.current?.suggestions).toEqual(["Bronze", "Silver", "Gold"]);
-
-		// Simulate `reset()` / `startNewThread()`: messages go back to empty
-		// while status stays "ready". No `initial` was ever configured.
-		render({ messages: [], status: "ready", config: { origins: ["flow"] } });
-
-		expect(hookRef.current?.suggestions).toEqual([]);
+	test("channel starters render when no page matches", () => {
+		render({ messages: [], status: "ready", starters: CHANNEL_ONLY });
+		expect(hookRef.current?.suggestions).toEqual(["Fixed one"]);
 		expect(hookRef.current?.source).toBe("channel");
 	});
 
-	test("resets to the configured `initial` pills (not last flow pills) once messages go back to empty", () => {
-		render({
-			messages: [],
-			status: "streaming",
-			config: { initial: ["Book a demo"], origins: ["flow"] },
-		});
+	test("no starters and no messages renders nothing", () => {
+		render({ messages: [], status: "ready" });
+		expect(hookRef.current?.suggestions).toEqual([]);
+	});
 
-		const turnMessages: Msg[] = [
-			userMessage("Which plan?"),
-			assistantMessageWithFlowSuggestions(["Bronze", "Silver", "Gold"]),
-		];
-		render({
-			messages: turnMessages,
-			status: "ready",
-			config: { initial: ["Book a demo"], origins: ["flow"] },
-		});
-
-		expect(hookRef.current?.suggestions).toEqual(["Bronze", "Silver", "Gold"]);
-		expect(hookRef.current?.source).toBe("flow");
-
+	test("enabled: false renders nothing even with starters", () => {
 		render({
 			messages: [],
 			status: "ready",
-			config: { initial: ["Book a demo"], origins: ["flow"] },
+			enabled: false,
+			starters: STARTERS,
 		});
-
-		expect(hookRef.current?.suggestions).toEqual(["Book a demo"]);
-		expect(hookRef.current?.source).toBe("channel");
+		expect(hookRef.current?.suggestions).toEqual([]);
 	});
 });
 
-describe("useSuggestions — flow pills are opt-in", () => {
-	test("renders no pills from a flow `_meta` entry when no config is passed", () => {
-		render({ messages: [], status: "streaming" });
-
-		const turnMessages: Msg[] = [
-			userMessage("Which plan?"),
-			assistantMessageWithFlowSuggestions(["Bronze", "Silver", "Gold"]),
-		];
-		render({ messages: turnMessages, status: "ready" });
-
-		expect(hookRef.current?.suggestions).toEqual([]);
-		expect(hookRef.current?.source).toBe("channel");
+describe("starter row identity", () => {
+	test("settles in a single render — no phantom re-render from the starter effect", () => {
+		const renderedSuggestionsRef: { current: string[][] } = { current: [] };
+		act(() => {
+			root.render(
+				createElement(RenderTrackingHarness, {
+					resultRef: hookRef,
+					renderedSuggestionsRef,
+					options: { messages: [], status: "ready", starters: STARTERS },
+				}),
+			);
+		});
+		expect(renderedSuggestionsRef.current).toHaveLength(1);
+		expect(renderedSuggestionsRef.current[0]).toBe(
+			hookRef.current?.suggestions,
+		);
 	});
 
-	test("with only `initial` configured, followup pills render (default origins) while flow pills do not", () => {
-		const config = { initial: ["Hi"] };
-		render({ messages: [], status: "streaming", config });
-
-		const followupTurn: Msg[] = [
-			userMessage("Anything else?"),
-			assistantMessageWithFollowupSuggestions(["From", "Followup"]),
-		];
-		render({ messages: followupTurn, status: "ready", config });
-
-		expect(hookRef.current?.suggestions).toEqual(["From", "Followup"]);
-		expect(hookRef.current?.source).toBe("followup");
-
-		const secondUser: Msg = {
-			id: "u2",
-			role: "user",
-			parts: [{ type: "text", text: "Which plan?" }],
+	test("keeps the same suggestions array reference across a re-render with unchanged starters", () => {
+		const options: UseSuggestionsOptions = {
+			messages: [],
+			status: "ready",
+			starters: STARTERS,
 		};
-		render({
-			messages: [...followupTurn, secondUser],
-			status: "streaming",
-			config,
-		});
-
-		const flowTurn: Msg[] = [
-			...followupTurn,
-			secondUser,
-			assistantMessageWithFlowSuggestions(["Bronze", "Silver", "Gold"]),
-		];
-		render({ messages: flowTurn, status: "ready", config });
-
-		expect(hookRef.current?.suggestions).toEqual([]);
-		expect(hookRef.current?.source).toBe("channel");
+		render(options);
+		const first = hookRef.current?.suggestions;
+		render(options);
+		expect(hookRef.current?.suggestions).toBe(first);
 	});
 });
 
-describe("useSuggestions — origin filtering", () => {
-	test("filters out a followup result when only `flow` is enabled", () => {
-		const config: { origins: SuggestionOrigin[] } = { origins: ["flow"] };
-		render({ messages: [], status: "streaming", config });
-
-		const turnMessages: Msg[] = [
-			userMessage("Anything else?"),
-			assistantMessageWithFollowupSuggestions(["From", "Followup"]),
-		];
-		render({ messages: turnMessages, status: "ready", config });
-
+describe("per-turn resolution", () => {
+	test("a user message clears the row", () => {
+		render({ messages: [], status: "ready", starters: STARTERS });
+		const messages: Msg[] = [userMessage("Hi")];
+		render({ messages, status: "submitted", starters: STARTERS });
 		expect(hookRef.current?.suggestions).toEqual([]);
-		expect(hookRef.current?.source).toBe("channel");
 	});
 
-	test("filters out a flow result when only `followup` is enabled", () => {
-		const config: { origins: SuggestionOrigin[] } = { origins: ["followup"] };
-		render({ messages: [], status: "streaming", config });
-
-		const turnMessages: Msg[] = [
-			userMessage("Which plan?"),
-			assistantMessageWithFlowSuggestions(["Bronze", "Silver", "Gold"]),
+	test("flow pills render with zero config (flow is always active)", () => {
+		const messages: Msg[] = [
+			userMessage("Hi"),
+			assistantMessageWithFlowSuggestions(["Flow A", "Flow B"]),
 		];
-		render({ messages: turnMessages, status: "ready", config });
+		render({ messages, status: "streaming", starters: STARTERS });
+		render({ messages, status: "ready", starters: STARTERS });
+		expect(hookRef.current?.suggestions).toEqual(["Flow A", "Flow B"]);
+		expect(hookRef.current?.source).toBe("flow");
+	});
 
+	test("followup pills render when the turn has no flow entry", () => {
+		const messages: Msg[] = [
+			userMessage("Hi"),
+			assistantMessageWithFollowupSuggestions(["F1"]),
+		];
+		render({ messages, status: "streaming", starters: STARTERS });
+		render({ messages, status: "ready", starters: STARTERS });
+		expect(hookRef.current?.suggestions).toEqual(["F1"]);
+		expect(hookRef.current?.source).toBe("followup");
+	});
+
+	test("an empty flow entry clears the row even when a followup arrived", () => {
+		const parts = [
+			...assistantMessageWithFlowSuggestions([]).parts,
+			...assistantMessageWithFollowupSuggestions(["F1"]).parts,
+		];
+		const messages: Msg[] = [
+			userMessage("Hi"),
+			{ id: "a1", role: "assistant", parts },
+		];
+		render({ messages, status: "streaming", starters: STARTERS });
+		render({ messages, status: "ready", starters: STARTERS });
 		expect(hookRef.current?.suggestions).toEqual([]);
-		expect(hookRef.current?.source).toBe("channel");
+	});
+
+	test("a turn with no suggestions clears the row", () => {
+		const messages: Msg[] = [
+			userMessage("Hi"),
+			{ id: "a1", role: "assistant", parts: [{ type: "text", text: "Hello" }] },
+		];
+		render({ messages, status: "streaming", starters: STARTERS });
+		render({ messages, status: "ready", starters: STARTERS });
+		expect(hookRef.current?.suggestions).toEqual([]);
+	});
+
+	test("enabled: false suppresses flow pills too", () => {
+		const messages: Msg[] = [
+			userMessage("Hi"),
+			assistantMessageWithFlowSuggestions(["Flow A"]),
+		];
+		render({
+			messages,
+			status: "streaming",
+			enabled: false,
+			starters: STARTERS,
+		});
+		render({ messages, status: "ready", enabled: false, starters: STARTERS });
+		expect(hookRef.current?.suggestions).toEqual([]);
+	});
+});
+
+describe("reset", () => {
+	test("emptying messages restores the starter row and drops leftover flow pills", () => {
+		const messages: Msg[] = [
+			userMessage("Hi"),
+			assistantMessageWithFlowSuggestions(["Flow A"]),
+		];
+		render({ messages, status: "streaming", starters: STARTERS });
+		render({ messages, status: "ready", starters: STARTERS });
+		expect(hookRef.current?.source).toBe("flow");
+		render({ messages: [], status: "ready", starters: STARTERS });
+		expect(hookRef.current?.suggestions).toEqual(["Page one"]);
+		expect(hookRef.current?.source).toBe("page");
 	});
 });

@@ -6,6 +6,7 @@ import {
 	useCallback,
 	useEffect,
 	useImperativeHandle,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -29,6 +30,7 @@ import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSuggestions } from "../hooks/use-suggestions";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
+import type { StarterSuggestions } from "../lib/resolve-suggestions";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
@@ -300,10 +302,20 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			return () => observer.disconnect();
 		}, [scrollToBottom]);
 
+		const suggestionsProp = props.suggestions;
+		const configInitial =
+			typeof suggestionsProp === "object" && suggestionsProp !== null
+				? suggestionsProp.initial
+				: undefined;
+		const fallbackStarters = useMemo<StarterSuggestions>(
+			() => ({ page: null, channel: configInitial ?? [] }),
+			[configInitial],
+		);
 		const suggestionsState = useSuggestions({
 			messages: engine.messages,
 			status: engine.status,
-			config: props.suggestions,
+			enabled: suggestionsProp !== false,
+			starters: props.starterSuggestions ?? fallbackStarters,
 		});
 
 		// Announce every pill set the visitor actually saw, once per set — keyed

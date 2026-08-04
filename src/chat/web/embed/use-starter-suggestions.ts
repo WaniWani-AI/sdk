@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { DEFAULT_SUGGESTION_ORIGINS } from "../hooks/use-suggestions";
 import { debugLog } from "../lib/debug";
+import type { StarterSuggestions } from "../lib/resolve-suggestions";
 import type {
 	EmbedConfig,
 	PagePrompt,
@@ -8,12 +8,6 @@ import type {
 	PageSuggestionsEntry,
 } from "./config";
 import { usePathname } from "./use-pathname";
-
-/** One starter prompt; `id` is null for fixed-list prompts (no stored identity). */
-export interface PageSuggestion {
-	id: string | null;
-	text: string;
-}
 
 /** How many of a page's prompts the widget shows at a time. */
 const SHOWN_PROMPT_COUNT = 3;
@@ -115,45 +109,30 @@ export function parsePageSuggestions(value: unknown): PageSuggestionsEntry[] {
 	});
 }
 
-/** The page's picked prompts when there are any, else the fixed fallback. */
-export function resolveSuggestions(
-	picked: PageSuggestion[] | null,
-	fallback: string[] | undefined,
-): PageSuggestion[] {
-	if (picked && picked.length > 0) {
-		return picked;
-	}
-	return (fallback ?? []).map((text) => ({ id: null, text }));
-}
-
-/** Starter prompts for the current page, else `config.suggestions`. Objects,
- *  not texts: the ids let a click attribute back to the authored prompt.
- *  @param config the resolved embed config (`pageSuggestions` opts in). */
-export function usePageSuggestions(config: EmbedConfig): PageSuggestion[] {
-	const { pageSuggestions, suggestions, suggestionOrigins } = config;
+/**
+ * Starter candidates for the current page: the matched entry's picked
+ * prompts (page) and the channel's fixed list (channel), kept separate so
+ * the pill row can attribute its origin exactly. Memoized because the pick
+ * is random and the identity has to hold: `useSuggestions` keys an effect
+ * on this object.
+ */
+export function useStarterSuggestions(config: EmbedConfig): StarterSuggestions {
+	const { pageSuggestions, suggestions } = config;
 	const pathname = usePathname();
-	const pageEnabled = (
-		suggestionOrigins ?? DEFAULT_SUGGESTION_ORIGINS
-	).includes("page");
 
-	// Memoized because the pick is random and the identity has to hold:
-	// `useSuggestions` keys an effect on this array and setStates it. Callers
-	// deriving the texts must memoize that map for the same reason.
 	return useMemo(() => {
 		const current = normalizePathname(pathname);
-		const page = pageEnabled
-			? pageSuggestions?.find(
-					(entry) => normalizePathname(entry.url) === current,
-				)
-			: undefined;
-		const picked = page
-			? pickPagePrompts(page.prompts).map(({ id, text }) => ({ id, text }))
+		const entry = pageSuggestions?.find(
+			(candidate) => normalizePathname(candidate.url) === current,
+		);
+		const picked = entry
+			? pickPagePrompts(entry.prompts).map(({ id, text }) => ({ id, text }))
 			: null;
-		debugLog("page suggestions resolve", {
+		debugLog("starter candidates resolve", {
 			pathname: current,
-			matched: Boolean(page),
+			matched: Boolean(entry),
 			count: picked?.length ?? 0,
 		});
-		return resolveSuggestions(picked, suggestions);
-	}, [pathname, pageEnabled, pageSuggestions, suggestions]);
+		return { page: picked, channel: suggestions ?? [] };
+	}, [pathname, pageSuggestions, suggestions]);
 }

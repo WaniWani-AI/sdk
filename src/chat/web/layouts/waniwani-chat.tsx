@@ -14,7 +14,6 @@ import type {
 	ChatClassNames,
 	ChatHandle,
 	ShowToolCalls,
-	SuggestionOrigin,
 	VisitorIdInput,
 	WelcomeConfig,
 } from "../@types";
@@ -26,10 +25,10 @@ import {
 	saveCachedConfig,
 } from "../embed/remote-config";
 import { useVisibilityGate } from "../embed/use-pathname";
+import { useStarterSuggestions } from "../embed/use-starter-suggestions";
 import type { WidgetEvent } from "../embed/widget-events";
 import { createWidgetEventEmitter } from "../embed/widget-events";
 import { WidgetEventsProvider } from "../embed/widget-events-context";
-import { toSuggestionsConfig } from "../hooks/use-suggestions";
 import type { Locale, MessageOverrides } from "../i18n";
 import {
 	createChatTrackClient,
@@ -69,15 +68,6 @@ export interface WaniwaniChatOverrides {
 	placeholder?: string;
 	/** Initial suggestion chips. */
 	suggestions?: string[];
-	/**
-	 * Which providers may fill the per-turn pill row. Defaults to
-	 * `["channel", "page", "followup"]` when unset: starter prompts and
-	 * generated follow-ups render, flow-driven pills stay opt-in — include
-	 * `"flow"` to render the pills a flow drives via
-	 * `interrupt({ suggestions })`. Starter prompts (`suggestions`) are
-	 * unaffected by this field and show either way.
-	 */
-	suggestionOrigins?: SuggestionOrigin[];
 	/** Persist conversations across reloads in IndexedDB. */
 	enableThreadHistory?: boolean;
 	/**
@@ -251,7 +241,6 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				welcomeMessage: overrides?.welcomeMessage,
 				placeholder: overrides?.placeholder,
 				suggestions: overrides?.suggestions,
-				suggestionOrigins: overrides?.suggestionOrigins,
 				enableThreadHistory: overrides?.enableThreadHistory,
 				showToolCalls: overrides?.showToolCalls,
 				appearance: overrides?.appearance,
@@ -268,7 +257,6 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				overrides?.welcomeMessage,
 				overrides?.placeholder,
 				overrides?.suggestions,
-				overrides?.suggestionOrigins,
 				overrides?.enableThreadHistory,
 				overrides?.showToolCalls,
 				overrides?.appearance,
@@ -357,6 +345,11 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			() => resolveConfig(programmatic, remote, undefined),
 			[programmatic, remote],
 		);
+
+		// Starter candidates for the current page; ids ride along for click
+		// attribution. Memoized inside the hook — `useSuggestions` keys an effect
+		// on the object's identity.
+		const starters = useStarterSuggestions(config);
 
 		// Host-page tracking client: same public token and channel as the chat,
 		// session id attached live once the first exchange assigns one.
@@ -466,10 +459,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					welcomeMessage={config.welcomeMessage}
 					welcome={overrides?.welcome}
 					placeholder={config.placeholder}
-					suggestions={toSuggestionsConfig({
-						suggestions: config.suggestions,
-						suggestionOrigins: config.suggestionOrigins,
-					})}
+					starterSuggestions={starters}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}
 					disclaimer={config.disclaimer}

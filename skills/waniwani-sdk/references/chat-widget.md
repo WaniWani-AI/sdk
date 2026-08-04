@@ -80,7 +80,6 @@ The dashboard owns the agent's display and behavior config. Use `overrides` only
 | `welcome` | `WelcomeConfig` | Rich welcome screen (icon, title, suggestion cards). Takes precedence over `welcomeMessage` |
 | `placeholder` | `string` | Input placeholder |
 | `suggestions` | `string[]` | Starter suggestion chips, shown before the first message |
-| `suggestionOrigins` | `SuggestionOrigin[]` | Which providers may fill the per-turn pill row (`"channel"`, `"page"`, `"flow"`, `"followup"`). Defaults to `["channel", "page", "followup"]` — include `"flow"` to render the pills a flow drives via `interrupt({ suggestions })`. `suggestions` (the starter prompts) are unaffected and show either way. See [Where the suggestion pills come from](#where-the-suggestion-pills-come-from) |
 | `enableThreadHistory` | `boolean` | Persist conversations across reloads in IndexedDB |
 | `showToolCalls` | `boolean \| "titles-only"` | How the agent's tool-call activity renders, grouped into one collapsible "chain of thought". `true` (default) — each step expandable to its request/response JSON. `"titles-only"` — step labels only, no JSON. `false` — hides the chain entirely (including the reasoning trace); only the generic "On it…" indicator shows while the agent works. MCP App widgets always render regardless. |
 | `allowAttachments` | `boolean` | Enable file attachments in the input |
@@ -93,38 +92,31 @@ The dashboard owns the agent's display and behavior config. Use `overrides` only
 
 #### Where the suggestion pills come from
 
-The pill row above the input can be filled by up to four origins, each gated
-independently by `suggestionOrigins`:
+The pill row above the input can be filled by four origins. Which one renders
+is decided internally by a fixed priority hierarchy, strongest first, and it
+is not configurable:
 
-- **`"channel"`**: the `suggestions` above, configured per channel in the
-  dashboard. Shown only until the visitor's first message.
-- **`"page"`**: per-URL starter prompts configured in the dashboard for the
-  current page.
-- **`"flow"`**: a connected MCP's flow declaring `suggestions` on a step with
-  one open question. These refresh after each reply and describe the question
-  the agent just asked.
-- **`"followup"`**: pills generated from the conversation and streamed as a
-  `data-suggestions` part (self-hosted backends only).
+1. **`"flow"`**: a connected MCP's flow declaring `suggestions` on a step with
+   one open question. Authoritative every turn: a reply whose flow step
+   carries no suggestions clears the row, even when a generated follow-up
+   arrived in the same turn.
+2. **`"followup"`**: pills generated from the conversation and streamed as a
+   `data-suggestions` part (self-hosted backends only).
+3. **`"page"`**: per-URL starter prompts configured in the dashboard for the
+   current page. Shown only until the visitor's first message.
+4. **`"channel"`**: the `suggestions` above, configured per channel in the
+   dashboard. The base fallback, shown only until the visitor's first message
+   and only when no page entry matches.
 
-`suggestionOrigins` defaults to `["channel", "page", "followup"]` when unset:
-starter prompts and generated follow-ups render, and flow-driven pills stay
-opt-in. Once `"flow"` is enabled, pills recompute every turn, so a reply that
-carries none clears the row. To opt in:
+Flow pills render with zero host configuration: every widget shows them as
+soon as a flow provides suggestions. The flow also sends its suggestions to
+the assistant as candidate answers, independently of the pill row.
 
-- `<WaniwaniChat>`: `overrides={{ suggestionOrigins: ["channel", "page", "flow", "followup"] }}`
-  (or any subset including `"flow"`)
-- `<script>` embed: `data-suggestion-origins="channel,page,flow,followup"`
-- `<ChatEmbed>` (self-hosted primitive only): `suggestions={{ origins: ["flow"] }}`
-  (optionally alongside `initial: [...]` starter prompts), or
-  `suggestions={false}` to hide the pill row entirely
-
-Without `"flow"` enabled, the flow still sends its suggestions to the
-assistant as candidate answers — only the clickable pill row is withheld.
-
-`<WaniwaniChat>` and the `<script>` embed have no equivalent of `ChatEmbed`'s
-`suggestions={false}`: there is always a pill row once at least one enabled
-origin supplies pills, and `suggestionOrigins` only controls which origins are
-allowed to fill it.
+`<ChatEmbed>` (self-hosted primitive only) accepts `suggestions={false}` to
+hide the pill row entirely, or `suggestions={{ initial: [...] }}` for starter
+prompts. `<WaniwaniChat>` and the `<script>` embed have no off switch: the
+dashboard controls the starter content, and the pill row renders whenever an
+origin supplies pills.
 
 Overrides win over dashboard config when both are set.
 
@@ -284,7 +276,6 @@ The chat fits within whatever bound you set and scrolls internally — no need t
 | `data-welcome-message` | No | Greeting shown before first message |
 | `data-placeholder` | No | Input field placeholder text |
 | `data-suggestions` | No | Comma-separated suggestion chips |
-| `data-suggestion-origins` | No | Comma-separated list of `channel`, `page`, `flow`, `followup` — which providers may fill the per-turn pill row. Defaults to `channel,page,followup` when unset (`flow` stays opt-in); an empty attribute means no origins render. Unknown values are dropped. `data-suggestions` (starter prompts) show either way. See [Where the suggestion pills come from](#where-the-suggestion-pills-come-from) |
 | `data-enable-thread-history` | No | `"true"`/`"false"` — persist threads in IndexedDB, show thread menu in header |
 | `data-show-tool-calls` | No | Tool-call activity rendering (grouped into one collapsible chain). `"true"` (default) — steps expandable to request/response JSON. `"titles-only"` — step labels only. `"false"` — hides the chain and the reasoning trace; only the "On it…" indicator shows |
 | `data-css` | No | URL to custom stylesheet (injected into Shadow DOM) |
