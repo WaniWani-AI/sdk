@@ -33,7 +33,7 @@ import { ThreadMenu } from "../../../chat/web/components/thread-menu";
 import { useCallTool } from "../../../chat/web/hooks/use-call-tool";
 import { useChatEngine } from "../../../chat/web/hooks/use-chat-engine";
 import { useConfig } from "../../../chat/web/hooks/use-config";
-import { useSuggestions } from "../../../chat/web/hooks/use-suggestions";
+import { useSuggestionRow } from "../../../chat/web/hooks/use-suggestion-row";
 import { useTypingPlaceholder } from "../../../chat/web/hooks/use-typing-placeholder";
 import { buildResourceEndpoint } from "../../../chat/web/lib/resource-endpoint";
 import { cn } from "../../../chat/web/lib/utils";
@@ -144,7 +144,7 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			);
 		}, []);
 
-		const suggestionsState = useSuggestions({
+		const suggestionsState = useSuggestionRow({
 			messages: engine.messages,
 			status: engine.status,
 			suggestions: props.suggestions,

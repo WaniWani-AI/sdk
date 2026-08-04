@@ -41,10 +41,7 @@ export interface SuggestionCandidates {
  * The rungs an embed host reads from `/config`. Grouped because they share a
  * source and a lifetime: both stop applying at the visitor's first message.
  */
-export type ConfiguredSuggestions = Pick<
-	SuggestionCandidates,
-	"page" | "channel"
->;
+export type PreChatSuggestions = Pick<SuggestionCandidates, "page" | "channel">;
 
 export interface ResolvedSuggestions {
 	origin: SuggestionOrigin;

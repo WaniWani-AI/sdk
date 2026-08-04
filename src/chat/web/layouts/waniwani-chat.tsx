@@ -24,8 +24,8 @@ import {
 	loadCachedConfig,
 	saveCachedConfig,
 } from "../embed/remote-config";
-import { useConfiguredSuggestions } from "../embed/use-configured-suggestions";
 import { useVisibilityGate } from "../embed/use-pathname";
+import { useSuggestions } from "../embed/use-suggestions";
 import type { WidgetEvent } from "../embed/widget-events";
 import { createWidgetEventEmitter } from "../embed/widget-events";
 import { WidgetEventsProvider } from "../embed/widget-events-context";
@@ -354,10 +354,10 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			[programmatic, remote],
 		);
 
-		// The dashboard-configured page and channel rungs; ids ride along for
-		// click attribution. Memoized inside the hook — `useSuggestions` keys an
-		// effect on the object's identity.
-		const configured = useConfiguredSuggestions(config);
+		// The page and channel rungs for this URL; ids ride along for click
+		// attribution. Memoized inside the hook — the pill row keys an effect
+		// on this object's identity.
+		const suggestions = useSuggestions(config);
 
 		// Host-page tracking client: same public token and channel as the chat,
 		// session id attached live once the first exchange assigns one.
@@ -467,7 +467,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					welcomeMessage={config.welcomeMessage}
 					welcome={overrides?.welcome}
 					placeholder={config.placeholder}
-					configuredSuggestions={configured}
+					suggestions={suggestions}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}
 					disclaimer={config.disclaimer}

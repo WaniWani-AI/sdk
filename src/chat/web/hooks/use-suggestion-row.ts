@@ -4,7 +4,7 @@ import type { ChatStatus, UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SuggestionsConfig } from "../@types";
 import type {
-	ConfiguredSuggestions,
+	PreChatSuggestions,
 	SuggestionOrigin,
 } from "../lib/resolve-suggestions";
 import { resolveSuggestions, toSuggestions } from "../lib/resolve-suggestions";
@@ -13,34 +13,52 @@ import {
 	extractFollowupSuggestions,
 } from "./turn-suggestions";
 
-export interface UseSuggestionsOptions {
+export interface UseSuggestionRowOptions {
 	messages: UIMessage[];
 	status: ChatStatus;
-	/** `false` renders no pill row; an object's `initial` seeds `channel`. */
-	suggestions?: boolean | SuggestionsConfig;
 	/**
-	 * Page-aware rungs from an embed host's `/config`. Wins over
-	 * `suggestions.initial`. Must be referentially stable — an effect keys on it.
+	 * The host's `suggestions` prop. `false` renders no row; `{ initial }` seeds
+	 * the channel rung; already-resolved {@link PreChatSuggestions} from an
+	 * embed host pass through with their prompt ids. A resolved value must be
+	 * referentially stable — an effect keys on it.
 	 */
-	configured?: ConfiguredSuggestions;
+	suggestions?: boolean | SuggestionsConfig | PreChatSuggestions;
+}
+
+/** An embed host's resolved rungs carry `page`/`channel`; a config carries `initial`. */
+function isResolved(
+	value: SuggestionsConfig | PreChatSuggestions,
+): value is PreChatSuggestions {
+	return "page" in value || "channel" in value;
+}
+
+function readProp(suggestions: UseSuggestionRowOptions["suggestions"]): {
+	rungs?: PreChatSuggestions;
+	initial?: string[];
+} {
+	if (typeof suggestions !== "object" || suggestions === null) {
+		return {};
+	}
+	return isResolved(suggestions)
+		? { rungs: suggestions }
+		: { initial: suggestions.initial };
 }
 
 /** Pill row state, driven entirely by `resolveSuggestions`. */
-export function useSuggestions(options: UseSuggestionsOptions) {
-	const { messages, status, suggestions: config, configured } = options;
-	const enabled = config !== false;
+export function useSuggestionRow(options: UseSuggestionRowOptions) {
+	const { messages, status, suggestions } = options;
+	const enabled = suggestions !== false;
 
-	const initial =
-		typeof config === "object" && config !== null ? config.initial : undefined;
-	const fromProp = useMemo<ConfiguredSuggestions>(
+	const { rungs, initial } = readProp(suggestions);
+	const fromInitial = useMemo<PreChatSuggestions>(
 		() => ({ page: null, channel: toSuggestions(initial ?? []) }),
 		[initial],
 	);
-	const preChat = configured ?? fromProp;
+	const preChat = rungs ?? fromInitial;
 
 	// Memoized so the `useState` initializer and the effect below share one array
-	// reference. Two content-equal arrays would defeat `setSuggestions`' bail-out
-	// and double-count the `suggestions.shown` impression in `chat-embed.tsx`.
+	// reference. Two content-equal arrays would defeat `setPills`' bail-out and
+	// double-count the `suggestions.shown` impression in `chat-embed.tsx`.
 	const preChatRow = useMemo(
 		() =>
 			enabled
@@ -52,14 +70,14 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		() => preChatRow?.suggestions.map((s) => s.text) ?? [],
 		[preChatRow],
 	);
-	const [suggestions, setSuggestions] = useState<string[]>(preChatTexts);
+	const [pills, setPills] = useState<string[]>(preChatTexts);
 	const [source, setSource] = useState<SuggestionOrigin>(
 		preChatRow?.origin ?? "channel",
 	);
 	const prevStatusRef = useRef<ChatStatus>(status);
 
 	const clear = useCallback(() => {
-		setSuggestions([]);
+		setPills([]);
 	}, []);
 
 	// Also covers `reset()` / `startNewThread()`, which empty `messages` without
@@ -70,7 +88,7 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 		if (hasMessages) {
 			return;
 		}
-		setSuggestions(preChatTexts);
+		setPills(preChatTexts);
 		setSource(preChatRow?.origin ?? "channel");
 	}, [preChatTexts, preChatRow, hasMessages]);
 
@@ -100,15 +118,15 @@ export function useSuggestions(options: UseSuggestionsOptions) {
 
 		const flow = extractFlowSuggestions(lastAssistant);
 		const followup = extractFollowupSuggestions(lastAssistant);
-		const resolved = resolveSuggestions({
+		const turnRow = resolveSuggestions({
 			flow: flow === null ? null : toSuggestions(flow),
 			followup: followup === null ? null : toSuggestions(followup),
 			page: null,
 			channel: null,
 		});
-		setSuggestions(resolved ? resolved.suggestions.map((s) => s.text) : []);
-		setSource(resolved?.origin ?? "channel");
+		setPills(turnRow ? turnRow.suggestions.map((s) => s.text) : []);
+		setSource(turnRow?.origin ?? "channel");
 	}, [status, enabled, messages]);
 
-	return { suggestions, source, isLoading: false, clear };
+	return { suggestions: pills, source, isLoading: false, clear };
 }

@@ -23,8 +23,8 @@ import {
 } from "../lib/suggestion-click";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
-import { useConfiguredSuggestions } from "./use-configured-suggestions";
 import { useVisibilityGate } from "./use-pathname";
+import { useSuggestions } from "./use-suggestions";
 import { createWidgetEventEmitter } from "./widget-events";
 import { WidgetEventsProvider } from "./widget-events-context";
 
@@ -116,10 +116,10 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			[],
 		);
 
-		// The dashboard-configured page and channel rungs; ids ride along for
-		// click attribution. Memoized inside the hook — `useSuggestions` keys an
-		// effect on the object's identity.
-		const configured = useConfiguredSuggestions(config);
+		// The page and channel rungs for this URL; ids ride along for click
+		// attribution. Memoized inside the hook — the pill row keys an effect
+		// on this object's identity.
+		const suggestions = useSuggestions(config);
 
 		// Record every suggestion click and every rendered pill set
 		// server-side, attributed to the authored prompts involved. Rides the
@@ -129,7 +129,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			return widgetEvents.subscribe((event) => {
 				if (event.name === "suggestion.clicked") {
 					const { text, origin } = event.properties;
-					const promptId = resolveSuggestionId(configured.page ?? [], text);
+					const promptId = resolveSuggestionId(suggestions.page ?? [], text);
 					void trackSuggestionClick({
 						api: config.api ?? "",
 						token: config.token,
@@ -146,7 +146,10 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 				}
 				if (event.name === "suggestions.shown") {
 					const { texts, origin } = event.properties;
-					const prompts = resolveShownSuggestions(configured.page ?? [], texts);
+					const prompts = resolveShownSuggestions(
+						suggestions.page ?? [],
+						texts,
+					);
 					void trackSuggestionShown({
 						api: config.api ?? "",
 						token: config.token,
@@ -161,7 +164,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			});
 		}, [
 			widgetEvents,
-			configured,
+			suggestions,
 			config.api,
 			config.token,
 			config.channelId,
@@ -191,7 +194,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 					hideHeader={config.hideHeader}
 					welcomeMessage={config.welcomeMessage}
 					placeholder={config.placeholder}
-					configuredSuggestions={configured}
+					suggestions={suggestions}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}
 					locale={config.locale}

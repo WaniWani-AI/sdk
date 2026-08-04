@@ -11,7 +11,7 @@ import { debugLog } from "../lib/debug";
 import { trackPageView } from "../lib/page-view";
 import type { EmbedConfig } from "./config";
 import { resolveConfig } from "./config";
-import { parsePageSuggestions } from "./use-configured-suggestions";
+import { parsePageSuggestions } from "./use-suggestions";
 import type { VisibilityRules } from "./visibility";
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 import type { ChatAppearance, ShowToolCalls } from "./embed/config";
 import type { MessageOverrides } from "./i18n";
 import type {
-	ConfiguredSuggestions,
+	PreChatSuggestions,
 	SuggestionOrigin,
 } from "./lib/resolve-suggestions";
 import type { VisitorIdInput } from "./lib/visitor-context";
@@ -201,13 +201,15 @@ export interface ChatBaseProps {
 	/** Callback fired when a response is received */
 	onResponseReceived?: () => void;
 	/**
-	 * Suggestion pill configuration. The pill row obeys a fixed priority
-	 * hierarchy — flow > followup > page > channel starter prompts — and every
-	 * origin is always active. An object sets starter prompts (`initial`);
-	 * `false` hides the pill row entirely; `true` and unset mean default
-	 * behavior.
+	 * Suggestion pills. The row obeys a fixed hierarchy — flow > followup >
+	 * page > channel — and every origin is always active.
+	 *
+	 * `false` hides the row; `true` / unset is the default. `{ initial: [...] }`
+	 * sets starter prompts. Embed hosts pass the resolved
+	 * {@link PreChatSuggestions} from `useSuggestions(config)` instead, which
+	 * carries the prompt ids needed for click attribution.
 	 */
-	suggestions?: boolean | SuggestionsConfig;
+	suggestions?: boolean | SuggestionsConfig | PreChatSuggestions;
 	/**
 	 * Handler for MCP tool calls from widgets.
 	 * Called when a widget uses `callServerTool` (MCP Apps standard).
@@ -376,14 +378,6 @@ export interface ChatEmbedProps
 	 * should leave this unset.
 	 */
 	initializing?: boolean;
-	/**
-	 * @internal
-	 * The page-aware `page` and `channel` rungs resolved by an embed host
-	 * (`InlineChat`, `FloatingChat`, `WaniwaniChat`) from its `/config`
-	 * payload. Wins over `suggestions.initial`. Must be referentially stable
-	 * (memoized) — the pill row keys an effect on it.
-	 */
-	configuredSuggestions?: ConfiguredSuggestions;
 }
 
 // `ChatCardProps` moved to `src/legacy/chat/web/chat-card.tsx` alongside the

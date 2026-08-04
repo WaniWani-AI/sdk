@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { debugLog } from "../lib/debug";
-import type { ConfiguredSuggestions } from "../lib/resolve-suggestions";
+import type { PreChatSuggestions } from "../lib/resolve-suggestions";
 import { toSuggestions } from "../lib/resolve-suggestions";
 import type {
 	EmbedConfig,
@@ -117,9 +117,7 @@ export function parsePageSuggestions(value: unknown): PageSuggestionsEntry[] {
  * the pick is random and the identity has to hold: `useSuggestions` keys an
  * effect on this object.
  */
-export function useConfiguredSuggestions(
-	config: EmbedConfig,
-): ConfiguredSuggestions {
+export function useSuggestions(config: EmbedConfig): PreChatSuggestions {
 	const { pageSuggestions, suggestions } = config;
 	const pathname = usePathname();
 

@@ -3,7 +3,7 @@ import { Window } from "happy-dom";
 
 // ---------------------------------------------------------------------------
 // Minimal DOM globals so react-dom/client can mount a hook harness. Unlike
-// `use-chat-engine.test.tsx`, `useSuggestions` has no dependency on
+// `use-chat-engine.test.tsx`, `useSuggestionRow` has no dependency on
 // `@ai-sdk/react`, IndexedDB, or the transport layer, so none of that mocking
 // is needed here — just enough DOM for `createRoot` + `act`.
 // ---------------------------------------------------------------------------
@@ -39,9 +39,9 @@ const { act, createElement } = await import("react");
 const { createRoot } = await import("react-dom/client");
 type Root = ReturnType<typeof createRoot>;
 
-const { useSuggestions } = await import("../use-suggestions");
-type UseSuggestionsOptions = Parameters<typeof useSuggestions>[0];
-type UseSuggestionsReturn = ReturnType<typeof useSuggestions>;
+const { useSuggestionRow } = await import("../use-suggestion-row");
+type UseSuggestionRowOptions = Parameters<typeof useSuggestionRow>[0];
+type UseSuggestionRowReturn = ReturnType<typeof useSuggestionRow>;
 
 const { SUGGESTIONS_META_KEY } = await import("../../../../shared/meta-keys");
 
@@ -53,18 +53,18 @@ function Harness({
 	resultRef,
 	options,
 }: {
-	resultRef: { current: UseSuggestionsReturn | null };
-	options: UseSuggestionsOptions;
+	resultRef: { current: UseSuggestionRowReturn | null };
+	options: UseSuggestionRowOptions;
 }) {
-	resultRef.current = useSuggestions(options);
+	resultRef.current = useSuggestionRow(options);
 	return null;
 }
 
 let root: Root;
 let container: HTMLElement;
-let hookRef: { current: UseSuggestionsReturn | null };
+let hookRef: { current: UseSuggestionRowReturn | null };
 
-function render(options: UseSuggestionsOptions) {
+function render(options: UseSuggestionRowOptions) {
 	act(() => {
 		root.render(createElement(Harness, { resultRef: hookRef, options }));
 	});
@@ -81,11 +81,11 @@ function RenderTrackingHarness({
 	renderedSuggestionsRef,
 	options,
 }: {
-	resultRef: { current: UseSuggestionsReturn | null };
+	resultRef: { current: UseSuggestionRowReturn | null };
 	renderedSuggestionsRef: { current: string[][] };
-	options: UseSuggestionsOptions;
+	options: UseSuggestionRowOptions;
 }) {
-	const result = useSuggestions(options);
+	const result = useSuggestionRow(options);
 	renderedSuggestionsRef.current.push(result.suggestions);
 	resultRef.current = result;
 	return null;
@@ -160,13 +160,13 @@ const CHANNEL_ONLY = { page: null, channel: [{ id: null, text: "Fixed one" }] };
 
 describe("pre-chat row", () => {
 	test("page prompts render with origin page while the conversation is empty", () => {
-		render({ messages: [], status: "ready", configured: CONFIGURED });
+		render({ messages: [], status: "ready", suggestions: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual(["Page one"]);
 		expect(hookRef.current?.source).toBe("page");
 	});
 
 	test("channel prompts render when no page matches", () => {
-		render({ messages: [], status: "ready", configured: CHANNEL_ONLY });
+		render({ messages: [], status: "ready", suggestions: CHANNEL_ONLY });
 		expect(hookRef.current?.suggestions).toEqual(["Fixed one"]);
 		expect(hookRef.current?.source).toBe("channel");
 	});
@@ -181,7 +181,6 @@ describe("pre-chat row", () => {
 			messages: [],
 			status: "ready",
 			suggestions: false,
-			configured: CONFIGURED,
 		});
 		expect(hookRef.current?.suggestions).toEqual([]);
 	});
@@ -195,7 +194,7 @@ describe("pre-chat row identity", () => {
 				createElement(RenderTrackingHarness, {
 					resultRef: hookRef,
 					renderedSuggestionsRef,
-					options: { messages: [], status: "ready", configured: CONFIGURED },
+					options: { messages: [], status: "ready", suggestions: CONFIGURED },
 				}),
 			);
 		});
@@ -206,10 +205,10 @@ describe("pre-chat row identity", () => {
 	});
 
 	test("keeps the same suggestions array reference when the candidates are unchanged", () => {
-		const options: UseSuggestionsOptions = {
+		const options: UseSuggestionRowOptions = {
 			messages: [],
 			status: "ready",
-			configured: CONFIGURED,
+			suggestions: CONFIGURED,
 		};
 		render(options);
 		const first = hookRef.current?.suggestions;
@@ -220,9 +219,9 @@ describe("pre-chat row identity", () => {
 
 describe("per-turn resolution", () => {
 	test("a user message clears the row", () => {
-		render({ messages: [], status: "ready", configured: CONFIGURED });
+		render({ messages: [], status: "ready", suggestions: CONFIGURED });
 		const messages: Msg[] = [userMessage("Hi")];
-		render({ messages, status: "submitted", configured: CONFIGURED });
+		render({ messages, status: "submitted", suggestions: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual([]);
 	});
 
@@ -231,8 +230,8 @@ describe("per-turn resolution", () => {
 			userMessage("Hi"),
 			assistantMessageWithFlowSuggestions(["Flow A", "Flow B"]),
 		];
-		render({ messages, status: "streaming", configured: CONFIGURED });
-		render({ messages, status: "ready", configured: CONFIGURED });
+		render({ messages, status: "streaming", suggestions: CONFIGURED });
+		render({ messages, status: "ready", suggestions: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual(["Flow A", "Flow B"]);
 		expect(hookRef.current?.source).toBe("flow");
 	});
@@ -242,8 +241,8 @@ describe("per-turn resolution", () => {
 			userMessage("Hi"),
 			assistantMessageWithFollowupSuggestions(["F1"]),
 		];
-		render({ messages, status: "streaming", configured: CONFIGURED });
-		render({ messages, status: "ready", configured: CONFIGURED });
+		render({ messages, status: "streaming", suggestions: CONFIGURED });
+		render({ messages, status: "ready", suggestions: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual(["F1"]);
 		expect(hookRef.current?.source).toBe("followup");
 	});
@@ -257,8 +256,8 @@ describe("per-turn resolution", () => {
 			userMessage("Hi"),
 			{ id: "a1", role: "assistant", parts },
 		];
-		render({ messages, status: "streaming", configured: CONFIGURED });
-		render({ messages, status: "ready", configured: CONFIGURED });
+		render({ messages, status: "streaming", suggestions: CONFIGURED });
+		render({ messages, status: "ready", suggestions: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual([]);
 	});
 
@@ -267,8 +266,8 @@ describe("per-turn resolution", () => {
 			userMessage("Hi"),
 			{ id: "a1", role: "assistant", parts: [{ type: "text", text: "Hello" }] },
 		];
-		render({ messages, status: "streaming", configured: CONFIGURED });
-		render({ messages, status: "ready", configured: CONFIGURED });
+		render({ messages, status: "streaming", suggestions: CONFIGURED });
+		render({ messages, status: "ready", suggestions: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual([]);
 	});
 
@@ -281,13 +280,11 @@ describe("per-turn resolution", () => {
 			messages,
 			status: "streaming",
 			suggestions: false,
-			configured: CONFIGURED,
 		});
 		render({
 			messages,
 			status: "ready",
 			suggestions: false,
-			configured: CONFIGURED,
 		});
 		expect(hookRef.current?.suggestions).toEqual([]);
 	});
@@ -299,10 +296,10 @@ describe("reset", () => {
 			userMessage("Hi"),
 			assistantMessageWithFlowSuggestions(["Flow A"]),
 		];
-		render({ messages, status: "streaming", configured: CONFIGURED });
-		render({ messages, status: "ready", configured: CONFIGURED });
+		render({ messages, status: "streaming", suggestions: CONFIGURED });
+		render({ messages, status: "ready", suggestions: CONFIGURED });
 		expect(hookRef.current?.source).toBe("flow");
-		render({ messages: [], status: "ready", configured: CONFIGURED });
+		render({ messages: [], status: "ready", suggestions: CONFIGURED });
 		expect(hookRef.current?.suggestions).toEqual(["Page one"]);
 		expect(hookRef.current?.source).toBe("page");
 	});

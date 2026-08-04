@@ -166,7 +166,8 @@ One word per concept, in identifiers. Enforced by `scripts/check-vocabulary.ts`
 
 | Concept | Use | Not | Frozen |
 |---|---|---|---|
-| A clickable answer above the composer | `Suggestion` | `prompt`, `starter`, `chip`, `CTA` | event payload keys `promptId` / `prompts`; `/config`'s `pageSuggestions[].prompts` |
+| A clickable answer above the composer | `Suggestion` | `prompt`, `starter`, `chip`, `CTA`, `configured` | event payload keys `promptId` / `prompts`; `/config`'s `pageSuggestions[].prompts` |
+| The `page` + `channel` rungs an embed host resolves | `PreChatSuggestions` | `configured*`, `starter*` | — |
 | Its rendered UI element | `pill` | `chip`, `card`, `CTA` | — |
 | Emitting an event | `track*` | `fire*`, `capture*`, `report*` | `captureBatch` (test helper); `record*` for writing to an in-memory trace, which is not emitting |
 | The chat text input | `PromptInput` | — | vendored from ai-elements |
@@ -191,6 +192,13 @@ Three rules produce the table, and they generalize to concepts not in it:
 Before naming a new type, file, function, or field, grep for the concept first.
 Reusing the incumbent word is nearly always right; coining a synonym costs every
 future reader.
+
+A fourth rule earned in review: **a name that describes the plumbing instead of
+the thing is not a name.** `configured` said where a value came from, not what it
+was, so it carried no meaning at the call site. Prefer a term a reader can check
+against the domain — `PreChatSuggestions` says exactly when those rungs apply.
+Where a wrapper exists only to carry such a value, delete the wrapper rather than
+renaming it: one `suggestions` prop that accepts either shape beats two props.
 
 ## CSS / Tailwind
 

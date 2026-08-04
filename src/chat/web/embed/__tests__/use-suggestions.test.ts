@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import type { ConfiguredSuggestions } from "../../lib/resolve-suggestions";
+import type { PreChatSuggestions } from "../../lib/resolve-suggestions";
 // Safe to import eagerly: pure, no DOM.
 import { toSuggestions } from "../../lib/resolve-suggestions";
 // Type-only, so it doesn't pull the module in before the globals below exist.
@@ -39,8 +39,8 @@ const {
 	normalizePathname,
 	parsePageSuggestions,
 	pickPagePrompts,
-	useConfiguredSuggestions,
-} = await import("../use-configured-suggestions");
+	useSuggestions,
+} = await import("../use-suggestions");
 
 const PRICING_PROMPTS: PagePrompt[] = [
 	{ id: "pricing-1", text: "What plans do you offer?", tier: "low" },
@@ -65,9 +65,9 @@ const BASE_CONFIG: EmbedConfig = {
 /** Mount a probe that surfaces the hook's resolved rungs. */
 async function mount(config: EmbedConfig) {
 	const container = win.document.createElement("div");
-	let latest: ConfiguredSuggestions = { page: null, channel: [] };
+	let latest: PreChatSuggestions = { page: null, channel: [] };
 	function Probe() {
-		latest = useConfiguredSuggestions(config);
+		latest = useSuggestions(config);
 		return null;
 	}
 	// biome-ignore lint/suspicious/noExplicitAny: happy-dom Element vs DOM Element
@@ -105,7 +105,7 @@ async function mount(config: EmbedConfig) {
  */
 async function renderConfigured(
 	overrides: Pick<EmbedConfig, "suggestions" | "pageSuggestions">,
-): Promise<ConfiguredSuggestions> {
+): Promise<PreChatSuggestions> {
 	const h = await mount({
 		api: BASE_CONFIG.api,
 		token: BASE_CONFIG.token,
@@ -228,7 +228,7 @@ describe("parsePageSuggestions", () => {
 	});
 });
 
-describe("useConfiguredSuggestions", () => {
+describe("useSuggestions", () => {
 	test("is inert without pageSuggestions — page is null, channel is the fixed list", async () => {
 		const h = await mount({ ...BASE_CONFIG, pageSuggestions: undefined });
 		expect(h.value).toEqual({

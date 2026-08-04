@@ -5,7 +5,7 @@
 // input** animates into view at the bottom of the screen — not a launcher
 // button. A beat after it settles the bar widens on its own, wraps itself in a
 // frosted-glass card (translucent + blurred, so the host page reads through
-// it), and reveals the agent's configured suggestions as pills *inside
+// it), and reveals the agent's suggestion pills *inside
 // that card*, above the input — without opening the chat yet. (Clicking/
 // focusing the resting bar does the same thing immediately.) As soon as the
 // visitor sends their first message (typed or a suggestion), the full chat
@@ -44,9 +44,9 @@ import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
-import { useConfiguredSuggestions } from "./use-configured-suggestions";
 import { usePathname, useVisibilityGate } from "./use-pathname";
 import { useScrollAppearance } from "./use-scroll-appearance";
+import { useSuggestions } from "./use-suggestions";
 import { appearTriggerForPath } from "./visibility";
 import { createWidgetEventEmitter } from "./widget-events";
 import { WidgetEventsProvider } from "./widget-events-context";
@@ -172,19 +172,19 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			[userVars],
 		);
 
-		// The dashboard-configured page and channel rungs; ids ride along for
-		// click attribution. Memoized inside the hook — `useSuggestions` keys an
-		// effect on the object's identity.
-		const configured = useConfiguredSuggestions(config);
+		// The page and channel rungs for this URL; ids ride along for click
+		// attribution. Memoized inside the hook — the pill row keys an effect
+		// on this object's identity.
+		const suggestions = useSuggestions(config);
 		// The dock renders the same pre-chat row the panel would, resolved through
 		// the same hierarchy so its impression event carries the exact origin. No
 		// turn has happened yet at the dock, so the two turn-derived rungs are
 		// absent by construction.
 		const dockRow = useMemo(
-			() => resolveSuggestions({ flow: null, followup: null, ...configured }),
-			[configured],
+			() => resolveSuggestions({ flow: null, followup: null, ...suggestions }),
+			[suggestions],
 		);
-		const suggestions = useMemo(
+		const dockTexts = useMemo(
 			() => dockRow?.suggestions.map((s) => s.text) ?? [],
 			[dockRow],
 		);
@@ -198,7 +198,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			return widgetEvents.subscribe((event) => {
 				if (event.name === "suggestion.clicked") {
 					const { text, origin } = event.properties;
-					const promptId = resolveSuggestionId(configured.page ?? [], text);
+					const promptId = resolveSuggestionId(suggestions.page ?? [], text);
 					void trackSuggestionClick({
 						api: config.api ?? "",
 						token: config.token,
@@ -215,7 +215,10 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				}
 				if (event.name === "suggestions.shown") {
 					const { texts, origin } = event.properties;
-					const prompts = resolveShownSuggestions(configured.page ?? [], texts);
+					const prompts = resolveShownSuggestions(
+						suggestions.page ?? [],
+						texts,
+					);
 					void trackSuggestionShown({
 						api: config.api ?? "",
 						token: config.token,
@@ -230,7 +233,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			});
 		}, [
 			widgetEvents,
-			configured,
+			suggestions,
 			config.api,
 			config.token,
 			config.channelId,
@@ -251,9 +254,9 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			shownSuggestionsRef.current = dockRow;
 			widgetEvents.emit({
 				name: "suggestions.shown",
-				properties: { texts: suggestions, origin: dockRow.origin },
+				properties: { texts: dockTexts, origin: dockRow.origin },
 			});
-		}, [suggestionsVisible, dockRow, suggestions, widgetEvents]);
+		}, [suggestionsVisible, dockRow, dockTexts, widgetEvents]);
 		// The dock is the chat's entry point, so it shows the configured input
 		// placeholder by default (`data-launcher-text` overrides it for a
 		// dock-specific prompt). Typed out like the in-chat input.
@@ -304,7 +307,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// means a collapse back to `input` (via the close button) won't
 		// re-trigger it.
 		useEffect(() => {
-			if (!appeared || suggestions.length === 0) {
+			if (!appeared || dockTexts.length === 0) {
 				return;
 			}
 			const id = setTimeout(() => {
@@ -315,7 +318,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				setPhase((p) => (p === "input" ? "expanded" : p));
 			}, AUTO_EXPAND_DELAY_MS);
 			return () => clearTimeout(id);
-		}, [appeared, suggestions.length]);
+		}, [appeared, dockTexts.length]);
 
 		// Focus the chat input after the panel has opened. Runs post-commit, so
 		// the (previously hidden) textarea is in layout and can take focus.
@@ -455,7 +458,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// The frosted card only exists to hold the suggestion pills, so it only
 		// materializes once the bar is expanded *and* there are suggestions. With
 		// none, focusing leaves the plain input bar (no empty card, no widen).
-		const showCard = suggestions.length > 0 && phase !== "input";
+		const showCard = dockTexts.length > 0 && phase !== "input";
 
 		const closeButton = (
 			<button
@@ -535,7 +538,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 										</button>
 									)}
 
-									{suggestions.length > 0 && (
+									{dockTexts.length > 0 && (
 										// The card grows straight up to reveal the pills: a
 										// `grid-rows` 0fr → 1fr height animation (eases to the pills'
 										// real height — no `max-h` guessing, no scale, so it rises
@@ -551,13 +554,13 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 										>
 											<div className="ww:overflow-hidden">
 												<Suggestions
-													suggestions={suggestions}
+													suggestions={dockTexts}
 													onSelect={(text) => {
 														widgetEvents.emit({
 															name: "suggestion.clicked",
 															properties: {
 																text,
-																index: suggestions.indexOf(text),
+																index: dockTexts.indexOf(text),
 																origin: dockRow?.origin ?? "channel",
 															},
 														});
@@ -654,7 +657,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									hideHeader={false}
 									welcomeMessage={config.welcomeMessage}
 									placeholder={config.placeholder}
-									configuredSuggestions={configured}
+									suggestions={suggestions}
 									enableThreadHistory={config.enableThreadHistory}
 									showToolCalls={config.showToolCalls}
 									locale={config.locale}
