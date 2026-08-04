@@ -24,12 +24,6 @@ class TestFlowStateStore {
 	}
 }
 
-/**
- * `withStartSelfHeal` returns the `FlowContent` union, and `createFlowTestHarness`
- * results carry the same union shape. These narrow to the interrupt member so
- * the assertions below can read `context`/`field`/`suggestions`, properties
- * the other members (widget/complete/error) don't declare.
- */
 function assertInterruptContent(
 	content: FlowContent,
 ): asserts content is FlowInterruptContent {

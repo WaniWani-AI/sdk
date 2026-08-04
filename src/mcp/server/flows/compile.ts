@@ -132,10 +132,8 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		sessionIdWasSupplied = false,
 	) {
 		if (args.action === "start") {
-			// A start on a session parked mid-flow executes as a continue: the
-			// model sometimes issues a spurious start after a continue in the
-			// same turn, and a fresh re-entry would wipe accumulated state and
-			// stamp the wrong step's suggestions onto the turn.
+			// A spurious start on a session parked mid-flow executes as a
+			// continue instead of wiping the accumulated state.
 			if (sessionIdWasSupplied && sessionId) {
 				let existing: Awaited<ReturnType<typeof store.get>> = null;
 				try {
@@ -143,15 +141,8 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				} catch {
 					existing = null;
 				}
-				// A record written by a different flow sharing the store and session
-				// id never redirects, even when its step name happens to also exist
-				// in this flow's graph. Records that predate the flowId field fall
-				// back to the node-name check so they still redirect once.
-				if (
-					existing?.step &&
-					(existing.flowId === config.id ||
-						(existing.flowId === undefined && nodes.has(existing.step)))
-				) {
+				// Only a record this flow wrote may redirect; anything else starts fresh.
+				if (existing?.step && existing.flowId === config.id) {
 					const mergedState = deepMerge(
 						existing.state as Record<string, unknown>,
 						expandDotPaths(args.stateUpdates ?? {}),
@@ -169,7 +160,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					);
 					if (redirectedResult.content.status === "interrupt") {
 						const note =
-							'This flow was already in progress; resumed at the current step. Use action "reset" to correct an earlier answer.';
+							'This flow was already in progress; resumed at the current step. Use action "reset" to correct an earlier answer. If the user wants to start over, use "reset" with every field to change; answers not corrected are kept.';
 						redirectedResult.content.context = redirectedResult.content.context
 							? `${redirectedResult.content.context}\n\n${note}`
 							: note;
@@ -452,12 +443,8 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				? { ...result.content, sessionId }
 				: result.content;
 
-		// A start that parks on a question the visitor's opening message already
-		// answered is the widest desync path: the agent replies past the parked
-		// step and the pill row describes the wrong question. The appended check
-		// tells the agent to advance the flow in the same turn instead. A
-		// redirected start already carries its own resumed-session framing, so
-		// it skips this self-heal check.
+		// Redirected starts carry their own resumed-session framing, so only
+		// fresh starts get the self-heal check.
 		if (args.action === "start" && !result.redirected) {
 			contentObj = withStartSelfHeal(contentObj, {
 				sessionIdEchoed: !metaSessionId && sessionId !== undefined,

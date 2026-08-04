@@ -8,12 +8,9 @@ const MULTI_QUESTION_CHECK =
 	'BEFORE asking, re-read the user\'s opening message. If it answers any of the questions below, do NOT re-ask those: immediately call this tool again with action "continue" and stateUpdates containing those answers; the engine re-asks the rest. Do NOT infer or convert values. Ask only what their message does not answer.';
 
 /**
- * Appends a hidden self-heal instruction to a start-interrupt so an agent
- * that received the visitor's answers in the opening message advances the
- * flow in the same turn instead of re-asking. Validation-error re-parks
- * (context starting with "ERROR:") and non-interrupt content pass through
- * untouched. The instruction is never persisted in flow state, so a bounce
- * that still extracts nothing cannot loop.
+ * Appends a hidden instruction to a start-interrupt telling the agent to
+ * advance with "continue" when the opening message already answers the
+ * parked question. Never persisted, so an empty bounce cannot loop.
  */
 export function withStartSelfHeal(
 	content: FlowContent,

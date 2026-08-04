@@ -21,10 +21,8 @@ class TestFlowStateStore {
 }
 
 /**
- * Fails the first read (the redirect probe made by a "start" call) and
- * succeeds afterward. The later, successful reads let the test harness's own
- * `decodedState` bookkeeping fetch (see `toResult` in `test-utils.ts`) resolve
- * normally, so only the redirect probe's catch-and-fall-through is under test.
+ * Fails only the first read (the start call's redirect probe) so the
+ * harness's own bookkeeping reads still resolve.
  */
 class ThrowingReadStore extends TestFlowStateStore {
 	private reads = 0;
@@ -37,11 +35,6 @@ class ThrowingReadStore extends TestFlowStateStore {
 	}
 }
 
-/**
- * `FlowTestResult` is a union of the four flow content shapes plus a decoded
- * state. These narrow to the member under test so assertions can read
- * `field`/`context`/`tool`, properties the other members don't declare.
- */
 function assertInterruptResult(
 	result: FlowTestResult,
 ): asserts result is Extract<FlowTestResult, { status: "interrupt" }> {
@@ -106,6 +99,7 @@ describe("idempotent start on a live session", () => {
 			"already in progress; resumed at the current step",
 		);
 		expect(r.context).toContain('Use action "reset"');
+		expect(r.context).toContain("answers not corrected are kept");
 		expect(r.context ?? "").not.toContain("BEFORE asking");
 	});
 
@@ -149,11 +143,12 @@ describe("idempotent start on a live session", () => {
 		expect(r.field).toBe("color");
 	});
 
-	test("a legacy record without flowId still redirects via the node-name fallback", async () => {
+	test("a record without flowId runs fresh instead of redirecting", async () => {
 		const store = new TestFlowStateStore();
 		const sessionId = "legacy-session-without-flow-id";
 
-		// Seed the store with a legacy record (no flowId field)
+		// A record without flowId must not redirect, even when its step name
+		// exists in this flow's graph.
 		await store.set(sessionId, { step: "ask_size", state: { color: "Red" } });
 
 		const flow = buildTwoStepFlow(store);
@@ -164,7 +159,6 @@ describe("idempotent start on a live session", () => {
 			throw new Error('flow "idempotent_probe" did not register a handler');
 		}
 
-		// Call start with the seeded sessionId
 		const resultPayload = (await handler(
 			{ action: "start", intent: "resume session" },
 			{ _meta: { sessionId } },
@@ -177,14 +171,12 @@ describe("idempotent start on a live session", () => {
 				`expected interrupt result, got status "${parsed.status}"`,
 			);
 		}
-		expect(parsed.field).toBe("size");
-		expect(parsed.context ?? "").toContain(
-			"already in progress; resumed at the current step",
-		);
+		expect(parsed.field).toBe("color");
+		expect(parsed.context ?? "").not.toContain("already in progress");
 
-		// Verify the stored record now has flowId stamped
 		const updated = await store.get(sessionId);
 		expect(updated?.flowId).toBe("idempotent_probe");
+		expect(updated?.step).toBe("ask_color");
 	});
 });
 
@@ -265,15 +257,13 @@ describe("idempotent start across flows sharing a session id", () => {
 			throw new Error('flow "idempotent_probe" did not register a handler');
 		}
 
-		// Park flow A mid-flow under the shared session id.
 		await handlerA({ action: "start", intent: "park flow A" }, extra);
 		await handlerA(
 			{ action: "continue", stateUpdates: { color: "Red" } },
 			extra,
 		);
 
-		// Flow B has its own id and its own node names, but shares the store and,
-		// via the shared session id, sees flow A's parked step on a start.
+		// Flow B shares the store and session id but not the flow id.
 		const flowB = createFlow({
 			id: "idempotent_other_flow",
 			title: "p",
@@ -314,9 +304,7 @@ describe("idempotent start across flows sharing a session id", () => {
 		const store = new TestFlowStateStore();
 		const extra = { _meta: { sessionId: "shared-session-same-node-name" } };
 
-		// Both flows name their first (and only) node "confirm", so a guard
-		// keyed on node-name presence alone would treat flow A's record as
-		// belonging to flow B too.
+		// Both flows name their only node "confirm".
 		const flowA = createFlow({
 			id: "idempotent_same_name_a",
 			title: "p",
@@ -339,8 +327,7 @@ describe("idempotent start across flows sharing a session id", () => {
 			);
 		}
 
-		// Park flow A on "confirm" carrying a field ("note") flow B never
-		// declares, without answering "topic" (so the flow stays parked there).
+		// Park flow A on "confirm" carrying a field flow B never declares.
 		await handlerA(
 			{
 				action: "start",

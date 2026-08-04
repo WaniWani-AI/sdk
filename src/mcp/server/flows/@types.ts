@@ -568,10 +568,7 @@ export type FlowTokenContent = {
 	state: Record<string, unknown>;
 	field?: string;
 	widgetId?: string;
-	/**
-	 * Identifies the flow that wrote this record; a start redirect resumes
-	 * only records written by the same flow.
-	 */
+	/** Flow that wrote this record; a start redirects only into records carrying this flow's id. */
 	flowId?: string;
 };
 
