@@ -186,6 +186,21 @@ step with two or more open questions gets none, because no single pill could
 answer them all. Other MCP hosts (ChatGPT, Claude) are unaffected either way:
 they have no pill row, and what they receive is unchanged.
 
+### Extraction on `start` and self-healing
+
+The generated tool schema requires the assistant to pass `stateUpdates` on
+every call (`{}` when the message answers nothing). On `start`, answers the
+visitor's opening message already contains are extracted into `stateUpdates`,
+and the engine auto-skips every question whose field is filled — so a flow
+whose first question the visitor answers up front opens on the first
+*unanswered* step. When a `start` still parks on an already-answered question,
+the interrupt carries a hidden instruction telling the assistant to advance
+the flow with `continue` in the same turn instead of re-asking.
+
+A `start` for a session that is already parked mid-flow executes as a
+`continue`: state merges instead of resetting, and a parked widget re-emits
+its display instruction. After a flow completes, `start` begins a fresh run.
+
 ### Multiple Questions
 
 ```ts

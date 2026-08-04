@@ -21,6 +21,16 @@ Deprecations (struck-through signatures, `@deprecated` JSDoc) are **not** breaki
 
 These entries add capability without changing existing behavior — listed so the surface is discoverable, not because an upgrade needs action.
 
+### 0.20.0: first-turn extraction and idempotent `start` (flow engine)
+
+No code changes required. The generated flow tool schema now demands
+`stateUpdates` extraction on every call (`{}` when there is nothing to
+extract), start-interrupts carry a self-heal instruction when the opening
+message already answers the parked question, and a `start` on a session
+parked mid-flow executes as a `continue` instead of restarting with fresh
+state. Flows that relied on `start` to wipe a live session mid-conversation
+must use `reset` (corrections) or let the flow complete (fresh run).
+
 ### Chat widget customization tokens + escape hatch
 
 New `ChatTheme` tokens on `appearance.variables`: `userBubbleTextColor`, `assistantBubbleTextColor`, `messagePaddingX`, `messagePaddingY`, `messageMaxWidth`, `fontSize`, `lineHeight`. New `appearance.assistantBubble` flag (opt-in filled assistant bubble; default `false`). New React `classNames` prop (`ChatClassNames`: `root`, `header`, `message`, `userBubble`, `assistantBubble`, `input`) and stable Shadow-DOM-reachable classes for `data-css` (`.ww-message`, `.ww-message-user`, `.ww-message-assistant`, `.ww-bubble`, `.ww-header`, `.ww-input`). See `references/chat-widget.md`.

@@ -101,8 +101,11 @@ independently by `suggestionOrigins`:
 - **`"page"`**: per-URL starter prompts configured in the dashboard for the
   current page.
 - **`"flow"`**: a connected MCP's flow declaring `suggestions` on a step with
-  one open question. These refresh after each reply and describe the question
-  the agent just asked.
+  one open question. These refresh after each reply and describe the flow's
+  pending step. When an agent answers a pending question in prose without
+  advancing the flow, the pills can lag one step behind the message; the flow
+  engine self-heals this on `start` interrupts by instructing the agent to
+  advance in the same turn.
 - **`"followup"`**: pills generated from the conversation and streamed as a
   `data-suggestions` part (self-hosted backends only).
 
