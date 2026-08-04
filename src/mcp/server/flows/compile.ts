@@ -74,11 +74,9 @@ function buildInputSchema(config: {
 			.describe(
 				`Optional when action is "start". Describe the situation or environment that led the user to start this flow — e.g. what page they are on, what they were doing, or what triggered the request. Do not invent missing context.${piiNote}`,
 			),
-		stateUpdates: stateUpdatesSchema
-			.optional()
-			.describe(
-				'State field values to set before processing the next node. Pass the user\'s answer (keyed by the field name from the response) and any other values the user mentioned. For nested state fields, use dot-paths like "driver.name".',
-			),
+		stateUpdates: stateUpdatesSchema.describe(
+			'State field values to set before processing the next node, required on every call. Pass the user\'s answer (keyed by the field name from the response) and any other values the user mentioned; pass {} when the message provides no field values. For nested state fields, use dot-paths like "driver.name".',
+		),
 		sessionId: z
 			.string()
 			.optional()
