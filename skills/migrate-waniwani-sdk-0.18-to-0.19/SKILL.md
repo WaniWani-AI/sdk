@@ -23,6 +23,8 @@ Also shipped (no action required):
 - `suggestionOrigins` on `<WaniwaniChat>` overrides and `data-suggestion-origins` on the `<script>` embed. Default everywhere is `["channel", "page", "followup"]` — flow-driven pills stay opt-in.
 - Flow tool results always carry `_meta["waniwani/suggestions"]` (exported as `SUGGESTIONS_META_KEY` / `SuggestionsMeta`). Additive; hosts that ignore `_meta` are unaffected.
 
+> **Skip the origin config if you are heading past 0.19.** The next minor drops it: the pill row resolves a fixed, non-configurable hierarchy (flow > followup > page > channel) and flow pills render with no opt-in. `SuggestionsConfig.origins` / `.dynamic` become accepted-and-ignored, and `suggestionOrigins` / `data-suggestion-origins` are removed outright. Adopting `origins` here only to delete it one hop later is wasted work — land the `suggestion.clicked` break below and leave the origin config alone. `suggestions={false}` on `<ChatEmbed>` keeps working as the kill switch.
+
 **Not affected:** reading widget events through `onEvent` — `origin` is a new, always-populated field, so existing readers keep compiling and running. Other MCP hosts (ChatGPT, Claude) see no behavior change.
 
 This break **is** visible to `tsc`: every hand-constructed `suggestion.clicked` literal typed as `WidgetEvent` / `WidgetEventDetail` fails to typecheck after the bump, so the compiler output is the complete call-site list.
@@ -95,6 +97,8 @@ Not a migration, but the reason to upgrade. If your flows declare `interrupt({ s
 - `<ChatEmbed>`: `suggestions={{ origins: ["flow"] }}`
 
 Pills appear only on steps with exactly one open question.
+
+The opt-in is 0.19-only. From the next minor the hierarchy is fixed and flow pills render on every host with no config, so if you are upgrading past 0.19 skip this section entirely.
 
 ## Not covered by a shim
 

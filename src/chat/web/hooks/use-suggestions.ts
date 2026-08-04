@@ -2,6 +2,7 @@
 
 import type { ChatStatus, UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { SuggestionsConfig } from "../@types";
 import type {
 	StarterSuggestions,
 	SuggestionOrigin,
@@ -28,6 +29,20 @@ export interface UseSuggestionsOptions {
 }
 
 const EMPTY_STARTERS: StarterSuggestions = { page: null, channel: [] };
+
+/**
+ * Starter candidates from a host's own `suggestions` prop, for surfaces with
+ * no page-aware set to pass — the bare `ChatEmbed` primitive and `ChatCard`.
+ * Memoized because {@link useSuggestions} keys an effect on the object's
+ * identity. Embed hosts pass `useStarterSuggestions(config)` instead.
+ */
+export function useConfigStarters(
+	config: boolean | SuggestionsConfig | undefined,
+): StarterSuggestions {
+	const initial =
+		typeof config === "object" && config !== null ? config.initial : undefined;
+	return useMemo(() => ({ page: null, channel: initial ?? [] }), [initial]);
+}
 
 /**
  * The pill row's state. Which pills render is decided exclusively by

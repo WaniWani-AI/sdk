@@ -12,7 +12,7 @@
 // a message was exchanged, never what was said.
 // ============================================================================
 
-import type { SuggestionOrigin } from "../@types";
+import type { SuggestionOrigin } from "../lib/resolve-suggestions";
 
 /** Surface the widget is mounted on. */
 export type WidgetMode = "inline" | "floating";

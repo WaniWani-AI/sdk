@@ -4,7 +4,10 @@
 
 import type { ChatAppearance, ShowToolCalls } from "./embed/config";
 import type { MessageOverrides } from "./i18n";
-import type { StarterSuggestions } from "./lib/resolve-suggestions";
+import type {
+	StarterSuggestions,
+	SuggestionOrigin,
+} from "./lib/resolve-suggestions";
 import type { VisitorIdInput } from "./lib/visitor-context";
 
 export type {
@@ -95,17 +98,23 @@ export interface WelcomeConfig {
 // Suggestions
 // ============================================================================
 
-export {
-	SUGGESTION_ORIGINS,
-	type SuggestionOrigin,
-} from "./lib/resolve-suggestions";
-
 export interface SuggestionsConfig {
 	/**
 	 * Starter prompts shown before the user sends their first message.
 	 * Defaults to an empty array.
 	 */
 	initial?: string[];
+	/**
+	 * @deprecated Accepted and ignored. The pill row resolves a fixed
+	 * hierarchy internally — flow > followup > page > channel — so there is
+	 * nothing to select. Drop the field; use `suggestions={false}` to hide the
+	 * row entirely. Removed in a future minor release.
+	 */
+	origins?: SuggestionOrigin[];
+	/**
+	 * @deprecated Accepted and ignored. See {@link SuggestionsConfig.origins}.
+	 */
+	dynamic?: boolean;
 }
 
 /**

@@ -5,7 +5,6 @@ import {
 	useCallback,
 	useEffect,
 	useImperativeHandle,
-	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -34,9 +33,11 @@ import { ThreadMenu } from "../../../chat/web/components/thread-menu";
 import { useCallTool } from "../../../chat/web/hooks/use-call-tool";
 import { useChatEngine } from "../../../chat/web/hooks/use-chat-engine";
 import { useConfig } from "../../../chat/web/hooks/use-config";
-import { useSuggestions } from "../../../chat/web/hooks/use-suggestions";
+import {
+	useConfigStarters,
+	useSuggestions,
+} from "../../../chat/web/hooks/use-suggestions";
 import { useTypingPlaceholder } from "../../../chat/web/hooks/use-typing-placeholder";
-import type { StarterSuggestions } from "../../../chat/web/lib/resolve-suggestions";
 import { buildResourceEndpoint } from "../../../chat/web/lib/resource-endpoint";
 import { cn } from "../../../chat/web/lib/utils";
 import { mergeTheme, themeToCSSProperties } from "../../../chat/web/theme";
@@ -146,20 +147,12 @@ export const ChatCard = forwardRef<ChatHandle, ChatCardProps>(
 			);
 		}, []);
 
-		const suggestionsProp = props.suggestions;
-		const configInitial =
-			typeof suggestionsProp === "object" && suggestionsProp !== null
-				? suggestionsProp.initial
-				: undefined;
-		const fallbackStarters = useMemo<StarterSuggestions>(
-			() => ({ page: null, channel: configInitial ?? [] }),
-			[configInitial],
-		);
+		const configStarters = useConfigStarters(props.suggestions);
 		const suggestionsState = useSuggestions({
 			messages: engine.messages,
 			status: engine.status,
-			enabled: suggestionsProp !== false,
-			starters: fallbackStarters,
+			enabled: props.suggestions !== false,
+			starters: configStarters,
 		});
 
 		const handleWidgetMessage = useCallback(

@@ -23,8 +23,9 @@ export const SUGGESTION_ORIGINS = [
 /** Where a suggestion pill came from. */
 export type SuggestionOrigin = (typeof SUGGESTION_ORIGINS)[number];
 
-/** One starter prompt; `id` is null for fixed-list prompts (no stored identity). */
-export interface PageSuggestion {
+/** One pill, whatever origin supplied it; `id` is null for prompts with no
+ *  stored identity (the channel's fixed list, flow and follow-up pills). */
+export interface Suggestion {
 	id: string | null;
 	text: string;
 }
@@ -32,7 +33,7 @@ export interface PageSuggestion {
 /** Starter prompt candidates, shown until the visitor's first message. */
 export interface StarterSuggestions {
 	/** Picked prompts for the matched page; `null` when no page matches. */
-	page: PageSuggestion[] | null;
+	page: Suggestion[] | null;
 	/** The channel's fixed starter prompts. */
 	channel: string[];
 }
@@ -45,7 +46,11 @@ export interface SuggestionCandidates {
 	 * no flow entry at all.
 	 */
 	flow: string[] | null;
-	/** The turn's streamed `data-suggestions` part; `null` when absent. */
+	/**
+	 * The turn's streamed `data-suggestions` part; `null` when absent. Unlike
+	 * `flow`, an empty entry carries no authority: `[]` and `null` both mean
+	 * "no follow-ups", and a weaker origin still gets its turn.
+	 */
 	followup: string[] | null;
 	/** Starter candidates; `null` once the conversation has started. */
 	starters: StarterSuggestions | null;
@@ -54,10 +59,10 @@ export interface SuggestionCandidates {
 /** The winning pill set and the origin that supplied it. */
 export interface ResolvedSuggestions {
 	origin: SuggestionOrigin;
-	suggestions: PageSuggestion[];
+	suggestions: Suggestion[];
 }
 
-function toPageSuggestions(texts: string[]): PageSuggestion[] {
+function toSuggestions(texts: string[]): Suggestion[] {
 	return texts.map((text) => ({ id: null, text }));
 }
 
@@ -74,7 +79,7 @@ export function resolveStarters(
 	if (starters.channel.length > 0) {
 		return {
 			origin: "channel",
-			suggestions: toPageSuggestions(starters.channel),
+			suggestions: toSuggestions(starters.channel),
 		};
 	}
 	return null;
@@ -90,12 +95,12 @@ export function resolveSuggestions(
 	candidates: SuggestionCandidates,
 ): ResolvedSuggestions | null {
 	if (candidates.flow !== null) {
-		return { origin: "flow", suggestions: toPageSuggestions(candidates.flow) };
+		return { origin: "flow", suggestions: toSuggestions(candidates.flow) };
 	}
 	if (candidates.followup !== null && candidates.followup.length > 0) {
 		return {
 			origin: "followup",
-			suggestions: toPageSuggestions(candidates.followup),
+			suggestions: toSuggestions(candidates.followup),
 		};
 	}
 	if (candidates.starters) {

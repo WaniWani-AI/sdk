@@ -24,9 +24,8 @@
 // channel), so it rides straight through from the widget event.
 // ============================================================================
 
-import type { SuggestionOrigin } from "../@types";
 import { eventsEndpoint } from "./page-view";
-import type { PageSuggestion } from "./resolve-suggestions";
+import type { Suggestion, SuggestionOrigin } from "./resolve-suggestions";
 import { getOrCreateVisitorId } from "./visitor-context";
 
 export interface FireSuggestionClickOptions {
@@ -66,7 +65,7 @@ export interface FireSuggestionClickOptions {
  * index through for.
  */
 export function resolvePromptId(
-	list: PageSuggestion[],
+	list: Suggestion[],
 	text: string,
 ): string | null {
 	return list.find((s) => s.text === text)?.id ?? null;
@@ -170,21 +169,15 @@ export async function fireSuggestionClick(
 	});
 }
 
-/** A prompt as it appeared in a rendered set, for impression logging. */
-export interface ShownPrompt {
-	id: string | null;
-	text: string;
-}
-
 /**
  * Attribute a rendered set back to the list that resolved it, one entry
  * per pill. The set's origin rides on the widget event that reported it —
  * the pill row resolves its origin exactly at render time.
  */
 export function resolveShownPrompts(
-	list: PageSuggestion[],
+	list: Suggestion[],
 	texts: string[],
-): ShownPrompt[] {
+): Suggestion[] {
 	return texts.map((text) => ({ id: resolvePromptId(list, text), text }));
 }
 
@@ -195,7 +188,7 @@ export interface FireSuggestionShownOptions {
 	mode?: "inline" | "floating";
 	source?: string;
 	sessionId?: string;
-	prompts: ShownPrompt[];
+	prompts: Suggestion[];
 	origin: SuggestionOrigin;
 }
 
