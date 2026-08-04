@@ -643,4 +643,6 @@ export type ExecutionResult = {
 	flowTokenContent?: FlowTokenContent;
 	/** Nodes visited during this execution (excludes nodes with hideFromFunnel). */
 	nodesVisited?: NodeVisit[];
+	/** Set when a start on a live session was executed as a continue. */
+	redirected?: boolean;
 };

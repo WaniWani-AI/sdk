@@ -83,4 +83,11 @@ describe("generated flow tool input schema", () => {
 	test("stateUpdates stays optional in the Zod schema (no new error paths)", () => {
 		expect(registeredSchema().stateUpdates?.isOptional()).toBe(true);
 	});
+
+	test("action description scopes start to a not-yet-started flow", () => {
+		const description = registeredSchema().action?.description ?? "";
+		expect(description).toContain(
+			"only if this flow has not already been started",
+		);
+	});
 });

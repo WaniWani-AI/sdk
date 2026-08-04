@@ -947,9 +947,8 @@ describe("validate on interrupt", () => {
 });
 
 describe("isError on error responses", () => {
-	const store = new TestFlowStateStore();
-
 	test("error responses have isError: true", async () => {
+		const store = new TestFlowStateStore();
 		const flow = createFlow({
 			id: "error_flow",
 			title: "Error Flow",
@@ -981,6 +980,7 @@ describe("isError on error responses", () => {
 	});
 
 	test("non-error responses do not have isError", async () => {
+		const store = new TestFlowStateStore();
 		const flow = createFlow({
 			id: "success_flow",
 			title: "Success Flow",

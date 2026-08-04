@@ -61,7 +61,7 @@ function buildInputSchema(config: {
 		action: z
 			.enum(["start", "continue", "reset"])
 			.describe(
-				'"start" to begin the flow, "continue" to resume after a pause (interrupt or widget), "reset" to restart from the beginning with a correction to a previously-collected field',
+				'"start" to begin the flow (only if this flow has not already been started in this conversation), "continue" to resume after a pause (interrupt or widget), "reset" to restart from the beginning with a correction to a previously-collected field',
 			),
 		stateUpdates: stateUpdatesSchema
 			.optional()
@@ -129,8 +129,47 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		sessionId: string | undefined,
 		meta?: Record<string, unknown>,
 		waniwani?: ScopedWaniWaniClient,
+		sessionIdWasSupplied = false,
 	) {
 		if (args.action === "start") {
+			// A start on a session parked mid-flow executes as a continue: the
+			// model sometimes issues a spurious start after a continue in the
+			// same turn, and a fresh re-entry would wipe accumulated state and
+			// stamp the wrong step's suggestions onto the turn.
+			if (sessionIdWasSupplied && sessionId) {
+				let existing: Awaited<ReturnType<typeof store.get>> = null;
+				try {
+					existing = await store.get(sessionId);
+				} catch {
+					existing = null;
+				}
+				if (existing?.step) {
+					const mergedState = deepMerge(
+						existing.state as Record<string, unknown>,
+						expandDotPaths(args.stateUpdates ?? {}),
+					) as TState;
+					const redirectedResult = await executeFrom(
+						existing.step,
+						mergedState,
+						nodes,
+						edges,
+						validators,
+						meta,
+						waniwani,
+						input.nodeOptions,
+						config.state,
+					);
+					if (redirectedResult.content.status === "interrupt") {
+						const note =
+							'This flow was already in progress; resumed at the current step. Use action "reset" to correct an earlier answer.';
+						redirectedResult.content.context = redirectedResult.content.context
+							? `${redirectedResult.content.context}\n\n${note}`
+							: note;
+					}
+					return { ...redirectedResult, redirected: true };
+				}
+			}
+
 			const intent =
 				typeof args.intent === "string" ? args.intent.trim() : undefined;
 			if (!intent) {
@@ -373,6 +412,8 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		const _meta: Record<string, unknown> = requestExtra._meta ?? {};
 		const metaSessionId = extractSessionId(_meta);
 		let sessionId = metaSessionId ?? args.sessionId;
+		const sessionIdWasSupplied =
+			metaSessionId !== undefined || args.sessionId !== undefined;
 
 		// Auto-generate session ID for clients that don't provide one (e.g. Claude Code)
 		if (!sessionId && args.action === "start") {
@@ -389,7 +430,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 		const waniwani = extractScopedClient(requestExtra);
 
-		const result = await handleToolCall(args, sessionId, _meta, waniwani);
+		const result = await handleToolCall(
+			args,
+			sessionId,
+			_meta,
+			waniwani,
+			sessionIdWasSupplied,
+		);
 
 		// Echo sessionId in response when not sourced from _meta (client must pass it back)
 		let contentObj =
@@ -400,8 +447,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		// A start that parks on a question the visitor's opening message already
 		// answered is the widest desync path: the agent replies past the parked
 		// step and the pill row describes the wrong question. The appended check
-		// tells the agent to advance the flow in the same turn instead.
-		if (args.action === "start") {
+		// tells the agent to advance the flow in the same turn instead. A
+		// redirected start already carries its own resumed-session framing, so
+		// it skips this self-heal check.
+		if (args.action === "start" && !result.redirected) {
 			contentObj = withStartSelfHeal(contentObj, {
 				sessionIdEchoed: !metaSessionId && sessionId !== undefined,
 			});
