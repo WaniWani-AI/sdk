@@ -111,6 +111,8 @@ const flow = createFlow({ /* …same… */ }).compile(); // hosted flow state, a
 
 ## Releasing (version bumps)
 
+**A feature/fix branch or PR must NEVER bump the version.** Leave `package.json`'s `version` untouched in any branch that changes code, and do not add a changelog `## <version>:` section for a version that has not been cut. The version bump is always its own separate branch and PR, cut once the code changes have landed. If a task asks for a change and a release in one go, do the code change first, then cut the bump separately — never in the same PR.
+
 `@waniwani/sdk` is `0.x`, so **minor bumps may break the public API** — and every breaking change is a migration our users have to do. The rule: no user should have to figure out an upgrade by hand. Whenever a release contains a breaking change, ship the migration alongside it so an agent can auto-apply it in one pass.
 
 **Every breaking change in a version bump must ship all four:**
