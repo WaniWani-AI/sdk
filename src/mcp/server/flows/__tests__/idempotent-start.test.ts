@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import type { RegisteredTool } from "../../../../legacy/mcp/tools/types";
-import type { FlowTokenContent } from "../@types";
+import type { FlowTokenContent, McpServer } from "../@types";
 import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
 import type { FlowTestResult } from "../test-utils";
@@ -191,5 +191,84 @@ describe("idempotent start while parked on a widget", () => {
 		const r = await h.start("spurious second start");
 		assertWidgetResult(r);
 		expect(r.tool).toBe(first.tool);
+	});
+});
+
+type Handler = (input: unknown, extra: unknown) => Promise<unknown>;
+type RegisterToolArgs = [string, Record<string, unknown>, Handler];
+
+function mockServer() {
+	const registered: RegisterToolArgs[] = [];
+	const server = {
+		registerTool: (...args: unknown[]) => {
+			registered.push(args as RegisterToolArgs);
+		},
+	};
+	return { server: server as unknown as McpServer, registered };
+}
+
+function parsePayload(
+	result: Record<string, unknown>,
+): Record<string, unknown> {
+	const content = result.content as Array<{ type: string; text?: string }>;
+	return JSON.parse(content[0]?.text ?? "") as Record<string, unknown>;
+}
+
+describe("idempotent start across flows sharing a session id", () => {
+	test("a start with a session id parked by another flow runs fresh instead of redirecting into it", async () => {
+		const store = new TestFlowStateStore();
+		const extra = { _meta: { sessionId: "shared-session-cross-flow" } };
+
+		const flowA = buildTwoStepFlow(store);
+		const mockA = mockServer();
+		await flowA.register(mockA.server);
+		const handlerA = mockA.registered[0]?.[2];
+		if (!handlerA) {
+			throw new Error('flow "idempotent_probe" did not register a handler');
+		}
+
+		// Park flow A mid-flow under the shared session id.
+		await handlerA({ action: "start", intent: "park flow A" }, extra);
+		await handlerA(
+			{ action: "continue", stateUpdates: { color: "Red" } },
+			extra,
+		);
+
+		// Flow B has its own id and its own node names, but shares the store and,
+		// via the shared session id, sees flow A's parked step on a start.
+		const flowB = createFlow({
+			id: "idempotent_other_flow",
+			title: "p",
+			description: "d",
+			state: { nickname: z.string().optional() },
+		})
+			.addNode("ask_nickname", ({ interrupt }) =>
+				interrupt({ nickname: { question: "What should we call you?" } }),
+			)
+			.addEdge(START, "ask_nickname")
+			.addEdge("ask_nickname", END)
+			.compile({ store });
+
+		const mockB = mockServer();
+		await flowB.register(mockB.server);
+		const handlerB = mockB.registered[0]?.[2];
+		if (!handlerB) {
+			throw new Error(
+				'flow "idempotent_other_flow" did not register a handler',
+			);
+		}
+
+		const resultB = (await handlerB(
+			{ action: "start", intent: "start flow B" },
+			extra,
+		)) as Record<string, unknown>;
+		const parsedB = parsePayload(resultB);
+
+		expect(parsedB.status).toBe("interrupt");
+		expect(parsedB.field).toBe("nickname");
+		expect((parsedB.context as string | undefined) ?? "").not.toContain(
+			"already in progress",
+		);
+		expect(resultB.isError).toBeUndefined();
 	});
 });

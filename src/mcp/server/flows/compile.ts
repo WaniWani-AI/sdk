@@ -143,7 +143,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				} catch {
 					existing = null;
 				}
-				if (existing?.step) {
+				// A stored step unknown to this graph belongs to a different flow
+				// sharing the store and session id; such a start runs fresh instead
+				// of resuming another flow's state.
+				if (existing?.step && nodes.has(existing.step)) {
 					const mergedState = deepMerge(
 						existing.state as Record<string, unknown>,
 						expandDotPaths(args.stateUpdates ?? {}),
