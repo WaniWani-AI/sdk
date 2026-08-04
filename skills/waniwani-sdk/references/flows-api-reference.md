@@ -154,8 +154,13 @@ type FlowTokenContent = {
   state: Record<string, unknown>;
   field?: string;
   widgetId?: string;
+  flowId?: string;
 };
 ```
+
+The engine stamps `flowId` on every write; a `start` on a parked session
+resumes only records carrying the same flow's id. Custom stores should
+persist it like any other field.
 
 ### WaniwaniFlowStore
 

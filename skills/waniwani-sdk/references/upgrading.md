@@ -29,8 +29,10 @@ extract), start-interrupts carry a self-heal instruction when the opening
 message already answers the parked question, and a `start` on a session
 parked mid-flow executes as a `continue` instead of restarting with fresh
 state, provided the parked record belongs to the same flow (a different
-flow's `start` on a shared session begins fresh). Flows that relied on `start` to wipe a live session mid-conversation
-must use `reset` (corrections) or let the flow complete (fresh run).
+flow's `start` on a shared session begins fresh). This changes
+conversational behavior only, with no code impact: a live session is
+corrected with `reset` (answers not corrected are kept) and a fresh run
+begins after the flow completes.
 
 ### Chat widget customization tokens + escape hatch
 
