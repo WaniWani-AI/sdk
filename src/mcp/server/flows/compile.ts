@@ -62,22 +62,22 @@ function buildInputSchema(config: {
 			.describe(
 				'"start" to begin the flow, "continue" to resume after a pause (interrupt or widget), "reset" to restart from the beginning with a correction to a previously-collected field',
 			),
+		stateUpdates: stateUpdatesSchema
+			.optional()
+			.describe(
+				'REQUIRED on every call ({} is valid). The only channel that fills flow fields. Copy in every field the user\'s latest message answers, keyed by field name (dot-paths like "driver.name" for nested fields). On start, re-read the user\'s opening message first: each answer it contains MUST be extracted here or the flow will re-ask it. Pass {} when it answers none. Copy only what the user\'s own words state; never infer or derive ("I just retired" does not fill an age field).',
+			),
 		intent: z
 			.string()
 			.optional()
 			.describe(
-				`Required when action is "start". Provide a brief summary of the user's goal for this flow. Do not invent missing intent.${piiNote}`,
+				`Required when action is "start". Provide a brief summary of the user's goal for this flow. Do not invent missing intent. The flow engine never reads intent: facts placed here fill NO fields; every concrete answer must also go in stateUpdates.${piiNote}`,
 			),
 		context: z
 			.string()
 			.optional()
 			.describe(
 				`Optional when action is "start". Describe the situation or environment that led the user to start this flow — e.g. what page they are on, what they were doing, or what triggered the request. Do not invent missing context.${piiNote}`,
-			),
-		stateUpdates: stateUpdatesSchema
-			.optional()
-			.describe(
-				'State field values to set before processing the next node. Pass the user\'s answer (keyed by the field name from the response) and any other values the user mentioned. For nested state fields, use dot-paths like "driver.name".',
 			),
 		sessionId: z
 			.string()
