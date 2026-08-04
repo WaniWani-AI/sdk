@@ -35,10 +35,10 @@ import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
 import {
-	fireSuggestionClick,
-	fireSuggestionShown,
-	resolvePromptId,
-	resolveShownPrompts,
+	resolveShownSuggestions,
+	resolveSuggestionId,
+	trackSuggestionClick,
+	trackSuggestionShown,
 } from "../lib/suggestion-click";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
@@ -198,8 +198,8 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			return widgetEvents.subscribe((event) => {
 				if (event.name === "suggestion.clicked") {
 					const { text, origin } = event.properties;
-					const promptId = resolvePromptId(configured.page ?? [], text);
-					void fireSuggestionClick({
+					const promptId = resolveSuggestionId(configured.page ?? [], text);
+					void trackSuggestionClick({
 						api: config.api ?? "",
 						token: config.token,
 						channelId: config.channelId,
@@ -215,8 +215,8 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				}
 				if (event.name === "suggestions.shown") {
 					const { texts, origin } = event.properties;
-					const prompts = resolveShownPrompts(configured.page ?? [], texts);
-					void fireSuggestionShown({
+					const prompts = resolveShownSuggestions(configured.page ?? [], texts);
+					void trackSuggestionShown({
 						api: config.api ?? "",
 						token: config.token,
 						channelId: config.channelId,

@@ -16,10 +16,10 @@ for (const key of [
 (globalThis as any).window = win;
 
 import {
-	fireSuggestionClick,
-	fireSuggestionShown,
-	resolvePromptId,
-	resolveShownPrompts,
+	resolveShownSuggestions,
+	resolveSuggestionId,
+	trackSuggestionClick,
+	trackSuggestionShown,
 } from "../suggestion-click";
 
 interface Captured {
@@ -63,24 +63,24 @@ beforeEach(() => {
 	}
 });
 
-describe("resolvePromptId", () => {
+describe("resolveSuggestionId", () => {
 	const list = [
 		{ id: "p1", text: "Page one" },
 		{ id: null, text: "Fixed one" },
 	];
 
 	test("finds the authored prompt's id by text", () => {
-		expect(resolvePromptId(list, "Page one")).toBe("p1");
+		expect(resolveSuggestionId(list, "Page one")).toBe("p1");
 	});
 
 	test("returns null for fixed-list prompts and unknown texts", () => {
-		expect(resolvePromptId(list, "Fixed one")).toBeNull();
-		expect(resolvePromptId(list, "Nope")).toBeNull();
+		expect(resolveSuggestionId(list, "Fixed one")).toBeNull();
+		expect(resolveSuggestionId(list, "Nope")).toBeNull();
 	});
 
 	test("duplicate texts attribute to the first match", () => {
 		expect(
-			resolvePromptId(
+			resolveSuggestionId(
 				[
 					{ id: "first", text: "Same" },
 					{ id: "second", text: "Same" },
@@ -91,11 +91,11 @@ describe("resolvePromptId", () => {
 	});
 });
 
-describe("fireSuggestionClick", () => {
+describe("trackSuggestionClick", () => {
 	test("POSTs a suggestion.clicked event to the canonical ingest with the prompt id", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await fireSuggestionClick({ ...BASE });
+			await trackSuggestionClick({ ...BASE });
 			expect(calls).toHaveLength(1);
 			const [call] = calls;
 			// Same canonical V2 batch ingest `page.viewed` uses.
@@ -130,8 +130,8 @@ describe("fireSuggestionClick", () => {
 		const { calls, restore } = mockFetch();
 		try {
 			// The usual case: the starter click is what starts the conversation.
-			await fireSuggestionClick({ ...BASE });
-			await fireSuggestionClick({ ...BASE, sessionId: "sess_1" });
+			await trackSuggestionClick({ ...BASE });
+			await trackSuggestionClick({ ...BASE, sessionId: "sess_1" });
 			expect(calls).toHaveLength(2);
 			const first = JSON.parse(calls[0].init.body as string).events[0];
 			const second = JSON.parse(calls[1].init.body as string).events[0];
@@ -145,8 +145,8 @@ describe("fireSuggestionClick", () => {
 	test("fires on every click — no once-per-page guard", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await fireSuggestionClick({ ...BASE });
-			await fireSuggestionClick({ ...BASE });
+			await trackSuggestionClick({ ...BASE });
+			await trackSuggestionClick({ ...BASE });
 			expect(calls).toHaveLength(2);
 		} finally {
 			restore();
@@ -156,7 +156,7 @@ describe("fireSuggestionClick", () => {
 	test("fires without a source tag when the channel has no configured source", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await fireSuggestionClick({ ...BASE, source: undefined });
+			await trackSuggestionClick({ ...BASE, source: undefined });
 			expect(calls).toHaveLength(1);
 			const [ev] = JSON.parse(calls[0].init.body as string).events;
 			expect("source" in ev).toBe(false);
@@ -169,7 +169,7 @@ describe("fireSuggestionClick", () => {
 	test("sends a null promptId for a channel prompt", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await fireSuggestionClick({
+			await trackSuggestionClick({
 				...BASE,
 				promptId: null,
 				origin: "channel",
@@ -185,8 +185,8 @@ describe("fireSuggestionClick", () => {
 	test("is a no-op without an api or token", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await fireSuggestionClick({ ...BASE, api: "" });
-			await fireSuggestionClick({ ...BASE, token: "" });
+			await trackSuggestionClick({ ...BASE, api: "" });
+			await trackSuggestionClick({ ...BASE, token: "" });
 			expect(calls).toHaveLength(0);
 		} finally {
 			restore();
@@ -200,30 +200,30 @@ describe("fireSuggestionClick", () => {
 			throw new Error("network down");
 		};
 		try {
-			await fireSuggestionClick({ ...BASE });
+			await trackSuggestionClick({ ...BASE });
 		} finally {
 			globalThis.fetch = real;
 		}
 	});
 });
 
-describe("resolveShownPrompts", () => {
+describe("resolveShownSuggestions", () => {
 	test("maps texts to prompts with their stored ids", () => {
 		const list = [{ id: "p1", text: "Page one" }];
-		expect(resolveShownPrompts(list, ["Page one", "Other"])).toEqual([
+		expect(resolveShownSuggestions(list, ["Page one", "Other"])).toEqual([
 			{ id: "p1", text: "Page one" },
 			{ id: null, text: "Other" },
 		]);
 	});
 
 	test("an empty text list resolves to an empty prompt list", () => {
-		expect(resolveShownPrompts([{ id: "p1", text: "Page one" }], [])).toEqual(
-			[],
-		);
+		expect(
+			resolveShownSuggestions([{ id: "p1", text: "Page one" }], []),
+		).toEqual([]);
 	});
 });
 
-describe("fireSuggestionShown", () => {
+describe("trackSuggestionShown", () => {
 	const SHOWN_BASE = {
 		api: BASE.api,
 		token: BASE.token,
@@ -240,7 +240,7 @@ describe("fireSuggestionShown", () => {
 	test("POSTs one suggestion.shown event carrying the whole set", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await fireSuggestionShown({
+			await trackSuggestionShown({
 				...SHOWN_BASE,
 				prompts: [...SHOWN_BASE.prompts],
 			});
@@ -268,7 +268,7 @@ describe("fireSuggestionShown", () => {
 	test("an empty set is a no-op, not an event", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await fireSuggestionShown({ ...SHOWN_BASE, prompts: [] });
+			await trackSuggestionShown({ ...SHOWN_BASE, prompts: [] });
 			expect(calls).toHaveLength(0);
 		} finally {
 			restore();
@@ -278,7 +278,7 @@ describe("fireSuggestionShown", () => {
 	test("is a no-op without an api or token", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await fireSuggestionShown({
+			await trackSuggestionShown({
 				...SHOWN_BASE,
 				prompts: [...SHOWN_BASE.prompts],
 				api: "",

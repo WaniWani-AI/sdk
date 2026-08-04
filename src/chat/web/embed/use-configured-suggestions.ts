@@ -11,7 +11,7 @@ import type {
 import { usePathname } from "./use-pathname";
 
 /** How many of a page's prompts the widget shows at a time. */
-const SHOWN_PROMPT_COUNT = 3;
+const SHOWN_SUGGESTION_COUNT = 3;
 
 /** Tier display order; one prompt is shown per tier. */
 const TIER_ORDER: PagePromptTier[] = ["low", "medium", "high"];
@@ -25,7 +25,7 @@ function takeRandom<T>(pool: T[]): T | undefined {
 	return taken;
 }
 
-/** Up to {@link SHOWN_PROMPT_COUNT} prompts, one per tier, random within pools;
+/** Up to {@link SHOWN_SUGGESTION_COUNT} prompts, one per tier, random within pools;
  *  untagged prompts fill any slot and leftovers top up short slots. */
 export function pickPagePrompts(prompts: PagePrompt[]): PagePrompt[] {
 	const byTier = new Map<PagePromptTier, PagePrompt[]>();
@@ -49,7 +49,7 @@ export function pickPagePrompts(prompts: PagePrompt[]): PagePrompt[] {
 	}
 
 	const leftovers = [...byTier.values()].flat().concat(wildcards);
-	while (picked.length < Math.min(SHOWN_PROMPT_COUNT, prompts.length)) {
+	while (picked.length < Math.min(SHOWN_SUGGESTION_COUNT, prompts.length)) {
 		const filler = takeRandom(leftovers);
 		if (!filler) {
 			break;

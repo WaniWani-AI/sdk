@@ -13,7 +13,7 @@ import { eventsEndpoint } from "./page-view";
 import type { Suggestion, SuggestionOrigin } from "./resolve-suggestions";
 import { getOrCreateVisitorId } from "./visitor-context";
 
-export interface FireSuggestionClickOptions {
+export interface TrackSuggestionClickOptions {
 	/** Chat API base, e.g. `https://app.waniwani.ai/api/mcp/chat`. */
 	api: string;
 	/** Public token (`wwp_...`). */
@@ -49,7 +49,7 @@ export interface FireSuggestionClickOptions {
  * within a page are pathological authoring, not worth plumbing the rendered
  * index through for.
  */
-export function resolvePromptId(
+export function resolveSuggestionId(
 	list: Suggestion[],
 	text: string,
 ): string | null {
@@ -121,8 +121,8 @@ async function postSuggestionEvent(
 /**
  * Emit a `suggestion.clicked` event for one pill click.
  */
-export async function fireSuggestionClick(
-	opts: FireSuggestionClickOptions,
+export async function trackSuggestionClick(
+	opts: TrackSuggestionClickOptions,
 ): Promise<void> {
 	const {
 		api,
@@ -159,14 +159,14 @@ export async function fireSuggestionClick(
  * per pill. The set's origin rides on the widget event that reported it —
  * the pill row resolves its origin exactly at render time.
  */
-export function resolveShownPrompts(
+export function resolveShownSuggestions(
 	list: Suggestion[],
 	texts: string[],
 ): Suggestion[] {
-	return texts.map((text) => ({ id: resolvePromptId(list, text), text }));
+	return texts.map((text) => ({ id: resolveSuggestionId(list, text), text }));
 }
 
-export interface FireSuggestionShownOptions {
+export interface TrackSuggestionShownOptions {
 	api: string;
 	token: string;
 	channelId?: string;
@@ -183,8 +183,8 @@ export interface FireSuggestionShownOptions {
  * per-prompt impressions stay queryable while a three-pill render costs one
  * row.
  */
-export async function fireSuggestionShown(
-	opts: FireSuggestionShownOptions,
+export async function trackSuggestionShown(
+	opts: TrackSuggestionShownOptions,
 ): Promise<void> {
 	const { api, token, channelId, mode, source, sessionId, prompts, origin } =
 		opts;

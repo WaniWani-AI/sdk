@@ -159,6 +159,39 @@ Target SDK **users**, not SDK developers.
 | Version upgrades / migrations | `references/upgrading.md` (general procedure + cumulative list); each hop also gets a version-specific `migrate-waniwani-sdk-<from>-to-<to>` sibling skill |
 | **Legacy** (not linked from `SKILL.md`) | `references/_legacy/tools-and-widgets.md`, `references/_legacy/widget-react-hooks.md`, `references/_legacy/chat-server.md` |
 
+## Vocabulary
+
+One word per concept, in identifiers. Enforced by `scripts/check-vocabulary.ts`
+(runs on staged files in pre-commit); the table below is the human version.
+
+| Concept | Use | Not | Frozen |
+|---|---|---|---|
+| A clickable answer above the composer | `Suggestion` | `prompt`, `starter`, `chip`, `CTA` | event payload keys `promptId` / `prompts`; `/config`'s `pageSuggestions[].prompts` |
+| Its rendered UI element | `pill` | `chip`, `card`, `CTA` | — |
+| Emitting an event | `track*` | `fire*`, `capture*`, `report*` | `captureBatch` (test helper); `record*` for writing to an in-memory trace, which is not emitting |
+| The chat text input | `PromptInput` | — | vendored from ai-elements |
+| An instruction sent to a model | `systemPrompt`, `prompt` | — | a different concept from `Suggestion`; keeps the word |
+| Conversation identity | `sessionId` | `conversationId` | the inbound alias list in `mcp/server/utils.ts` |
+| Persisted conversation history | `threadId` | — | a distinct concept, not a `sessionId` synonym |
+| The configured agent | `channelId` in code, "agent" in prose | `agentId`, `projectId` | — |
+
+Three rules produce the table, and they generalize to concepts not in it:
+
+1. **Name by the taxonomy.** A feature with an enum of N cases gets types with N
+   fields named after those cases. Bundling a subset under an invented noun
+   hides the taxonomy — this is what `SuggestionCandidates` got wrong when it
+   read `{ flow, followup, starters }`.
+2. **Prose gets the product's word, identifiers get the canonical one.** Docs
+   and comments may say "starter prompt" or "the agent"; code says
+   `Suggestion` and `channelId`.
+3. **Freeze payload keys, not the code around them.** A shipped event key or
+   wire field is a contract — renaming it breaks analytics queries. The
+   functions that build it are not, and should use the canonical term.
+
+Before naming a new type, file, function, or field, grep for the concept first.
+Reusing the incumbent word is nearly always right; coining a synonym costs every
+future reader.
+
 ## CSS / Tailwind
 
 All Tailwind classes in `src/chat/web/` use the `ww` prefix (e.g. `ww:flex`, `ww:bg-primary`). This prevents the SDK's styles from leaking into host applications.

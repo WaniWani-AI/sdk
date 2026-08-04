@@ -15,7 +15,7 @@ for (const key of [
 // biome-ignore lint/suspicious/noExplicitAny: test setup
 (globalThis as any).window = win;
 
-import { __resetPageViewGuard, firePageView } from "../page-view";
+import { __resetPageViewGuard, trackPageView } from "../page-view";
 
 interface Captured {
 	url: string;
@@ -47,11 +47,11 @@ beforeEach(() => {
 	}
 });
 
-describe("firePageView", () => {
+describe("trackPageView", () => {
 	test("POSTs a page.viewed event to the canonical ingest with bearer auth and visitor attribution", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await firePageView({
+			await trackPageView({
 				api: "https://app.waniwani.ai/api/mcp/chat",
 				token: "wwp_test",
 				channelId: "chan_1",
@@ -94,9 +94,9 @@ describe("firePageView", () => {
 				channelId: "chan_1",
 				source: "acme-web",
 			} as const;
-			await firePageView(opts);
-			await firePageView(opts);
-			await firePageView(opts);
+			await trackPageView(opts);
+			await trackPageView(opts);
+			await trackPageView(opts);
 			expect(calls).toHaveLength(1);
 		} finally {
 			restore();
@@ -106,8 +106,8 @@ describe("firePageView", () => {
 	test("is a no-op without an api or token", async () => {
 		const { calls, restore } = mockFetch();
 		try {
-			await firePageView({ api: "", token: "wwp_test", source: "acme-web" });
-			await firePageView({
+			await trackPageView({ api: "", token: "wwp_test", source: "acme-web" });
+			await trackPageView({
 				api: "https://app.waniwani.ai/api/mcp/chat",
 				token: "",
 				source: "acme-web",
@@ -124,7 +124,7 @@ describe("firePageView", () => {
 			// A channel with a blank Analytics source still records page views;
 			// attribution rides on `properties.channelId`. No source tag is sent,
 			// and none is invented.
-			await firePageView({
+			await trackPageView({
 				api: "https://app.waniwani.ai/api/mcp/chat",
 				token: "wwp_test",
 				channelId: "chan_1",
@@ -157,8 +157,8 @@ describe("firePageView", () => {
 				token: "wwp_test",
 				source: "acme-web",
 			} as const;
-			await firePageView(opts); // fails, guard rolled back
-			await firePageView(opts); // succeeds
+			await trackPageView(opts); // fails, guard rolled back
+			await trackPageView(opts); // succeeds
 			expect(attempts).toBe(2);
 		} finally {
 			globalThis.fetch = real;

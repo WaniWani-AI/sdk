@@ -16,10 +16,10 @@ import {
 import type { ChatHandle } from "../@types";
 import { ChatEmbed } from "../layouts/chat-embed";
 import {
-	fireSuggestionClick,
-	fireSuggestionShown,
-	resolvePromptId,
-	resolveShownPrompts,
+	resolveShownSuggestions,
+	resolveSuggestionId,
+	trackSuggestionClick,
+	trackSuggestionShown,
 } from "../lib/suggestion-click";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
@@ -129,8 +129,8 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 			return widgetEvents.subscribe((event) => {
 				if (event.name === "suggestion.clicked") {
 					const { text, origin } = event.properties;
-					const promptId = resolvePromptId(configured.page ?? [], text);
-					void fireSuggestionClick({
+					const promptId = resolveSuggestionId(configured.page ?? [], text);
+					void trackSuggestionClick({
 						api: config.api ?? "",
 						token: config.token,
 						channelId: config.channelId,
@@ -146,8 +146,8 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 				}
 				if (event.name === "suggestions.shown") {
 					const { texts, origin } = event.properties;
-					const prompts = resolveShownPrompts(configured.page ?? [], texts);
-					void fireSuggestionShown({
+					const prompts = resolveShownSuggestions(configured.page ?? [], texts);
+					void trackSuggestionShown({
 						api: config.api ?? "",
 						token: config.token,
 						channelId: config.channelId,
