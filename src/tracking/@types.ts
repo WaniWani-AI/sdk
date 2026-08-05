@@ -26,9 +26,10 @@ export const EVENT_TYPES = [
 	"option_selected",
 	"lead_qualified",
 	"converted",
-	// Emitted automatically by SDK internals when a flow or a tool handler
-	// fails. Properties carry bounded tokens only; the underlying error stays
-	// in the host's own logs.
+	// Emitted automatically by the flow engine when a flow step fails. A failing
+	// tool handler surfaces as `tool.called` with a `cause` property instead.
+	// Properties carry bounded tokens only; the underlying error stays in the
+	// host's own logs.
 	"session.error",
 ] as const;
 

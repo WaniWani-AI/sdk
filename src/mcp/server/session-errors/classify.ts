@@ -16,12 +16,27 @@ function readStatus(error: unknown): number | undefined {
 	return parsed.data.status ?? parsed.data.statusCode;
 }
 
+/**
+ * Runtime fetch-failure strings from the environments that surface network
+ * errors as a `TypeError`: undici/Node, Chrome, Firefox. Anchored to these
+ * exact phrases rather than a bare "fetch" substring, which also matches
+ * unrelated identifiers such as `fetchedPlans`.
+ */
+const NETWORK_ERROR_MESSAGES = [
+	"fetch failed",
+	"failed to fetch",
+	"networkerror when attempting to fetch",
+];
+
 export function classifyCause({
 	error,
 }: {
 	error: unknown;
 }): SessionErrorProperties["cause"] {
-	if (error instanceof z.ZodError) {
+	// Name-based rather than `instanceof z.ZodError`: zod is an optional peer
+	// dependency, and an error thrown by a nested dependency's own zod copy
+	// fails an `instanceof` check across that realm boundary.
+	if (error instanceof Error && error.name === "ZodError") {
 		return "invalid_output";
 	}
 
@@ -45,7 +60,9 @@ export function classifyCause({
 
 	if (
 		error instanceof TypeError &&
-		error.message.toLowerCase().includes("fetch")
+		NETWORK_ERROR_MESSAGES.some((message) =>
+			error.message.toLowerCase().includes(message),
+		)
 	) {
 		return "network";
 	}

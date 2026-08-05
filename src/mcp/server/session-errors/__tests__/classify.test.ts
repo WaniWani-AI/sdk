@@ -39,6 +39,27 @@ describe("classifyCause", () => {
 		);
 	});
 
+	test("a browser fetch rejection is a network fault", () => {
+		expect(classifyCause({ error: new TypeError("Failed to fetch") })).toBe(
+			"network",
+		);
+		expect(
+			classifyCause({
+				error: new TypeError("NetworkError when attempting to fetch resource"),
+			}),
+		).toBe("network");
+	});
+
+	test("a TypeError whose message merely contains 'fetch' as part of an identifier is unknown, not network", () => {
+		expect(
+			classifyCause({
+				error: new TypeError(
+					"Cannot read properties of undefined (reading 'fetchedPlans')",
+				),
+			}),
+		).toBe("unknown");
+	});
+
 	test("a schema failure is invalid output", () => {
 		const parsed = z.object({ a: z.string() }).safeParse({ a: 1 });
 		expect(parsed.success).toBe(false);

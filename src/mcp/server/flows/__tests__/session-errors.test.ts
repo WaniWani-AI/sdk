@@ -226,4 +226,31 @@ describe("executeFrom reports session errors", () => {
 
 		expect(result.content.status).toBe("error");
 	});
+
+	test("a client whose track throws synchronously does not turn a dead end into a rejection", async () => {
+		const throwingClient = {
+			track: () => {
+				throw new Error("client track blew up");
+			},
+		} as unknown as ScopedWaniWaniClient;
+		const nodes = new Map<string, NodeHandler<State>>([
+			["start", async () => ({})],
+		]);
+
+		const result = await executeFrom(
+			"start",
+			{},
+			nodes,
+			new Map<string, Edge<State>>(),
+			new Map(),
+			undefined,
+			throwingClient,
+		);
+
+		expect(result.content.status).toBe("error");
+		if (result.content.status !== "error") {
+			throw new Error("expected error content");
+		}
+		expect(result.content.error).toBe('No outgoing edge from node "start"');
+	});
 });

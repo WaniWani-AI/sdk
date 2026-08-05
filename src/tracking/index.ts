@@ -29,6 +29,7 @@ export type {
 	RevenuePriceShownInput,
 	RevenuePricesComparedInput,
 	RevenueTrackingApi,
+	SessionErrorProperties,
 	ToolCalledProperties,
 	TrackEvent,
 	TrackFn,

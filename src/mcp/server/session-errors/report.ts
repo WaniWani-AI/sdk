@@ -55,15 +55,22 @@ export function reportSessionError({
 		return;
 	}
 
-	void waniwani
-		.track({
-			event: "session.error",
-			properties: {
-				code,
-				cause,
-				...(tool ? { tool } : {}),
-				...(node ? { node } : {}),
-			},
-		})
-		.catch(() => {});
+	// A caller-supplied ScopedWaniWaniClient is not guaranteed to return a
+	// promise from `track` or to only fail asynchronously. `Promise.resolve`
+	// normalizes a non-promise return, and the `try/catch` absorbs a synchronous
+	// throw, keeping this call from ever propagating into the caller, who is
+	// already on a failure path.
+	try {
+		void Promise.resolve(
+			waniwani.track({
+				event: "session.error",
+				properties: {
+					code,
+					cause,
+					...(tool ? { tool } : {}),
+					...(node ? { node } : {}),
+				},
+			}),
+		).catch(() => {});
+	} catch {}
 }
