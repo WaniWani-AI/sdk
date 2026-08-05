@@ -64,6 +64,12 @@ export interface ToolCalledProperties {
 	type?: "pricing" | "product_info" | "availability" | "support" | "other";
 	/** Retrieval traces for kb.search() calls made inside this tool handler. */
 	kbSearch?: KbSearchTrace[];
+	/**
+	 * The classified cause, stamped when a tool handler throws. A handler that
+	 * returns `{ isError: true }` without throwing carries a `status` of
+	 * `"error"` and no cause, since there is no error object to classify.
+	 */
+	cause?: SessionErrorProperties["cause"];
 }
 
 export interface LinkClickedProperties {
