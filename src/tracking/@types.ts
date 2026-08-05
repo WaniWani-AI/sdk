@@ -26,6 +26,10 @@ export const EVENT_TYPES = [
 	"option_selected",
 	"lead_qualified",
 	"converted",
+	// Emitted automatically by SDK internals when a flow or a tool handler
+	// fails. Properties carry bounded tokens only; the underlying error stays
+	// in the host's own logs.
+	"session.error",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -119,6 +123,28 @@ export interface ConvertedProperties {
 	occurredAt?: string;
 }
 
+/**
+ * Properties for `session.error`.
+ *
+ * `code` is what a customer is shown. `cause` is the technical discriminator
+ * the platform groups issues on. Both are closed sets so grouping cardinality
+ * stays bounded. `tool` and `node` narrow the group when the failure has a
+ * location.
+ */
+export interface SessionErrorProperties {
+	code: "agent_failed" | "tool_failed" | "upstream_failed";
+	cause:
+		| "timeout"
+		| "rate_limited"
+		| "upstream_4xx"
+		| "upstream_5xx"
+		| "network"
+		| "invalid_output"
+		| "unknown";
+	tool?: string;
+	node?: string;
+}
+
 // ============================================
 // Legacy + Modern Track Inputs
 // ============================================
@@ -196,6 +222,10 @@ export type TrackEvent =
 	| ({
 			event: "converted";
 			properties?: ConvertedProperties;
+	  } & BaseTrackEvent)
+	| ({
+			event: "session.error";
+			properties?: SessionErrorProperties;
 	  } & BaseTrackEvent);
 
 /**
