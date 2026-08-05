@@ -130,18 +130,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		waniwani?: ScopedWaniWaniClient,
 	) {
 		if (args.action === "start") {
+			// `intent` is observational: the schema asks for it on start, but nothing
+			// in the engine reads it (it never reaches a node, the store, or an
+			// event). A missing value therefore costs a conversation turn and buys
+			// nothing, so trim it and carry on instead of failing the call.
 			const intent =
 				typeof args.intent === "string" ? args.intent.trim() : undefined;
-			if (!intent) {
-				return {
-					content: {
-						status: "error" as const,
-						error:
-							'Missing required "intent" for action "start". Include a brief summary of the user\'s goal for this flow and any relevant prior context that led to triggering it, if available.',
-					},
-				};
-			}
-			args.intent = intent;
+			args.intent = intent || undefined;
 
 			// Trim context if provided (optional field, no error if missing)
 			if (typeof args.context === "string") {
