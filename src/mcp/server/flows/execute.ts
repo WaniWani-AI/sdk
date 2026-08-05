@@ -1,5 +1,7 @@
 import type { z } from "zod";
 import type { ScopedWaniWaniClient } from "../scoped-client";
+import { classifyCause } from "../session-errors/classify";
+import { reportSessionError } from "../session-errors/report";
 import type {
 	Edge,
 	ExecutionResult,
@@ -147,6 +149,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 
 		const handler = nodes.get(currentNode);
 		if (!handler) {
+			reportSessionError({
+				waniwani,
+				code: "agent_failed",
+				cause: "unknown",
+				node: currentNode,
+			});
 			return {
 				content: {
 					status: "error",
@@ -317,6 +325,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 
 			const edge = edges.get(currentNode);
 			if (!edge) {
+				reportSessionError({
+					waniwani,
+					code: "agent_failed",
+					cause: "unknown",
+					node: currentNode,
+				});
 				return {
 					content: {
 						status: "error",
@@ -328,6 +342,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 			currentNode = await resolveNextNode(edge, state);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
+			reportSessionError({
+				waniwani,
+				code: "agent_failed",
+				cause: classifyCause({ error }),
+				node: currentNode,
+			});
 			return {
 				content: { status: "error", error: message },
 				flowTokenContent: { step: currentNode, state },
@@ -336,6 +356,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 		}
 	}
 
+	reportSessionError({
+		waniwani,
+		code: "agent_failed",
+		cause: "unknown",
+		node: currentNode,
+	});
 	return {
 		content: {
 			status: "error",
