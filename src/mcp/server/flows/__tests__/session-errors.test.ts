@@ -150,6 +150,39 @@ describe("executeFrom reports session errors", () => {
 		expect(tracked[0].properties?.cause).toBe("flow_dead_end");
 	});
 
+	test("the iteration cap reports and returns the cap error", async () => {
+		const { tracked, client } = fakeClient();
+		const nodes = new Map<string, NodeHandler<State>>([
+			["a", async () => ({})],
+			["b", async () => ({})],
+		]);
+		const edges = new Map<string, Edge<State>>([
+			["a", { type: "direct", to: "b" }],
+			["b", { type: "direct", to: "a" }],
+		]);
+
+		const result = await executeFrom(
+			"a",
+			{},
+			nodes,
+			edges,
+			new Map(),
+			undefined,
+			client,
+		);
+
+		expect(result.content.status).toBe("error");
+		if (result.content.status !== "error") {
+			throw new Error("expected error content");
+		}
+		expect(result.content.error).toBe(
+			"Flow exceeded maximum iterations (possible infinite loop)",
+		);
+		expect(tracked).toHaveLength(1);
+		expect(tracked[0].properties?.code).toBe("agent_failed");
+		expect(tracked[0].properties?.cause).toBe("flow_loop");
+	});
+
 	test("a healthy flow reports nothing", async () => {
 		const { tracked, client } = fakeClient();
 		const nodes = new Map<string, NodeHandler<State>>([
