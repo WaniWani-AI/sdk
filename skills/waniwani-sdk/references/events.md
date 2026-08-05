@@ -240,11 +240,13 @@ await client.track({ event: "link.clicked", properties: { url: "https://example.
   `tool` and `node` naming where the failure happened. An unknown node reports
   `flow_unknown_node`, a missing edge reports `flow_dead_end`, the iteration cap
   reports `flow_loop`, and a throwing step handler reports whichever cause the thrown
-  error classifies to. A failing tool call does not emit `session.error`: it emits
-  `tool.called` with `status: "error"` and the same `cause`. The properties carry no
-  error message, stack, or handler input; the SDK also writes a `console.error` line
-  prefixed `[waniwani][session-error]`, so the underlying error stays available in the
-  host's own logs.
+  error classifies to. A failing tool call does not emit `session.error`: a handler
+  that throws emits `tool.called` with `status: "error"` and the same `cause`; a
+  handler that returns `{ isError: true }` without throwing emits `tool.called` with
+  `status: "error"` and no `cause`. The properties carry no error message, stack, or
+  handler input; the SDK also writes a `console.error` line prefixed
+  `[waniwani][session-error]`, so the underlying error stays available in the host's
+  own logs.
 
 ## Off-platform conversions (the case this taxonomy exists for)
 
@@ -365,8 +367,9 @@ await client.track.converted({
   the end.
 - **Trying to emit `session.error` yourself:** there is no public API for it. The flow
   engine emits it automatically when a step fails; application code never constructs
-  or sends this event. A tool handler's own failure surfaces as `tool.called` with
-  `status: "error"` and a `cause`, not as `session.error`.
+  or sends this event. A tool handler's own failure surfaces as `tool.called`, not
+  `session.error`: with `status: "error"` and a `cause` if the handler threw, with
+  `status: "error"` and no `cause` if it returned `{ isError: true }` instead.
 - **Emitting `lead_qualified` at flow entry** — entering a funnel is not qualifying
   (`tool.called` already covers activity). Place it at the node where your qualification
   bar is met, and fire it once per flow run.
