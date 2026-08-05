@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ScopedWaniWaniClient } from "../../scoped-client";
 import type { Edge, NodeHandler } from "../@types";
-import { END } from "../@types";
+import { END, interrupt, showWidget } from "../@types";
 import { executeFrom } from "../execute";
 
 type State = Record<string, unknown>;
@@ -88,6 +88,51 @@ describe("executeFrom reports session errors", () => {
 
 		expect(result.content.status).toBe("error");
 		expect(tracked).toHaveLength(1);
+	});
+
+	test("a dead end reached after an already-answered interrupt reports", async () => {
+		const { tracked, client } = fakeClient();
+		const nodes = new Map<string, NodeHandler<State>>([
+			[
+				"start",
+				async () => interrupt({ name: { question: "What's your name?" } }),
+			],
+		]);
+
+		const result = await executeFrom(
+			"start",
+			{ name: "Ada" },
+			nodes,
+			new Map<string, Edge<State>>(),
+			new Map(),
+			undefined,
+			client,
+		);
+
+		expect(result.content.status).toBe("error");
+		expect(tracked).toHaveLength(1);
+		expect(tracked[0].properties?.code).toBe("agent_failed");
+	});
+
+	test("a dead end reached after an auto-skipped widget reports", async () => {
+		const { tracked, client } = fakeClient();
+		const nodes = new Map<string, NodeHandler<State>>([
+			["start", async () => showWidget({ tool: "plan_picker", field: "plan" })],
+		]);
+
+		const result = await executeFrom(
+			"start",
+			{ plan: "pro" },
+			nodes,
+			new Map<string, Edge<State>>(),
+			new Map(),
+			undefined,
+			client,
+		);
+
+		expect(result.content.status).toBe("error");
+		expect(tracked).toHaveLength(1);
+		expect(tracked[0].properties?.code).toBe("agent_failed");
 	});
 
 	test("a healthy flow reports nothing", async () => {

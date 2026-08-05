@@ -251,6 +251,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				// All questions filled and validated — advance to next node
 				const edge = edges.get(currentNode);
 				if (!edge) {
+					reportSessionError({
+						waniwani,
+						code: "agent_failed",
+						cause: "unknown",
+						node: currentNode,
+					});
 					return {
 						content: {
 							status: "error",
@@ -274,6 +280,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 					) {
 						const edge = edges.get(currentNode);
 						if (!edge) {
+							reportSessionError({
+								waniwani,
+								code: "agent_failed",
+								cause: "unknown",
+								node: currentNode,
+							});
 							return {
 								content: {
 									status: "error",
