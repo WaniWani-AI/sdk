@@ -8,6 +8,7 @@ import { waniwani } from "../../../waniwani.js";
 import type { FlowGraph } from "../flows/@types.js";
 import { REDACTED_STATE_UPDATE_FIELDS_META_KEY } from "../flows/redacted.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
+import { classifyCause } from "../session-errors/classify.js";
 import type { McpServer } from "../types";
 import {
 	extractSessionId,
@@ -320,6 +321,7 @@ function createWrappedHandler(
 						status: "error",
 						errorMessage:
 							error instanceof Error ? error.message : String(error),
+						cause: classifyCause({ error }),
 					},
 					clientInfo,
 					{ input },
