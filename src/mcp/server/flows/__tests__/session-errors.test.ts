@@ -46,9 +46,15 @@ describe("executeFrom reports session errors", () => {
 		);
 
 		expect(result.content.status).toBe("error");
+		if (result.content.status !== "error") {
+			throw new Error("expected error content");
+		}
+		expect(result.content.error).toBe("partner API exploded");
+		expect(result.flowTokenContent).toEqual({ step: "start", state: {} });
 		expect(tracked).toHaveLength(1);
 		expect(tracked[0].event).toBe("session.error");
 		expect(tracked[0].properties?.code).toBe("agent_failed");
+		expect(tracked[0].properties?.cause).toBe("unknown");
 		expect(tracked[0].properties?.node).toBe("start");
 	});
 
@@ -68,6 +74,7 @@ describe("executeFrom reports session errors", () => {
 		expect(result.content.status).toBe("error");
 		expect(tracked).toHaveLength(1);
 		expect(tracked[0].properties?.code).toBe("agent_failed");
+		expect(tracked[0].properties?.cause).toBe("flow_unknown_node");
 	});
 
 	test("a dead end reports", async () => {
@@ -87,7 +94,13 @@ describe("executeFrom reports session errors", () => {
 		);
 
 		expect(result.content.status).toBe("error");
+		if (result.content.status !== "error") {
+			throw new Error("expected error content");
+		}
+		expect(result.content.error).toBe('No outgoing edge from node "start"');
 		expect(tracked).toHaveLength(1);
+		expect(tracked[0].properties?.code).toBe("agent_failed");
+		expect(tracked[0].properties?.cause).toBe("flow_dead_end");
 	});
 
 	test("a dead end reached after an already-answered interrupt reports", async () => {
@@ -112,6 +125,7 @@ describe("executeFrom reports session errors", () => {
 		expect(result.content.status).toBe("error");
 		expect(tracked).toHaveLength(1);
 		expect(tracked[0].properties?.code).toBe("agent_failed");
+		expect(tracked[0].properties?.cause).toBe("flow_dead_end");
 	});
 
 	test("a dead end reached after an auto-skipped widget reports", async () => {
@@ -133,6 +147,7 @@ describe("executeFrom reports session errors", () => {
 		expect(result.content.status).toBe("error");
 		expect(tracked).toHaveLength(1);
 		expect(tracked[0].properties?.code).toBe("agent_failed");
+		expect(tracked[0].properties?.cause).toBe("flow_dead_end");
 	});
 
 	test("a healthy flow reports nothing", async () => {

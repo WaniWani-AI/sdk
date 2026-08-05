@@ -140,7 +140,10 @@ export interface SessionErrorProperties {
 		| "upstream_5xx"
 		| "network"
 		| "invalid_output"
-		| "unknown";
+		| "unknown"
+		| "flow_dead_end"
+		| "flow_unknown_node"
+		| "flow_loop";
 	tool?: string;
 	node?: string;
 }

@@ -152,7 +152,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 			reportSessionError({
 				waniwani,
 				code: "agent_failed",
-				cause: "unknown",
+				cause: "flow_unknown_node",
 				node: currentNode,
 			});
 			return {
@@ -254,7 +254,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 					reportSessionError({
 						waniwani,
 						code: "agent_failed",
-						cause: "unknown",
+						cause: "flow_dead_end",
 						node: currentNode,
 					});
 					return {
@@ -283,7 +283,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 							reportSessionError({
 								waniwani,
 								code: "agent_failed",
-								cause: "unknown",
+								cause: "flow_dead_end",
 								node: currentNode,
 							});
 							return {
@@ -340,7 +340,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				reportSessionError({
 					waniwani,
 					code: "agent_failed",
-					cause: "unknown",
+					cause: "flow_dead_end",
 					node: currentNode,
 				});
 				return {
@@ -371,7 +371,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 	reportSessionError({
 		waniwani,
 		code: "agent_failed",
-		cause: "unknown",
+		cause: "flow_loop",
 		node: currentNode,
 	});
 	return {
