@@ -1,8 +1,8 @@
 import { z } from "zod";
 import type { SessionErrorProperties } from "../../../tracking/@types.js";
 
-// Providers and HTTP clients disagree on which key carries the status, so read
-// both. Zod rather than a cast: the input is genuinely `unknown`.
+// HTTP clients disagree on which key carries the status, so both are read;
+// Zod (not a cast) validates it since the input is genuinely unknown.
 const statusCarrierSchema = z.object({
 	status: z.number().optional(),
 	statusCode: z.number().optional(),
@@ -16,12 +16,7 @@ function readStatus(error: unknown): number | undefined {
 	return parsed.data.status ?? parsed.data.statusCode;
 }
 
-/**
- * Runtime fetch-failure strings from the environments that surface network
- * errors as a `TypeError`: undici/Node, Chrome, Firefox. Anchored to these
- * exact phrases rather than a bare "fetch" substring, which also matches
- * unrelated identifiers such as `fetchedPlans`.
- */
+// Exact phrases, not a bare "fetch" substring, to avoid false positives like `fetchedPlans`.
 const NETWORK_ERROR_MESSAGES = [
 	"fetch failed",
 	"failed to fetch",
@@ -33,9 +28,8 @@ export function classifyCause({
 }: {
 	error: unknown;
 }): SessionErrorProperties["cause"] {
-	// Name-based rather than `instanceof z.ZodError`: zod is an optional peer
-	// dependency, and an error thrown by a nested dependency's own zod copy
-	// fails an `instanceof` check across that realm boundary.
+	// Name-based, not instanceof z.ZodError: zod is an optional peer dependency,
+	// and a nested dependency's own zod copy fails instanceof across realms.
 	if (error instanceof Error && error.name === "ZodError") {
 		return "invalid_output";
 	}

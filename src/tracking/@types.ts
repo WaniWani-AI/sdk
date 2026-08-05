@@ -26,10 +26,8 @@ export const EVENT_TYPES = [
 	"option_selected",
 	"lead_qualified",
 	"converted",
-	// Emitted automatically by the flow engine when a flow step fails. A failing
-	// tool handler surfaces as `tool.called` with a `cause` property instead.
-	// Properties carry bounded tokens only; the underlying error stays in the
-	// host's own logs.
+	// Flow step failures only; a failing tool handler emits tool.called with a
+	// cause property instead. Properties carry bounded tokens, never the raw error.
 	"session.error",
 ] as const;
 
@@ -124,14 +122,7 @@ export interface ConvertedProperties {
 	occurredAt?: string;
 }
 
-/**
- * Properties for `session.error`.
- *
- * `code` is what a customer is shown. `cause` is the technical discriminator
- * the platform groups issues on. Both are closed sets so grouping cardinality
- * stays bounded. `tool` and `node` narrow the group when the failure has a
- * location.
- */
+/** `code`/`cause` are closed sets so grouping cardinality stays bounded. */
 export interface SessionErrorProperties {
 	code: "agent_failed" | "tool_failed" | "upstream_failed";
 	cause:

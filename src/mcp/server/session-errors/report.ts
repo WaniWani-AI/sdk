@@ -1,11 +1,7 @@
 import type { SessionErrorProperties } from "../../../tracking/@types.js";
 import type { ScopedWaniWaniClient } from "../scoped-client.js";
 
-/**
- * The shared identifier for one issue. The platform derives the same token from
- * the event's grouping tuple, so a log line in the host's deployment and an
- * alert on the platform name the same thing.
- */
+/** Matches the token the platform derives from the same grouping tuple, so a host log line and a platform alert name the same issue. */
 function sessionErrorToken({
 	code,
 	tool,
@@ -18,19 +14,7 @@ function sessionErrorToken({
 	return `${code}:${tool ?? "-"}:${cause}`;
 }
 
-/**
- * Emit one `session.error` without ever affecting the caller.
- *
- * Fire-and-forget by design: the caller is already on a failure path, and a
- * telemetry problem must not replace the failure the host is about to handle.
- * The scoped client carries the request meta, so the event inherits its session
- * id and its source.
- *
- * The log line carries only the token and the node, keeping it stable enough to
- * fold in whatever log aggregator the host runs. It is emitted even without a
- * client, since a flow failing with no telemetry configured is exactly the case
- * where a log line is the only signal there is.
- */
+/** Fire-and-forget: the caller is already on a failure path, so a telemetry problem must never replace it. Logged even without a client. */
 export function reportSessionError({
 	waniwani,
 	code,
@@ -55,11 +39,8 @@ export function reportSessionError({
 		return;
 	}
 
-	// A caller-supplied ScopedWaniWaniClient is not guaranteed to return a
-	// promise from `track` or to only fail asynchronously. `Promise.resolve`
-	// normalizes a non-promise return, and the `try/catch` absorbs a synchronous
-	// throw, keeping this call from ever propagating into the caller, who is
-	// already on a failure path.
+	// Promise.resolve normalizes a non-promise return; try/catch absorbs a
+	// synchronous throw, so track() can never propagate to the caller.
 	try {
 		void Promise.resolve(
 			waniwani.track({
