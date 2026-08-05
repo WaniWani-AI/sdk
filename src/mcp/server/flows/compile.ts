@@ -7,6 +7,8 @@ import type {
 import { z } from "zod";
 import type { ScopedWaniWaniClient } from "../scoped-client";
 import { extractScopedClient } from "../scoped-client";
+import { classifyCause } from "../session-errors/classify";
+import { reportSessionError } from "../session-errors/report";
 import {
 	extractSessionId,
 	FLOW_META_KEY,
@@ -146,6 +148,12 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 			const startEdge = edges.get(START);
 			if (!startEdge) {
+				reportSessionError({
+					waniwani,
+					code: "agent_failed",
+					cause: "flow_dead_end",
+					node: START,
+				});
 				return {
 					content: { status: "error" as const, error: "No start edge" },
 				};
@@ -181,6 +189,11 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				flowState = await store.get(sessionId);
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
+				reportSessionError({
+					waniwani,
+					code: "upstream_failed",
+					cause: classifyCause({ error: err }),
+				});
 				return {
 					content: {
 						status: "error" as const,
@@ -219,6 +232,12 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			if (flowState.widgetId) {
 				const edge = edges.get(step);
 				if (!edge) {
+					reportSessionError({
+						waniwani,
+						code: "agent_failed",
+						cause: "flow_dead_end",
+						node: step,
+					});
 					return {
 						content: {
 							status: "error" as const,
@@ -271,6 +290,11 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				flowState = await store.get(sessionId);
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
+				reportSessionError({
+					waniwani,
+					code: "upstream_failed",
+					cause: classifyCause({ error: err }),
+				});
 				return {
 					content: {
 						status: "error" as const,
@@ -310,6 +334,12 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 			const startEdge = edges.get(START);
 			if (!startEdge) {
+				reportSessionError({
+					waniwani,
+					code: "agent_failed",
+					cause: "flow_dead_end",
+					node: START,
+				});
 				return {
 					content: { status: "error" as const, error: "No start edge" },
 				};
@@ -412,6 +442,12 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				await store.set(sessionId, result.flowTokenContent);
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
+				reportSessionError({
+					waniwani,
+					code: "upstream_failed",
+					cause: classifyCause({ error: err }),
+					node: result.flowTokenContent.step,
+				});
 				const errorContent = [
 					{
 						type: "text" as const,
