@@ -1,7 +1,13 @@
 import type { SessionErrorProperties } from "../../../tracking/@types.js";
 import type { ScopedWaniWaniClient } from "../scoped-client.js";
 
-/** Matches the token the platform derives from the same grouping tuple, so a host log line and a platform alert name the same issue. */
+/**
+ * The grouping tuple as a single token.
+ *
+ * It holds the log line's text stable across every occurrence of the same
+ * failure, so a host searching or aggregating its own logs matches one string
+ * instead of one variant per call. Volatile identifiers stay out of it.
+ */
 function sessionErrorToken({
 	code,
 	tool,

@@ -244,9 +244,10 @@ await client.track({ event: "link.clicked", properties: { url: "https://example.
   that throws emits `tool.called` with `status: "error"` and the same `cause`; a
   handler that returns `{ isError: true }` without throwing emits `tool.called` with
   `status: "error"` and no `cause`. The properties carry no error message, stack, or
-  handler input; the SDK also writes a `console.error` line prefixed
-  `[waniwani][session-error]`, so the underlying error stays available in the host's
-  own logs.
+  handler input. The SDK also writes a `console.error` line prefixed
+  `[waniwani][session-error]`, but that line carries only the same `code:tool:cause`
+  token plus `{ node }`. The thrown error is not in it, so if you need the underlying
+  error in your host's logs, log it yourself where it is thrown.
 
 ## Off-platform conversions (the case this taxonomy exists for)
 
