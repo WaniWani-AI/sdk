@@ -152,7 +152,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					waniwani,
 					code: "agent_failed",
 					cause: "flow_dead_end",
-					node: START,
+					properties: { node: START },
 				});
 				return {
 					content: { status: "error" as const, error: "No start edge" },
@@ -236,7 +236,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 						waniwani,
 						code: "agent_failed",
 						cause: "flow_dead_end",
-						node: step,
+						properties: { node: step },
 					});
 					return {
 						content: {
@@ -338,7 +338,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					waniwani,
 					code: "agent_failed",
 					cause: "flow_dead_end",
-					node: START,
+					properties: { node: START },
 				});
 				return {
 					content: { status: "error" as const, error: "No start edge" },
@@ -446,7 +446,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					waniwani,
 					code: "upstream_failed",
 					cause: classifyCause({ error: err }),
-					node: result.flowTokenContent.step,
+					properties: { node: result.flowTokenContent.step },
 				});
 				const errorContent = [
 					{

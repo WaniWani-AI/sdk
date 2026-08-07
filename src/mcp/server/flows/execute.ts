@@ -153,7 +153,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				waniwani,
 				code: "agent_failed",
 				cause: "flow_unknown_node",
-				node: currentNode,
+				properties: { node: currentNode },
 			});
 			return {
 				content: {
@@ -255,7 +255,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 						waniwani,
 						code: "agent_failed",
 						cause: "flow_dead_end",
-						node: currentNode,
+						properties: { node: currentNode },
 					});
 					return {
 						content: {
@@ -284,7 +284,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 								waniwani,
 								code: "agent_failed",
 								cause: "flow_dead_end",
-								node: currentNode,
+								properties: { node: currentNode },
 							});
 							return {
 								content: {
@@ -341,7 +341,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 					waniwani,
 					code: "agent_failed",
 					cause: "flow_dead_end",
-					node: currentNode,
+					properties: { node: currentNode },
 				});
 				return {
 					content: {
@@ -358,7 +358,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				waniwani,
 				code: "agent_failed",
 				cause: classifyCause({ error }),
-				node: currentNode,
+				properties: { node: currentNode },
 			});
 			return {
 				content: { status: "error", error: message },
@@ -372,7 +372,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 		waniwani,
 		code: "agent_failed",
 		cause: "flow_loop",
-		node: currentNode,
+		properties: { node: currentNode },
 	});
 	return {
 		content: {

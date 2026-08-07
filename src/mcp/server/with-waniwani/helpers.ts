@@ -1,5 +1,5 @@
 import type { KbSearchTrace } from "../../../kb/types.js";
-import type { SessionErrorProperties } from "../../../tracking/@types.js";
+import type { ErrorCauseType } from "../../../tracking/@types.js";
 import type {
 	CallableTrack,
 	ToolCalledProperties,
@@ -125,7 +125,7 @@ export function buildTrackInput(
 		durationMs: number;
 		status: string;
 		errorMessage?: string;
-		cause?: SessionErrorProperties["cause"];
+		cause?: ErrorCauseType;
 	},
 	clientInfo?: { name: string; version: string },
 	io?: { input?: unknown; output?: unknown },

@@ -15,7 +15,7 @@ describe("reportSessionError", () => {
 				waniwani: client,
 				code: "agent_failed",
 				cause: "flow_dead_end",
-				node: "start",
+				properties: { node: "start" },
 			}),
 		).not.toThrow();
 	});
@@ -30,7 +30,7 @@ describe("reportSessionError", () => {
 				waniwani: client,
 				code: "agent_failed",
 				cause: "flow_dead_end",
-				node: "start",
+				properties: { node: "start" },
 			}),
 		).not.toThrow();
 	});
