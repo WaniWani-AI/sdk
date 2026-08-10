@@ -34,4 +34,34 @@ describe("reportSessionError", () => {
 			}),
 		).not.toThrow();
 	});
+
+	test("returns normally and still tracks when console.error throws", () => {
+		const tracked: unknown[] = [];
+		const client = {
+			track: (event: unknown) => {
+				tracked.push(event);
+				return Promise.resolve({ eventId: "1" });
+			},
+		} as unknown as ScopedWaniWaniClient;
+
+		const originalConsoleError = console.error;
+		console.error = () => {
+			throw new Error("host logger failure");
+		};
+
+		try {
+			expect(() =>
+				reportSessionError({
+					waniwani: client,
+					code: "agent_failed",
+					cause: "flow_dead_end",
+					properties: { node: "start" },
+				}),
+			).not.toThrow();
+		} finally {
+			console.error = originalConsoleError;
+		}
+
+		expect(tracked).toHaveLength(1);
+	});
 });

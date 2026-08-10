@@ -17,10 +17,13 @@ export function reportSessionError({
 	cause: ErrorCauseType;
 	properties?: Omit<SessionErrorProperties, "code" | "cause">;
 }): void {
-	console.error(
-		`[waniwani][session-error] ${code}:${properties?.tool ?? "-"}:${cause}`,
-		{ node: properties?.node },
-	);
+	// Hosts patch console; a logger that throws must not cost us the event either.
+	try {
+		console.error(
+			`[waniwani][session-error] ${code}:${properties?.tool ?? "-"}:${cause}`,
+			{ node: properties?.node },
+		);
+	} catch {}
 
 	if (!waniwani) {
 		return;
