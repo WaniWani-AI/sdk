@@ -38,8 +38,12 @@ export type { TrackingRouteOptions } from "./server/tracking-route";
 export { createTrackingRoute } from "./server/tracking-route";
 // Shared MCP server types (non-legacy)
 export type { McpServer, ZodRawShapeCompat } from "./server/types";
-export type { WithWaniwaniOptions } from "./server/with-waniwani/index";
+export type {
+	InstrumentableMcpServer,
+	WithWaniwaniOptions,
+} from "./server/with-waniwani/index";
 export { withWaniwani } from "./server/with-waniwani/index";
+export type { CaptureIntentOptions } from "./server/with-waniwani/intent-capture";
 
 // ----------------------------------------------------------------------------
 // Legacy — preserved for back-compat. Prefer `@waniwani/sdk/legacy` for new code

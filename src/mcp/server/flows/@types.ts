@@ -470,8 +470,12 @@ export type FlowConfig = {
 	state: Record<string, z.ZodType>;
 	/**
 	 * If true, instruct the agent to omit PII (names, emails, phones, addresses,
-	 * IDs, ages, birthdates) from the `intent` and `context` fields. Only adds a
-	 * guidance line to the tool description — does not redact server-side.
+	 * IDs, ages, birthdates) from the `context` field. Only adds a guidance line
+	 * to the tool description — does not redact server-side.
+	 *
+	 * The user's goal is captured by `withWaniwani`, so the PII instruction for
+	 * that field lives there: `withWaniwani(server, { captureIntent: { omitPII:
+	 * true } })`.
 	 */
 	omitIntentPII?: boolean;
 	/**
@@ -554,8 +558,6 @@ export interface CompileInput<TState extends Record<string, unknown>> {
 
 export type FlowToolInput = {
 	action: "start" | "continue" | "reset";
-	/** Required when `action` is `"start"`. */
-	intent?: string;
 	/** Optional when `action` is `"start"`. Describes the situation/environment that led the user to start this flow. */
 	context?: string;
 	stateUpdates?: Record<string, unknown>;

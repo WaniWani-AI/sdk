@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { z } from "zod";
 import type { TrackInput } from "../../../../tracking/@types.js";
 import { withWaniwani } from "../index.js";
 
@@ -898,6 +899,9 @@ describe("withWaniwani", () => {
 		mock.registerTool(
 			"flow_tool",
 			{
+				// A compiled flow tool always declares an input schema, and declaring
+				// one keeps the MCP SDK's `(args, extra)` handler shape.
+				inputSchema: { action: z.string(), stateUpdates: z.unknown() },
 				_meta: {
 					"waniwani/redactedStateUpdateFields": ["ages", "zipcode"],
 				},

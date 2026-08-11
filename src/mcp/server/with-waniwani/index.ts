@@ -8,7 +8,6 @@ import { waniwani } from "../../../waniwani.js";
 import type { FlowGraph } from "../flows/@types.js";
 import { REDACTED_STATE_UPDATE_FIELDS_META_KEY } from "../flows/redacted.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
-import type { McpServer } from "../types";
 import {
 	extractSessionId,
 	extractSource,
@@ -29,6 +28,8 @@ import {
 	safeTrack,
 	type WaniwaniTracker,
 } from "./helpers.js";
+import type { CaptureIntentOptions, IntentCapture } from "./intent-capture.js";
+import { createIntentCapture, stripIntentArgument } from "./intent-capture.js";
 import { extractTransportSessionId } from "./transport-session.js";
 
 type UnknownRecord = Record<string, unknown>;
@@ -37,7 +38,32 @@ type RawHandler = (
 	extra: unknown,
 ) => Promise<unknown> | unknown;
 
-type WrappedServer = McpServer & {
+/**
+ * The structural surface `withWaniwani` needs from an MCP server.
+ *
+ * Deliberately *not* the MCP SDK's `McpServer` class type. That class declares
+ * 23 private members, and TypeScript compares private members nominally — so
+ * only an instance of that exact class satisfies it. Any subclass that
+ * re-exports a narrowed public surface through a mapped type fails the check:
+ * skybridge declares `class McpServer extends Omit<McpServerBase, "registerTool"
+ * | "connect">`, and `Omit` drops every private member, leaving a type that is
+ * structurally an MCP server but nominally unassignable. Callers were forced
+ * into `withWaniwani(server as unknown as Parameters<typeof withWaniwani>[0])`.
+ *
+ * Nothing is lost by widening: every member this function actually touches
+ * (`registerTool`, the private `_registeredTools`, `.server.getClientVersion()`)
+ * is already reached through an internal cast, so the nominal parameter type
+ * never provided safety inside the function — only friction outside it.
+ */
+export type InstrumentableMcpServer = {
+	// `any` parameters keep this compatible with both the SDK's
+	// `(name, config, handler)` overloads and skybridge's `(config, handler)`
+	// form; the body calls it through an untyped varargs cast either way.
+	// biome-ignore lint/suspicious/noExplicitAny: see above
+	registerTool: (...args: any[]) => unknown;
+};
+
+type WrappedServer = InstrumentableMcpServer & {
 	__waniwaniWrapped?: true;
 };
 
@@ -110,6 +136,25 @@ export type WithWaniwaniOptions = {
 	 * @default false
 	 */
 	applyFieldRedactions?: boolean;
+	/**
+	 * Capture the user's goal behind each tool call.
+	 *
+	 * Adds an optional `intent` argument to every tool's input schema, which the
+	 * calling model fills in with what the user is trying to achieve. The value
+	 * is stripped before the tool's own handler runs and tracked as
+	 * `properties.input.intent` on `tool.called` — the same field flow tools
+	 * already record, so both read back identically.
+	 *
+	 * Tools that already declare the argument are left untouched (flow tools,
+	 * and any tool whose own schema carries the goal). Pass an object to narrow
+	 * capture to specific tools (`tools`), rename the argument
+	 * (`argumentName`), or ask the model to keep PII out of it (`omitPII`).
+	 * Pass `false` to switch it off entirely — the escape hatch for a server
+	 * whose tool contract must not change.
+	 *
+	 * @default true
+	 */
+	captureIntent?: boolean | CaptureIntentOptions;
 };
 
 const log = createLogger("mcp");
@@ -159,21 +204,71 @@ function buildStateUpdateRedactor(
 }
 
 type WrapContext = {
-	server: McpServer;
+	server: InstrumentableMcpServer;
 	tracker: WaniwaniTracker;
 	opts: WithWaniwaniOptions;
 	tokenCache: WidgetTokenCache | null;
 	injectToken: boolean;
 	funnelSync: FunnelSyncPayload | null;
+	/** `null` when `captureIntent: false` turns capture off. */
+	intentCapture: IntentCapture | null;
+};
+
+type InjectedIntent = {
+	argumentName: string;
+	/**
+	 * The tool declared no input schema of its own. The MCP SDK calls a schemaless
+	 * tool as `handler(extra)` and a schema-carrying one as `handler(args, extra)`,
+	 * so the injected schema shifts the call shape and the tool's own handler
+	 * still expects the single-argument form.
+	 */
+	schemaWasAbsent: boolean;
 };
 
 type UnknownRecordOrUndefined = UnknownRecord | undefined;
+
+/**
+ * Add the intent argument to one tool's input schema.
+ *
+ * Returns the extended schema together with what the wrapped handler has to
+ * strip again, or `undefined` when the tool is left alone: capture is off, the
+ * tool is outside the allow-list, the tool already declares the argument, or
+ * its schema is not an object we can extend.
+ *
+ * Both registration orders funnel through here — the intercepted
+ * `registerTool` (which puts the schema on the config) and the
+ * `_registeredTools` walk (which assigns `entry.inputSchema`).
+ */
+function captureIntentFor(
+	toolName: string,
+	inputSchema: unknown,
+	ctx: WrapContext,
+): { schema: unknown; injected: InjectedIntent } | undefined {
+	const capture = ctx.intentCapture;
+	if (!capture?.appliesTo(toolName)) {
+		return undefined;
+	}
+
+	const schema = capture.augment(inputSchema);
+	if (schema === undefined) {
+		return undefined;
+	}
+
+	return {
+		schema,
+		injected: {
+			argumentName: capture.argumentName,
+			schemaWasAbsent: inputSchema === undefined || inputSchema === null,
+		},
+	};
+}
 
 function createWrappedHandler(
 	toolName: string,
 	originalHandler: RawHandler,
 	ctx: WrapContext,
 	definitionMeta: UnknownRecordOrUndefined,
+	injectedIntent: InjectedIntent | undefined,
 ): MaybeWrappedHandler {
 	const { server, tracker, opts, tokenCache, injectToken } = ctx;
 
@@ -181,6 +276,28 @@ function createWrappedHandler(
 		opts.applyFieldRedactions === true
 			? buildStateUpdateRedactor(definitionMeta)
 			: undefined;
+
+	// The intent argument is ours, not the tool's: track it as part of the input,
+	// but hand the handler the parameters it actually declared, in the call shape
+	// it was registered with. Which of the three shapes applies is fixed at
+	// registration, so resolve it once here rather than on every call.
+	const invokeOriginal: RawHandler = !injectedIntent
+		? originalHandler
+		: injectedIntent.schemaWasAbsent
+			? // The tool declared no input schema, so its handler takes `extra`
+				// alone. The injected schema makes the MCP SDK call this wrapper as
+				// `(args, extra)`; a caller that still uses the single-argument shape
+				// passes the extra as `input` and nothing else.
+				(input, extra) =>
+					(originalHandler as unknown as (extra: unknown) => unknown)(
+						extra === undefined ? input : extra,
+					)
+			: (input, extra) =>
+					originalHandler(
+						stripIntentArgument(input, injectedIntent.argumentName),
+						extra,
+					);
+
 	const wrappedHandler: MaybeWrappedHandler = async (
 		input: unknown,
 		extra: unknown,
@@ -243,8 +360,11 @@ function createWrappedHandler(
 		const retrievalCollector: RetrievalCollector = { searches: [] };
 		const startTime = performance.now();
 		try {
-			const result = await retrievalCollectorStore.run(retrievalCollector, () =>
-				originalHandler(input, extra),
+			const result = await retrievalCollectorStore.run(
+				retrievalCollector,
+				invokeOriginal,
+				input,
+				extra,
 			);
 			const durationMs = Math.round(performance.now() - startTime);
 
@@ -359,14 +479,19 @@ function createWrappedHandler(
  * OpenAI's `_meta["openai/outputTemplate"]`) is also forwarded into each tool
  * result's `_meta`, so chat UIs that only see tool results (and not
  * `tools/list`) can still render widgets. Handler-set keys take precedence.
+ *
+ * Every tool's input schema also gains an optional `intent` argument so the
+ * calling model records the user's goal; the value is stripped before the tool's
+ * handler runs and tracked on `tool.called`. Pass `captureIntent: false` to
+ * leave tool schemas exactly as declared.
  */
-export async function withWaniwani(
-	server: McpServer,
+export async function withWaniwani<TServer extends InstrumentableMcpServer>(
+	server: TServer,
 	options?: WithWaniwaniOptions,
-): Promise<McpServer> {
+): Promise<TServer> {
 	const wrappedServer = server as WrappedServer;
 	if (wrappedServer.__waniwaniWrapped) {
-		return wrappedServer;
+		return server;
 	}
 
 	wrappedServer.__waniwaniWrapped = true;
@@ -389,6 +514,7 @@ export async function withWaniwani(
 		tokenCache,
 		injectToken,
 		funnelSync: null,
+		intentCapture: createIntentCapture(opts.captureIntent),
 	};
 
 	const originalRegisterTool = server.registerTool.bind(server) as (
@@ -412,14 +538,24 @@ export async function withWaniwani(
 				? ((config as UnknownRecord)._meta as UnknownRecord)
 				: undefined;
 
+		const capture = isRecord(config)
+			? captureIntentFor(toolName, (config as UnknownRecord).inputSchema, ctx)
+			: undefined;
+
 		const wrapped = createWrappedHandler(
 			toolName,
 			handlerRaw as RawHandler,
 			ctx,
 			definitionMeta,
+			capture?.injected,
 		);
-		return originalRegisterTool(toolNameRaw, config, wrapped);
-	}) as McpServer["registerTool"];
+
+		const effectiveConfig = capture
+			? { ...(config as UnknownRecord), inputSchema: capture.schema }
+			: config;
+
+		return originalRegisterTool(toolNameRaw, effectiveConfig, wrapped);
+	}) as InstrumentableMcpServer["registerTool"];
 
 	// Wrap any tools that were already registered before withWaniwani() ran.
 	// MCP SDK internal: `_registeredTools` is the dictionary used by the
@@ -439,6 +575,21 @@ export async function withWaniwani(
 			if (!isRecord(entry)) {
 				continue;
 			}
+			// The MCP SDK reads `entry.inputSchema` when it serves `tools/list` and
+			// when it validates a call, so reassigning it upgrades the tool in
+			// place. This is the schema half of the SDK's own
+			// `registeredTool.update({ paramsSchema })`; it deliberately skips the
+			// `tools/list_changed` notification that method also sends, because
+			// `withWaniwani` runs before `connect()` in every supported call order.
+			const capture = captureIntentFor(
+				toolName,
+				(entry as UnknownRecord).inputSchema,
+				ctx,
+			);
+			if (capture) {
+				(entry as UnknownRecord).inputSchema = capture.schema;
+			}
+
 			const existing = entry.handler as MaybeWrappedHandler | undefined;
 			if (typeof existing !== "function") {
 				continue;
@@ -456,6 +607,7 @@ export async function withWaniwani(
 				existing,
 				ctx,
 				definitionMeta,
+				capture?.injected,
 			);
 		}
 	}
@@ -490,5 +642,5 @@ export async function withWaniwani(
 		}
 	}
 
-	return wrappedServer;
+	return server;
 }

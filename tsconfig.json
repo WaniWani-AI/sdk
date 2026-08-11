@@ -13,7 +13,8 @@
 		"rootDir": "src",
 		"resolveJsonModule": true,
 		"noEmit": true,
-		"jsx": "react-jsx"
+		"jsx": "react-jsx",
+		"types": ["bun"]
 	},
 	"include": ["src/**/*"],
 	"exclude": ["node_modules", "dist"]

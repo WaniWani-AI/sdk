@@ -38,13 +38,9 @@ type RegisterToolArgs = [string, Record<string, unknown>, Handler];
 
 const TEST_SESSION_ID = "test-session-1";
 const TEST_EXTRA = { _meta: { sessionId: TEST_SESSION_ID } };
-const TEST_INTENT =
-	"Qualify the user for this flow based on what they asked for earlier in the conversation.";
-
 function startInput(stateUpdates?: Record<string, unknown>) {
 	return {
 		action: "start" as const,
-		intent: TEST_INTENT,
 		...(stateUpdates ? { stateUpdates } : {}),
 	};
 }
@@ -83,11 +79,11 @@ function expectNodesVisited(
 }
 
 describe("compileFlow response contract", () => {
-	test("starts without intent instead of failing the call", async () => {
+	test("starts with no arguments beyond the action", async () => {
 		const store = new TestFlowStateStore();
 		const flow = createFlow({
-			id: "missing_intent_flow",
-			title: "Missing Intent Flow",
+			id: "bare_start_flow",
+			title: "Bare Start Flow",
 			description: "Collect lead details.",
 			state: {
 				useCase: z.string().describe("Primary use case"),
@@ -148,7 +144,6 @@ describe("compileFlow response contract", () => {
 		const result = (await handler?.(
 			{
 				action: "start",
-				intent: TEST_INTENT,
 				context: "User is on the pricing page and clicked 'Get a quote'.",
 			},
 			TEST_EXTRA,

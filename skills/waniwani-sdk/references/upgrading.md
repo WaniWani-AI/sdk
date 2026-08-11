@@ -31,6 +31,28 @@ One behavioral note (not a break): `messageBorderRadius` / `--ww-msg-radius` is 
 
 This list mirrors the changelog so you can apply migrations without a network fetch. Always cross-check against the live changelog for anything newer than this file.
 
+### 0.20.0: intent capture moved from `createFlow` into `withWaniwani`
+
+`withWaniwani` now adds an optional `intent` argument to **every** tool it wraps (on by default), strips it before your handler runs, and tracks it as `properties.input.intent` on `tool.called`. `createFlow` no longer declares its own `intent`, so the capture has one implementation instead of two. Consequences:
+
+- `createFlowTestHarness().start()` lost its leading argument: `start(intent, stateUpdates?, context?)` → `start(stateUpdates?, context?)`. The only break `tsc` catches.
+- `FlowToolInput.intent` is gone, and the flow protocol text no longer asks for it. A wrapped flow is unaffected (the field comes from the wrapper); an **unwrapped** flow collects no intent.
+- `createFlow({ omitIntentPII: true })` now governs the `context` field only.
+- Every wrapped tool advertises one more property, so `tools/list` snapshots change. Tools with no declared input schema go from zero properties to one.
+
+Node handlers, flow state, the store, and event ingest are untouched — nothing in the engine ever read `intent`.
+
+Auto-fix:
+
+1. Delete the leading string argument from every `harness.start(...)` call and shift the rest left: `harness.start("Get a quote", { zipcode: "75001" })` → `harness.start({ zipcode: "75001" })`. Do not preserve the string — it was never read.
+2. Where a flow sets `omitIntentPII: true`, also pass `captureIntent: { omitPII: true }` to `withWaniwani`, or the captured intent loses its PII instruction (silent — no compile error).
+3. Refresh any tool-schema snapshot so it includes `intent`.
+4. To keep the published tool contract unchanged instead, pass `captureIntent: false`.
+
+<Tip>
+Run it: `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.19-to-0.20`
+</Tip>
+
 ### 0.19.1: `suggestion.clicked` requires a `properties.origin` field
 
 `suggestion.clicked` (part of `WidgetEventDetail` / `WidgetEvent` from `@waniwani/sdk/chat`) gained a required `properties.origin: "channel" | "page" | "flow" | "followup"` field, reporting which provider supplied the clicked pill. On 0.18.x the payload was `{ text, index }`. Consumers who only *read* the event through `onEvent` (the overwhelmingly common case) need no changes: it is a new, always-populated field. Only code that *constructs* a `suggestion.clicked` event literal (test fixtures, a custom adapter) needs updating.

@@ -109,7 +109,7 @@ If no `{ store }` is passed and `WANIWANI_API_KEY` is not set, `.compile()` thro
 Adds hosted features on top of the OSS flow engine.
 
 - **Hosted flow state** — `WaniwaniKvStore` used by default when no `{ store }` is passed.
-- **Event tracking** — a typed, revenue-first funnel taxonomy (`lead_qualified` → `price_shown` / `prices_compared` / `option_selected` → `converted`) via flat `track.*` helpers; `withWaniwani(server)` auto-captures `tool.called`. Off-platform conversions correlate by `externalUserId`. See [events.md](references/events.md).
+- **Event tracking** — a typed, revenue-first funnel taxonomy (`lead_qualified` → `price_shown` / `prices_compared` / `option_selected` → `converted`) via flat `track.*` helpers; `withWaniwani(server)` auto-captures `tool.called`, including the `intent` behind each call. Off-platform conversions correlate by `externalUserId`. See [events.md](references/events.md).
 - **Knowledge base** — `createKbClient()` for ingest/search.
 - **Funnel analytics** — flow graphs auto-sync to the dashboard.
 - **Chat widget** — `ChatEmbed` talks directly to `app.waniwani.ai`.
@@ -133,6 +133,7 @@ The following are still exported for back-compat with existing customer MCPs but
 | Deploy a pure OSS production MCP server | [self-hosting.md](references/self-hosting.md) |
 | Add a free-tier API key and unlock tracking + dashboard | [setup.md](references/setup.md) |
 | Track events and build a revenue funnel (lead_qualified → price → converted), incl. off-platform conversions | [events.md](references/events.md) |
+| Record why each tool ran, not just that it ran (on by default; `captureIntent`) | [events.md](references/events.md) |
 | Auto-instrument funnel events across existing flows | [instrument-tracking.md](references/instrument-tracking.md) |
 | Audit an existing app's tracking (only defined events, find missing funnel events) | [audit-tracking.md](references/audit-tracking.md) |
 | Use the flow API in detail (nodes, edges, interrupts, widgets) | [flows-api-reference.md](references/flows-api-reference.md) |
@@ -152,7 +153,7 @@ When a playbook exists for the user's task, **follow the playbook step by step**
 
 ## Upgrading the SDK
 
-`@waniwani/sdk` is `0.x`, so **minor version bumps can break the public API**. Whenever you raise the SDK version in a project — editing `package.json`, running `bun add @waniwani/sdk@latest`, or fixing a build that started failing after an upgrade — do not treat it as a drop-in. Read the [changelog](https://docs.waniwani.ai/sdk/changelog) for every breaking change between the old and new version and **auto-apply the documented migration** (each one is a mechanical codemod), then run `bun run typecheck && bun test`. Full procedure in [upgrading.md](references/upgrading.md). Each version hop also has a self-contained, directly invocable migration skill named `migrate-waniwani-sdk-<from>-to-<to>` — for the latest release: `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.18-to-0.19`.
+`@waniwani/sdk` is `0.x`, so **minor version bumps can break the public API**. Whenever you raise the SDK version in a project — editing `package.json`, running `bun add @waniwani/sdk@latest`, or fixing a build that started failing after an upgrade — do not treat it as a drop-in. Read the [changelog](https://docs.waniwani.ai/sdk/changelog) for every breaking change between the old and new version and **auto-apply the documented migration** (each one is a mechanical codemod), then run `bun run typecheck && bun test`. Full procedure in [upgrading.md](references/upgrading.md). Each version hop also has a self-contained, directly invocable migration skill named `migrate-waniwani-sdk-<from>-to-<to>` — for the latest release: `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.19-to-0.20`.
 
 ## Common mistakes
 

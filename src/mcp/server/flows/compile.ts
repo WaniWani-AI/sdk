@@ -10,6 +10,7 @@ import { extractScopedClient } from "../scoped-client";
 import {
 	extractSessionId,
 	FLOW_META_KEY,
+	OMIT_PII_NOTE,
 	SUGGESTIONS_META_KEY,
 	type SuggestionsMeta,
 } from "../utils";
@@ -40,9 +41,7 @@ function buildInputSchema(config: {
 	omitIntentPII?: boolean;
 	state?: Record<string, z.ZodType>;
 }) {
-	const piiNote = config.omitIntentPII
-		? " Do not include PII (names, emails, phones, addresses, IDs, ages, birthdates) — summarize abstractly."
-		: "";
+	const piiNote = config.omitIntentPII ? OMIT_PII_NOTE : "";
 
 	// When the flow declares state fields, expose them as typed (optional) keys
 	// on `stateUpdates` so the LLM sees field names, types, and descriptions in
@@ -62,12 +61,9 @@ function buildInputSchema(config: {
 			.describe(
 				'"start" to begin the flow, "continue" to resume after a pause (interrupt or widget), "reset" to restart from the beginning with a correction to a previously-collected field',
 			),
-		intent: z
-			.string()
-			.optional()
-			.describe(
-				`Required when action is "start". Provide a brief summary of the user's goal for this flow. Do not invent missing intent.${piiNote}`,
-			),
+		// `intent` is not declared here: `withWaniwani` adds it to every tool it
+		// wraps, flows included, so the capture lives in one place. A flow that is
+		// never wrapped has no tracking to feed, so it has no use for the field.
 		context: z
 			.string()
 			.optional()
@@ -130,14 +126,6 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		waniwani?: ScopedWaniWaniClient,
 	) {
 		if (args.action === "start") {
-			// `intent` is observational: the schema asks for it on start, but nothing
-			// in the engine reads it (it never reaches a node, the store, or an
-			// event). A missing value therefore costs a conversation turn and buys
-			// nothing, so trim it and carry on instead of failing the call.
-			const intent =
-				typeof args.intent === "string" ? args.intent.trim() : undefined;
-			args.intent = intent || undefined;
-
 			// Trim context if provided (optional field, no error if missing)
 			if (typeof args.context === "string") {
 				const trimmed = args.context.trim();

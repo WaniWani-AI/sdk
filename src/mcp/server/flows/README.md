@@ -24,7 +24,7 @@ Flow tools accept:
 type FlowToolInput =
   | {
       action: "start";
-      intent: string;
+      context?: string;
       stateUpdates?: Record<string, unknown>;
     }
   | {
@@ -33,7 +33,9 @@ type FlowToolInput =
     };
 ```
 
-`intent` is required on `start` and should summarize the user's goal for the flow, including relevant prior context that led to triggering it, if available.
+`context` is optional on `start` and describes the situation that led the user here (the page they are on, what triggered the request).
+
+The user's goal is captured separately: `withWaniwani` adds an `intent` argument to every tool it wraps, flows included, and records it on the `tool.called` event. Nothing in the engine reads it, so an unwrapped flow simply does not collect it.
 
 ### Tool output
 

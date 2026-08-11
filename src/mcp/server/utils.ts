@@ -60,6 +60,17 @@ const TURN_COUNT_KEYS = ["waniwani/turnCount"] as const;
 /** Meta key for flow execution path (nodesVisited, flowId). */
 export const FLOW_META_KEY = "waniwani/flow" as const;
 
+/**
+ * Instruction appended to an intent/context field description when PII is to be
+ * kept out of the captured value.
+ *
+ * Shared so flow tools (`createFlow({ omitIntentPII })`) and plain tools
+ * (`withWaniwani({ captureIntent: { omitPII } })`) ask the model for the same
+ * thing — a privacy wording change has to land in exactly one place.
+ */
+export const OMIT_PII_NOTE =
+	" Do not include PII (names, emails, phones, addresses, IDs, ages, birthdates) — summarize abstractly." as const;
+
 export type { SuggestionsMeta } from "../../shared/meta-keys";
 export { SUGGESTIONS_META_KEY } from "../../shared/meta-keys";
 

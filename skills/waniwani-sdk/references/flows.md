@@ -115,7 +115,9 @@ Rules for nested state:
 
 ## Pre-filling Answers
 
-When calling `action: "start"`, the AI provides `intent` (required -- the user's goal) and optionally `context` (the situation that led to starting the flow, e.g. what page the user is on or what triggered the request). Both are tool call arguments for the AI -- they are not passed to node handlers or stored in flow state.
+When calling `action: "start"`, the AI optionally provides `context` (the situation that led to starting the flow, e.g. what page the user is on or what triggered the request). It is a tool call argument for the AI -- it is not passed to node handlers or stored in flow state.
+
+The user's goal is captured by `withWaniwani`, which adds an `intent` argument to every tool it wraps and records it on `tool.called` (see [events.md](events.md)). Flows do not declare it themselves.
 
 The AI can also pass known answers via `stateUpdates`. The engine auto-skips nodes whose fields are already filled.
 

@@ -30,12 +30,10 @@ type Handler = (input: unknown, extra: unknown) => Promise<unknown>;
 type RegisterToolArgs = [string, Record<string, unknown>, Handler];
 
 const TEST_SESSION_ID = "test-session-suggestions";
-const TEST_INTENT = "Qualify the user for this flow.";
 
 function startInput(stateUpdates?: Record<string, unknown>) {
 	return {
 		action: "start" as const,
-		intent: TEST_INTENT,
 		...(stateUpdates ? { stateUpdates } : {}),
 	};
 }

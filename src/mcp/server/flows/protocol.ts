@@ -7,9 +7,7 @@ export function buildFlowProtocol(config: FlowConfig): string {
 		"",
 		"This tool implements a multi-step conversational flow. Follow this protocol exactly:",
 		"",
-		'1. Call with `action: "start"` to begin and include `intent`.',
-		"   `intent` must be a brief summary of the user's goal for this flow.",
-		"   Do NOT invent missing intent.",
+		'1. Call with `action: "start"` to begin.',
 		"   Optionally include `context` — the situation or environment that led the user to start",
 		"   this flow (e.g. what page they are on, what they were doing, or what triggered the request).",
 		"   Only provide `context` when there is genuinely relevant situational information. Do NOT invent missing context.",
@@ -21,8 +19,8 @@ export function buildFlowProtocol(config: FlowConfig): string {
 
 	if (config.omitIntentPII) {
 		lines.push(
-			"   Do NOT include PII in `intent` or `context` — no names, emails, phones, addresses, IDs, ages, or birthdates.",
-			'   Summarize the goal abstractly (e.g. "user wants a quote", not "Jane Doe wants a quote").',
+			"   Do NOT include PII in `context` — no names, emails, phones, addresses, IDs, ages, or birthdates.",
+			'   Describe the situation abstractly (e.g. "user is on the pricing page", not "Jane Doe is on the pricing page").',
 		);
 	}
 

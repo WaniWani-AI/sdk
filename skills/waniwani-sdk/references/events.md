@@ -231,6 +231,49 @@ await client.track({ event: "link.clicked", properties: { url: "https://example.
   identity to the session — useful right before an off-platform conversion so the later
   `converted` can be joined by `externalUserId`.
 
+## Capturing why a tool ran (`captureIntent`)
+
+A tool call tells you *what* happened, never *why*: the MCP server sees the arguments,
+not the conversation that produced them. `withWaniwani` closes that gap by adding an
+optional `intent` argument to each tool's input schema, which the calling model fills in
+with the user's goal.
+
+This is **on by default** — wrapping the server is all it takes:
+
+```ts
+await withWaniwani(server); // every tool now advertises `intent`
+```
+
+The captured value rides on the existing `tool.called` event as
+`properties.input.intent`, so nothing else changes: no extra event, no extra call. Flow
+tools and plain tools go through this one path, so both read back identically.
+
+Narrow it, rename it, or switch it off with `captureIntent`:
+
+```ts
+await withWaniwani(server, {
+  captureIntent: { tools: ["get_quote"], argumentName: "intent", omitPII: true },
+});
+
+await withWaniwani(server, { captureIntent: false }); // leave schemas as declared
+```
+
+- **Your handler never sees it.** The argument is stripped before your tool code runs, so
+  the handler receives exactly the parameters it declared. Argument-less tools stay
+  argument-less from their handler's point of view.
+- **Tools that already declare the argument are left alone**, and the value reaches their
+  handler as usual. Point `argumentName` at a field your tool already collects to reuse it
+  as the intent rather than adding one.
+- **Flows use this too.** `createFlow` does not declare `intent`; its flow tool gets the
+  field here, alongside the flow's own `action` / `context` / `stateUpdates`. An unwrapped
+  flow collects no intent, since there is no tracking for it to feed.
+- **`omitPII: true`** asks the model to summarize abstractly. The flow-side
+  `createFlow({ omitIntentPII: true })` covers that flow's `context` field.
+- **The argument is optional**, so adding it is a backward-compatible schema change: a
+  model that ignores it changes nothing. For an app published in a directory that
+  reviews tool schemas (ChatGPT apps), the field reaches the model once that app's next
+  version is submitted, and what you collect belongs in the app's privacy policy.
+
 ## Off-platform conversions (the case this taxonomy exists for)
 
 The hard problem: a lead chats today, but the sale closes next week on your own website,
