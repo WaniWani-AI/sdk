@@ -477,6 +477,26 @@ describe("resolveConfig — assistantBubble precedence", () => {
 	});
 });
 
+describe("resolveConfig — channelId precedence", () => {
+	test("remote channelId fills in on a token-only config", () => {
+		const config = resolveConfig({ token: "tok" }, { channelId: "chan_srv" });
+		expect(config.channelId).toBe("chan_srv");
+	});
+
+	test("host-supplied channelId wins over remote", () => {
+		const config = resolveConfig(
+			{ token: "tok", channelId: "chan_host" },
+			{ channelId: "chan_srv" },
+		);
+		expect(config.channelId).toBe("chan_host");
+	});
+
+	test("channelId stays unset when neither layer supplies one", () => {
+		const config = resolveConfig({ token: "tok" }, {});
+		expect(config.channelId).toBeUndefined();
+	});
+});
+
 describe("parseConfigFromScript — data-suggestion-origins", () => {
 	test("data-suggestion-origins is ignored like any unknown attribute", async () => {
 		const cfg = await parseWithAttrs({

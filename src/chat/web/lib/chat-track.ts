@@ -22,8 +22,12 @@ export interface CreateChatTrackClientOptions {
 	api: string;
 	/** Public token (`wwp_...`). */
 	token: string;
-	/** Agent channel ID, when known. Stamped as `properties.channelId`. */
-	channelId?: string;
+	/**
+	 * Agent channel ID, when known. Stamped as `properties.channelId`. Accepts
+	 * a getter (like `getSource`) so a token-only embed can pick up the
+	 * channel the resolved remote `/config` reports once the fetch lands.
+	 */
+	channelId?: string | (() => string | undefined);
 	/**
 	 * Channel-specific event source, read live so the value from the resolved
 	 * remote `/config` is picked up once the fetch lands.

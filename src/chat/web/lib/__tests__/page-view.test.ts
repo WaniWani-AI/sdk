@@ -140,6 +140,35 @@ describe("firePageView", () => {
 		}
 	});
 
+	test("skips the send when neither channelId nor source resolves — ingest would drop it", async () => {
+		const { calls, restore } = mockFetch();
+		try {
+			await firePageView({
+				api: "https://app.waniwani.ai/api/mcp/chat",
+				token: "wwp_test",
+			});
+			expect(calls).toHaveLength(0);
+		} finally {
+			restore();
+		}
+	});
+
+	test("a skipped no-channel call does not consume the once-per-page guard", async () => {
+		const { calls, restore } = mockFetch();
+		try {
+			const api = "https://app.waniwani.ai/api/mcp/chat";
+			// Stale cache path: no channel resolvable yet — skipped.
+			await firePageView({ api, token: "wwp_test" });
+			// Post-fetch path: `/config` reported the token's channel — fires.
+			await firePageView({ api, token: "wwp_test", channelId: "chan_1" });
+			expect(calls).toHaveLength(1);
+			const batch = JSON.parse(calls[0].init.body as string);
+			expect(batch.events[0].properties.channelId).toBe("chan_1");
+		} finally {
+			restore();
+		}
+	});
+
 	test("rolls back the guard so a failed send can retry on next mount", async () => {
 		const real = globalThis.fetch;
 		let attempts = 0;
