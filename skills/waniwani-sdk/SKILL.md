@@ -8,25 +8,58 @@ metadata:
 
 # Waniwani SDK (`@waniwani/sdk`)
 
-The MCP distribution SDK. Build sales funnels, lead generation, booking, insurance quote, and pricing quote apps on top of your MCP server. Open-source flow engine, with an optional free tier for hosted state, event tracking, funnel analytics, knowledge base, and a playground. The split:
+The MCP distribution SDK. Build sales funnels, lead generation, booking, insurance quote, and pricing quote apps on top of your MCP server.
 
-- **Open source** — `createFlow`, `StateGraph`, the `KvStore` interface, `MemoryKvStore`. Runs with no API key against any state backend you implement.
-- **Free tier** — set `WANIWANI_API_KEY` to unlock hosted flow state, event tracking, funnel analytics, knowledge base, and the dashboard playground.
+## Read the docs before you write code
 
-Docs: [docs.waniwani.ai](https://docs.waniwani.ai)
-Dashboard: [app.waniwani.ai](https://app.waniwani.ai)
+**This file is a map, not a manual.** The full, current documentation lives at
+[docs.waniwani.ai/sdk/introduction](https://docs.waniwani.ai/sdk/introduction) and it is the only
+source of truth for API shapes, option names, event properties, and version behavior. The SDK is
+`0.x` and moves fast, so anything you remember about it may already be wrong.
 
-## Install
+Before you answer an API question or write a line of `@waniwani/sdk` code, **fetch the relevant docs
+page** from the map below. When this file and the docs disagree, the docs win.
 
-```bash
-bun add @waniwani/sdk
-```
+If you can fetch only one thing, fetch [docs.waniwani.ai/llms.txt](https://docs.waniwani.ai/llms.txt):
+it is the complete page index, always current, and cheap to read.
 
-Core flow engine has no required runtime dependencies. Peer dependencies (`@modelcontextprotocol/sdk`, `zod`, etc.) vary by entry point — see the export table below.
+## Where things live in the docs
 
-## Quick start — open source path
+| You want to... | Fetch |
+|---|---|
+| Understand what the SDK is and pick a path | [/sdk/introduction](https://docs.waniwani.ai/sdk/introduction) |
+| Get something running end to end | [/sdk/quickstart](https://docs.waniwani.ai/sdk/quickstart) |
+| Install the package, pick an entry point | [/sdk/configuration/installation](https://docs.waniwani.ai/sdk/configuration/installation), [/sdk/reference/entry-points](https://docs.waniwani.ai/sdk/reference/entry-points) |
+| Get a free API key | [/sdk/configuration/api-key](https://docs.waniwani.ai/sdk/configuration/api-key) |
+| Learn the flow engine | [/sdk/flows/overview](https://docs.waniwani.ai/sdk/flows/overview), then [architecture](https://docs.waniwani.ai/sdk/flows/architecture), [state](https://docs.waniwani.ai/sdk/flows/state), [nodes](https://docs.waniwani.ai/sdk/flows/nodes), [edges](https://docs.waniwani.ai/sdk/flows/edges), [interrupts](https://docs.waniwani.ai/sdk/flows/interrupts), [register](https://docs.waniwani.ai/sdk/flows/register) |
+| Plug in Redis / Upstash / Cloudflare KV / DynamoDB | [/sdk/flows/kv-store](https://docs.waniwani.ai/sdk/flows/kv-store), [/sdk/reference/kv-store-api](https://docs.waniwani.ai/sdk/reference/kv-store-api) |
+| Build a specific funnel | [/sdk/guides/funnels](https://docs.waniwani.ai/sdk/guides/funnels), then [sales-funnel](https://docs.waniwani.ai/sdk/guides/sales-funnel), [lead-generation](https://docs.waniwani.ai/sdk/guides/lead-generation), [booking](https://docs.waniwani.ai/sdk/guides/booking), [insurance-quote](https://docs.waniwani.ai/sdk/guides/insurance-quote) |
+| See a full worked example | [/sdk/guides/pet-insurance](https://docs.waniwani.ai/sdk/guides/pet-insurance) |
+| Deploy, or self-host with no API key | [/sdk/deployment/overview](https://docs.waniwani.ai/sdk/deployment/overview), [/sdk/deployment/self-hosting](https://docs.waniwani.ai/sdk/deployment/self-hosting) |
+| Wrap an existing MCP server, set env vars | [/sdk/configuration/wrap-server](https://docs.waniwani.ai/sdk/configuration/wrap-server), [/sdk/configuration/environment-variables](https://docs.waniwani.ai/sdk/configuration/environment-variables) |
+| Track events and build a revenue funnel | [/sdk/tracking/overview](https://docs.waniwani.ai/sdk/tracking/overview), [events](https://docs.waniwani.ai/sdk/tracking/events), [identify](https://docs.waniwani.ai/sdk/tracking/identify), [sessions](https://docs.waniwani.ai/sdk/tracking/sessions) |
+| Know where each event belongs in a flow | [/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation) |
+| Check a typed event payload | [/sdk/reference/event-schema](https://docs.waniwani.ai/sdk/reference/event-schema) |
+| Add knowledge-base search | [/sdk/knowledge-base/overview](https://docs.waniwani.ai/sdk/knowledge-base/overview) |
+| Embed the chat widget | [/sdk/chat/embed](https://docs.waniwani.ai/sdk/chat/embed) (script tag), [/sdk/chat/react](https://docs.waniwani.ai/sdk/chat/react) |
+| Read the exact tool contract a flow compiles to | [/sdk/reference/flow-tool-contract](https://docs.waniwani.ai/sdk/reference/flow-tool-contract) |
+| Tunnel a dev server for remote testing | [/sdk/guides/tunnel](https://docs.waniwani.ai/sdk/guides/tunnel) |
+| Use the CLI | [/sdk/cli/overview](https://docs.waniwani.ai/sdk/cli/overview) |
+| Upgrade the SDK, or fix a build that broke after a bump | [/sdk/changelog](https://docs.waniwani.ai/sdk/changelog) |
 
-For developers who want pure OSS with no telemetry:
+Dashboard and free API key: [app.waniwani.ai](https://app.waniwani.ai).
+
+## The one thing to get right without fetching: the tier split
+
+- **Open source, no API key.** `createFlow`, `StateGraph`, `START`, `END`, the `KvStore` interface,
+  `MemoryKvStore`. Runs against any state backend you implement.
+- **Free tier, one env var (`WANIWANI_API_KEY`).** Same SDK, plus hosted flow state, event tracking,
+  funnel analytics, knowledge base, chat widget, and the dashboard playground.
+
+Default to the OSS path. Reach for the free tier when the user asks for tracking, analytics, hosted
+state, KB, or chat, and say plainly that it needs a key.
+
+Minimal shape, enough to orient yourself before you fetch the flow docs:
 
 ```typescript
 import { createFlow, MemoryKvStore, START, END } from "@waniwani/sdk/mcp";
@@ -38,107 +71,55 @@ const onboardingFlow = createFlow({
   description: "Use when a new user wants to get started.",
   state: {
     email: z.string().describe("Work email"),
-    useCase: z.string().describe("What they want to build"),
   },
 })
   .addNode("ask_email", ({ interrupt }) =>
     interrupt({ email: { question: "What's your work email?" } })
   )
-  .addNode("ask_use_case", ({ interrupt }) =>
-    interrupt({ useCase: { question: "What do you want to build?" } })
-  )
   .addEdge(START, "ask_email")
-  .addEdge("ask_email", "ask_use_case")
-  .addEdge("ask_use_case", END)
+  .addEdge("ask_email", END)
   .compile({ store: new MemoryKvStore() });
 
 await onboardingFlow.register(server);
 ```
 
-`MemoryKvStore` is fine for dev/tests. For production self-hosting, see [kv-store.md](references/kv-store.md) for Redis, Upstash, Cloudflare KV, and DynamoDB adapters.
+Drop the `{ store }` argument once `WANIWANI_API_KEY` is set and flow state moves to app.waniwani.ai.
+With neither a store nor a key, `.compile()` throws and tells you how to fix it. There is no silent
+fallback.
 
-## Quick start — free tier path
+## Legacy surfaces: never recommend these
 
-Same code, hosted features added:
+Still exported so existing customer MCPs keep working, no longer documented for new code:
+`createTool`, `createResource`, `registerTools`, `toNextJsHandler`, `toExpressJsHandler`,
+`createApiHandler`, `ChatCard`, every MCP-widget React hook except `useWaniwani` (`WidgetProvider`,
+`useWidgetClient`, `useToolOutput`, and the rest), `InitializeNextJsInIframe`, `LoadingWidget`,
+`DevModeProvider`, `detectPlatform`, `isMCPApps`, `isOpenAI`.
+
+Use `createFlow` instead of `createTool` / `createResource`. These will move to dedicated
+`@waniwani/sdk/legacy*` entry points in a future minor release.
+
+`@waniwani/sdk/evals` was removed entirely. See the
+[changelog](https://docs.waniwani.ai/sdk/changelog).
+
+## Upgrading
+
+`@waniwani/sdk` is `0.x`, so minor bumps can break the public API. Whenever you raise the version in
+a project, whether by editing `package.json`, running `bun add @waniwani/sdk@latest`, or chasing a
+build that started failing, do not treat it as a drop-in.
+
+1. Read [the changelog](https://docs.waniwani.ai/sdk/changelog), starting at the **Breaking changes
+   at a glance** table, then every `## <version>:` section above your old version and at or below
+   your new one.
+2. Apply each documented migration. They are written as mechanical codemods, so apply them rather
+   than paraphrasing them.
+3. Run `bun run typecheck && bun test`.
+
+Every version hop also ships a self-contained migration skill you can invoke directly, named
+`migrate-waniwani-sdk-<from>-to-<to>`. For the latest release:
 
 ```bash
-# .env
-WANIWANI_API_KEY=wwk_...
+npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.18-to-0.19
 ```
-
-```typescript
-// Drop the `store` argument — flow state now lives on app.waniwani.ai
-const flow = createFlow({ /* …same… */ }).compile();
-
-// Optional: auto-track every tool call
-import { withWaniwani } from "@waniwani/sdk/mcp";
-withWaniwani(server);
-```
-
-Get a free key at [app.waniwani.ai](https://app.waniwani.ai). See [setup.md](references/setup.md) for full configuration.
-
-## Export paths
-
-| Export | Purpose | Tier | Reference |
-|---|---|---|---|
-| `@waniwani/sdk` | `waniwani()` client, `track.*` event helpers, `WaniWaniError` | Free tier | [setup.md](references/setup.md), [events.md](references/events.md) |
-| `@waniwani/sdk/mcp` | `createFlow`, `KvStore`, `MemoryKvStore`, `withWaniwani`, tracking helpers | OSS + Free tier | [flows.md](references/flows.md), [kv-store.md](references/kv-store.md), [events.md](references/events.md) |
-| `@waniwani/sdk/mcp/react` | `useWaniwani` host-agnostic tracking hook (takes `toolResponseMetadata` or explicit `{ endpoint, source }`) | OSS + Free tier | [events.md](references/events.md) (rest of this entry point is legacy) |
-| `@waniwani/sdk/mcp/react/skybridge` | `useWaniwani` skybridge adapter — bare call resolves config from skybridge's `useToolInfo()` | OSS + Free tier | [events.md](references/events.md) |
-| `@waniwani/sdk/chat` | `ChatEmbed`, themes | Free tier | [chat-widget.md](references/chat-widget.md) |
-| `@waniwani/sdk/chat/embed.js` | Self-contained `<script>` install for any website | Free tier | [chat-widget.md](references/chat-widget.md) |
-| `@waniwani/sdk/chat/styles.css` | Prebuilt Tailwind styles for chat components | Free tier | [chat-widget.md](references/chat-widget.md) |
-| `@waniwani/sdk/kb` | Knowledge base client | Free tier | [knowledge-base.md](references/knowledge-base.md) |
-
-## Tier reference
-
-### Open source (no API key required)
-
-`createFlow` plus its supporting types. Drives multi-step conversations: pause on interrupts, branch on conditions, persist state across calls. Compiles into a single MCP tool the model invokes.
-
-State persistence is pluggable through the `KvStore` interface. Built-in:
-- `MemoryKvStore` — in-process `Map`, dev only
-- `WaniwaniKvStore` — hosted (free tier; selected automatically when API key is set)
-
-Or write a 10-line adapter for any backend. See [kv-store.md](references/kv-store.md).
-
-If no `{ store }` is passed and `WANIWANI_API_KEY` is not set, `.compile()` throws with a clear error pointing at the fix. No silent fallback.
-
-### Free tier (one env var: `WANIWANI_API_KEY`)
-
-Adds hosted features on top of the OSS flow engine.
-
-- **Hosted flow state** — `WaniwaniKvStore` used by default when no `{ store }` is passed.
-- **Event tracking** — a typed, revenue-first funnel taxonomy (`lead_qualified` → `price_shown` / `prices_compared` / `option_selected` → `converted`) via flat `track.*` helpers; `withWaniwani(server)` auto-captures `tool.called`. Off-platform conversions correlate by `externalUserId`. See [events.md](references/events.md).
-- **Knowledge base** — `createKbClient()` for ingest/search.
-- **Funnel analytics** — flow graphs auto-sync to the dashboard.
-- **Chat widget** — `ChatEmbed` talks directly to `app.waniwani.ai`.
-
-`withWaniwani(server)` is safe to call with or without an API key — its auto-captured `tool.called` events are internally guarded, and session-ID bridging and widget metadata forwarding still happen. Your own tracking calls are **not** guarded: `client.track.*`, `identify()`, and the scoped `context.waniwani` throw `WANIWANI_API_KEY is not set` when no key is configured, so guard them in code paths that must also run keyless. See [events.md](references/events.md).
-
-### Legacy
-
-The following are still exported for back-compat with existing customer MCPs but are no longer documented for new code: `createTool`, `createResource`, `registerTools`, `toNextJsHandler`, `toExpressJsHandler`, `createApiHandler`, all MCP-widget React hooks (`WidgetProvider`, `useWidgetClient`, `useToolOutput`, etc.) except `useWaniwani`, `InitializeNextJsInIframe`, `LoadingWidget`, `DevModeProvider`, `detectPlatform`, `isMCPApps`, `isOpenAI`.
-
-**Never recommend these for new code.** They will move to dedicated `@waniwani/sdk/legacy*` entry points in a future minor release. Existing apps using them keep working.
-
-`@waniwani/sdk/evals` has been removed entirely — see the [changelog](https://docs.waniwani.ai/sdk/changelog).
-
-## Reading guide
-
-| You want to... | Read |
-|---|---|
-| Build a flow that runs without an API key | [flows.md](references/flows.md) |
-| Plug in a Redis / Upstash / Cloudflare KV / DynamoDB backend | [kv-store.md](references/kv-store.md) |
-| Deploy a pure OSS production MCP server | [self-hosting.md](references/self-hosting.md) |
-| Add a free-tier API key and unlock tracking + dashboard | [setup.md](references/setup.md) |
-| Track events and build a revenue funnel (lead_qualified → price → converted), incl. off-platform conversions | [events.md](references/events.md) |
-| Auto-instrument funnel events across existing flows | [instrument-tracking.md](references/instrument-tracking.md) |
-| Audit an existing app's tracking (only defined events, find missing funnel events) | [audit-tracking.md](references/audit-tracking.md) |
-| Use the flow API in detail (nodes, edges, interrupts, widgets) | [flows-api-reference.md](references/flows-api-reference.md) |
-| Add knowledge-base search | [knowledge-base.md](references/knowledge-base.md) |
-| Embed the chat widget on a website | [chat-widget.md](references/chat-widget.md) |
-| Upgrade the SDK / fix a build that broke after a version bump | [upgrading.md](references/upgrading.md) |
 
 ## Guided playbooks
 
@@ -148,17 +129,25 @@ The following are still exported for back-compat with existing customer MCPs but
 | Create their first flow | [scripts/create-flow.md](scripts/create-flow.md) |
 | Tunnel the dev server for remote testing | [scripts/tunnel.md](scripts/tunnel.md) |
 
-When a playbook exists for the user's task, **follow the playbook step by step** instead of writing code directly. The playbooks include prerequisite checks, interactive design steps, and testing instructions.
+When a playbook covers the user's task, follow it step by step instead of writing code directly. Each
+one includes prerequisite checks, interactive design steps, and testing instructions.
 
-## Upgrading the SDK
+Two sibling skills handle tracking work end to end:
 
-`@waniwani/sdk` is `0.x`, so **minor version bumps can break the public API**. Whenever you raise the SDK version in a project — editing `package.json`, running `bun add @waniwani/sdk@latest`, or fixing a build that started failing after an upgrade — do not treat it as a drop-in. Read the [changelog](https://docs.waniwani.ai/sdk/changelog) for every breaking change between the old and new version and **auto-apply the documented migration** (each one is a mechanical codemod), then run `bun run typecheck && bun test`. Full procedure in [upgrading.md](references/upgrading.md). Each version hop also has a self-contained, directly invocable migration skill named `migrate-waniwani-sdk-<from>-to-<to>` — for the latest release: `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.18-to-0.19`.
+```bash
+npx skills add Waniwani-AI/sdk -s instrument-tracking   # add funnel events across existing flows
+npx skills add Waniwani-AI/sdk -s audit-tracking        # read-only audit of an app's instrumentation
+```
 
 ## Common mistakes
 
-- **`createFlow().compile()` throws "no flow store configured"** — Pass `{ store: new MemoryKvStore() }` to `.compile()` for dev, or set `WANIWANI_API_KEY` for the hosted store, or pass a custom KV adapter.
-- **Creating multiple clients** — Create one `waniwani()` in `lib/waniwani.ts` and import everywhere.
-- **Wrong import paths** — Flow primitives + KV: `@waniwani/sdk/mcp`. `useWaniwani`: `@waniwani/sdk/mcp/react`. Chat widget: `@waniwani/sdk/chat`.
-- **Forgetting `START`/`END` edges** — Every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`.
-- **Calling `interrupt`/`showWidget` directly** — These come from the handler context: `({ interrupt }) => interrupt(...)`.
-- **Suggesting `createTool` / `createResource` for new code** — These are legacy. Use `createFlow` instead. They remain exported only for back-compat.
+- **`createFlow().compile()` throws "no flow store configured"**: pass `{ store: new MemoryKvStore() }`
+  for dev, set `WANIWANI_API_KEY` for the hosted store, or pass your own KV adapter.
+- **Creating multiple clients**: create one `waniwani()` in `lib/waniwani.ts` and import it everywhere.
+- **Wrong import paths**: flow primitives and KV come from `@waniwani/sdk/mcp`, `useWaniwani` from
+  `@waniwani/sdk/mcp/react`, the chat widget from `@waniwani/sdk/chat`.
+- **Forgetting `START` / `END` edges**: every flow needs `addEdge(START, firstNode)` and
+  `addEdge(lastNode, END)`.
+- **Calling `interrupt` / `showWidget` directly**: they come from the handler context,
+  `({ interrupt }) => interrupt(...)`.
+- **Answering from memory**: if you have not fetched the docs page for what you are writing, fetch it.

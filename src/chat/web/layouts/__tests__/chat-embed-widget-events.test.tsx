@@ -114,7 +114,9 @@ afterEach(() => {
 	container = null;
 });
 
-async function renderEmbed() {
+type EmbedProps = Parameters<typeof ChatEmbed>[0];
+
+async function renderEmbed(overrides: Partial<EmbedProps> = {}) {
 	const emitter = createWidgetEventEmitter({ mode: "inline" });
 	const events: WidgetEventType[] = [];
 	emitter.subscribe((event) => events.push(event));
@@ -123,20 +125,31 @@ async function renderEmbed() {
 	document.body.appendChild(container);
 	root = createRoot(container);
 
-	await act(async () => {
-		root?.render(
-			createElement(
-				WidgetEventsProvider,
-				{ value: emitter },
-				createElement(ChatEmbed, {
-					api: "https://example.com/api/chat",
-					suggestions: { initial: ["First suggestion", "Second suggestion"] },
-				}),
-			),
-		);
-	});
+	const props: EmbedProps = {
+		api: "https://example.com/api/chat",
+		suggestions: { initial: ["First suggestion", "Second suggestion"] },
+		...overrides,
+	};
 
-	return { events };
+	const render = async (next: Partial<EmbedProps> = {}) => {
+		await act(async () => {
+			root?.render(
+				createElement(
+					WidgetEventsProvider,
+					{ value: emitter },
+					createElement(ChatEmbed, { ...props, ...next }),
+				),
+			);
+		});
+	};
+
+	await render();
+
+	return { events, render };
+}
+
+function shownSets(events: WidgetEventType[]) {
+	return events.filter((e) => e.name === "suggestions.shown");
 }
 
 function clickElement(el: Element) {
@@ -173,6 +186,45 @@ describe("ChatEmbed widget events", () => {
 				origin: "channel",
 			},
 		});
+	});
+
+	test("the pre-chat pill row announces one impression", async () => {
+		const { events } = await renderEmbed();
+
+		expect(shownSets(events)).toHaveLength(1);
+		expect(shownSets(events)[0]).toMatchObject({
+			name: "suggestions.shown",
+			properties: {
+				texts: ["First suggestion", "Second suggestion"],
+				origin: "channel",
+			},
+		});
+	});
+
+	test("welcome-screen cards announce their own impression", async () => {
+		const { events } = await renderEmbed({
+			suggestions: false,
+			welcome: { title: "Hi", suggestions: ["Over 65", "Under 65"] },
+		});
+
+		expect(shownSets(events)).toHaveLength(1);
+		expect(shownSets(events)[0]).toMatchObject({
+			name: "suggestions.shown",
+			properties: { texts: ["Over 65", "Under 65"], origin: "channel" },
+		});
+	});
+
+	test("an off-screen mount holds its impression until it is shown", async () => {
+		const { events, render } = await renderEmbed({ onScreen: false });
+		expect(shownSets(events)).toHaveLength(0);
+
+		await render({ onScreen: true });
+		expect(shownSets(events)).toHaveLength(1);
+
+		// Still one set, so a hide/show cycle doesn't re-count the same pills.
+		await render({ onScreen: false });
+		await render({ onScreen: true });
+		expect(shownSets(events)).toHaveLength(1);
 	});
 
 	test("clicking an anchor inside the messages scroller emits link.clicked", async () => {

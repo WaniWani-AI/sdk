@@ -30,16 +30,11 @@ import {
 import type { ChatHandle } from "../@types";
 import BorderGlow from "../components/border-glow";
 import { Suggestions } from "../components/suggestions";
+import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
-import {
-	fireSuggestionClick,
-	fireSuggestionShown,
-	resolveShownSuggestions,
-	resolveSuggestionId,
-} from "../lib/suggestion-click";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
@@ -189,56 +184,19 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			[dockRow],
 		);
 
-		// Record every suggestion click and every rendered pill set
-		// server-side, attributed to the authored prompts involved. Rides the
-		// same widget-event stream the host page subscribes to, so there is one
-		// signal per interaction, not two — and it covers both the dock's CTAs
-		// and the panel's own pills.
-		useEffect(() => {
-			return widgetEvents.subscribe((event) => {
-				if (event.name === "suggestion.clicked") {
-					const { text, origin } = event.properties;
-					const promptId = resolveSuggestionId(suggestions.page ?? [], text);
-					void fireSuggestionClick({
-						api: config.api ?? "",
-						token: config.token,
-						channelId: config.channelId,
-						mode: "floating",
-						source: config.source,
-						sessionId: chatRef.current?.sessionId,
-						promptId,
-						origin,
-						text,
-						index: event.properties.index,
-					});
-					return;
-				}
-				if (event.name === "suggestions.shown") {
-					const { texts, origin } = event.properties;
-					const prompts = resolveShownSuggestions(
-						suggestions.page ?? [],
-						texts,
-					);
-					void fireSuggestionShown({
-						api: config.api ?? "",
-						token: config.token,
-						channelId: config.channelId,
-						mode: "floating",
-						source: config.source,
-						sessionId: chatRef.current?.sessionId,
-						prompts,
-						origin,
-					});
-				}
-			});
-		}, [
+		// Record every suggestion click and every rendered pill set server-side,
+		// attributed to the authored prompts involved. Covers both the dock's
+		// CTAs and the panel's own pills.
+		useSuggestionIngest({
 			widgetEvents,
-			suggestions,
-			config.api,
-			config.token,
-			config.channelId,
-			config.source,
-		]);
+			api: config.api,
+			token: config.token,
+			channelId: config.channelId,
+			source: config.source,
+			mode: "floating",
+			pagePrompts: suggestions.page,
+			getSessionId: () => chatRef.current?.sessionId,
+		});
 
 		// One impression per revealed dock row, keyed on the resolved row's
 		// identity — a new fetch (SPA navigation) is a new object and counts
@@ -655,6 +613,11 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									// leave an opened (full-screen on mobile) panel with no in-UI
 									// way back to the dock. The panel is its own chrome anyway.
 									hideHeader={false}
+									// Mounted eagerly behind the dock, so without this the
+									// panel's own pill row reports impressions for pills no
+									// visitor has seen, and double-counts the pre-chat row
+									// the dock already announced.
+									onScreen={phase === "open"}
 									welcomeMessage={config.welcomeMessage}
 									placeholder={config.placeholder}
 									suggestions={suggestions}

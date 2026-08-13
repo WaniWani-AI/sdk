@@ -29,6 +29,7 @@ import { useSuggestions } from "../embed/use-suggestions";
 import type { WidgetEvent } from "../embed/widget-events";
 import { createWidgetEventEmitter } from "../embed/widget-events";
 import { WidgetEventsProvider } from "../embed/widget-events-context";
+import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import type { Locale, MessageOverrides } from "../i18n";
 import {
 	createChatTrackClient,
@@ -354,6 +355,20 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 		// attribution. Memoized inside the hook — the pill row keys an effect
 		// on this object's identity.
 		const suggestions = useSuggestions(config);
+
+		// Record every suggestion click and every rendered pill set server-side,
+		// attributed to the authored prompts involved. Same signal the script
+		// embeds record, so a React host is not a blind spot in the funnel.
+		useSuggestionIngest({
+			widgetEvents,
+			api: config.api ?? resolvedApi,
+			token: config.token ?? token,
+			channelId: config.channelId ?? channelId,
+			source: config.source,
+			mode: "inline",
+			pagePrompts: suggestions.page,
+			getSessionId: () => innerRef.current?.sessionId,
+		});
 
 		// Host-page tracking client: same public token and channel as the chat,
 		// session id attached live once the first exchange assigns one.

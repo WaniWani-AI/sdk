@@ -105,7 +105,7 @@ Assistant messages render as plain text by default. Set `assistantBubble: true` 
 - **React** — pass `classNames` (`ChatClassNames`) to target individual slots: `root`, `header`, `message`, `userBubble`, `assistantBubble`, `input`.
 - **`<script>` embed** — the widget renders in a Shadow DOM, so host-page selectors can't reach internals. Set `--ww-*` variables (they inherit through the boundary), or inject a stylesheet with `data-css="https://.../sheet.css"` and target the stable semantic classes: `.ww-header`, `.ww-input`, `.ww-message-user .ww-bubble`, `.ww-message-assistant .ww-bubble`.
 
-See `skills/waniwani-sdk/references/chat-widget.md` for the full customization guide and script-tag options.
+See [docs.waniwani.ai/sdk/chat/embed](https://docs.waniwani.ai/sdk/chat/embed) and [docs.waniwani.ai/sdk/chat/react](https://docs.waniwani.ai/sdk/chat/react) for the full customization guide and script-tag options.
 
 ## Data flow
 

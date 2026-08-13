@@ -83,6 +83,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			enableThreadHistory = false,
 			showToolCalls = true,
 			initializing = false,
+			onScreen = true,
 			disclaimer,
 		} = props;
 
@@ -310,10 +311,18 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		// on the array identity `useSuggestionRow` returns (a new array per
 		// config load / streamed turn), so re-renders of the same set stay
 		// silent. The embed hosts subscribe and log one impression per set.
+		//
+		// `onScreen` holds the announcement rather than dropping it: a hidden
+		// mount that becomes visible with the same row still owes its
+		// impression, so the effect re-runs and reports it then.
 		const announcedSuggestionsRef = useRef<string[] | null>(null);
 		useEffect(() => {
 			const current = suggestionsState.suggestions;
-			if (current.length === 0 || announcedSuggestionsRef.current === current) {
+			if (
+				!onScreen ||
+				current.length === 0 ||
+				announcedSuggestionsRef.current === current
+			) {
 				return;
 			}
 			announcedSuggestionsRef.current = current;
@@ -321,7 +330,37 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				name: "suggestions.shown",
 				properties: { texts: current, origin: suggestionsState.source },
 			});
-		}, [suggestionsState.suggestions, suggestionsState.source, widgetEvents]);
+		}, [
+			suggestionsState.suggestions,
+			suggestionsState.source,
+			widgetEvents,
+			onScreen,
+		]);
+
+		// Welcome-screen cards are a second, separately-rendered set of pills:
+		// they live in the message area rather than the row above the input, and
+		// `MessageList` shows them while the conversation is empty. Announced
+		// here so a card that earns a click has a matching impression — the
+		// click already reports itself through `handleSuggestionSelect`.
+		const welcomeSuggestions = welcome?.suggestions;
+		const announcedWelcomeRef = useRef<string[] | null>(null);
+		useEffect(() => {
+			if (
+				!onScreen ||
+				engine.messages.length > 0 ||
+				!welcomeSuggestions?.length ||
+				announcedWelcomeRef.current === welcomeSuggestions
+			) {
+				return;
+			}
+			announcedWelcomeRef.current = welcomeSuggestions;
+			widgetEvents.emit({
+				name: "suggestions.shown",
+				// Welcome cards are always operator-authored channel prompts, the
+				// same origin `handleSuggestionSelect` reports for their clicks.
+				properties: { texts: welcomeSuggestions, origin: "channel" },
+			});
+		}, [welcomeSuggestions, engine.messages.length, widgetEvents, onScreen]);
 
 		const handleWidgetMessage = useCallback(
 			(message: {
