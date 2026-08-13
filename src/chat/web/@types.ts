@@ -364,6 +364,14 @@ export interface ChatEmbedProps
 	 * should leave this unset.
 	 */
 	initializing?: boolean;
+	/**
+	 * @internal
+	 * Whether the chat is actually on screen. `false` suppresses
+	 * `suggestions.shown` impressions, so a mount kept hidden behind other
+	 * chrome (the floating dock) never reports pills the visitor cannot see.
+	 * Defaults to `true`; standalone `ChatEmbed` callers should leave it unset.
+	 */
+	onScreen?: boolean;
 }
 
 // `ChatCardProps` moved to `src/legacy/chat/web/chat-card.tsx` alongside the
