@@ -813,7 +813,7 @@ Both hosted surfaces accept an `onEvent` callback — `WaniWani.chat.init({ onEv
 | `thread.changed` | Thread created or switched (requires thread history; the top-level `sessionId` is the target thread's session, `undefined` for a fresh thread) | `{ threadId }` |
 | `chat.error` | Chat request failed | `{ message }` (truncated to 200 chars) |
 | `suggestion.clicked` | Suggestion pill or welcome card clicked (dock pills, in-chat pills, welcome cards) | `{ text, index, origin }` (`index` is `-1` when the position is unknown; `origin` is one of `"channel"`, `"page"`, `"flow"`, `"followup"` — see [Where the suggestion pills come from](#where-the-suggestion-pills-come-from)) |
-| `suggestions.shown` | A pill set was rendered — one event per set, not per pill. Fires once per set: re-renders and collapse/expand cycles of the same pills stay silent, a new set (an SPA navigation, a streamed turn) fires again | `{ texts, origin }` (`origin` uses the same taxonomy as `suggestion.clicked`) |
+| `suggestions.shown` | A pill set was rendered and is on screen — one event per set, not per pill (dock pills, in-chat pills, welcome cards). Fires once per set: re-renders and collapse/expand cycles of the same pills stay silent, a new set (an SPA navigation, a streamed turn) fires again. In floating mode the collapsed panel reports nothing, so a set is announced when the visitor can actually see it | `{ texts, origin }` (`origin` uses the same taxonomy as `suggestion.clicked`) |
 | `link.clicked` | Anchor clicked inside the conversation | `{ url }` (absolute URL) |
 
 Do not assume `chat.opened` precedes the first `message.sent`: a send from the docked bar opens the panel and sends in one action, and the open transition is reported after the send.
