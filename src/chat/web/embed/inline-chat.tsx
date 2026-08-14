@@ -14,13 +14,8 @@ import {
 	useRef,
 } from "react";
 import type { ChatHandle } from "../@types";
+import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { ChatEmbed } from "../layouts/chat-embed";
-import {
-	fireSuggestionClick,
-	fireSuggestionShown,
-	resolveShownSuggestions,
-	resolveSuggestionId,
-} from "../lib/suggestion-click";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { useVisibilityGate } from "./use-pathname";
@@ -121,55 +116,18 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		// on this object's identity.
 		const suggestions = useSuggestions(config);
 
-		// Record every suggestion click and every rendered pill set
-		// server-side, attributed to the authored prompts involved. Rides the
-		// same widget-event stream the host page subscribes to, so there is one
-		// signal per interaction, not two.
-		useEffect(() => {
-			return widgetEvents.subscribe((event) => {
-				if (event.name === "suggestion.clicked") {
-					const { text, origin } = event.properties;
-					const promptId = resolveSuggestionId(suggestions.page ?? [], text);
-					void fireSuggestionClick({
-						api: config.api ?? "",
-						token: config.token,
-						channelId: config.channelId,
-						mode: "inline",
-						source: config.source,
-						sessionId: chatRef.current?.sessionId,
-						promptId,
-						origin,
-						text,
-						index: event.properties.index,
-					});
-					return;
-				}
-				if (event.name === "suggestions.shown") {
-					const { texts, origin } = event.properties;
-					const prompts = resolveShownSuggestions(
-						suggestions.page ?? [],
-						texts,
-					);
-					void fireSuggestionShown({
-						api: config.api ?? "",
-						token: config.token,
-						channelId: config.channelId,
-						mode: "inline",
-						source: config.source,
-						sessionId: chatRef.current?.sessionId,
-						prompts,
-						origin,
-					});
-				}
-			});
-		}, [
+		// Record every suggestion click and every rendered pill set server-side,
+		// attributed to the authored prompts involved.
+		useSuggestionIngest({
 			widgetEvents,
-			suggestions,
-			config.api,
-			config.token,
-			config.channelId,
-			config.source,
-		]);
+			api: config.api,
+			token: config.token,
+			channelId: config.channelId,
+			source: config.source,
+			mode: "inline",
+			pagePrompts: suggestions.page,
+			getSessionId: () => chatRef.current?.sessionId,
+		});
 
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.

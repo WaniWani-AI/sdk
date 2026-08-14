@@ -82,8 +82,11 @@ These are kept in the codebase but `@deprecated`. New code shouldn't use them.
 
 ## Reading guide
 
-- Flow API: `skills/waniwani-sdk/references/flows.md` and `flows-api-reference.md`
-- KV adapters: `skills/waniwani-sdk/references/kv-store.md`
-- Self-hosting walkthrough: `skills/waniwani-sdk/references/self-hosting.md`
-- Tier model + free tier: `skills/waniwani-sdk/references/setup.md`
+User-facing docs are the source of truth for API shapes, and they are hosted, not in this repo. Fetch the page you need:
+
+- Flow API: [docs.waniwani.ai/sdk/flows/overview](https://docs.waniwani.ai/sdk/flows/overview) and the pages under `/sdk/flows/`
+- KV adapters: [docs.waniwani.ai/sdk/flows/kv-store](https://docs.waniwani.ai/sdk/flows/kv-store)
+- Self-hosting walkthrough: [docs.waniwani.ai/sdk/deployment/self-hosting](https://docs.waniwani.ai/sdk/deployment/self-hosting)
+- Tier model + free tier: [docs.waniwani.ai/sdk/introduction](https://docs.waniwani.ai/sdk/introduction)
+- Full page index: [docs.waniwani.ai/llms.txt](https://docs.waniwani.ai/llms.txt)
 - Project conventions: `CLAUDE.md` in the repo root
