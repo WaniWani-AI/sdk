@@ -26,9 +26,33 @@ export const EVENT_TYPES = [
 	"option_selected",
 	"lead_qualified",
 	"converted",
+	"session.error",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
+
+export const SESSION_ERROR_CODES = [
+	"agent_failed",
+	"tool_failed",
+	"upstream_failed",
+] as const;
+
+export type SessionErrorCodeType = (typeof SESSION_ERROR_CODES)[number];
+
+export const ERROR_CAUSES = [
+	"timeout",
+	"rate_limited",
+	"upstream_4xx",
+	"upstream_5xx",
+	"network",
+	"invalid_output",
+	"flow_dead_end",
+	"flow_unknown_node",
+	"flow_loop",
+	"unknown",
+] as const;
+
+export type ErrorCauseType = (typeof ERROR_CAUSES)[number];
 
 // ============================================
 // Event Properties
@@ -61,6 +85,7 @@ export interface ToolCalledProperties {
 	type?: "pricing" | "product_info" | "availability" | "support" | "other";
 	/** Retrieval traces for kb.search() calls made inside this tool handler. */
 	kbSearch?: KbSearchTrace[];
+	cause?: ErrorCauseType;
 }
 
 export interface LinkClickedProperties {
@@ -117,6 +142,13 @@ export interface ConvertedProperties {
 	currency: string;
 	/** When the conversion actually happened — for backdated off-platform sales. */
 	occurredAt?: string;
+}
+
+export interface SessionErrorProperties {
+	code: SessionErrorCodeType;
+	cause: ErrorCauseType;
+	tool?: string;
+	node?: string;
 }
 
 // ============================================
@@ -196,6 +228,10 @@ export type TrackEvent =
 	| ({
 			event: "converted";
 			properties?: ConvertedProperties;
+	  } & BaseTrackEvent)
+	| ({
+			event: "session.error";
+			properties?: SessionErrorProperties;
 	  } & BaseTrackEvent);
 
 /**
