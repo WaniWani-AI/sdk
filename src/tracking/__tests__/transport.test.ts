@@ -157,4 +157,41 @@ describe("V2 transport", () => {
 		expect(timedOut.timedOut).toBe(true);
 		expect(timedOut.pendingEvents).toBeGreaterThan(0);
 	});
+
+	test("calls globalThis.fetch with the global as receiver by default", async () => {
+		const originalFetch = globalThis.fetch;
+		const receivers: unknown[] = [];
+		const requests: V2BatchRequest[] = [];
+
+		globalThis.fetch = function (
+			this: unknown,
+			_input: URL | RequestInfo,
+			init?: RequestInit,
+		): Promise<Response> {
+			receivers.push(this);
+			requests.push(JSON.parse(String(init?.body)));
+			return Promise.resolve(jsonResponse({ accepted: 1 }));
+		} as typeof globalThis.fetch;
+
+		try {
+			const transport = createV2BatchTransport({
+				apiUrl: "https://example.com",
+				apiKey: "test-key",
+				flushIntervalMs: 10_000,
+			});
+
+			transport.enqueue(makeEvent("evt_default_fetch"));
+			await transport.flush();
+
+			expect(requests).toHaveLength(1);
+			expect(requests[0]?.events).toHaveLength(1);
+			// A bare `fetch` on an instance field would arrive with the transport as
+			// receiver, which browsers reject with "Illegal invocation".
+			expect(receivers[0]).toBe(globalThis);
+
+			await transport.shutdown();
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
 });
