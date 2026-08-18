@@ -299,23 +299,27 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				setReady(true);
 				return;
 			}
-			const pageView = (source: string | undefined) => {
+			// Host-supplied `channelId` prop wins over the server-resolved one,
+			// matching the `resolveConfig` merge order; a token-only mount falls
+			// back to the channel `/config` resolves from the bearer token so
+			// ingest can attribute the event.
+			const pageView = (remote: Partial<EmbedConfig>) => {
 				if (disablePageView) {
 					return;
 				}
 				void firePageView({
 					api: resolvedApi,
 					token,
-					channelId,
+					channelId: channelId ?? remote.channelId,
 					mode: "inline",
-					source,
+					source: remote.source,
 				});
 			};
 			const cached = loadCachedConfig(resolvedApi, token, channelId);
 			if (cached) {
 				setRemote(cached);
 				setReady(true);
-				pageView(cached.source);
+				pageView(cached);
 			}
 			const controller = new AbortController();
 			const safety = setTimeout(() => setReady(true), READINESS_TIMEOUT_MS);
@@ -329,7 +333,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 						setRemote(r);
 					}
 					setReady(true);
-					pageView(r.source);
+					pageView(r);
 				})
 				.catch((err) => {
 					console.error("[Waniwani] Remote config fetch failed:", err);
@@ -375,7 +379,12 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			const client = createChatTrackClient({
 				api: resolvedApi,
 				token,
-				channelId,
+				// Host-supplied `channelId` prop wins; a token-only mount reads the
+				// server-resolved channel from the cached `/config`, same as
+				// `getSource` below.
+				channelId: () =>
+					channelId ??
+					loadCachedConfig(resolvedApi, token, channelId)?.channelId,
 				getSource: () =>
 					loadCachedConfig(resolvedApi, token, channelId)?.source ?? undefined,
 				getSessionId: () => innerRef.current?.sessionId,

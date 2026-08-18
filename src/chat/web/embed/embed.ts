@@ -611,7 +611,12 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 		? createChatTrackClient({
 				api,
 				token: config.token,
-				channelId: config.channelId,
+				// Host-supplied channel wins; a token-only embed reads the
+				// server-resolved channel from the cached `/config`, same as
+				// `getSource` below.
+				channelId: () =>
+					config.channelId ??
+					loadCachedConfig(api, config.token, config.channelId)?.channelId,
 				getSource: () =>
 					loadCachedConfig(api, config.token, config.channelId)?.source ??
 					undefined,
