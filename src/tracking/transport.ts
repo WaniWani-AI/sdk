@@ -29,6 +29,10 @@ const TEARDOWN_MAX_BODY_BYTES = 60_000;
 const AUTH_FAILURE_STATUS = new Set([401, 403]);
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 
+// `fetch` brand-checks its receiver, so it cannot be stored on an instance field.
+// Resolve it off `globalThis` per call so a host swapping `fetch` later is honoured.
+const defaultFetch: FetchFn = (input, init) => globalThis.fetch(input, init);
+
 interface Logger {
 	warn: (message: string, ...args: unknown[]) => void;
 	error: (message: string, ...args: unknown[]) => void;
@@ -122,7 +126,7 @@ class BatchingV2Transport implements V2BatchTransport {
 			options.retryMaxDelayMs ?? DEFAULT_RETRY_MAX_DELAY_MS;
 		this.shutdownTimeoutMs =
 			options.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
-		this.fetchFn = options.fetchFn ?? fetch;
+		this.fetchFn = options.fetchFn ?? defaultFetch;
 		this.logger = options.logger ?? console;
 		this.now = options.now ?? (() => new Date());
 		this.sleep =
