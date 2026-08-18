@@ -168,6 +168,7 @@ describe("withWaniwani", () => {
 				type: "other",
 				status: "error",
 				errorMessage: "tool broke",
+				cause: "unknown",
 			},
 		});
 	});

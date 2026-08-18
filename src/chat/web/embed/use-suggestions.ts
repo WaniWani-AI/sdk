@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { DEFAULT_SUGGESTION_ORIGINS } from "../hooks/use-suggestions";
 import { debugLog } from "../lib/debug";
+import type { PreChatSuggestions } from "../lib/resolve-suggestions";
+import { toSuggestions } from "../lib/resolve-suggestions";
 import type {
 	EmbedConfig,
 	PagePrompt,
@@ -9,14 +10,8 @@ import type {
 } from "./config";
 import { usePathname } from "./use-pathname";
 
-/** One starter prompt; `id` is null for fixed-list prompts (no stored identity). */
-export interface PageSuggestion {
-	id: string | null;
-	text: string;
-}
-
 /** How many of a page's prompts the widget shows at a time. */
-const SHOWN_PROMPT_COUNT = 3;
+const SHOWN_SUGGESTION_COUNT = 3;
 
 /** Tier display order; one prompt is shown per tier. */
 const TIER_ORDER: PagePromptTier[] = ["low", "medium", "high"];
@@ -30,7 +25,7 @@ function takeRandom<T>(pool: T[]): T | undefined {
 	return taken;
 }
 
-/** Up to {@link SHOWN_PROMPT_COUNT} prompts, one per tier, random within pools;
+/** Up to {@link SHOWN_SUGGESTION_COUNT} prompts, one per tier, random within pools;
  *  untagged prompts fill any slot and leftovers top up short slots. */
 export function pickPagePrompts(prompts: PagePrompt[]): PagePrompt[] {
 	const byTier = new Map<PagePromptTier, PagePrompt[]>();
@@ -54,7 +49,7 @@ export function pickPagePrompts(prompts: PagePrompt[]): PagePrompt[] {
 	}
 
 	const leftovers = [...byTier.values()].flat().concat(wildcards);
-	while (picked.length < Math.min(SHOWN_PROMPT_COUNT, prompts.length)) {
+	while (picked.length < Math.min(SHOWN_SUGGESTION_COUNT, prompts.length)) {
 		const filler = takeRandom(leftovers);
 		if (!filler) {
 			break;
@@ -115,45 +110,30 @@ export function parsePageSuggestions(value: unknown): PageSuggestionsEntry[] {
 	});
 }
 
-/** The page's picked prompts when there are any, else the fixed fallback. */
-export function resolveSuggestions(
-	picked: PageSuggestion[] | null,
-	fallback: string[] | undefined,
-): PageSuggestion[] {
-	if (picked && picked.length > 0) {
-		return picked;
-	}
-	return (fallback ?? []).map((text) => ({ id: null, text }));
-}
-
-/** Starter prompts for the current page, else `config.suggestions`. Objects,
- *  not texts: the ids let a click attribute back to the authored prompt.
- *  @param config the resolved embed config (`pageSuggestions` opts in). */
-export function usePageSuggestions(config: EmbedConfig): PageSuggestion[] {
-	const { pageSuggestions, suggestions, suggestionOrigins } = config;
+/**
+ * The dashboard-configured rungs for the current page: the matched entry's
+ * picked prompts (`page`) and the channel's fixed list (`channel`), kept
+ * separate so the pill row can attribute its origin exactly. Memoized because
+ * the pick is random and the identity has to hold: `useSuggestions` keys an
+ * effect on this object.
+ */
+export function useSuggestions(config: EmbedConfig): PreChatSuggestions {
+	const { pageSuggestions, suggestions } = config;
 	const pathname = usePathname();
-	const pageEnabled = (
-		suggestionOrigins ?? DEFAULT_SUGGESTION_ORIGINS
-	).includes("page");
 
-	// Memoized because the pick is random and the identity has to hold:
-	// `useSuggestions` keys an effect on this array and setStates it. Callers
-	// deriving the texts must memoize that map for the same reason.
 	return useMemo(() => {
 		const current = normalizePathname(pathname);
-		const page = pageEnabled
-			? pageSuggestions?.find(
-					(entry) => normalizePathname(entry.url) === current,
-				)
-			: undefined;
-		const picked = page
-			? pickPagePrompts(page.prompts).map(({ id, text }) => ({ id, text }))
+		const entry = pageSuggestions?.find(
+			(candidate) => normalizePathname(candidate.url) === current,
+		);
+		const page = entry
+			? pickPagePrompts(entry.prompts).map(({ id, text }) => ({ id, text }))
 			: null;
-		debugLog("page suggestions resolve", {
+		debugLog("configured suggestions resolve", {
 			pathname: current,
-			matched: Boolean(page),
-			count: picked?.length ?? 0,
+			matched: Boolean(entry),
+			count: page?.length ?? 0,
 		});
-		return resolveSuggestions(picked, suggestions);
-	}, [pathname, pageEnabled, pageSuggestions, suggestions]);
+		return { page, channel: toSuggestions(suggestions ?? []) };
+	}, [pathname, pageSuggestions, suggestions]);
 }

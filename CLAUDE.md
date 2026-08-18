@@ -115,14 +115,13 @@ const flow = createFlow({ /* …same… */ }).compile(); // hosted flow state, a
 
 `@waniwani/sdk` is `0.x`, so **minor bumps may break the public API** — and every breaking change is a migration our users have to do. The rule: no user should have to figure out an upgrade by hand. Whenever a release contains a breaking change, ship the migration alongside it so an agent can auto-apply it in one pass.
 
-**Every breaking change in a version bump must ship all four:**
+**Every breaking change in a version bump must ship all three:**
 
-1. **A changelog entry** — a `## <version>:` section with a before/after and a mechanical, agent-applicable migration (a codemod recipe, not prose). Add it to the "Breaking changes at a glance" table too, and **link the version-specific migration skill from the section** (a `<Tip>` with the `npx skills add ... -s migrate-waniwani-sdk-<from>-to-<to>` command) so a reader can run it, not just read it.
-2. **An entry in `skills/waniwani-sdk/references/upgrading.md`** — under "Currently auto-fixable breaking changes", mirroring the changelog so an agent can migrate without a network fetch.
-3. **A version-specific migration skill** — `skills/migrate-waniwani-sdk-<from>-to-<to>/SKILL.md`, self-contained to that one hop (the Vercel `migrate-*`-per-major pattern), ending on `bun run typecheck && bun test`. Copy the newest existing one as the template and link it from `skills/waniwani-sdk/SKILL.md`.
-4. **A `@deprecated` shim where feasible** — keep the old shape working with a `@deprecated` notice naming the removal version, so the bump isn't a hard cliff. Not always possible (a surface that never worked is deleted outright).
+1. **A changelog entry** — a `## <version>:` section in the docs repo (`docs/docs/sdk/changelog.mdx`, published at [docs.waniwani.ai/sdk/changelog](https://docs.waniwani.ai/sdk/changelog)) with a before/after and a mechanical, agent-applicable migration (a codemod recipe, not prose). Add it to the "Breaking changes at a glance" table too, and **link the version-specific migration skill from the section** (a `<Tip>` with the `npx skills add ... -s migrate-waniwani-sdk-<from>-to-<to>` command) so a reader can run it, not just read it.
+2. **A version-specific migration skill** — `skills/migrate-waniwani-sdk-<from>-to-<to>/SKILL.md`, self-contained to that one hop (the Vercel `migrate-*`-per-major pattern), ending on `bun run typecheck && bun test`. Copy the newest existing one as the template and link it from `skills/waniwani-sdk/SKILL.md`. This is the offline, applyable form of the changelog entry: a user's agent must be able to migrate from it alone, with no network fetch.
+3. **A `@deprecated` shim where feasible** — keep the old shape working with a `@deprecated` notice naming the removal version, so the bump isn't a hard cliff. Not always possible (a surface that never worked is deleted outright).
 
-This is a standing obligation, not a per-release decision: the `.claude/skills/release-migration/` skill walks through cutting a release this way, and the user-facing upgrade path lives in `skills/waniwani-sdk/references/upgrading.md` plus the per-hop migration skills. If you bump the version and touch the public API, you are not done until the changelog entry, the `upgrading.md` mirror, and the `migrate-waniwani-sdk-<from>-to-<to>` skill for it all exist and cross-link. The same discipline applies at every future version (0.15, 1.0, 15.0): a version bump always ships its migration, and the changelog always points at the skill that applies it.
+This is a standing obligation, not a per-release decision: the `.claude/skills/release-migration/` skill walks through cutting a release this way, and the user-facing upgrade path is the hosted changelog plus the per-hop migration skills. If you bump the version and touch the public API, you are not done until the changelog entry and the `migrate-waniwani-sdk-<from>-to-<to>` skill both exist and cross-link. The same discipline applies at every future version (0.15, 1.0, 15.0): a version bump always ships its migration, and the changelog always points at the skill that applies it.
 
 ## Skills (kept in sync with source)
 
@@ -134,30 +133,33 @@ When changing the public API or behavior, **always update the corresponding skil
 - `knowledge-base/SKILL.md` — KB setup (free tier)
 - `visualize-flow/SKILL.md` — Mermaid diagrams from `createFlow`
 - `translations/SKILL.md` — app translations
-- `release-migration/SKILL.md` — cut a version bump that ships its own migration (changelog + `upgrading.md` + deprecation shim)
+- `release-migration/SKILL.md` — cut a version bump that ships its own migration (changelog + per-hop migration skill + deprecation shim)
 - (`create-mcp-app` and `mcp-server` were removed — they taught the legacy `createTool`/`createResource` patterns)
 
 ### External skills (`skills/`, published to skills.sh)
 
 Target SDK **users**, not SDK developers.
 
-**`waniwani-sdk` is the main entry-point skill; standalone sibling skills exist only for directly invocable workflows.** Current siblings: `instrument-tracking` (auto-instrument funnel events across flows), `audit-tracking` (read-only audit: verify only defined events are used, report missing funnel events) and per-version migration skills named `migrate-waniwani-sdk-<from>-to-<to>` (e.g. `migrate-waniwani-sdk-0.15-to-0.16`). Migration skills are **version-specific and self-contained**, one per version hop, mirroring how Vercel ships a `migrate-*` skill per major: a user invokes exactly the skill for their jump and gets that jump's complete migration, with no version-delta logic to reason about. The general "how to approach any upgrade" procedure and the cumulative breaking-change list stay in `references/upgrading.md`. Everything that is reference material rather than an invocable workflow lives *inside* `waniwani-sdk/` as a `references/*.md` file linked from `SKILL.md`. Before adding a new sibling skill, default to a reference; a sibling is justified only when users should invoke it by name (`npx skills add Waniwani-AI/sdk -s <skill>`).
+**`waniwani-sdk/SKILL.md` carries no reference material of its own.** It is a router: a short tier summary, the common mistakes, and a map of which [docs.waniwani.ai](https://docs.waniwani.ai/sdk/introduction) page to fetch for what. There is no `references/` directory, and no new one should be created. API shapes, option names, event properties, and version behavior live in the docs repo at `/Users/maximeantoine/Projects/WaniWani/docs/docs/sdk/`, which is the single source of truth. **When you change the public API or behavior, update the matching docs page there**, and update `waniwani-sdk/SKILL.md` only if the map, the tier split, or a common mistake changed.
 
-**Every version bump that breaks the public API adds a new `migrate-waniwani-sdk-<from>-to-<to>` sibling skill** alongside the changelog + `upgrading.md` entries required by the release rule below.
-
-| Source area | Reference file |
+| Source area | Docs page to update (`docs/docs/`) |
 |---|---|
-| `src/mcp/server/flows/` | `references/flows.md` + `flows-api-reference.md` |
-| `src/tracking/` + `src/mcp/server/scoped-client.ts` | `references/events.md` (NEW) |
-| Auto-instrumentation playbook (funnel events across flows) | `references/instrument-tracking.md` |
-| Tracking audit playbook (taxonomy compliance + missing events) | `references/audit-tracking.md` |
-| `src/mcp/server/kv/` | `references/kv-store.md` (NEW) |
-| Self-hosting | `references/self-hosting.md` (NEW) |
-| `src/kb/` | `references/knowledge-base.md` |
-| `src/chat/web/` | `references/chat-widget.md` |
-| Setup / env vars | `references/setup.md` |
-| Version upgrades / migrations | `references/upgrading.md` (general procedure + cumulative list); each hop also gets a version-specific `migrate-waniwani-sdk-<from>-to-<to>` sibling skill |
-| **Legacy** (not linked from `SKILL.md`) | `references/_legacy/tools-and-widgets.md`, `references/_legacy/widget-react-hooks.md`, `references/_legacy/chat-server.md` |
+| `src/mcp/server/flows/` | `sdk/flows/*.mdx`, `sdk/reference/flow-tool-contract.mdx` |
+| `src/tracking/` + `src/mcp/server/scoped-client.ts` | `sdk/tracking/*.mdx`, `sdk/reference/event-schema.mdx` |
+| `src/mcp/server/kv/` | `sdk/flows/kv-store.mdx`, `sdk/reference/kv-store-api.mdx` |
+| `src/kb/` | `sdk/knowledge-base/overview.mdx` |
+| `src/chat/web/` | `sdk/chat/embed.mdx`, `sdk/chat/react.mdx` |
+| Setup / env vars / entry points | `sdk/configuration/*.mdx`, `sdk/reference/entry-points.mdx` |
+| Self-hosting | `sdk/deployment/self-hosting.mdx` |
+| Version upgrades / migrations | `sdk/changelog.mdx`, plus a `migrate-waniwani-sdk-<from>-to-<to>` sibling skill per hop |
+
+Adding a docs page means adding it to `docs/docs/llms.txt` and to the map in `waniwani-sdk/SKILL.md`.
+
+**Standalone sibling skills exist only for directly invocable workflows.** Current siblings: `instrument-tracking` (auto-instrument funnel events across flows), `audit-tracking` (read-only audit: verify only defined events are used, report missing funnel events) and per-version migration skills named `migrate-waniwani-sdk-<from>-to-<to>` (e.g. `migrate-waniwani-sdk-0.15-to-0.16`). Each sibling is self-contained and fetches the live docs for anything that can drift. Migration skills are **version-specific**, one per version hop, mirroring how Vercel ships a `migrate-*` skill per major: a user invokes exactly the skill for their jump and gets that jump's complete migration, with no version-delta logic to reason about. Before adding a new sibling skill, default to a docs page plus a row in the SKILL.md map; a sibling is justified only when users should invoke it by name (`npx skills add Waniwani-AI/sdk -s <skill>`).
+
+Guided playbooks that walk a user through a multi-step build (init a project, create a first flow, tunnel a dev server) stay in `waniwani-sdk/scripts/*.md`. They are procedures, not reference.
+
+**Every version bump that breaks the public API adds a new `migrate-waniwani-sdk-<from>-to-<to>` sibling skill** alongside the changelog entry required by the release rule above.
 
 ## CSS / Tailwind
 

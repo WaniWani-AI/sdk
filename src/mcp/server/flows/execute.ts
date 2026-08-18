@@ -1,5 +1,7 @@
 import type { z } from "zod";
 import type { ScopedWaniWaniClient } from "../scoped-client";
+import { classifyCause } from "../session-errors/classify";
+import { reportSessionError } from "../session-errors/report";
 import type {
 	Edge,
 	ExecutionResult,
@@ -147,6 +149,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 
 		const handler = nodes.get(currentNode);
 		if (!handler) {
+			reportSessionError({
+				waniwani,
+				code: "agent_failed",
+				cause: "flow_unknown_node",
+				properties: { node: currentNode },
+			});
 			return {
 				content: {
 					status: "error",
@@ -243,6 +251,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				// All questions filled and validated — advance to next node
 				const edge = edges.get(currentNode);
 				if (!edge) {
+					reportSessionError({
+						waniwani,
+						code: "agent_failed",
+						cause: "flow_dead_end",
+						properties: { node: currentNode },
+					});
 					return {
 						content: {
 							status: "error",
@@ -266,6 +280,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 					) {
 						const edge = edges.get(currentNode);
 						if (!edge) {
+							reportSessionError({
+								waniwani,
+								code: "agent_failed",
+								cause: "flow_dead_end",
+								properties: { node: currentNode },
+							});
 							return {
 								content: {
 									status: "error",
@@ -317,6 +337,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 
 			const edge = edges.get(currentNode);
 			if (!edge) {
+				reportSessionError({
+					waniwani,
+					code: "agent_failed",
+					cause: "flow_dead_end",
+					properties: { node: currentNode },
+				});
 				return {
 					content: {
 						status: "error",
@@ -328,6 +354,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 			currentNode = await resolveNextNode(edge, state);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
+			reportSessionError({
+				waniwani,
+				code: "agent_failed",
+				cause: classifyCause({ error }),
+				properties: { node: currentNode },
+			});
 			return {
 				content: { status: "error", error: message },
 				flowTokenContent: { step: currentNode, state },
@@ -336,6 +368,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 		}
 	}
 
+	reportSessionError({
+		waniwani,
+		code: "agent_failed",
+		cause: "flow_loop",
+		properties: { node: currentNode },
+	});
 	return {
 		content: {
 			status: "error",

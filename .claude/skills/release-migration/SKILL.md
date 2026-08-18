@@ -21,16 +21,15 @@ If the change is purely internal (no exported symbol, type, or documented behavi
 
 ## The rule
 
-**A release that breaks the public API must ship all four of these before it is done:**
+**A release that breaks the public API must ship all three of these before it is done:**
 
 1. **Changelog entry** — a `## <version>:` section in the docs changelog (`sdk/changelog.mdx` in the docs repo, published at [docs.waniwani.ai/sdk/changelog](https://docs.waniwani.ai/sdk/changelog)) with:
    - a **before/after** code snippet, and
    - a **mechanical migration** an agent can apply without judgment (a codemod recipe, not "update your calls").
    - Also add a row to the **Breaking changes at a glance** table.
-   - **A `<Tip>` at the top of the section linking the version-specific migration skill** (deliverable 3): `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-<from>-to-<to>`, so a reader can run the migration, not just read it.
-2. **`upgrading.md` entry** — mirror the changelog into `skills/waniwani-sdk/references/upgrading.md` under **"Currently auto-fixable breaking changes"**, so an agent can migrate a user's codebase without a network fetch. Match the existing `### <version> — <one-line summary>` format.
-3. **A version-specific migration skill** — a self-contained sibling skill `skills/migrate-waniwani-sdk-<from>-to-<to>/SKILL.md` covering exactly this hop (one skill per version boundary, the way Vercel ships a `migrate-*` skill per major). It restates every breaking change of the release as a numbered, apply-without-judgment recipe, ends with `bun run typecheck && bun test` as the completion check, and does **not** try to handle other version deltas. Copy the newest existing `migrate-waniwani-sdk-*` skill as the template. Add a one-line pointer to it from `skills/waniwani-sdk/SKILL.md`'s upgrade section.
-4. **Deprecation shim (where feasible)** — keep the old signature/export working behind a `@deprecated` JSDoc that names the removal version. This turns a hard break into a soft one; users get warnings before errors. Not always possible (a surface that never worked is deleted outright, not shimmed).
+   - **A `<Tip>` at the top of the section linking the version-specific migration skill** (deliverable 2): `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-<from>-to-<to>`, so a reader can run the migration, not just read it.
+2. **A version-specific migration skill** — a self-contained sibling skill `skills/migrate-waniwani-sdk-<from>-to-<to>/SKILL.md` covering exactly this hop (one skill per version boundary, the way Vercel ships a `migrate-*` skill per major). It restates every breaking change of the release as a numbered, apply-without-judgment recipe, ends with `bun run typecheck && bun test` as the completion check, and does **not** try to handle other version deltas. Copy the newest existing `migrate-waniwani-sdk-*` skill as the template. Add a one-line pointer to it from `skills/waniwani-sdk/SKILL.md`'s upgrade section.
+3. **Deprecation shim (where feasible)** — keep the old signature/export working behind a `@deprecated` JSDoc that names the removal version. This turns a hard break into a soft one; users get warnings before errors. Not always possible (a surface that never worked is deleted outright, not shimmed).
 
 ## Steps
 
@@ -40,7 +39,7 @@ If the change is purely internal (no exported symbol, type, or documented behavi
    ```
    Cross-check against the tiers in [CLAUDE.md](../../../CLAUDE.md). A renamed/removed/re-typed export, a changed function signature, a moved entry point, or a changed default is breaking. A new optional export is not.
 
-2. **For each breaking change, write the migration.** Prefer a codemod recipe precise enough to auto-apply: what to match, what to rewrite it to, and how the type checker confirms success. See the `0.14.0` `addConditionalEdge` entry in [upgrading.md](../../../skills/waniwani-sdk/references/upgrading.md) for the target quality — it tells an agent exactly what to collect and where to insert it.
+2. **For each breaking change, write the migration.** Prefer a codemod recipe precise enough to auto-apply: what to match, what to rewrite it to, and how the type checker confirms success. The newest `skills/migrate-waniwani-sdk-*/SKILL.md` sets the quality bar: it tells an agent exactly what to collect and where to insert it.
 
 3. **Add the deprecation shim** if the old shape can coexist. Example:
    ```ts
@@ -48,7 +47,7 @@ If the change is purely internal (no exported symbol, type, or documented behavi
    export const oldName = newName;
    ```
 
-4. **Update the changelog and `upgrading.md`** with entries 1 and 2 above. Keep the two in sync — `upgrading.md` explicitly mirrors the changelog.
+4. **Write the changelog section and the migration skill** (deliverables 1 and 2). Keep them in sync: the skill is the applyable form of what the changelog describes.
 
 5. **Bump the version** in `package.json` (and commit as `<version>` per the repo's tagging convention — see recent `git log`).
 
@@ -67,8 +66,7 @@ If the change is purely internal (no exported symbol, type, or documented behavi
 - [ ] Every breaking change has a changelog `## <version>:` section with before/after + codemod recipe
 - [ ] Changelog section links its `migrate-waniwani-sdk-<from>-to-<to>` skill in a `<Tip>`
 - [ ] "Breaking changes at a glance" table updated
-- [ ] `skills/waniwani-sdk/references/upgrading.md` mirrors each entry under "Currently auto-fixable breaking changes"
-- [ ] `skills/migrate-waniwani-sdk-<from>-to-<to>/SKILL.md` created for this hop, and linked from `skills/waniwani-sdk/SKILL.md`
+- [ ] `skills/migrate-waniwani-sdk-<from>-to-<to>/SKILL.md` created for this hop, self-contained, and linked from `skills/waniwani-sdk/SKILL.md`'s upgrade section
 - [ ] `@deprecated` shim added wherever the old shape can coexist, naming the removal version
 - [ ] `bun run typecheck && bun test && bun run build` pass
 - [ ] Migration recipe dry-run compiles

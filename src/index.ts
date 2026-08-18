@@ -15,7 +15,11 @@ export type { WaniWaniProjectConfig } from "./project-config.js";
 // Project Config
 export { defineConfig } from "./project-config.js";
 // Tracking
-export { EVENT_TYPES } from "./tracking/@types.js";
+export {
+	ERROR_CAUSES,
+	EVENT_TYPES,
+	SESSION_ERROR_CODES,
+} from "./tracking/@types.js";
 export type {
 	FrontendClientOptions,
 	FrontendIdentity,
@@ -26,6 +30,7 @@ export { createFrontendClient } from "./tracking/frontend.js";
 export type {
 	ComparedPriceOption,
 	ConvertedProperties,
+	ErrorCauseType,
 	EventType,
 	LeadQualifiedProperties,
 	LegacyTrackEvent,
@@ -39,6 +44,8 @@ export type {
 	RevenuePriceShownInput,
 	RevenuePricesComparedInput,
 	RevenueTrackingApi,
+	SessionErrorCodeType,
+	SessionErrorProperties,
 	ToolCalledProperties,
 	TrackEvent,
 	TrackFn,

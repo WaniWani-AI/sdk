@@ -83,7 +83,7 @@ function expectNodesVisited(
 }
 
 describe("compileFlow response contract", () => {
-	test("returns an error when start is missing intent", async () => {
+	test("starts without intent instead of failing the call", async () => {
 		const store = new TestFlowStateStore();
 		const flow = createFlow({
 			id: "missing_intent_flow",
@@ -112,10 +112,14 @@ describe("compileFlow response contract", () => {
 		>;
 		const parsed = parsePayload(result);
 
-		expect(parsed.status).toBe("error");
-		expect(parsed.error).toContain('Missing required "intent"');
-		expect(result.isError).toBe(true);
-		expect(await store.get(TEST_SESSION_ID)).toEqual(null);
+		expect(parsed.status).toBe("interrupt");
+		expect(parsed.field).toBe("useCase");
+		expect(result.isError).toBe(undefined);
+		expect(await store.get(TEST_SESSION_ID)).toEqual({
+			step: "ask_use_case",
+			state: {},
+			field: "useCase",
+		});
 	});
 
 	test("accepts optional context on start", async () => {

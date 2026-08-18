@@ -37,6 +37,7 @@ export type {
 	CallableTrack,
 	ComparedPriceOption,
 	ConvertedProperties,
+	ErrorCauseType,
 	EventType,
 	LeadQualifiedProperties,
 	LegacyTrackEvent,
@@ -50,6 +51,8 @@ export type {
 	RevenuePriceShownInput,
 	RevenuePricesComparedInput,
 	RevenueTrackingApi,
+	SessionErrorCodeType,
+	SessionErrorProperties,
 	ToolCalledProperties,
 	TrackEvent,
 	TrackFn,
@@ -59,7 +62,7 @@ export type {
 	TrackingShutdownOptions,
 	TrackingShutdownResult,
 } from "./@types.js";
-export { EVENT_TYPES } from "./@types.js";
+export { ERROR_CAUSES, EVENT_TYPES, SESSION_ERROR_CODES } from "./@types.js";
 export { createEventId, mapTrackEventToV2 } from "./mapper.js";
 export type {
 	V2BatchRejectedEvent,
