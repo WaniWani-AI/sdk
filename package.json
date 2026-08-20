@@ -101,8 +101,8 @@
     "postinstall": "lefthook install || true"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/sdk": "~1.29.0",
-    "@modelcontextprotocol/ext-apps": "~1.5.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/ext-apps": "^1.7.4",
     "react": ">=18.0.0",
     "zod": ">=4.0.0",
     "@ai-sdk/react": ">=1.0.0",
@@ -140,8 +140,8 @@
     "@ai-sdk/mcp": "^1.0.0",
     "@ai-sdk/react": "^3.0.134",
     "@biomejs/biome": "^2.3.13",
-    "@modelcontextprotocol/ext-apps": "~1.5.0",
-    "@modelcontextprotocol/sdk": "~1.29.0",
+    "@modelcontextprotocol/ext-apps": "^1.7.4",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@storybook/react-vite": "^10.4.6",
     "@streamdown/cjk": "^1.0.1",
     "@streamdown/code": "^1.0.1",
