@@ -64,16 +64,17 @@ const flow = createFlow({
   },
 })
   .addNode("ask_email", () =>
-    interrupt({ question: "What is your work email?", field: "email" }),
+    interrupt({ email: { question: "What is your work email?" } }),
   )
   .addNode("ask_role", () =>
-    interrupt({ question: "What is your role?", field: "role" }),
+    interrupt({ role: { question: "What is your role?" } }),
   )
   .addNode("ask_use_case", () =>
     interrupt({
-      question: "What's your primary use case?",
-      field: "useCase",
-      suggestions: ["Analytics", "Lead gen", "Support"],
+      useCase: {
+        question: "What's your primary use case?",
+        suggestions: ["Analytics", "Lead gen", "Support"],
+      },
     }),
   )
   .addNode("complete", (state) => ({
@@ -138,10 +139,10 @@ const flow = createFlow({
   },
 })
   .addNode("ask_postal", () =>
-    interrupt({ question: "What's your postal code?", field: "postalCode" }),
+    interrupt({ postalCode: { question: "What's your postal code?" } }),
   )
   .addNode("ask_sqm", () =>
-    interrupt({ question: "How many m² is your home?", field: "sqm" }),
+    interrupt({ sqm: { question: "How many m² is your home?" } }),
   )
   .addNode("show_pricing", (state) =>
     showWidget({
@@ -176,7 +177,7 @@ const flow = createFlow({
   },
 })
   .addNode("ask_email", () =>
-    interrupt({ question: "What's your email?", field: "email" }),
+    interrupt({ email: { question: "What's your email?" } }),
   )
   .addNode("analyze_email", (state) => {
     const domain = state.email?.split("@")[1] ?? "";
@@ -184,7 +185,7 @@ const flow = createFlow({
     return { isCompanyEmail: !generic.has(domain) };
   })
   .addNode("ask_company", () =>
-    interrupt({ question: "What company are you with?", field: "companyName" }),
+    interrupt({ companyName: { question: "What company are you with?" } }),
   )
   .addNode("done", () => ({ ready: true }))
   .addEdge(START, "ask_email")
@@ -208,8 +209,8 @@ undeclared, and graph introspection (funnel analytics, Mermaid diagrams) reads
 
 | Return value | Behavior |
 |---|---|
-| `interrupt({ question, field })` | Pause -> ask user -> resume with answer stored at `field` |
-| `interrupt({ question, field, context })` | Same, plus hidden guidance for the assistant |
+| `interrupt({ field: { question } })` | Pause -> ask user -> resume with answer stored at `field` |
+| `interrupt({ field: { question, context } })` | Same, plus hidden guidance for the assistant |
 | `showWidget({ tool: displayTool, data?, field?, interactive? })` | Pause -> instruct AI to call display tool -> resume on continue |
 | `{ key: value, ... }` | Action node -> merge into state -> auto-advance |
 
