@@ -87,16 +87,20 @@ Drop the `{ store }` argument once `WANIWANI_API_KEY` is set and flow state move
 With neither a store nor a key, `.compile()` throws and tells you how to fix it. There is no silent
 fallback.
 
-## Legacy surfaces: never recommend these
+## Removed surfaces
 
-Still exported so existing customer MCPs keep working, no longer documented for new code:
+Removed. An import error for any of these means the code predates the removal:
 `createTool`, `createResource`, `registerTools`, `toNextJsHandler`, `toExpressJsHandler`,
 `createApiHandler`, `ChatCard`, every MCP-widget React hook except `useWaniwani` (`WidgetProvider`,
 `useWidgetClient`, `useToolOutput`, and the rest), `InitializeNextJsInIframe`, `LoadingWidget`,
 `DevModeProvider`, `detectPlatform`, `isMCPApps`, `isOpenAI`.
 
-Use `createFlow` instead of `createTool` / `createResource`. These will move to dedicated
-`@waniwani/sdk/legacy*` entry points in a future minor release.
+The `@waniwani/sdk/legacy`, `@waniwani/sdk/legacy/react`, `@waniwani/sdk/legacy/next-js`,
+`@waniwani/sdk/legacy/express-js`, `@waniwani/sdk/chat/server`, `@waniwani/sdk/next-js`, and
+`@waniwani/sdk/express-js` entry points no longer exist.
+
+Use `createFlow` for multi-step tools, `server.registerTool` for single-shot ones, and
+`WaniwaniChat` for chat.
 
 `@waniwani/sdk/evals` was removed entirely. See the
 [changelog](https://docs.waniwani.ai/sdk/changelog).

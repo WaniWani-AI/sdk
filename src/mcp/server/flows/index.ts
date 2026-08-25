@@ -9,6 +9,7 @@ export type {
 	NodeContext,
 	NodeHandler,
 	RegisteredFlow,
+	RegisteredTool,
 	TypedInterrupt,
 	TypedShowWidget,
 	WidgetSignal,

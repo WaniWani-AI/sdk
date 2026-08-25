@@ -16,7 +16,6 @@
 
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { createTool } from "../../../../legacy/mcp/tools/create-tool";
 import type { FlowTokenContent, McpServer } from "../@types";
 import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
@@ -67,57 +66,5 @@ describe("annotations.title", () => {
 
 		expect(registered).toHaveLength(1);
 		expect(registered[0]?.annotations?.title).toBe("Create a titled thing");
-	});
-
-	test("createTool passes annotations.title through to registerTool", async () => {
-		const tool = createTool(
-			{
-				id: "titled_tool",
-				title: "Titled Tool",
-				description: "A tool whose annotations carry a title.",
-				inputSchema: { a: z.string() },
-				annotations: {
-					title: "Show a titled thing",
-					readOnlyHint: true,
-				},
-			},
-			async () => ({ text: "ok" }),
-		);
-
-		const { server, registered } = mockServer();
-		await tool.register(server);
-
-		expect(registered).toHaveLength(1);
-		expect(registered[0]?.annotations?.title).toBe("Show a titled thing");
-	});
-
-	test("the other MCP hints still round-trip alongside title", async () => {
-		const tool = createTool(
-			{
-				id: "all_hints_tool",
-				title: "All Hints",
-				description: "Every annotation the MCP spec defines.",
-				inputSchema: { a: z.string() },
-				annotations: {
-					title: "Show everything",
-					readOnlyHint: true,
-					idempotentHint: true,
-					openWorldHint: false,
-					destructiveHint: false,
-				},
-			},
-			async () => ({ text: "ok" }),
-		);
-
-		const { server, registered } = mockServer();
-		await tool.register(server);
-
-		expect(registered[0]?.annotations).toEqual({
-			title: "Show everything",
-			readOnlyHint: true,
-			idempotentHint: true,
-			openWorldHint: false,
-			destructiveHint: false,
-		});
 	});
 });

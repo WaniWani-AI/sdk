@@ -80,62 +80,79 @@ Add to `scripts`:
 
 ### 5. Create the FAQ tool
 
+A KB lookup is a single-shot tool, not a multi-step flow, so register it
+directly on the MCP server. `withWaniwani` wraps the server to capture
+`tool.called` and hand the handler a session-scoped client.
+
 Create `lib/{MCP_NAME}/tools/faq.ts`:
 
 ```typescript
 import { waniwani } from "@waniwani/sdk";
-import { createTool } from "@waniwani/sdk/mcp";
+import type { McpServer } from "@waniwani/sdk/mcp";
 import { z } from "zod";
 
 const client = waniwani();
 
-export const faqTool = createTool(
-  {
-    id: "faq",
-    title: "FAQ",
-    description:
-      "Answer frequently asked questions. Use this when users ask general questions about the product or service.",
-    inputSchema: {
-      question: z.string().describe("The user's question"),
+export function registerFaqTool(server: McpServer): void {
+  server.registerTool(
+    "faq",
+    {
+      title: "FAQ",
+      description:
+        "Answer frequently asked questions. Use this when users ask general questions about the product or service.",
+      inputSchema: {
+        question: z.string().describe("The user's question"),
+      },
+      annotations: {
+        title: "FAQ",
+        readOnlyHint: true,
+        openWorldHint: false,
+        destructiveHint: false,
+      },
     },
-    annotations: {
-      readOnlyHint: true,
-      openWorldHint: false,
-      destructiveHint: false,
+    async ({ question }) => {
+      const results = await client.kb.search(question, { topK: 5 });
+
+      if (results.length === 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "I don't have a specific answer for that question.",
+            },
+          ],
+        };
+      }
+
+      const text = results
+        .map((r) => `**${r.heading}**\n${r.content}`)
+        .join("\n\n---\n\n");
+
+      return { content: [{ type: "text" as const, text }] };
     },
-  },
-  async ({ question }) => {
-    const results = await client.kb.search(question, { topK: 5 });
-
-    if (results.length === 0) {
-      return {
-        text: "I don't have a specific answer for that question.",
-      };
-    }
-
-    const text = results
-      .map((r) => `**${r.heading}**\n${r.content}`)
-      .join("\n\n---\n\n");
-
-    return { text };
-  },
-);
+  );
+}
 ```
+
+`annotations.title` is required by Claude's Connectors Directory, which flags
+the server at submission without it. The top-level `title` does not satisfy it.
 
 ### 6. Register the FAQ tool
 
 Export from `lib/{MCP_NAME}/tools/index.ts`:
 
 ```typescript
-export { faqTool } from "./faq";
+export { registerFaqTool } from "./faq";
 ```
 
-Import and register in `app/mcp/route.ts`:
+Call it where the server is built, inside the `withWaniwani` wrapper:
 
 ```typescript
-import { faqTool } from "@/lib/{MCP_NAME}/tools";
-// ...
-await registerTools(server, [faqTool]);
+import { withWaniwani } from "@waniwani/sdk/mcp";
+import { registerFaqTool } from "@/lib/{MCP_NAME}/tools";
+
+const server = withWaniwani(new McpServer({ name: "{MCP_NAME}", version: "1.0.0" }));
+registerFaqTool(server);
 ```
 
 ### 7. Ingest knowledge files

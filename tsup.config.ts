@@ -28,7 +28,6 @@ export default defineConfig([
 		outDir: "dist",
 		external: [
 			"@modelcontextprotocol/sdk",
-			"@modelcontextprotocol/ext-apps",
 			"zod",
 			"react",
 		],
@@ -48,7 +47,6 @@ export default defineConfig([
 		external: [
 			"react",
 			"@modelcontextprotocol/sdk",
-			"@modelcontextprotocol/ext-apps",
 		],
 		banner: {
 			js: '"use client";',
@@ -73,7 +71,6 @@ export default defineConfig([
 			"skybridge",
 			"skybridge/web",
 			"@modelcontextprotocol/sdk",
-			"@modelcontextprotocol/ext-apps",
 		],
 		banner: {
 			js: '"use client";',
@@ -96,87 +93,10 @@ export default defineConfig([
 			"react-dom",
 			"@ai-sdk/react",
 			"ai",
-			"@modelcontextprotocol/ext-apps",
-			/^@modelcontextprotocol\/ext-apps\//,
 		],
 		banner: {
 			js: '"use client";',
 		},
-	},
-	// Chat server-side handler (Node.js)
-	{
-		entry: { "chat/server/index": "src/chat/server/index.ts" },
-		format: ["esm"],
-		target: "node20",
-		dts: true,
-		clean: false,
-		shims: true,
-		splitting: true,
-		sourcemap: true,
-		minify: true,
-		outDir: "dist",
-		external: [
-			"ai",
-			"@ai-sdk/mcp",
-			"@modelcontextprotocol/sdk",
-		],
-	},
-	// Next.js adapter (legacy — source moved to src/legacy/chat/next-js,
-	// re-published at @waniwani/sdk/next-js for back-compat)
-	{
-		entry: { "chat/next-js/index": "src/legacy/chat/next-js/index.ts" },
-		format: ["esm"],
-		target: "node20",
-		dts: true,
-		clean: false,
-		shims: true,
-		splitting: true,
-		sourcemap: true,
-		minify: true,
-		outDir: "dist",
-		external: [
-			"ai",
-			"@ai-sdk/mcp",
-			"@modelcontextprotocol/sdk",
-		],
-	},
-	// Express adapter (legacy — source moved to src/legacy/chat/express-js,
-	// re-published at @waniwani/sdk/express-js for back-compat)
-	{
-		entry: { "chat/express-js/index": "src/legacy/chat/express-js/index.ts" },
-		format: ["esm"],
-		target: "node20",
-		dts: true,
-		clean: false,
-		shims: true,
-		splitting: true,
-		sourcemap: true,
-		minify: true,
-		outDir: "dist",
-		external: [
-			"ai",
-			"@ai-sdk/mcp",
-			"@modelcontextprotocol/sdk",
-		],
-	},
-	// Legacy server-side MCP primitives (createTool, createResource, registerTools)
-	{
-		entry: { "legacy/index": "src/legacy/index.ts" },
-		format: ["esm"],
-		target: "node20",
-		dts: true,
-		clean: false,
-		shims: true,
-		splitting: true,
-		sourcemap: true,
-		minify: true,
-		outDir: "dist",
-		external: [
-			"@modelcontextprotocol/sdk",
-			"@modelcontextprotocol/ext-apps",
-			"zod",
-			"react",
-		],
 	},
 	// Internal SDK surface (mounted at @waniwani/sdk/internal — not public).
 	// Used by the Waniwani platform (app.waniwani.ai). Not for third parties.
@@ -192,63 +112,6 @@ export default defineConfig([
 		minify: true,
 		outDir: "dist",
 		external: ["ai", "zod"],
-	},
-	// Legacy MCP React hooks (WidgetProvider, useWidgetClient, etc.)
-	{
-		entry: { "legacy/mcp/react": "src/legacy/mcp/react/index.ts" },
-		format: ["esm"],
-		target: "es2022",
-		dts: true,
-		clean: false,
-		shims: false,
-		splitting: true,
-		sourcemap: true,
-		minify: true,
-		outDir: "dist",
-		external: [
-			"react",
-			"@modelcontextprotocol/sdk",
-			"@modelcontextprotocol/ext-apps",
-		],
-		banner: {
-			js: '"use client";',
-		},
-	},
-	// Legacy Next.js adapter (mounted at @waniwani/sdk/legacy/next-js)
-	{
-		entry: { "legacy/chat/next-js/index": "src/legacy/chat/next-js/index.ts" },
-		format: ["esm"],
-		target: "node20",
-		dts: true,
-		clean: false,
-		shims: true,
-		splitting: true,
-		sourcemap: true,
-		minify: true,
-		outDir: "dist",
-		external: [
-			"ai",
-			"@ai-sdk/mcp",
-			"@modelcontextprotocol/sdk",
-		],
-	},
-	// Legacy Express adapter (mounted at @waniwani/sdk/legacy/express-js)
-	{
-		entry: { "legacy/chat/express-js/index": "src/legacy/chat/express-js/index.ts" },
-		format: ["esm"],
-		target: "node20",
-		dts: true,
-		clean: false,
-		shims: true,
-		splitting: true,
-		sourcemap: true,
-		minify: true,
-		outDir: "dist",
-		external: [
-			"ai",
-			"@ai-sdk/mcp",
-			"@modelcontextprotocol/sdk",
-		],
 	},
 	// Knowledge Base (Node.js, server-side)
 	{

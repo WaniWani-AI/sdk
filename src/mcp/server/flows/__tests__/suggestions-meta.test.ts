@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import type { RegisteredTool } from "../../../../legacy/mcp/tools/types";
 import { SUGGESTIONS_META_KEY } from "../../utils";
-import type { FlowTokenContent, McpServer, RegisteredFlow } from "../@types";
+import type {
+	FlowTokenContent,
+	McpServer,
+	RegisteredFlow,
+	RegisteredTool,
+} from "../@types";
 import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
 

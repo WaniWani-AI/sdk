@@ -29,23 +29,8 @@
       "import": "./dist/chat/index.js",
       "default": "./dist/chat/index.js"
     },
-    "./chat/server": {
-      "types": "./dist/chat/server/index.d.ts",
-      "import": "./dist/chat/server/index.js",
-      "default": "./dist/chat/server/index.js"
-    },
     "./chat/styles.css": "./dist/chat/styles.css",
     "./chat/embed.js": "./dist/chat/embed.js",
-    "./next-js": {
-      "types": "./dist/chat/next-js/index.d.ts",
-      "import": "./dist/chat/next-js/index.js",
-      "default": "./dist/chat/next-js/index.js"
-    },
-    "./express-js": {
-      "types": "./dist/chat/express-js/index.d.ts",
-      "import": "./dist/chat/express-js/index.js",
-      "default": "./dist/chat/express-js/index.js"
-    },
     "./kb": {
       "types": "./dist/kb/index.d.ts",
       "import": "./dist/kb/index.js",
@@ -55,26 +40,6 @@
       "types": "./dist/internal/index.d.ts",
       "import": "./dist/internal/index.js",
       "default": "./dist/internal/index.js"
-    },
-    "./legacy": {
-      "types": "./dist/legacy/index.d.ts",
-      "import": "./dist/legacy/index.js",
-      "default": "./dist/legacy/index.js"
-    },
-    "./legacy/react": {
-      "types": "./dist/legacy/mcp/react.d.ts",
-      "import": "./dist/legacy/mcp/react.js",
-      "default": "./dist/legacy/mcp/react.js"
-    },
-    "./legacy/next-js": {
-      "types": "./dist/legacy/chat/next-js/index.d.ts",
-      "import": "./dist/legacy/chat/next-js/index.js",
-      "default": "./dist/legacy/chat/next-js/index.js"
-    },
-    "./legacy/express-js": {
-      "types": "./dist/legacy/chat/express-js/index.d.ts",
-      "import": "./dist/legacy/chat/express-js/index.js",
-      "default": "./dist/legacy/chat/express-js/index.js"
     }
   },
   "files": [
@@ -102,7 +67,6 @@
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@modelcontextprotocol/ext-apps": "^1.7.4",
     "react": ">=18.0.0",
     "zod": ">=4.0.0",
     "@ai-sdk/react": ">=1.0.0",
@@ -115,9 +79,6 @@
       "optional": true
     },
     "@modelcontextprotocol/sdk": {
-      "optional": true
-    },
-    "@modelcontextprotocol/ext-apps": {
       "optional": true
     },
     "zod": {
@@ -140,7 +101,6 @@
     "@ai-sdk/mcp": "^1.0.0",
     "@ai-sdk/react": "^3.0.134",
     "@biomejs/biome": "^2.3.13",
-    "@modelcontextprotocol/ext-apps": "^1.7.4",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@storybook/react-vite": "^10.4.6",
     "@streamdown/cjk": "^1.0.1",

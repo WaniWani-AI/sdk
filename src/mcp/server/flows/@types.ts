@@ -7,7 +7,6 @@ import type {
 	ToolAnnotations,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
-import type { RegisteredTool } from "../../../legacy/mcp/tools/types";
 import type { ScopedWaniWaniClient } from "../scoped-client";
 import type { McpServer } from "../types";
 import type { FieldSchemaInfo } from "./field-schema";
@@ -17,6 +16,21 @@ import type { FlowOutputSchema } from "./output-schema";
 export type { FieldSchemaInfo };
 
 export type { McpServer };
+
+/**
+ * A tool object `showWidget` can render, as opposed to a bare tool name.
+ *
+ * Structural on purpose: anything carrying these four members satisfies it,
+ * so a server that registers its tools by hand keeps working without
+ * importing a factory from this package.
+ */
+export type RegisteredTool = {
+	id: string;
+	title: string;
+	description: string;
+	/** Register the tool on the server */
+	register: (server: McpServer) => Promise<void>;
+};
 
 // ============================================================================
 // Sentinel constants
