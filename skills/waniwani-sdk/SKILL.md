@@ -89,7 +89,7 @@ fallback.
 
 ## Removed surfaces
 
-Removed. An import error for any of these means the code predates the removal:
+Removed in 0.20.0. An import error for any of these means the code is on a pre-0.20 pattern:
 `createTool`, `createResource`, `registerTools`, `toNextJsHandler`, `toExpressJsHandler`,
 `createApiHandler`, `ChatCard`, every MCP-widget React hook except `useWaniwani` (`WidgetProvider`,
 `useWidgetClient`, `useToolOutput`, and the rest), `InitializeNextJsInIframe`, `LoadingWidget`,
@@ -100,7 +100,8 @@ The `@waniwani/sdk/legacy`, `@waniwani/sdk/legacy/react`, `@waniwani/sdk/legacy/
 `@waniwani/sdk/express-js` entry points no longer exist.
 
 Use `createFlow` for multi-step tools, `server.registerTool` for single-shot ones, and
-`WaniwaniChat` for chat.
+`WaniwaniChat` for chat. `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.19-to-0.20`
+applies the whole migration.
 
 `@waniwani/sdk/evals` was removed entirely. See the
 [changelog](https://docs.waniwani.ai/sdk/changelog).
@@ -122,7 +123,7 @@ Every version hop also ships a self-contained migration skill you can invoke dir
 `migrate-waniwani-sdk-<from>-to-<to>`. For the latest release:
 
 ```bash
-npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.18-to-0.19
+npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.19-to-0.20
 ```
 
 ## Guided playbooks

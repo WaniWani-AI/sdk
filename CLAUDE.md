@@ -4,7 +4,7 @@ SDK for [app.waniwani.ai](https://app.waniwani.ai) — open-source flow engine p
 
 ## Public API tiers
 
-The SDK ships two public tiers plus a private one. The legacy tier is gone: no `src/legacy/`, no re-exports, no entry point serving it.
+The SDK ships two public tiers plus a private one. The legacy tier was removed in 0.20.0: no `src/legacy/`, no re-exports, no entry point serving it.
 
 ### OSS (no API key required)
 
