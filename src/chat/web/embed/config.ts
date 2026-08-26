@@ -180,29 +180,36 @@ export interface EmbedConfig {
 	 * - `"floating"` renders a launcher pill anchored to a corner that opens
 	 *   the chat in a panel — a fixed-size panel on desktop, full-screen on
 	 *   mobile. No `[data-waniwani-embed]` element is needed.
+	 * - `"composer"` mounts just the input (plus the channel's suggestion
+	 *   pills) into `[data-waniwani-embed]`, sized by your own CSS — a hero
+	 *   search box, a card in a help page. Sending the first message opens the
+	 *   same panel `"floating"` uses, over the page.
 	 *
 	 * Surfaced as `data-mode` on the embed script tag.
 	 */
-	mode?: "inline" | "floating";
+	mode?: "inline" | "floating" | "composer";
 	/**
 	 * Default height for the inline embed container. Any CSS length
 	 * (`"500px"`, `"80vh"`, …) or a bare number (treated as `px`). Applied to
 	 * the `[data-waniwani-embed]` container unless you size it yourself in
-	 * CSS. Defaults to `500px`. Ignored in `floating` mode. Surfaced as
-	 * `data-height`.
+	 * CSS. Defaults to `500px`. Ignored in `floating` and `composer` mode,
+	 * where the surface is sized by its content. Surfaced as `data-height`.
 	 */
 	height?: string;
 	/**
-	 * Text shown on the floating launcher pill (e.g. `"Ask anything…"`).
-	 * Only applies when `mode` is `"floating"`. Defaults to a localized
-	 * prompt. Surfaced as `data-launcher-text`.
+	 * Text shown on the chat's entry input (e.g. `"Ask anything…"`) — the
+	 * floating dock's bar, or the in-flow box in `composer` mode. Overrides
+	 * `placeholder` there, leaving the in-panel input's own placeholder alone.
+	 * Only applies when `mode` is `"floating"` or `"composer"`. Defaults to a
+	 * localized prompt. Surfaced as `data-launcher-text`.
 	 */
 	launcherText?: string;
 	/**
 	 * Delay in milliseconds before the floating dock animates into view after
 	 * the page renders. Letting the page settle first keeps the bar from
 	 * competing with the host's initial content. Defaults to `2000`. `0` shows
-	 * it immediately. Only applies when `mode` is `"floating"`. Surfaced as
+	 * it immediately. Only applies when `mode` is `"floating"` — a `composer`
+	 * surface is page content and renders with the page. Surfaced as
 	 * `data-appear-delay`.
 	 */
 	appearDelay?: number;
@@ -216,11 +223,11 @@ export interface EmbedConfig {
 	 */
 	disablePageView?: boolean;
 	/**
-	 * Per-URL show/hide rules for the floating bar. Comes from the remote
-	 * `/config` response (not author-set). When set, the floating dock only
-	 * renders on paths the rules resolve to `"show"`. Unset/`null` means show
-	 * on every page (default behavior). Only applies when `mode` is
-	 * `"floating"`.
+	 * Per-URL show/hide rules for the widget. Comes from the remote `/config`
+	 * response (not author-set). When set, the surface only renders on paths
+	 * the rules resolve to `"show"`; in `inline` and `composer` mode the
+	 * `[data-waniwani-embed]` container collapses too, so a gated page shows no
+	 * empty box. Unset/`null` means show on every page (default behavior).
 	 */
 	visibility?: VisibilityRules;
 	/**
@@ -410,7 +417,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	}
 
 	const modeRaw = str("data-mode");
-	if (modeRaw === "inline" || modeRaw === "floating") {
+	if (
+		modeRaw === "inline" ||
+		modeRaw === "floating" ||
+		modeRaw === "composer"
+	) {
 		config.mode = modeRaw;
 	}
 

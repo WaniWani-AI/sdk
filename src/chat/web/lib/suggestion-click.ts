@@ -9,6 +9,7 @@
 // render time.
 // ============================================================================
 
+import type { WidgetMode } from "../embed/widget-events";
 import { eventsEndpoint } from "./page-view";
 import type { Suggestion, SuggestionOrigin } from "./resolve-suggestions";
 import { getOrCreateVisitorId } from "./visitor-context";
@@ -21,7 +22,7 @@ export interface FireSuggestionClickOptions {
 	/** Agent channel ID, when known. */
 	channelId?: string;
 	/** Embed surface the click happened on. */
-	mode?: "inline" | "floating";
+	mode?: WidgetMode;
 	/**
 	 * Channel-specific event source from the resolved `/config`, same tag
 	 * `page.viewed` carries. Omitted from the event entirely when absent — the
@@ -170,7 +171,7 @@ export interface FireSuggestionShownOptions {
 	api: string;
 	token: string;
 	channelId?: string;
-	mode?: "inline" | "floating";
+	mode?: WidgetMode;
 	source?: string;
 	sessionId?: string;
 	prompts: Suggestion[];

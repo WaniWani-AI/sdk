@@ -15,7 +15,7 @@
 import type { SuggestionOrigin } from "../lib/resolve-suggestions";
 
 /** Surface the widget is mounted on. */
-export type WidgetMode = "inline" | "floating";
+export type WidgetMode = "inline" | "floating" | "composer";
 
 interface WidgetEventBase {
 	/** Surface the widget is mounted on. */

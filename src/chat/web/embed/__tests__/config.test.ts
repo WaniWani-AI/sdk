@@ -208,6 +208,14 @@ describe("parseConfigFromScript — render mode attrs", () => {
 		expect(cfg.mode).toBe("floating");
 	});
 
+	test("data-mode=composer parses", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-mode": "composer",
+		});
+		expect(cfg.mode).toBe("composer");
+	});
+
 	test("invalid data-mode is ignored", async () => {
 		const cfg = await parseWithAttrs({
 			"data-token": "tok",
