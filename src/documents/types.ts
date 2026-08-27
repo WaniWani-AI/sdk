@@ -18,6 +18,8 @@ export interface DocumentExtractInput<T> {
 	filename: string;
 	/** The shape to return. Extraction runs in strict mode, so mark anything a document may not answer `.nullable()`. */
 	schema: ZodType<T>;
+	/** Zero-based page indexes to read: `[0]` is the first page. Omit to read every page. Ignored for images. Billing is per page processed, so a narrower selection costs less. */
+	pages?: number[];
 	/** Conversation this document arrived in */
 	sessionId?: string;
 	/** Ties the extraction to one tool call */

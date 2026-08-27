@@ -43,6 +43,7 @@ export function createDocumentsClient(
 						url: input.url,
 						filename: input.filename,
 						schema: toJSONSchema(input.schema),
+						pages: input.pages,
 						sessionId: input.sessionId,
 						correlationId: input.correlationId,
 					}),
