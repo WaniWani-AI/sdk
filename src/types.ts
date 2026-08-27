@@ -1,5 +1,6 @@
 // Waniwani SDK - Core Types
 
+import type { DocumentsClient } from "./documents/types.js";
 import type { KbClient } from "./kb/types.js";
 import type { TrackingClient, TrackingConfig } from "./tracking/@types.js";
 
@@ -50,11 +51,15 @@ export interface WaniWaniClient extends TrackingClient {
 	readonly _config: InternalConfig;
 	/** Knowledge base client for ingestion, search, and source listing */
 	readonly kb: KbClient;
+	/** Documents client for reading a file into typed fields */
+	readonly documents: DocumentsClient;
 }
 
 // ============================================================================
 // Internal
 // ============================================================================
+
+export const DEFAULT_API_URL = "https://app.waniwani.ai";
 
 export interface InternalConfig {
 	apiUrl: string;

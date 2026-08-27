@@ -57,6 +57,20 @@ const CORRELATION_ID_KEYS = ["correlationId", "openai/requestId"] as const;
 
 const TURN_COUNT_KEYS = ["waniwani/turnCount"] as const;
 
+const FILE_PARAMS_KEYS = ["waniwani/fileParams", "openai/fileParams"] as const;
+
+const FILE_URL_KEYS = [
+	"url",
+	"download_url",
+	"downloadUrl",
+	"file_url",
+	"fileUrl",
+	"signed_url",
+	"signedUrl",
+] as const;
+
+const FILE_NAME_KEYS = ["filename", "file_name", "fileName", "name"] as const;
+
 /** Meta key for flow execution path (nodesVisited, flowId). */
 export const FLOW_META_KEY = "waniwani/flow" as const;
 
@@ -130,6 +144,97 @@ export function extractTurnCount(
 		}
 	}
 	return undefined;
+}
+
+/** A file the host bound to this tool call, resolved to something fetchable. */
+export interface AttachedFile {
+	url: string;
+	filename: string;
+}
+
+function isRecordValue(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function fetchableUrl(value: unknown): string | undefined {
+	if (typeof value !== "string" || value.length === 0) {
+		return undefined;
+	}
+	try {
+		const url = new URL(value);
+		return url.protocol === "https:" || url.protocol === "http:"
+			? value
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function filenameFromUrl(url: string): string {
+	try {
+		const segments = new URL(url).pathname.split("/").filter(Boolean);
+		const last = segments[segments.length - 1];
+		return last ? decodeURIComponent(last) : "document";
+	} catch {
+		return "document";
+	}
+}
+
+function toAttachedFile(entry: unknown): AttachedFile | undefined {
+	if (!isRecordValue(entry)) {
+		return undefined;
+	}
+
+	const url = fetchableUrl(pickFirst(entry, FILE_URL_KEYS));
+	if (!url) {
+		return undefined;
+	}
+
+	const filename = pickFirst(entry, FILE_NAME_KEYS);
+	return { url, filename: filename ?? filenameFromUrl(url) };
+}
+
+/**
+ * Files the host attached to this tool call, from `openai/fileParams` (ChatGPT)
+ * or `waniwani/fileParams`. The container may be a list or an object keyed by
+ * parameter name, and entries name their URL differently per host, so every
+ * plausible spelling is read and anything without a fetchable URL is skipped.
+ */
+export function extractAttachedFiles(
+	meta: Record<string, unknown> | undefined,
+): AttachedFile[] {
+	if (!meta) {
+		return [];
+	}
+
+	const files: AttachedFile[] = [];
+	const seen = new Set<string>();
+
+	const collect = (candidate: unknown): void => {
+		if (Array.isArray(candidate)) {
+			for (const entry of candidate) {
+				collect(entry);
+			}
+			return;
+		}
+		const file = toAttachedFile(candidate);
+		if (file && !seen.has(file.url)) {
+			seen.add(file.url);
+			files.push(file);
+			return;
+		}
+		if (!file && isRecordValue(candidate)) {
+			for (const entry of Object.values(candidate)) {
+				collect(entry);
+			}
+		}
+	};
+
+	for (const key of FILE_PARAMS_KEYS) {
+		collect(meta[key]);
+	}
+
+	return files;
 }
 
 const SOURCE_SESSION_KEYS = [
