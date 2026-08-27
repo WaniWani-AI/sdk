@@ -1,4 +1,3 @@
-import { toJSONSchema } from "zod";
 import { WaniWaniError } from "../error.js";
 import type { InternalConfig } from "../types.js";
 import type {
@@ -17,6 +16,22 @@ interface ExtractWireResponse {
 	documentId: string;
 }
 
+/** The platform names what it refused in the envelope's `message`; the raw body is the fallback. */
+function refusalMessage(body: string, status: number): string {
+	try {
+		const parsed: unknown = JSON.parse(body);
+		if (parsed !== null && typeof parsed === "object" && "message" in parsed) {
+			const { message } = parsed;
+			if (typeof message === "string" && message.length > 0) {
+				return message;
+			}
+		}
+	} catch {
+		// A non-JSON body is surfaced as-is below.
+	}
+	return body || `Documents API error: HTTP ${status}`;
+}
+
 export function createDocumentsClient(
 	config: Pick<InternalConfig, "apiUrl" | "apiKey">,
 ): DocumentsClient {
@@ -29,6 +44,11 @@ export function createDocumentsClient(
 			if (!apiKey) {
 				throw new Error("WANIWANI_API_KEY is not set");
 			}
+
+			// zod is an optional peer dependency and this module is reachable from the
+			// package root, so a top-level import would break every consumer that only
+			// uses tracking.
+			const { toJSONSchema } = await import("zod");
 
 			const response = await fetch(
 				`${apiUrl.replace(/\/$/, "")}${EXTRACT_PATH}`,
@@ -53,7 +73,7 @@ export function createDocumentsClient(
 			if (!response.ok) {
 				const text = await response.text().catch(() => "");
 				throw new WaniWaniError(
-					text || `Documents API error: HTTP ${response.status}`,
+					refusalMessage(text, response.status),
 					response.status,
 				);
 			}
@@ -64,7 +84,7 @@ export function createDocumentsClient(
 			return {
 				fields: input.schema.parse(fields),
 				pageCount,
-				pageConfidence,
+				pageConfidence: pageConfidence ?? null,
 				documentId,
 			};
 		},

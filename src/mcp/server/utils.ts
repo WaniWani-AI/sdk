@@ -61,6 +61,7 @@ const FILE_PARAMS_KEYS = ["waniwani/fileParams", "openai/fileParams"] as const;
 
 const FILE_URL_KEYS = [
 	"url",
+	"uri",
 	"download_url",
 	"downloadUrl",
 	"file_url",
@@ -195,10 +196,11 @@ function toAttachedFile(entry: unknown): AttachedFile | undefined {
 }
 
 /**
- * Files the host attached to this tool call, from `openai/fileParams` (ChatGPT)
- * or `waniwani/fileParams`. The container may be a list or an object keyed by
- * parameter name, and entries name their URL differently per host, so every
- * plausible spelling is read and anything without a fetchable URL is skipped.
+ * Files the host attached to this tool call, from the first of
+ * `waniwani/fileParams` or `openai/fileParams` (ChatGPT) that carries any. The
+ * container may be a list or an object keyed by parameter name, and entries name
+ * their URL differently per host, so every plausible spelling is read and
+ * anything without a fetchable URL is skipped.
  */
 export function extractAttachedFiles(
 	meta: Record<string, unknown> | undefined,
@@ -207,33 +209,43 @@ export function extractAttachedFiles(
 		return [];
 	}
 
+	for (const key of FILE_PARAMS_KEYS) {
+		const files = filesUnder(meta[key]);
+		if (files.length > 0) {
+			return files;
+		}
+	}
+
+	return [];
+}
+
+function filesUnder(candidate: unknown): AttachedFile[] {
 	const files: AttachedFile[] = [];
 	const seen = new Set<string>();
 
-	const collect = (candidate: unknown): void => {
-		if (Array.isArray(candidate)) {
-			for (const entry of candidate) {
+	const collect = (value: unknown): void => {
+		if (Array.isArray(value)) {
+			for (const entry of value) {
 				collect(entry);
 			}
 			return;
 		}
-		const file = toAttachedFile(candidate);
-		if (file && !seen.has(file.url)) {
-			seen.add(file.url);
-			files.push(file);
+		const file = toAttachedFile(value);
+		if (file) {
+			if (!seen.has(file.url)) {
+				seen.add(file.url);
+				files.push(file);
+			}
 			return;
 		}
-		if (!file && isRecordValue(candidate)) {
-			for (const entry of Object.values(candidate)) {
+		if (isRecordValue(value)) {
+			for (const entry of Object.values(value)) {
 				collect(entry);
 			}
 		}
 	};
 
-	for (const key of FILE_PARAMS_KEYS) {
-		collect(meta[key]);
-	}
-
+	collect(candidate);
 	return files;
 }
 

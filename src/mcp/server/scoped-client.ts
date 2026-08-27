@@ -110,7 +110,7 @@ export function createScopedClient(
 	const sessionId = extractSessionId(meta);
 	const correlationId = extractCorrelationId(meta);
 	const documents = createDocumentsClient({
-		apiUrl: config?.apiUrl ?? DEFAULT_API_URL,
+		apiUrl: config?.apiUrl ?? process.env.WANIWANI_API_URL ?? DEFAULT_API_URL,
 		apiKey: config?.apiKey,
 	});
 
