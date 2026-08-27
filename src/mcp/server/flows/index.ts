@@ -4,6 +4,8 @@ export type {
 	AddNodeConfig,
 	ConditionFn,
 	FlowConfig,
+	FlowIntro,
+	FlowIntroPayload,
 	InferFlowState,
 	InterruptSignal,
 	NodeContext,

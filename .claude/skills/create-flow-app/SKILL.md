@@ -37,6 +37,42 @@ export const myFlow = createFlow({
 await myFlow.register(server);
 ```
 
+## Opening message (intro)
+
+If the flow should introduce the assistant or state a data/GDPR notice, put it on the config as
+`intro` — never as a first node. Pre-filled state skips opening nodes, so a greeting node is the
+one node most likely never to run.
+
+```ts
+createFlow({
+  id: "my_flow",
+  title: "My Flow",
+  description: "Use when the user wants to X.",
+  intro: {
+    verbatim: "Acme is the data controller. Your answers are deleted after 30 days.",
+    instructions: "Introduce yourself as Léa from Acme in one short sentence first.",
+  },
+  state: { /* … */ },
+})
+```
+
+`verbatim` is reproduced word for word, `instructions` is guidance the model writes from, and either
+alone is fine (a bare string means `verbatim`).
+
+The intro is not a node. It is seeded into the session's **internal state** at `start` and attached
+to the first non-error response, whichever node the flow lands on, then taken off so it is never
+repeated. Internal state is the engine's own state for a session, stored under `internal` on
+`FlowTokenContent` and kept strictly apart from the flow's `state`: nothing in it is declared by the
+author, reaches a node, or can be written through `stateUpdates`. Everything about it lives in
+`internal-state.ts`:
+
+- Add a field to `FlowInternalState` plus its entry in the `SEEDS` map, and a fresh session starts
+  with it. Seeds run at compile time, so a malformed config fails at startup.
+- Read it where you need it as `internal.<field>`, and use `takeInternalField(internal, "<field>")`
+  when a field is meant to be used once (present = still pending, absent = done).
+- Fields the running version does not recognize are carried through untouched, so a record written
+  by a newer engine survives a call served by an older one.
+
 ## State store decision
 
 Three options at `.compile()` time:
@@ -69,6 +105,7 @@ Never import `interrupt` or `showWidget` directly.
 - **Forgetting `START` / `END` edges**: every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`.
 - **Missing `.describe()` on state fields**: the model reads these descriptions to know what to ask and what it can pre-fill. Skipping them degrades the flow significantly.
 - **Calling `.compile()` with no store and no API key**: throws immediately with a clear migration message. Pick one.
+- **A greeting or disclaimer node**: use the `intro` config option instead, or pre-filled state will skip it.
 - **State is always `Partial<TState>`**: at any node, only fields filled by earlier nodes are populated. Guard with `if (!state.x) return {};`.
 
 ## Don't suggest

@@ -27,6 +27,23 @@ const flowFieldSchema = z
 		"JIT schema fragment for a state field — type, allowed values, and description.",
 	);
 
+const flowIntroSchema = z
+	.object({
+		verbatim: z
+			.string()
+			.optional()
+			.describe(
+				"Text to reproduce word for word, before anything else in the reply.",
+			),
+		instructions: z
+			.string()
+			.optional()
+			.describe("How to write the introduction in your own words."),
+	})
+	.describe(
+		"Opening message for the session's first flow response. Delivered once per conversation.",
+	);
+
 const flowQuestionSchema = z
 	.object({
 		question: z.string(),
@@ -38,6 +55,11 @@ const flowQuestionSchema = z
 	.describe("One question within a multi-question interrupt.");
 
 export const flowOutputSchema = {
+	intro: flowIntroSchema
+		.optional()
+		.describe(
+			"Present only on the session's first flow response. Deliver it at the very start of your next message, then never again.",
+		),
 	status: z
 		.enum(["interrupt", "widget", "complete", "error"])
 		.describe(

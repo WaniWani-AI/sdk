@@ -9,6 +9,8 @@ export type {
 	AddNodeConfig,
 	ConditionFn,
 	FlowConfig,
+	FlowIntro,
+	FlowIntroPayload,
 	FlowTestResult,
 	InferFlowState,
 	InterruptSignal,

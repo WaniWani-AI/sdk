@@ -32,6 +32,7 @@ it is the complete page index, always current, and cheap to read.
 | Install the package, pick an entry point | [/sdk/configuration/installation](https://docs.waniwani.ai/sdk/configuration/installation), [/sdk/reference/entry-points](https://docs.waniwani.ai/sdk/reference/entry-points) |
 | Get a free API key | [/sdk/configuration/api-key](https://docs.waniwani.ai/sdk/configuration/api-key) |
 | Learn the flow engine | [/sdk/flows/overview](https://docs.waniwani.ai/sdk/flows/overview), then [architecture](https://docs.waniwani.ai/sdk/flows/architecture), [state](https://docs.waniwani.ai/sdk/flows/state), [nodes](https://docs.waniwani.ai/sdk/flows/nodes), [edges](https://docs.waniwani.ai/sdk/flows/edges), [interrupts](https://docs.waniwani.ai/sdk/flows/interrupts), [register](https://docs.waniwani.ai/sdk/flows/register) |
+| Open a flow with an introduction or a GDPR notice | [/sdk/flows/intro](https://docs.waniwani.ai/sdk/flows/intro) |
 | Plug in Redis / Upstash / Cloudflare KV / DynamoDB | [/sdk/flows/kv-store](https://docs.waniwani.ai/sdk/flows/kv-store), [/sdk/reference/kv-store-api](https://docs.waniwani.ai/sdk/reference/kv-store-api) |
 | Build a specific funnel | [/sdk/guides/funnels](https://docs.waniwani.ai/sdk/guides/funnels), then [sales-funnel](https://docs.waniwani.ai/sdk/guides/sales-funnel), [lead-generation](https://docs.waniwani.ai/sdk/guides/lead-generation), [booking](https://docs.waniwani.ai/sdk/guides/booking), [insurance-quote](https://docs.waniwani.ai/sdk/guides/insurance-quote) |
 | See a full worked example | [/sdk/guides/pet-insurance](https://docs.waniwani.ai/sdk/guides/pet-insurance) |
@@ -153,6 +154,9 @@ npx skills add Waniwani-AI/sdk -s audit-tracking        # read-only audit of an 
   `@waniwani/sdk/mcp/react`, the chat widget from `@waniwani/sdk/chat`.
 - **Forgetting `START` / `END` edges**: every flow needs `addEdge(START, firstNode)` and
   `addEdge(lastNode, END)`.
+- **Adding a first node just to greet the user or state a GDPR notice**: pre-filled state skips
+  opening nodes, so that message never lands. Use `intro` on the flow config instead
+  ([/sdk/flows/intro](https://docs.waniwani.ai/sdk/flows/intro)).
 - **Calling `interrupt` / `showWidget` directly**: they come from the handler context,
   `({ interrupt }) => interrupt(...)`.
 - **Answering from memory**: if you have not fetched the docs page for what you are writing, fetch it.

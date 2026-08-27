@@ -71,5 +71,20 @@ export function buildFlowProtocol(config: FlowConfig): string {
 		'   in every subsequent "continue" and "reset" call for this flow.',
 	);
 
+	if (config.intro) {
+		lines.push(
+			"7. OPENING MESSAGE: if the response contains an `intro` object, deliver it at the very",
+			"   start of your next message to the user — before the question, before calling a widget",
+			"   tool, before presenting the result.",
+			"   - `intro.verbatim` (when present) MUST be reproduced word for word, exactly as written.",
+			"     Do NOT paraphrase, translate, shorten, expand, reformat, or fold it into another sentence.",
+			"   - `intro.instructions` (when present) tells you how to write the introduction in your own words.",
+			"   - When both are present, follow `instructions` for the prose around the notice and leave the",
+			"     `verbatim` text untouched.",
+			"   `intro` appears at most once per conversation. Later responses omit it, and you must not",
+			"   repeat it or reuse it from earlier in the conversation.",
+		);
+	}
+
 	return lines.join("\n");
 }
