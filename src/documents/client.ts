@@ -3,11 +3,17 @@ import type { InternalConfig } from "../types.js";
 import type {
 	DocumentExtractInput,
 	DocumentExtractResult,
+	DocumentSchema,
 	DocumentsClient,
 } from "./types.js";
 
 const SDK_NAME = "@waniwani/sdk";
 const EXTRACT_PATH = "/api/mcp/modules/documents/extract";
+
+/** Method syntax makes the parameter bivariant, so a structural schema is accepted without an assertion. */
+interface ZodModule {
+	toJSONSchema(schema: DocumentSchema<unknown>): Record<string, unknown>;
+}
 
 interface ExtractWireResponse {
 	fields: unknown;
@@ -65,7 +71,7 @@ export function createDocumentsClient(
 			// zod is an optional peer dependency and this module is reachable from the
 			// package root, so a top-level import would break every consumer that only
 			// uses tracking.
-			const { toJSONSchema } = await import("zod");
+			const { toJSONSchema }: ZodModule = await import("zod");
 
 			const response = await fetch(
 				`${apiUrl.replace(/\/$/, "")}${EXTRACT_PATH}`,
