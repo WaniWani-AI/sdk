@@ -5,6 +5,8 @@ export const es: Messages = {
 		placeholder: "¿Qué te gustaría saber?",
 		uploadFiles: "Subir archivos",
 		uploadFilesUpTo: "Subir un documento, hasta {limit}",
+		uploadFilesUpToWithPages:
+			"Subir un documento, hasta {limit} y {pages} páginas",
 		stop: "Detener",
 		submit: "Enviar",
 		removeAttachments: "Eliminar todos los archivos adjuntos",

@@ -668,6 +668,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 									multiple={attachmentsEnabled}
 									accept={acceptedTypes}
 									maxFileSize={documentUpload?.maxBytes}
+									maxPdfPages={documentUpload?.maxPdfPages}
 									maxFiles={documentUpload?.maxFiles}
 									upload={uploadEnabled ? documentUploader : undefined}
 									onDiscard={uploadEnabled ? discardUploaded : undefined}

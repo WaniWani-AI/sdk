@@ -8,6 +8,7 @@ export interface Messages {
 		placeholder: string;
 		uploadFiles: string;
 		uploadFilesUpTo: string;
+		uploadFilesUpToWithPages: string;
 		stop: string;
 		submit: string;
 		removeAttachments: string;
@@ -90,6 +91,8 @@ export const en: Messages = {
 		placeholder: "What would you like to know?",
 		uploadFiles: "Upload files",
 		uploadFilesUpTo: "Upload a document, up to {limit}",
+		uploadFilesUpToWithPages:
+			"Upload a document, up to {limit} and {pages} pages",
 		stop: "Stop",
 		submit: "Submit",
 		removeAttachments: "Remove all attachments",

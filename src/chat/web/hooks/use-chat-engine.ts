@@ -11,6 +11,7 @@ import type { ChatBaseProps } from "../@types";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
 import { useWidgetEvents } from "../embed/widget-events-context";
 import { buildApiUrl } from "../lib/api-url";
+import { discardDocument } from "../lib/document-upload";
 import { LenientChatTransport } from "../lib/lenient-chat-transport";
 import {
 	deleteThread as deleteThreadFromStore,
@@ -621,12 +622,45 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	const [text, setText] = useState("");
 	const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
+	const queuedMessagesRef = useRef<QueuedMessage[]>([]);
+	queuedMessagesRef.current = queuedMessages;
 
 	const isLoading = status === "submitted" || status === "streaming";
 
-	const removeQueuedMessage = useCallback((id: string) => {
-		setQueuedMessages((prev) => prev.filter((m) => m.id !== id));
-	}, []);
+	/**
+	 * A queued message the visitor never sends takes its uploads with it. The
+	 * send path must not call this: dequeuing to send is not taking it back.
+	 */
+	const dropQueued = useCallback(
+		(dropped: QueuedMessage[]) => {
+			for (const message of dropped) {
+				for (const document of message.documents ?? []) {
+					void discardDocument({
+						documentId: document.documentId,
+						api,
+						headers: headersRef.current ?? {},
+					});
+				}
+			}
+		},
+		[api],
+	);
+
+	const discardAllQueued = useCallback(() => {
+		dropQueued(queuedMessagesRef.current);
+		setQueuedMessages([]);
+	}, [dropQueued]);
+
+	const removeQueuedMessage = useCallback(
+		(id: string) => {
+			const found = queuedMessagesRef.current.find((m) => m.id === id);
+			if (found) {
+				dropQueued([found]);
+			}
+			setQueuedMessages((prev) => prev.filter((m) => m.id !== id));
+		},
+		[dropQueued],
+	);
 
 	const queueFull = isLoading && queuedMessages.length > 0;
 
@@ -722,13 +756,13 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	const reset = useCallback(() => {
 		setMessages([]);
-		setQueuedMessages([]);
+		discardAllQueued();
 		clearSessionId();
 		setText("");
 		toolDefinitionsRef.current = {};
 		setToolDefinitionsRevision((r) => r + 1);
 		void refreshToolDefinitions();
-	}, [setMessages, clearSessionId, refreshToolDefinitions]);
+	}, [setMessages, clearSessionId, refreshToolDefinitions, discardAllQueued]);
 
 	// Build a `StoredThread` from current refs synchronously. Callers that
 	// need to flush before mutating thread state (startNewThread,
@@ -849,7 +883,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		// the outgoing write.
 		void flushPendingPersist();
 		setMessages([]);
-		setQueuedMessages([]);
+		discardAllQueued();
 		clearSessionId();
 		setText("");
 		const nextId = generateThreadId();
@@ -864,6 +898,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		setActiveThreadId,
 		refreshThreads,
 		flushPendingPersist,
+		discardAllQueued,
 	]);
 
 	const switchThread = useCallback(
@@ -893,10 +928,16 @@ export function useChatEngine(props: ChatBaseProps) {
 			threadCreatedAtRef.current = stored.createdAt;
 			threadTitleRef.current = stored.title;
 			setMessages(stored.messages);
-			setQueuedMessages([]);
+			discardAllQueued();
 			setText("");
 		},
-		[setMessages, clearSessionId, setActiveThreadId, flushPendingPersist],
+		[
+			setMessages,
+			clearSessionId,
+			setActiveThreadId,
+			flushPendingPersist,
+			discardAllQueued,
+		],
 	);
 
 	const deleteThread = useCallback(
@@ -920,7 +961,7 @@ export function useChatEngine(props: ChatBaseProps) {
 			await refreshThreads();
 			if (activeThreadIdRef.current === threadId) {
 				setMessages([]);
-				setQueuedMessages([]);
+				discardAllQueued();
 				clearSessionId();
 				setText("");
 				activeThreadIdRef.current = undefined;
@@ -929,7 +970,7 @@ export function useChatEngine(props: ChatBaseProps) {
 				threadTitleRef.current = undefined;
 			}
 		},
-		[setMessages, clearSessionId, refreshThreads],
+		[setMessages, clearSessionId, refreshThreads, discardAllQueued],
 	);
 
 	// Sync controlled `activeThreadId` after mount. The mount effect seeds

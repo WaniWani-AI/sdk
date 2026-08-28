@@ -123,6 +123,8 @@ export interface AttachmentsContext {
 	openFileDialog: () => void;
 	/** The picker cannot filter by size, so the composer states the limit instead. */
 	maxFileSize?: number;
+	/** Only the vendor can count pages, so the composer states this rather than enforcing it. */
+	maxPdfPages?: number;
 }
 
 const LocalAttachmentsContext = createContext<AttachmentsContext | null>(null);
@@ -161,6 +163,7 @@ export type PromptInputProps = Omit<
 	globalDrop?: boolean;
 	maxFiles?: number;
 	maxFileSize?: number;
+	maxPdfPages?: number;
 	/** Gates the picker, the drop target and the paste handler together. */
 	attachmentsEnabled?: boolean;
 	/** When set, an attachment uploads as soon as it is picked and the message carries its id. */
@@ -188,6 +191,7 @@ export const PromptInput = ({
 	globalDrop,
 	maxFiles,
 	maxFileSize,
+	maxPdfPages,
 	attachmentsEnabled = true,
 	upload,
 	onDiscard,
@@ -398,6 +402,17 @@ export const PromptInput = ({
 		commit([]);
 	}, [forget, commit]);
 
+	// Turning the module off mid-session hides the chips but would leave their
+	// items behind, and one failed hidden upload makes every later submit refuse.
+	const wasEnabledRef = useRef(attachmentsEnabled);
+	useEffect(() => {
+		const wasEnabled = wasEnabledRef.current;
+		wasEnabledRef.current = attachmentsEnabled;
+		if (wasEnabled && !attachmentsEnabled) {
+			clear();
+		}
+	}, [attachmentsEnabled, clear]);
+
 	/** Emptying the composer after a send keeps what was sent. */
 	const settle = useCallback(() => {
 		for (const f of filesRef.current) {
@@ -531,8 +546,18 @@ export const PromptInput = ({
 			remove,
 			retry,
 			maxFileSize,
+			maxPdfPages,
 		}),
-		[items, add, remove, retry, clear, openFileDialog, maxFileSize],
+		[
+			items,
+			add,
+			remove,
+			retry,
+			clear,
+			openFileDialog,
+			maxFileSize,
+			maxPdfPages,
+		],
 	);
 
 	return (
@@ -820,10 +845,13 @@ export const PromptInputAddAttachments = ({
 	}
 
 	const label = attachments.maxFileSize
-		? t.promptInput.uploadFilesUpTo.replace(
-				"{limit}",
-				formatBytes(attachments.maxFileSize),
-			)
+		? (attachments.maxPdfPages
+				? t.promptInput.uploadFilesUpToWithPages.replace(
+						"{pages}",
+						String(attachments.maxPdfPages),
+					)
+				: t.promptInput.uploadFilesUpTo
+			).replace("{limit}", formatBytes(attachments.maxFileSize))
 		: t.promptInput.uploadFiles;
 
 	return (
