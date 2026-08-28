@@ -200,7 +200,7 @@ export const PromptInput = ({
 	children,
 	...props
 }: PromptInputProps) => {
-	const { t } = useTranslation();
+	const { t, locale } = useTranslation();
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const formRef = useRef<HTMLFormElement | null>(null);
 	const [items, setItems] = useState<AttachmentItem[]>([]);
@@ -298,7 +298,7 @@ export const PromptInput = ({
 						"max_file_size",
 						t.promptInput.errorTooLarge
 							.replace("{name}", file.name)
-							.replace("{limit}", formatBytes(maxFileSize)),
+							.replace("{limit}", formatBytes(maxFileSize, locale)),
 					);
 					continue;
 				}
@@ -346,7 +346,16 @@ export const PromptInput = ({
 				startUpload(entry.item.id, entry.file);
 			}
 		},
-		[maxFiles, maxFileSize, accept, attachmentsEnabled, startUpload, commit, t],
+		[
+			maxFiles,
+			maxFileSize,
+			accept,
+			attachmentsEnabled,
+			startUpload,
+			commit,
+			t,
+			locale,
+		],
 	);
 
 	const retry = useCallback(
@@ -589,11 +598,15 @@ export const PromptInput = ({
 
 const BYTES_PER_MB = 1024 * 1024;
 
-function formatBytes(bytes: number): string {
-	if (bytes >= BYTES_PER_MB) {
-		return `${Math.round(bytes / BYTES_PER_MB)} MB`;
-	}
-	return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+// The caps are powers of 1024 but are advertised in decimal units everywhere, as
+// every desktop OS does, so the value is divided binary and labelled decimal.
+function formatBytes(bytes: number, locale: string): string {
+	const megabytes = bytes >= BYTES_PER_MB;
+	return new Intl.NumberFormat(locale, {
+		style: "unit",
+		unit: megabytes ? "megabyte" : "kilobyte",
+		maximumFractionDigits: 0,
+	}).format(megabytes ? bytes / BYTES_PER_MB : Math.max(1, bytes / 1024));
 }
 
 // ============================================================================
@@ -821,7 +834,7 @@ export const PromptInputAddAttachments = ({
 	children,
 	...props
 }: PromptInputAddAttachmentsProps) => {
-	const { t } = useTranslation();
+	const { t, locale } = useTranslation();
 	const attachments = usePromptInputAttachments();
 	const hasFiles = attachments.files.length > 0;
 
@@ -851,7 +864,7 @@ export const PromptInputAddAttachments = ({
 						String(attachments.maxPdfPages),
 					)
 				: t.promptInput.uploadFilesUpTo
-			).replace("{limit}", formatBytes(attachments.maxFileSize))
+			).replace("{limit}", formatBytes(attachments.maxFileSize, locale))
 		: t.promptInput.uploadFiles;
 
 	return (
