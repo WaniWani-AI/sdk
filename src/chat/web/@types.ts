@@ -129,6 +129,19 @@ export interface ChatClassNames {
 // Shared Base Props
 // ============================================================================
 
+/** What the platform reports about the documents module for this project. */
+export interface DocumentUploadConfig {
+	enabled: boolean;
+	/** Refused before the upload starts. */
+	maxBytes: number;
+	/** Stated to the visitor; the OCR vendor is what enforces it. */
+	maxPdfPages: number;
+	/** The chat request refuses more than this, so the composer must not take more. */
+	maxFiles: number;
+	/** MIME types the platform accepts. */
+	accept: string[];
+}
+
 export interface ChatBaseProps {
 	/** Waniwani project API key */
 	apiKey?: string;
@@ -174,6 +187,12 @@ export interface ChatBaseProps {
 	body?: Record<string, unknown>;
 	/** Enable file attachments in the input. Defaults to false. */
 	allowAttachments?: boolean;
+	/**
+	 * Document upload, as the platform reports it on `GET /api/mcp/chat/config`.
+	 * The composer offers a paperclip, a drop target and paste only while
+	 * `enabled` is true, and the upload endpoint enforces the same flag.
+	 */
+	documentUpload?: DocumentUploadConfig;
 	/** Placeholder text shown in the input field. Defaults to "Ask me anything...". Animates with a typing effect. */
 	placeholder?: string;
 	/**

@@ -622,6 +622,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									placeholder={config.placeholder}
 									suggestions={suggestions}
 									enableThreadHistory={config.enableThreadHistory}
+									documentUpload={config.documentUpload}
 									showToolCalls={config.showToolCalls}
 									locale={config.locale}
 									initializing={!ready}

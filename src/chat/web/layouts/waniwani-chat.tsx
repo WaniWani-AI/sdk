@@ -487,6 +487,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}
 					disclaimer={config.disclaimer}
+					documentUpload={config.documentUpload}
 					allowAttachments={overrides?.allowAttachments}
 					locale={config.locale}
 					messages={overrides?.messages}

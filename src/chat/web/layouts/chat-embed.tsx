@@ -11,9 +11,15 @@ import {
 } from "react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import type { ChatEmbedProps, ChatHandle } from "../@types";
+import type {
+	AttachmentError,
+	AttachmentUploader,
+} from "../ai-elements/prompt-input";
 import {
 	PromptInput,
 	PromptInputAddAttachments,
+	PromptInputAttachments,
+	PromptInputDropOverlay,
 	PromptInputSubmit,
 	PromptInputTextarea,
 } from "../ai-elements/prompt-input";
@@ -26,6 +32,7 @@ import { ThreadMenu } from "../components/thread-menu";
 import { useWidgetEvents } from "../embed/widget-events-context";
 import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
+import { useDocumentUpload } from "../hooks/use-document-upload";
 import { useSuggestionRow } from "../hooks/use-suggestion-row";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
@@ -69,6 +76,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			className,
 			classNames,
 			allowAttachments = false,
+			documentUpload,
 			welcomeMessage,
 			welcome,
 			placeholder = t.promptInput.placeholder,
@@ -141,6 +149,14 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			mcp?.resourceEndpoint ?? buildResourceEndpoint(api, props.headers);
 
 		const animatedPlaceholder = useTypingPlaceholder(placeholder, !engine.text);
+
+		const uploads = useDocumentUpload({
+			api,
+			headers: props.headers,
+			sessionId: engine.sessionId,
+			documentUpload,
+			allowAttachments,
+		});
 
 		const [fullscreenToolCallId, setFullscreenToolCallId] = useState<
 			string | null
@@ -611,15 +627,27 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							<div className="ww:mx-auto ww:w-full ww:max-w-3xl">
 								<PromptInput
 									onSubmit={engine.handleSubmit}
-									globalDrop={allowAttachments}
-									multiple={allowAttachments}
+									attachmentsEnabled={uploads.enabled}
+									globalDrop={uploads.enabled}
+									multiple={uploads.enabled}
+									accept={uploads.accept}
+									maxFileSize={uploads.maxFileSize}
+									maxPdfPages={uploads.maxPdfPages}
+									maxFiles={uploads.maxFiles}
+									upload={uploads.upload}
+									onDiscard={uploads.onDiscard}
+									onError={uploads.reportError}
 									className={cn(
 										"ww-input ww:rounded-2xl ww:border-border ww:bg-input",
 										classNames?.input,
 									)}
 								>
+									<PromptInputDropOverlay enabled={uploads.enabled} />
+									{uploads.enabled && (
+										<PromptInputAttachments className="ww:px-4 ww:pt-3" />
+									)}
 									<div className="ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-2.5">
-										{allowAttachments && <PromptInputAddAttachments />}
+										{uploads.enabled && <PromptInputAddAttachments />}
 										<PromptInputTextarea
 											onChange={engine.handleTextChange}
 											value={engine.text}
@@ -632,6 +660,11 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 										/>
 									</div>
 								</PromptInput>
+								{uploads.error && (
+									<output className="ww:block ww:pt-1.5 ww:text-center ww:text-destructive ww:text-xs">
+										{uploads.error.message}
+									</output>
+								)}
 								<div className="ww:pt-2 ww:pb-1 ww:flex ww:flex-nowrap ww:justify-center ww:items-center ww:gap-1.5">
 									<PoweredBy />
 									<AiDisclaimer text={disclaimer} />

@@ -292,3 +292,168 @@ describe("useRemoteEmbedConfig — page.viewed channel attribution", () => {
 		}
 	});
 });
+
+const DOCUMENT_UPLOAD = {
+	enabled: true,
+	maxBytes: 20 * 1024 * 1024,
+	maxPdfPages: 30,
+	maxFiles: 10,
+	accept: ["application/pdf", "image/png"],
+};
+
+async function partialFor(documentUpload: unknown) {
+	const { restore } = stubFetch({
+		success: true,
+		data: { welcomeMessage: null, documentUpload },
+	});
+	try {
+		return await fetchRemoteConfig(API, "wwp_test");
+	} finally {
+		restore();
+	}
+}
+
+describe("fetchRemoteConfig — documentUpload", () => {
+	test("maps a well-formed module payload through unchanged", async () => {
+		const partial = await partialFor(DOCUMENT_UPLOAD);
+
+		expect(partial.documentUpload).toEqual(DOCUMENT_UPLOAD);
+	});
+
+	test("a project with the module switched off still speaks, and says off", async () => {
+		const partial = await partialFor({ ...DOCUMENT_UPLOAD, enabled: false });
+
+		expect("documentUpload" in partial).toBe(true);
+		expect(partial.documentUpload).toEqual({
+			enabled: false,
+			maxBytes: 0,
+			maxPdfPages: 0,
+			maxFiles: 0,
+			accept: ["application/pdf", "image/png"],
+		});
+	});
+
+	test("a switched-off module carrying no caps at all still survives", async () => {
+		const partial = await partialFor({ enabled: false });
+
+		expect("documentUpload" in partial).toBe(true);
+		expect(partial.documentUpload).toEqual({
+			enabled: false,
+			maxBytes: 0,
+			maxPdfPages: 0,
+			maxFiles: 0,
+			accept: [],
+		});
+	});
+
+	test("keeps only the string entries of accept", async () => {
+		const partial = await partialFor({
+			...DOCUMENT_UPLOAD,
+			accept: ["application/pdf", 42, null, "image/png"],
+		});
+
+		expect(partial.documentUpload?.accept).toEqual([
+			"application/pdf",
+			"image/png",
+		]);
+	});
+
+	test("ignores fields the widget does not know about", async () => {
+		const partial = await partialFor({
+			...DOCUMENT_UPLOAD,
+			maxPagesPerMinute: 4,
+		});
+
+		expect(partial.documentUpload).toEqual(DOCUMENT_UPLOAD);
+	});
+
+	test("a server that predates the field leaves the key off entirely", async () => {
+		const { restore } = stubFetch({
+			success: true,
+			data: { welcomeMessage: "Hi" },
+		});
+		try {
+			const partial = await fetchRemoteConfig(API, "wwp_test");
+			expect("documentUpload" in partial).toBe(false);
+		} finally {
+			restore();
+		}
+	});
+
+	test("a malformed payload is dropped whole, never half-applied", async () => {
+		const malformed: unknown[] = [
+			null,
+			"enabled",
+			42,
+			true,
+			[],
+			{},
+			{
+				enabled: "true",
+				maxBytes: 1,
+				maxPdfPages: 1,
+				maxFiles: 1,
+				accept: ["a"],
+			},
+			{ maxBytes: 1, maxPdfPages: 1, maxFiles: 1, accept: ["a"] },
+			{ enabled: true, maxPdfPages: 1, maxFiles: 1, accept: ["a"] },
+			{
+				enabled: true,
+				maxBytes: "20mb",
+				maxPdfPages: 1,
+				maxFiles: 1,
+				accept: ["a"],
+			},
+			{ enabled: true, maxBytes: 1, maxFiles: 1, accept: ["a"] },
+			{
+				enabled: true,
+				maxBytes: 1,
+				maxPdfPages: "30",
+				maxFiles: 1,
+				accept: ["a"],
+			},
+			{ enabled: true, maxBytes: 1, maxPdfPages: 1, maxFiles: 1 },
+			{ enabled: true, maxBytes: 1, maxPdfPages: 1, maxFiles: 1, accept: [] },
+			{
+				enabled: true,
+				maxBytes: 1,
+				maxPdfPages: 1,
+				maxFiles: 1,
+				accept: [42, null],
+			},
+			{
+				enabled: true,
+				maxBytes: 1,
+				maxPdfPages: 1,
+				maxFiles: 1,
+				accept: "application/pdf",
+			},
+		];
+
+		for (const payload of malformed) {
+			const partial = await partialFor(payload);
+			expect({
+				payload,
+				hasKey: "documentUpload" in partial,
+			}).toEqual({ payload, hasKey: false });
+		}
+	});
+
+	test("an enabled module with no usable maxFiles is dropped, never uncapped", async () => {
+		const unusable = [undefined, null, 0, -1, "10", true, [10]];
+
+		for (const maxFiles of unusable) {
+			const partial = await partialFor({ ...DOCUMENT_UPLOAD, maxFiles });
+			expect({
+				maxFiles,
+				hasKey: "documentUpload" in partial,
+			}).toEqual({ maxFiles, hasKey: false });
+		}
+	});
+
+	test("a cap of one is a real cap, not a missing one", async () => {
+		const partial = await partialFor({ ...DOCUMENT_UPLOAD, maxFiles: 1 });
+
+		expect(partial.documentUpload?.maxFiles).toBe(1);
+	});
+});

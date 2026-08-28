@@ -179,3 +179,42 @@ describe("thread-store", () => {
 		expect(list.length).toBe(1);
 	});
 });
+
+describe("thread-store — a reloaded turn still shows what was attached", () => {
+	const DOCUMENTS = [
+		{
+			documentId: "doc_pdf",
+			filename: "policy.pdf",
+			mediaType: "application/pdf",
+		},
+	];
+
+	test("a message's documents metadata survives the round-trip to IndexedDB", async () => {
+		const store = await importThreadStore();
+		const turn: UIMessage = {
+			...makeMessage("m1", "read this"),
+			metadata: { documents: DOCUMENTS },
+		};
+
+		await store.upsertThread(makeThread({ messages: [turn] }));
+		const loaded = await store.loadThread("thread-1");
+
+		expect(loaded?.messages[0]?.metadata).toEqual({ documents: DOCUMENTS });
+	});
+
+	test("the reloaded turn still carries no bytes, only the ids", async () => {
+		const store = await importThreadStore();
+		const turn: UIMessage = {
+			...makeMessage("m1", "read this"),
+			metadata: { documents: DOCUMENTS },
+		};
+
+		await store.upsertThread(makeThread({ messages: [turn] }));
+		const loaded = await store.loadThread("thread-1");
+
+		expect(JSON.stringify(loaded)).not.toContain("base64");
+		expect(loaded?.messages[0]?.parts).toEqual([
+			{ type: "text", text: "read this" },
+		]);
+	});
+});
