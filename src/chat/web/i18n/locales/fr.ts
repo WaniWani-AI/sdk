@@ -4,9 +4,19 @@ export const fr: Messages = {
 	promptInput: {
 		placeholder: "Que souhaitez-vous savoir ?",
 		uploadFiles: "Importer des fichiers",
+		uploadFilesUpTo: "Joindre un document, jusqu'à {limit}",
 		stop: "Arrêter",
 		submit: "Envoyer",
 		removeAttachments: "Supprimer toutes les pièces jointes",
+		removeAttachment: "Retirer la pièce jointe",
+		uploading: "Envoi en cours…",
+		retry: "Réessayer",
+		retryUpload: "Réessayer l'envoi",
+		uploadFailed: "L'envoi ne s'est pas terminé.",
+		dropToAttach: "Déposez pour joindre",
+		errorAccept: "{name} n'est pas un type de fichier accepté par ce chat.",
+		errorTooLarge: "{name} dépasse {limit}.",
+		errorTooMany: "Vous pouvez joindre jusqu'à {limit} fichiers.",
 	},
 	workingIndicator: {
 		default: "Un instant…",
@@ -30,6 +40,9 @@ export const fr: Messages = {
 	},
 	attachments: {
 		attachmentFallback: "pièce jointe",
+		kindPdf: "PDF",
+		kindImage: "Image",
+		kindFile: "Fichier",
 		fileFallback: "fichier",
 	},
 	threadMenu: {

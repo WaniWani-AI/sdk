@@ -66,7 +66,7 @@ let capturedOnFinish:
 	  }) => void)
 	| undefined;
 let capturedOnError: ((error: Error) => void) | undefined;
-const mockSendMessage = mock(() => {});
+const mockSendMessage = mock((..._args: unknown[]) => {});
 const mockSetMessages = mock(() => {});
 
 // @ts-expect-error -- bun:test `mock.module` exists at runtime but has no TS type
@@ -89,11 +89,18 @@ mock.module("@ai-sdk/react", () => ({
 // Capture transport body callback so we can inspect resolvedBody without
 // actually firing a network request through the real DefaultChatTransport.
 let capturedTransportBody: (() => Record<string, unknown>) | undefined;
+// The engine clears its per-turn refs inside the transport's own `fetch`
+// wrapper, so tests need a handle on it to model a completed request.
+let capturedTransportFetch: typeof fetch | undefined;
 // @ts-expect-error -- bun:test `mock.module` exists at runtime but has no TS type
 mock.module("../lib/lenient-chat-transport", () => ({
 	LenientChatTransport: class {
-		constructor(opts: { body?: () => Record<string, unknown> }) {
+		constructor(opts: {
+			body?: () => Record<string, unknown>;
+			fetch?: typeof fetch;
+		}) {
 			capturedTransportBody = opts.body;
+			capturedTransportFetch = opts.fetch;
 		}
 	},
 }));
@@ -543,5 +550,259 @@ describe("useChatEngine – widget events", () => {
 				engine.handleSubmit({ text: "hello", files: [] });
 			});
 		}).not.toThrow();
+	});
+});
+
+const DOC = {
+	documentId: "doc_1",
+	filename: "policy.pdf",
+	mediaType: "application/pdf",
+};
+
+async function completeRequest() {
+	await act(async () => {
+		await capturedTransportFetch?.("https://localhost/api/waniwani", {});
+	});
+}
+
+describe("useChatEngine – documents on the turn that carries them", () => {
+	test("the request body carries the ids the composer uploaded", async () => {
+		await flushAsync();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		act(() => {
+			engine.handleSubmit({ text: "read this", files: [], documents: [DOC] });
+		});
+
+		expect(capturedTransportBody?.().documents).toEqual([DOC]);
+	});
+
+	test("a message with no attachments leaves documents off the body entirely", async () => {
+		await flushAsync();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		act(() => {
+			engine.handleSubmit({ text: "hello", files: [], documents: [] });
+		});
+
+		expect(capturedTransportBody?.()).not.toHaveProperty("documents");
+	});
+
+	test("the next turn does not repeat the previous turn's documents", async () => {
+		await flushAsync();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		act(() => {
+			engine.handleSubmit({ text: "read this", files: [], documents: [DOC] });
+		});
+		expect(capturedTransportBody?.().documents).toEqual([DOC]);
+
+		await completeRequest();
+
+		act(() => {
+			engine.handleSubmit({ text: "and now?", files: [], documents: [] });
+		});
+		expect(capturedTransportBody?.()).not.toHaveProperty("documents");
+	});
+
+	test("an attachment with no text still sends", async () => {
+		await flushAsync();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+		mockSendMessage.mockClear();
+
+		act(() => {
+			engine.handleSubmit({ text: "", files: [], documents: [DOC] });
+		});
+
+		expect(mockSendMessage).toHaveBeenCalledTimes(1);
+		expect(capturedTransportBody?.().documents).toEqual([DOC]);
+	});
+
+	test("an empty message is still refused", async () => {
+		await flushAsync();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+		mockSendMessage.mockClear();
+
+		act(() => {
+			engine.handleSubmit({ text: "   ", files: [], documents: [] });
+		});
+
+		expect(mockSendMessage).toHaveBeenCalledTimes(0);
+	});
+
+	test("a message queued behind a streaming reply keeps its documents", async () => {
+		await flushAsync();
+		useChatStatus = "streaming";
+		act(() => {
+			root.render(createElement(Harness, { resultRef: hookRef }));
+		});
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		mockSendMessage.mockClear();
+		act(() => {
+			engine.handleSubmit({ text: "read this", files: [], documents: [DOC] });
+		});
+		expect(mockSendMessage).toHaveBeenCalledTimes(0);
+		expect(capturedTransportBody?.()).not.toHaveProperty("documents");
+
+		useChatStatus = "ready";
+		act(() => {
+			root.render(createElement(Harness, { resultRef: hookRef }));
+		});
+
+		expect(mockSendMessage).toHaveBeenCalledTimes(1);
+		expect(capturedTransportBody?.().documents).toEqual([DOC]);
+	});
+});
+
+describe("useChatEngine – documents do not outlive their turn", () => {
+	test("a request that never reached the server does not re-attach its documents to the next send", async () => {
+		await flushAsync();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		act(() => {
+			engine.handleSubmit({ text: "read this", files: [], documents: [DOC] });
+		});
+		expect(capturedTransportBody?.().documents).toEqual([DOC]);
+
+		globalThis.fetch = mock(async () => {
+			throw new TypeError("Failed to fetch");
+		}) as unknown as typeof fetch;
+		await act(async () => {
+			await capturedTransportFetch?.(
+				"https://localhost/api/waniwani",
+				{},
+			).catch(() => {});
+		});
+
+		act(() => {
+			void engine.sendMessageAndWait("are you there?");
+		});
+
+		expect(capturedTransportBody?.()).not.toHaveProperty("documents");
+	});
+});
+
+function lastSentMessage(): Record<string, unknown> {
+	const calls = mockSendMessage.mock.calls;
+	const sent = calls[calls.length - 1]?.[0];
+	if (!sent || typeof sent !== "object") {
+		throw new Error("sendMessage was never called with a message");
+	}
+	return sent as Record<string, unknown>;
+}
+
+describe("useChatEngine – the sent turn carries its documents as message metadata", () => {
+	test("the direct path hands sendMessage the documents the composer uploaded", async () => {
+		await flushAsync();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+		mockSendMessage.mockClear();
+
+		act(() => {
+			engine.handleSubmit({ text: "read this", files: [], documents: [DOC] });
+		});
+
+		expect(lastSentMessage().metadata).toEqual({ documents: [DOC] });
+	});
+
+	test("the queued path hands sendMessage the same metadata when it drains", async () => {
+		await flushAsync();
+		useChatStatus = "streaming";
+		act(() => {
+			root.render(createElement(Harness, { resultRef: hookRef }));
+		});
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		mockSendMessage.mockClear();
+		act(() => {
+			engine.handleSubmit({ text: "read this", files: [], documents: [DOC] });
+		});
+		expect(mockSendMessage).toHaveBeenCalledTimes(0);
+
+		useChatStatus = "ready";
+		act(() => {
+			root.render(createElement(Harness, { resultRef: hookRef }));
+		});
+
+		expect(lastSentMessage().metadata).toEqual({ documents: [DOC] });
+	});
+
+	test("a turn with no documents carries no metadata at all", async () => {
+		await flushAsync();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+		mockSendMessage.mockClear();
+
+		act(() => {
+			engine.handleSubmit({ text: "hello", files: [], documents: [] });
+		});
+
+		expect(lastSentMessage()).not.toHaveProperty("metadata");
+	});
+
+	test("the bytes stay out of the turn: metadata carries ids, files stays empty", async () => {
+		await flushAsync();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+		mockSendMessage.mockClear();
+
+		act(() => {
+			engine.handleSubmit({ text: "read this", files: [], documents: [DOC] });
+		});
+
+		const sent = lastSentMessage();
+		expect(sent.files).toEqual([]);
+		expect(JSON.stringify(sent)).not.toContain("base64");
+		expect(JSON.stringify(sent)).not.toContain("blob:");
+	});
+
+	test("the metadata addition leaves the wire body's documents untouched", async () => {
+		await flushAsync();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+
+		act(() => {
+			engine.handleSubmit({ text: "read this", files: [], documents: [DOC] });
+		});
+
+		if (!capturedTransportBody) {
+			throw new Error("transport not constructed");
+		}
+		const body = capturedTransportBody();
+		expect(body.documents).toEqual([DOC]);
+		expect(body).not.toHaveProperty("metadata");
 	});
 });

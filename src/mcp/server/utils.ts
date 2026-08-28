@@ -1,3 +1,6 @@
+import { readAttachedDocuments } from "../../documents/messages.js";
+import type { AttachedDocument } from "../../documents/types.js";
+
 // ============================================================================
 // Meta key extraction helpers
 // ============================================================================
@@ -153,6 +156,8 @@ export interface AttachedFile {
 	filename: string;
 }
 
+export type { AttachedDocument };
+
 function isRecordValue(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -247,6 +252,24 @@ function filesUnder(candidate: unknown): AttachedFile[] {
 
 	collect(candidate);
 	return files;
+}
+
+const DOCUMENTS_META_KEY = "waniwani/documents";
+
+/**
+ * Documents the visitor attached to this chat turn, stamped by the Waniwani chat
+ * route under `waniwani/documents`. The bytes stay on the platform, so each entry
+ * is a handle: spread one straight into `documents.extract({ documentId, schema })`.
+ * Empty on hosts that upload nothing, which is every host but the web widget.
+ */
+export function extractAttachedDocuments(
+	meta: Record<string, unknown> | undefined,
+): AttachedDocument[] {
+	if (!meta) {
+		return [];
+	}
+	const raw = meta[DOCUMENTS_META_KEY];
+	return readAttachedDocuments(Array.isArray(raw) ? raw : [raw]);
 }
 
 const SOURCE_SESSION_KEYS = [

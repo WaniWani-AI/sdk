@@ -499,6 +499,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 						placeholder={config.placeholder}
 						suggestions={suggestions}
 						enableThreadHistory={config.enableThreadHistory}
+						documentUpload={config.documentUpload}
 						showToolCalls={config.showToolCalls}
 						locale={config.locale}
 						initializing={!ready}

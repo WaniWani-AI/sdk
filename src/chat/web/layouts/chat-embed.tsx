@@ -11,9 +11,15 @@ import {
 } from "react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import type { ChatEmbedProps, ChatHandle } from "../@types";
+import type {
+	AttachmentError,
+	AttachmentUploader,
+} from "../ai-elements/prompt-input";
 import {
 	PromptInput,
 	PromptInputAddAttachments,
+	PromptInputAttachments,
+	PromptInputDropOverlay,
 	PromptInputSubmit,
 	PromptInputTextarea,
 } from "../ai-elements/prompt-input";
@@ -29,6 +35,7 @@ import { useChatEngine } from "../hooks/use-chat-engine";
 import { useSuggestionRow } from "../hooks/use-suggestion-row";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
+import { discardDocument, uploadDocument } from "../lib/document-upload";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
@@ -69,6 +76,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			className,
 			classNames,
 			allowAttachments = false,
+			documentUpload,
 			welcomeMessage,
 			welcome,
 			placeholder = t.promptInput.placeholder,
@@ -141,6 +149,50 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			mcp?.resourceEndpoint ?? buildResourceEndpoint(api, props.headers);
 
 		const animatedPlaceholder = useTypingPlaceholder(placeholder, !engine.text);
+
+		// The platform's answer wins wherever it speaks; `allowAttachments` stays
+		// the switch for a bring-your-own-backend embed the platform never sees.
+		const attachmentsEnabled = documentUpload
+			? documentUpload.enabled
+			: allowAttachments;
+		const acceptedTypes = documentUpload?.accept.join(",");
+		const [attachmentError, setAttachmentError] =
+			useState<AttachmentError | null>(null);
+
+		const uploadHeaders = props.headers;
+		const uploadSessionId = engine.sessionId;
+		const uploadEnabled = documentUpload?.enabled ?? false;
+		const documentUploader: AttachmentUploader | undefined = useCallback(
+			(file: File, signal: AbortSignal, onProgress: (n: number) => void) =>
+				uploadDocument({
+					file,
+					api,
+					headers: uploadHeaders ?? {},
+					sessionId: uploadSessionId,
+					signal,
+					onProgress,
+				}),
+			[api, uploadHeaders, uploadSessionId],
+		);
+
+		const discardUploaded = useCallback(
+			(document: { documentId: string }) => {
+				void discardDocument({
+					documentId: document.documentId,
+					api,
+					headers: uploadHeaders ?? {},
+				});
+			},
+			[api, uploadHeaders],
+		);
+
+		useEffect(() => {
+			if (!attachmentError) {
+				return;
+			}
+			const timer = setTimeout(() => setAttachmentError(null), 6000);
+			return () => clearTimeout(timer);
+		}, [attachmentError]);
 
 		const [fullscreenToolCallId, setFullscreenToolCallId] = useState<
 			string | null
@@ -611,15 +663,26 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							<div className="ww:mx-auto ww:w-full ww:max-w-3xl">
 								<PromptInput
 									onSubmit={engine.handleSubmit}
-									globalDrop={allowAttachments}
-									multiple={allowAttachments}
+									attachmentsEnabled={attachmentsEnabled}
+									globalDrop={attachmentsEnabled}
+									multiple={attachmentsEnabled}
+									accept={acceptedTypes}
+									maxFileSize={documentUpload?.maxBytes}
+									maxFiles={documentUpload?.maxFiles}
+									upload={uploadEnabled ? documentUploader : undefined}
+									onDiscard={uploadEnabled ? discardUploaded : undefined}
+									onError={setAttachmentError}
 									className={cn(
 										"ww-input ww:rounded-2xl ww:border-border ww:bg-input",
 										classNames?.input,
 									)}
 								>
+									<PromptInputDropOverlay enabled={attachmentsEnabled} />
+									{attachmentsEnabled && (
+										<PromptInputAttachments className="ww:px-4 ww:pt-3" />
+									)}
 									<div className="ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-2.5">
-										{allowAttachments && <PromptInputAddAttachments />}
+										{attachmentsEnabled && <PromptInputAddAttachments />}
 										<PromptInputTextarea
 											onChange={engine.handleTextChange}
 											value={engine.text}
@@ -632,6 +695,11 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 										/>
 									</div>
 								</PromptInput>
+								{attachmentError && (
+									<output className="ww:block ww:pt-1.5 ww:text-center ww:text-destructive ww:text-xs">
+										{attachmentError.message}
+									</output>
+								)}
 								<div className="ww:pt-2 ww:pb-1 ww:flex ww:flex-nowrap ww:justify-center ww:items-center ww:gap-1.5">
 									<PoweredBy />
 									<AiDisclaimer text={disclaimer} />

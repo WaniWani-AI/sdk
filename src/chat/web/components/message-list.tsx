@@ -9,7 +9,11 @@ import {
 } from "lucide-react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import type { ShowToolCalls, WelcomeConfig } from "../@types";
-import { Attachments } from "../ai-elements/attachments";
+import {
+	AttachedDocuments,
+	Attachments,
+	readAttachedDocuments,
+} from "../ai-elements/attachments";
 import {
 	ChainOfThought,
 	ChainOfThoughtContent,
@@ -187,6 +191,9 @@ export function MessageList({
 					(p): p is ReasoningUIPart => p.type === "reasoning",
 				);
 				const fileParts = message.parts.filter((p) => p.type === "file");
+				// Uploaded documents never enter `parts`, so the turn reads them off
+				// the metadata the composer attached when it sent the message.
+				const attachedDocuments = readAttachedDocuments(message.metadata);
 				const toolParts = message.parts.filter(
 					(
 						p,
@@ -511,6 +518,9 @@ export function MessageList({
 								</div>
 							);
 						})}
+						{!containsFullscreenTool && attachedDocuments.length > 0 && (
+							<AttachedDocuments documents={attachedDocuments} />
+						)}
 						{!containsFullscreenTool && (
 							<div>
 								<MessageContent

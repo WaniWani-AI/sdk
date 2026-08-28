@@ -3,6 +3,7 @@ import type { InternalConfig } from "../types.js";
 import type {
 	DocumentExtractInput,
 	DocumentExtractResult,
+	DocumentExtractStoredInput,
 	DocumentSchema,
 	DocumentsClient,
 } from "./types.js";
@@ -55,6 +56,22 @@ function refusalMessage(body: string, status: number): string {
 	return body || `Documents API error: HTTP ${status}`;
 }
 
+function isStoredInput<T>(
+	input: DocumentExtractInput<T>,
+): input is DocumentExtractStoredInput<T> {
+	return "documentId" in input && typeof input.documentId === "string";
+}
+
+/** The platform's body is a union, so each branch's fields must travel alone. */
+function sourceFields<T>(
+	input: DocumentExtractInput<T>,
+): Record<string, string> {
+	if (isStoredInput(input)) {
+		return { documentId: input.documentId };
+	}
+	return { url: input.url, filename: input.filename };
+}
+
 export function createDocumentsClient(
 	config: Pick<InternalConfig, "apiUrl" | "apiKey">,
 ): DocumentsClient {
@@ -83,8 +100,7 @@ export function createDocumentsClient(
 						"X-WaniWani-SDK": SDK_NAME,
 					},
 					body: JSON.stringify({
-						url: input.url,
-						filename: input.filename,
+						...sourceFields(input),
 						schema: toJSONSchema(input.schema),
 						pages: input.pages,
 						sessionId: input.sessionId,

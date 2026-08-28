@@ -7,9 +7,19 @@ export interface Messages {
 	promptInput: {
 		placeholder: string;
 		uploadFiles: string;
+		uploadFilesUpTo: string;
 		stop: string;
 		submit: string;
 		removeAttachments: string;
+		removeAttachment: string;
+		uploading: string;
+		retry: string;
+		retryUpload: string;
+		uploadFailed: string;
+		dropToAttach: string;
+		errorAccept: string;
+		errorTooLarge: string;
+		errorTooMany: string;
 	};
 	workingIndicator: {
 		default: string;
@@ -33,6 +43,9 @@ export interface Messages {
 	};
 	attachments: {
 		attachmentFallback: string;
+		kindPdf: string;
+		kindImage: string;
+		kindFile: string;
 		fileFallback: string;
 	};
 	threadMenu: {
@@ -76,9 +89,19 @@ export const en: Messages = {
 	promptInput: {
 		placeholder: "What would you like to know?",
 		uploadFiles: "Upload files",
+		uploadFilesUpTo: "Upload a document, up to {limit}",
 		stop: "Stop",
 		submit: "Submit",
 		removeAttachments: "Remove all attachments",
+		removeAttachment: "Remove attachment",
+		uploading: "Uploading…",
+		retry: "Retry",
+		retryUpload: "Retry the upload",
+		uploadFailed: "The upload did not finish.",
+		dropToAttach: "Drop to attach",
+		errorAccept: "{name} is not a file type this chat accepts.",
+		errorTooLarge: "{name} is larger than {limit}.",
+		errorTooMany: "You can attach up to {limit} files.",
 	},
 	workingIndicator: {
 		default: "On it…",
@@ -102,6 +125,9 @@ export const en: Messages = {
 	},
 	attachments: {
 		attachmentFallback: "attachment",
+		kindPdf: "PDF",
+		kindImage: "Image",
+		kindFile: "File",
 		fileFallback: "file",
 	},
 	threadMenu: {

@@ -14,7 +14,9 @@ import type {
 import { createRevenueApi } from "../../tracking/revenue.js";
 import { DEFAULT_API_URL } from "../../types.js";
 import {
+	type AttachedDocument,
 	type AttachedFile,
+	extractAttachedDocuments,
 	extractAttachedFiles,
 	extractCorrelationId,
 	extractExternalUserId,
@@ -76,6 +78,13 @@ export interface ScopedWaniWaniClient {
 	 * hosts that attach nothing.
 	 */
 	readonly attachedFiles: AttachedFile[];
+	/**
+	 * Documents the visitor uploaded through the chat widget on this turn. The
+	 * platform holds the bytes, so each entry is a handle: spread one straight
+	 * into `documents.extract({ documentId, schema })`. Empty on hosts that
+	 * upload nothing.
+	 */
+	readonly attachedDocuments: AttachedDocument[];
 	/** Documents client; `sessionId` and `correlationId` are carried from the request. */
 	readonly documents: DocumentsClient;
 	/** @internal Resolved API config from withWaniwani(). */
@@ -124,6 +133,7 @@ export function createScopedClient(
 		},
 		kb: base.kb,
 		attachedFiles: extractAttachedFiles(meta),
+		attachedDocuments: extractAttachedDocuments(meta),
 		documents: {
 			extract<T>(
 				input: DocumentExtractInput<T>,

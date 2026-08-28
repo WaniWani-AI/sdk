@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import type { FileUIPart, UIMessage } from "ai";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { AttachedDocument } from "../../../documents/types";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import { hasModelContext } from "../../../shared/model-context";
 import type { ChatBaseProps } from "../@types";
@@ -57,6 +58,7 @@ export interface QueuedMessage {
 	id: string;
 	text: string;
 	files: FileUIPart[];
+	documents: AttachedDocument[];
 	modelContext?: ModelContextUpdate;
 }
 
@@ -153,6 +155,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	const pendingModelContextRef = useRef<ModelContextUpdate | undefined>(
 		undefined,
 	);
+	const pendingDocumentsRef = useRef<AttachedDocument[] | undefined>(undefined);
 	const visitorContextRef = useRef<VisitorContext | null>(null);
 	const [sessionId, setSessionIdState] = useState<string | undefined>(
 		undefined,
@@ -350,6 +353,10 @@ export function useChatEngine(props: ChatBaseProps) {
 					resolvedBody.modelContext = pendingModelContextRef.current;
 				}
 
+				if (pendingDocumentsRef.current?.length) {
+					resolvedBody.documents = pendingDocumentsRef.current;
+				}
+
 				// Resolve the visitor id synchronously so it is present on the very
 				// first request, before the async `collectVisitorContext()` in the
 				// mount effect has resolved. The full context (device/client fields)
@@ -433,10 +440,16 @@ export function useChatEngine(props: ChatBaseProps) {
 				return resolvedBody;
 			},
 			fetch: (async (input, init) => {
-				const response = await fetch(input, init);
-				pendingModelContextRef.current = undefined;
-				setSessionId(response.headers.get(SESSION_HEADER_NAME));
-				return response;
+				try {
+					const response = await fetch(input, init);
+					pendingModelContextRef.current = undefined;
+					setSessionId(response.headers.get(SESSION_HEADER_NAME));
+					return response;
+				} finally {
+					// A request that never landed still consumed its documents; the
+					// next turn must not re-attach them.
+					pendingDocumentsRef.current = undefined;
+				}
 			}) as typeof fetch,
 		}),
 	);
@@ -620,7 +633,9 @@ export function useChatEngine(props: ChatBaseProps) {
 	const handleSubmit = useCallback(
 		(message: ChatEngineMessage) => {
 			const hasText = Boolean(message.text?.trim());
-			const hasFiles = Boolean(message.files?.length);
+			const hasFiles = Boolean(
+				message.files?.length || message.documents?.length,
+			);
 			if (!(hasText || hasFiles)) {
 				return;
 			}
@@ -637,6 +652,7 @@ export function useChatEngine(props: ChatBaseProps) {
 						id: nanoid(),
 						text: message.text || "",
 						files: message.files ?? [],
+						documents: message.documents ?? [],
 						modelContext: message.modelContext,
 					},
 				]);
@@ -645,9 +661,13 @@ export function useChatEngine(props: ChatBaseProps) {
 			}
 
 			pendingModelContextRef.current = message.modelContext;
+			pendingDocumentsRef.current = message.documents;
 			sendMessage({
 				text: message.text || "",
 				files: message.files,
+				...(message.documents?.length && {
+					metadata: { documents: message.documents },
+				}),
 			});
 
 			onMessageSent?.(message.text || "");
@@ -688,9 +708,13 @@ export function useChatEngine(props: ChatBaseProps) {
 		setQueuedMessages(rest);
 
 		pendingModelContextRef.current = first.modelContext;
+		pendingDocumentsRef.current = first.documents;
 		sendMessage({
 			text: first.text,
 			files: first.files.length > 0 ? first.files : undefined,
+			...(first.documents.length > 0 && {
+				metadata: { documents: first.documents },
+			}),
 		});
 		onMessageSent?.(first.text);
 		widgetEvents.emit({ name: "message.sent" });

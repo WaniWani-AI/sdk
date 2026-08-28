@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { useEffect, useState } from "react";
+import type { DocumentUploadConfig } from "../@types";
 import { buildApiUrl } from "../lib/api-url";
 import { debugLog } from "../lib/debug";
 import { firePageView } from "../lib/page-view";
@@ -117,6 +118,50 @@ interface RemoteConfigResponse {
 	 * (or absent) means show everywhere.
 	 */
 	visibility?: VisibilityRules | null;
+	/**
+	 * Documents module state for the project behind this token. Absent on
+	 * servers that predate the field, which the widget reads as off.
+	 */
+	documentUpload?: unknown;
+}
+
+function parseDocumentUpload(value: unknown): DocumentUploadConfig | null {
+	if (typeof value !== "object" || value === null) {
+		return null;
+	}
+	const raw = value as Record<string, unknown>;
+	if (typeof raw.enabled !== "boolean") {
+		return null;
+	}
+	const accept = Array.isArray(raw.accept)
+		? raw.accept.filter((entry): entry is string => typeof entry === "string")
+		: [];
+	const positive = (value: unknown): value is number =>
+		typeof value === "number" && Number.isFinite(value) && value > 0;
+
+	// A disabled module is the answer even when it carries no caps, and it has to
+	// survive: dropping it here would fall back to the `allowAttachments` prop and
+	// show the paperclip on a project the platform said no to.
+	if (!raw.enabled) {
+		return { enabled: false, maxBytes: 0, maxPdfPages: 0, maxFiles: 0, accept };
+	}
+	if (
+		!(
+			positive(raw.maxBytes) &&
+			positive(raw.maxPdfPages) &&
+			positive(raw.maxFiles) &&
+			accept.length > 0
+		)
+	) {
+		return null;
+	}
+	return {
+		enabled: true,
+		maxBytes: raw.maxBytes,
+		maxPdfPages: raw.maxPdfPages,
+		maxFiles: raw.maxFiles,
+		accept,
+	};
 }
 
 /**
@@ -203,6 +248,10 @@ function remoteToConfigPartial(
 	}
 	if (data.visibility) {
 		out.visibility = data.visibility;
+	}
+	const documentUpload = parseDocumentUpload(data.documentUpload);
+	if (documentUpload) {
+		out.documentUpload = documentUpload;
 	}
 	return out;
 }

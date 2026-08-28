@@ -2,7 +2,7 @@
 // Embed Config — types and resolution
 // ============================================================================
 
-import type { ChatTheme } from "../@types";
+import type { ChatTheme, DocumentUploadConfig } from "../@types";
 import type { Locale } from "../i18n";
 import type { VisitorIdInput } from "../lib/visitor-context";
 import type { VisibilityRules } from "./visibility";
@@ -157,6 +157,11 @@ export interface EmbedConfig {
 	 * resume previous threads. Defaults to `false` — opt in explicitly.
 	 */
 	enableThreadHistory?: boolean;
+	/**
+	 * Documents module state, served by the platform. The composer offers the
+	 * paperclip, the drop target and paste only while `enabled` is true.
+	 */
+	documentUpload?: DocumentUploadConfig;
 	/**
 	 * Theme preset + per-property overrides. The script tag exposes the
 	 * preset via `data-theme="light|dark|auto"`; programmatic callers can
