@@ -14,6 +14,8 @@
 // public token. The chat widget has one, and it identifies the channel.
 // ============================================================================
 
+import type { WidgetMode } from "../embed/widget-events";
+import { debugLog } from "./debug";
 import { collectVisitorContext } from "./visitor-context";
 
 export interface FirePageViewOptions {
@@ -24,7 +26,7 @@ export interface FirePageViewOptions {
 	/** Agent channel ID, when known. */
 	channelId?: string;
 	/** Embed mode the widget initialized in. */
-	mode?: "inline" | "floating";
+	mode?: WidgetMode;
 	/**
 	 * Channel-specific event source from the resolved `/config`, used as the
 	 * event's `source` tag so events can be sliced by channel. Optional: the
@@ -66,6 +68,17 @@ export function eventsEndpoint(api: string): string {
 export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 	const { api, token, channelId, mode, source } = opts;
 	if (typeof window === "undefined" || !api || !token) {
+		return;
+	}
+
+	// Ingest attributes an event to a channel via `properties.channelId` or the
+	// `source` tag; `page.viewed` deliberately carries no session, so with
+	// neither in hand the event is guaranteed to be dropped server-side. Skip
+	// the send instead — degrades safely against a `/config` that does not
+	// report the token's channel. Skipping happens before the once-per-page
+	// guard, so a later call that does resolve a channel still fires.
+	if (!channelId && !source) {
+		debugLog("page.viewed skipped: no channelId or source to attribute it");
 		return;
 	}
 

@@ -18,5 +18,10 @@
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab"
+	},
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
 	}
 }

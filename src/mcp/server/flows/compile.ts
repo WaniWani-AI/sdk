@@ -17,6 +17,8 @@ import {
 } from "../utils";
 import type {
 	CompileInput,
+	ExecutionResult,
+	FlowInternalState,
 	FlowToolHandler,
 	FlowToolInput,
 	McpServer,
@@ -26,6 +28,12 @@ import { START } from "./@types";
 import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
 import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
 import { extractFlowGraph } from "./graph-extract";
+import {
+	initInternalState,
+	loadInternalState,
+	takeInternalField,
+	withInternalState,
+} from "./internal-state";
 import { deepMerge, expandDotPaths } from "./nested";
 import { flowOutputSchema } from "./output-schema";
 import { buildFlowProtocol } from "./protocol";
@@ -110,6 +118,14 @@ function resolveDefaultStore(flowId: string): FlowStore {
 // Compile
 // ============================================================================
 
+/**
+ * One handled tool call, plus the internal state this session arrived with. The
+ * response assembler reads it to decide what to attach, then persists what is
+ * left. Branches that fail before the engine runs return no `internal`, which
+ * reads as "nothing pending".
+ */
+type HandledCall = ExecutionResult & { internal?: FlowInternalState };
+
 export function compileFlow<TState extends Record<string, unknown>>(
 	input: CompileInput<TState>,
 ): RegisteredFlow {
@@ -121,6 +137,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 	const store: FlowStore = input.store ?? resolveDefaultStore(config.id);
 
+	// The internal state every new session starts from. Built once at compile
+	// time so a malformed config fails at startup, not on a live conversation.
+	const initialInternal = initInternalState(config);
+
 	// Validator storage — populated when handlers return interrupts with validate functions.
 	// Keyed by "nodeName:fieldName", persists across tool calls within the same server.
 	const validators = new Map<string, ValidateFn>();
@@ -128,9 +148,34 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	async function handleToolCall(
 		args: FlowToolInput,
 		sessionId: string | undefined,
+		sessionIsPreexisting: boolean,
 		meta?: Record<string, unknown>,
 		waniwani?: ScopedWaniWaniClient,
-	) {
+	): Promise<HandledCall> {
+		/**
+		 * Run the engine from `node`, carrying this session's internal state
+		 * through to the response assembler. Every branch below resumes the same
+		 * graph with the same per-call context, so the only things that vary are
+		 * where execution starts, the state it starts from, and where the internal
+		 * state was read.
+		 */
+		const run = (
+			node: string,
+			state: TState,
+			internal: FlowInternalState,
+		): Promise<HandledCall> =>
+			executeFrom(
+				node,
+				state,
+				nodes,
+				edges,
+				validators,
+				meta,
+				waniwani,
+				input.nodeOptions,
+				config.state,
+			).then((result) => ({ ...result, internal }));
+
 		if (args.action === "start") {
 			// `intent` is observational: the schema asks for it on start, but nothing
 			// in the engine reads it (it never reaches a node, the store, or an
@@ -159,19 +204,15 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
+			const internal = await loadInternalState({
+				store,
+				sessionId,
+				sessionIsPreexisting,
+				seed: initialInternal,
+			});
 			const startState = expandDotPaths(args.stateUpdates ?? {}) as TState;
 			const firstNode = await resolveNextNode(startEdge, startState);
-			return executeFrom(
-				firstNode,
-				startState,
-				nodes,
-				edges,
-				validators,
-				meta,
-				waniwani,
-				input.nodeOptions,
-				config.state,
-			);
+			return run(firstNode, startState, internal);
 		}
 
 		if (args.action === "continue") {
@@ -227,6 +268,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				state as Record<string, unknown>,
 				expandDotPaths(args.stateUpdates ?? {}),
 			) as TState;
+			const internal = flowState.internal ?? {};
 
 			// Widget continue: advance past the widget step (don't re-show it)
 			if (flowState.widgetId) {
@@ -246,33 +288,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					};
 				}
 				const nextNode = await resolveNextNode(edge, updatedState);
-				return executeFrom(
-					nextNode,
-					updatedState,
-					nodes,
-					edges,
-					validators,
-					meta,
-					waniwani,
-					input.nodeOptions,
-					config.state,
-				);
+				return run(nextNode, updatedState, internal);
 			}
 
 			// Interrupt continue: re-execute from current step.
 			// The handler re-runs, filters answered questions, and runs
 			// validators if all questions are filled.
-			return executeFrom(
-				step,
-				updatedState,
-				nodes,
-				edges,
-				validators,
-				meta,
-				waniwani,
-				input.nodeOptions,
-				config.state,
-			);
+			return run(step, updatedState, internal);
 		}
 
 		if (args.action === "reset") {
@@ -351,18 +373,9 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				expandDotPaths(args.stateUpdates),
 			) as TState;
 
+			const internal = flowState.internal ?? {};
 			const firstNode = await resolveNextNode(startEdge, mergedState);
-			return executeFrom(
-				firstNode,
-				mergedState,
-				nodes,
-				edges,
-				validators,
-				meta,
-				waniwani,
-				input.nodeOptions,
-				config.state,
-			);
+			return run(firstNode, mergedState, internal);
 		}
 
 		return {
@@ -397,6 +410,9 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		const _meta: Record<string, unknown> = requestExtra._meta ?? {};
 		const metaSessionId = extractSessionId(_meta);
 		let sessionId = metaSessionId ?? args.sessionId;
+		// A session id the caller supplied may already carry flow history; one we
+		// generate below cannot.
+		const sessionIsPreexisting = Boolean(sessionId);
 
 		// Auto-generate session ID for clients that don't provide one (e.g. Claude Code)
 		if (!sessionId && args.action === "start") {
@@ -413,13 +429,34 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 		const waniwani = extractScopedClient(requestExtra);
 
-		const result = await handleToolCall(args, sessionId, _meta, waniwani);
+		const result = await handleToolCall(
+			args,
+			sessionId,
+			sessionIsPreexisting,
+			_meta,
+			waniwani,
+		);
 
 		// Echo sessionId in response when not sourced from _meta (client must pass it back)
 		const contentObj =
 			!metaSessionId && sessionId
 				? { ...result.content, sessionId }
 				: result.content;
+
+		// The intro goes on whichever response the engine returns first for a
+		// session, so it lands even when pre-filled state skips the flow's opening
+		// nodes, and taking it off the internal state is what keeps it to once per
+		// conversation. Error responses keep it pending: the assistant may never
+		// surface one to the user, so delivering it there would spend it on a
+		// message nobody reads.
+		const { value: intro, internal } =
+			contentObj.status === "error"
+				? { value: undefined, internal: result.internal ?? {} }
+				: takeInternalField(result.internal, "intro");
+
+		// `intro` first so it reads as the opening instruction rather than a
+		// trailing detail after the question and its schema.
+		const payload = intro ? { intro, ...contentObj } : contentObj;
 
 		// Authoritative for the turn: an empty array clears pills an earlier flow
 		// call in the same turn set. Only the single-open-question shorthand
@@ -438,8 +475,9 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		// TODO: expose a `deleteOnComplete` compile option for customers who
 		// want the prior behavior (drop the session as soon as END is reached).
 		if (sessionId && result.flowTokenContent) {
+			const tokenContent = withInternalState(result.flowTokenContent, internal);
 			try {
-				await store.set(sessionId, result.flowTokenContent);
+				await store.set(sessionId, tokenContent);
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
 				reportSessionError({
@@ -472,7 +510,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		const content = [
 			{
 				type: "text" as const,
-				text: JSON.stringify(contentObj, null, 2),
+				text: JSON.stringify(payload, null, 2),
 			},
 		];
 
@@ -486,7 +524,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 		return {
 			content,
-			structuredContent: contentObj as Record<string, unknown>,
+			structuredContent: payload as Record<string, unknown>,
 			_meta,
 			...(result.content.status === "error" ? { isError: true } : {}),
 		};

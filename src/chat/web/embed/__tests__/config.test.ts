@@ -208,6 +208,14 @@ describe("parseConfigFromScript — render mode attrs", () => {
 		expect(cfg.mode).toBe("floating");
 	});
 
+	test("data-mode=composer parses", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-mode": "composer",
+		});
+		expect(cfg.mode).toBe("composer");
+	});
+
 	test("invalid data-mode is ignored", async () => {
 		const cfg = await parseWithAttrs({
 			"data-token": "tok",
@@ -474,6 +482,26 @@ describe("resolveConfig — assistantBubble precedence", () => {
 			{ appearance: { assistantBubble: false } },
 		);
 		expect(config.appearance?.assistantBubble).toBe(false);
+	});
+});
+
+describe("resolveConfig — channelId precedence", () => {
+	test("remote channelId fills in on a token-only config", () => {
+		const config = resolveConfig({ token: "tok" }, { channelId: "chan_srv" });
+		expect(config.channelId).toBe("chan_srv");
+	});
+
+	test("host-supplied channelId wins over remote", () => {
+		const config = resolveConfig(
+			{ token: "tok", channelId: "chan_host" },
+			{ channelId: "chan_srv" },
+		);
+		expect(config.channelId).toBe("chan_host");
+	});
+
+	test("channelId stays unset when neither layer supplies one", () => {
+		const config = resolveConfig({ token: "tok" }, {});
+		expect(config.channelId).toBeUndefined();
 	});
 });
 

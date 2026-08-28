@@ -19,6 +19,7 @@ import {
 	getOrCreateVisitorId,
 	setVisitorId,
 } from "../lib/visitor-context";
+import { ComposerChat, type ComposerChatHandle } from "./composer-chat";
 import type { EmbedConfig } from "./config";
 import {
 	DEFAULT_EMBED_HEIGHT,
@@ -47,16 +48,16 @@ declare global {
 			chat?: {
 				init: (options?: Partial<EmbedConfig>) => EmbedInstance;
 				destroy: () => void;
-				/** Open the floating panel. No-op in inline mode. */
+				/** Open the chat panel. No-op in inline mode. */
 				open: () => void;
-				/** Close the floating panel. No-op in inline mode. */
+				/** Close the chat panel. No-op in inline mode. */
 				close: () => void;
-				/** Toggle the floating panel. No-op in inline mode. */
+				/** Toggle the chat panel. No-op in inline mode. */
 				toggle: () => void;
 				/**
 				 * Submit a user message to the chat. No-op if the embed has not
-				 * mounted yet or the inner layout has not attached. In floating
-				 * mode this also opens the panel.
+				 * mounted yet or the inner layout has not attached. In floating and
+				 * composer mode this also opens the panel.
 				 */
 				sendMessage: (text: string) => void;
 				/**
@@ -144,6 +145,10 @@ type MountedEmbed = Omit<
 let currentInstance: EmbedInstance | null = null;
 let reactRoot: ReactDOM.Root | null = null;
 let hostElement: HTMLElement | null = null;
+// Second, body-level host used by `composer` mode for the overlay panel. The
+// in-flow composer lives in `hostElement`; the panel is portaled here so a
+// transformed ancestor in the host's markup can't become its containing block.
+let panelHostElement: HTMLElement | null = null;
 let containerResizeObserver: ResizeObserver | null = null;
 
 // ---------------------------------------------------------------------------
@@ -191,6 +196,13 @@ const CONTAINER_CHROME_CSS = `:where([data-waniwani-embed]){border-style:solid;b
 // the same `--ww-*` vars so customer `appearance.variables` override them.
 // `:where()` => any author rule targeting `[data-waniwani-embed]` still wins.
 const AUTO_CARD_CSS = `:where([data-waniwani-embed][data-waniwani-auto]){width:100%;max-width:28rem;margin-inline:auto;border-radius:16px;overflow:hidden;border-style:solid;border-width:var(--ww-border-width,1px);border-color:var(--ww-border,rgba(0,0,0,0.1));box-shadow:var(--ww-shadow,0 10px 30px rgba(0,0,0,0.08))}`;
+
+// Card defaults for a container we auto-create in `composer` mode. The
+// composer draws its own border, radius and shadow, so this only bounds and
+// centers the block — no chrome of its own to double up, and no height (the
+// composer is content-sized).
+const COMPOSER_AUTO_STYLE_ID = "waniwani-chat-composer-auto";
+const COMPOSER_AUTO_CSS = `:where([data-waniwani-embed][data-waniwani-auto]){width:100%;max-width:40rem;margin-inline:auto}`;
 
 function ensureStyle(id: string, css: string): void {
 	if (typeof document === "undefined" || document.getElementById(id)) {
@@ -572,6 +584,133 @@ function mountFloating(
 }
 
 // ---------------------------------------------------------------------------
+// Mount — composer
+// ---------------------------------------------------------------------------
+
+function mountComposer(
+	config: EmbedConfig,
+	programmatic: Partial<EmbedConfig> | undefined,
+	scriptConfig: Partial<EmbedConfig> | undefined,
+	scriptEl: HTMLScriptElement | null,
+): MountedEmbed {
+	// The composer itself mounts in the page flow, like the inline embed: same
+	// `[data-waniwani-embed]` contract, auto-created in front of the script tag
+	// when the page has none.
+	const container = ensureInlineContainer(scriptEl);
+
+	// No `SIZING_DEFAULTS_CSS` and no `data-height` here: the composer is one
+	// input, sized by its content, so the inline embed's 500px default would
+	// leave a tall empty box. Container chrome is skipped too — the composer
+	// draws its own border, radius and shadow, and a second set around it would
+	// read as a box inside a box. `applyContainerAppearance` still runs so
+	// `appearance.variables.boxShadow` / `borderColor` reach the composer: CSS
+	// custom properties inherit into the shadow root through the composed tree.
+	if (container.hasAttribute(AUTO_MARKER_ATTR)) {
+		ensureStyle(COMPOSER_AUTO_STYLE_ID, COMPOSER_AUTO_CSS);
+	}
+	applyContainerAppearance(container, config);
+
+	hostElement = document.createElement("div");
+	hostElement.id = "waniwani-chat-embed";
+	hostElement.style.cssText = "display:block;width:100%;";
+	container.appendChild(hostElement);
+
+	const shadowRoot = hostElement.attachShadow({ mode: "open" });
+	injectStyles(shadowRoot, config);
+
+	const mountContainer = document.createElement("div");
+	mountContainer.className = "ww:contents";
+	shadowRoot.appendChild(mountContainer);
+
+	// Viewport-sized, click-through overlay for the panel — the same host
+	// `floating` mode uses, and for the same reason: the panel is fixed to the
+	// viewport, and the host page must stay interactive everywhere the panel
+	// isn't. It gets its own shadow root (styles are scoped per root), and the
+	// mount node below is the portal target the composer renders the panel into.
+	panelHostElement = document.createElement("div");
+	panelHostElement.id = "waniwani-chat-panel";
+	panelHostElement.style.cssText =
+		"position:fixed;inset:0;z-index:2147483000;pointer-events:none;";
+	document.body.appendChild(panelHostElement);
+
+	const panelShadowRoot = panelHostElement.attachShadow({ mode: "open" });
+	injectStyles(panelShadowRoot, config);
+
+	const panelContainer = document.createElement("div");
+	panelContainer.className = "ww:contents";
+	panelShadowRoot.appendChild(panelContainer);
+
+	const composerRef = React.createRef<ComposerChatHandle>();
+
+	// Collapse the container (which we own, outside React) on gated pages so it
+	// shows no empty box. Pre-hide synchronously from the sessionStorage cache
+	// so repeat visits to a gated page don't flash before the fetch resolves;
+	// `onVisibilityChange` then keeps it in sync (incl. SPA route changes).
+	const toggleContainer = (vis: boolean) => {
+		if (container instanceof HTMLElement) {
+			container.style.display = vis ? "" : "none";
+		}
+	};
+	if (config.token) {
+		const cached = loadCachedConfig(
+			config.api ?? "",
+			config.token,
+			config.channelId,
+		);
+		if (
+			cached?.visibility &&
+			!isVisibleForPath(cached.visibility, window.location.pathname)
+		) {
+			toggleContainer(false);
+		}
+	}
+
+	reactRoot = ReactDOM.createRoot(mountContainer);
+	reactRoot.render(
+		React.createElement(ComposerChat, {
+			ref: composerRef,
+			config,
+			programmatic,
+			scriptConfig,
+			panelContainer,
+			onVisibilityChange: toggleContainer,
+		}),
+	);
+
+	return {
+		destroy: () => {
+			reactRoot?.unmount();
+			reactRoot = null;
+			hostElement?.remove();
+			hostElement = null;
+			panelHostElement?.remove();
+			panelHostElement = null;
+			// Remove the container too, but only if WE created it — leave any
+			// author-placed `[data-waniwani-embed]` element in the page so
+			// `destroy()` doesn't strip the host's own markup.
+			if (container.hasAttribute(AUTO_MARKER_ATTR)) {
+				container.remove();
+			}
+			currentInstance = null;
+		},
+		open: () => composerRef.current?.open(),
+		close: () => composerRef.current?.close(),
+		toggle: () => composerRef.current?.toggle(),
+		sendMessage: (text: string) => composerRef.current?.sendMessage(text),
+		sendMessageAndWait: async (text: string) => {
+			if (!composerRef.current) {
+				return undefined;
+			}
+			return composerRef.current.sendMessageAndWait(text);
+		},
+		reset: () => composerRef.current?.reset(),
+		focus: () => composerRef.current?.focus(),
+		getMessages: () => composerRef.current?.getMessages() ?? [],
+		getSessionId: () => composerRef.current?.getSessionId(),
+	};
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -598,10 +737,14 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 	// `WaniWani.chat.setVisitorId()`.
 	applyVisitorId(config.visitorId);
 
-	const mounted =
-		config.mode === "floating"
-			? mountFloating(config, options, scriptConfig)
-			: mountInline(config, options, scriptConfig, scriptEl);
+	let mounted: MountedEmbed;
+	if (config.mode === "floating") {
+		mounted = mountFloating(config, options, scriptConfig);
+	} else if (config.mode === "composer") {
+		mounted = mountComposer(config, options, scriptConfig, scriptEl);
+	} else {
+		mounted = mountInline(config, options, scriptConfig, scriptEl);
+	}
 
 	// Host-page tracking rides on the same public token and channel the chat
 	// itself uses; the session id attaches live once the first exchange
@@ -611,7 +754,12 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 		? createChatTrackClient({
 				api,
 				token: config.token,
-				channelId: config.channelId,
+				// Host-supplied channel wins; a token-only embed reads the
+				// server-resolved channel from the cached `/config`, same as
+				// `getSource` below.
+				channelId: () =>
+					config.channelId ??
+					loadCachedConfig(api, config.token, config.channelId)?.channelId,
 				getSource: () =>
 					loadCachedConfig(api, config.token, config.channelId)?.source ??
 					undefined,

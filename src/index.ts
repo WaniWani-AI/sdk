@@ -1,6 +1,12 @@
 // Waniwani SDK
 
 // Error
+export type {
+	DocumentExtractInput,
+	DocumentExtractResult,
+	DocumentSchema,
+	DocumentsClient,
+} from "./documents/types.js";
 export { WaniWaniError } from "./error.js";
 
 // Types - KB Client

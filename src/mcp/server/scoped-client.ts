@@ -1,3 +1,9 @@
+import { createDocumentsClient } from "../../documents/client.js";
+import type {
+	DocumentExtractInput,
+	DocumentExtractResult,
+	DocumentsClient,
+} from "../../documents/types.js";
 import type { KbClient } from "../../kb/types.js";
 import type {
 	CallableTrack,
@@ -6,7 +12,11 @@ import type {
 	TrackingClient,
 } from "../../tracking/@types.js";
 import { createRevenueApi } from "../../tracking/revenue.js";
+import { DEFAULT_API_URL } from "../../types.js";
 import {
+	type AttachedFile,
+	extractAttachedFiles,
+	extractCorrelationId,
 	extractExternalUserId,
 	extractSessionId,
 	extractVisitorId,
@@ -60,6 +70,14 @@ export interface ScopedWaniWaniClient {
 	): Promise<{ eventId: string }>;
 	/** Knowledge base client (no meta needed). */
 	readonly kb: KbClient;
+	/**
+	 * Files the host attached to this tool call, each with a fetchable `url` and
+	 * a `filename` — spread one straight into `documents.extract()`. Empty on
+	 * hosts that attach nothing.
+	 */
+	readonly attachedFiles: AttachedFile[];
+	/** Documents client; `sessionId` and `correlationId` are carried from the request. */
+	readonly documents: DocumentsClient;
 	/** @internal Resolved API config from withWaniwani(). */
 	readonly _config?: { apiUrl?: string; apiKey?: string };
 }
@@ -89,8 +107,15 @@ export function createScopedClient(
 	const trackOnce = (event: TrackInput): Promise<{ eventId: string }> =>
 		base.track({ ...event, meta: { ...meta, ...event.meta } });
 
+	const sessionId = extractSessionId(meta);
+	const correlationId = extractCorrelationId(meta);
+	const documents = createDocumentsClient({
+		apiUrl: config?.apiUrl ?? process.env.WANIWANI_API_URL ?? DEFAULT_API_URL,
+		apiKey: config?.apiKey,
+	});
+
 	return {
-		sessionId: extractSessionId(meta),
+		sessionId,
 		visitorId: extractVisitorId(meta),
 		externalUserId: extractExternalUserId(meta),
 		track: Object.assign(trackOnce, createRevenueApi(trackOnce)),
@@ -98,6 +123,18 @@ export function createScopedClient(
 			return base.identify(userId, properties, meta);
 		},
 		kb: base.kb,
+		attachedFiles: extractAttachedFiles(meta),
+		documents: {
+			extract<T>(
+				input: DocumentExtractInput<T>,
+			): Promise<DocumentExtractResult<T>> {
+				return documents.extract({
+					...input,
+					sessionId: input.sessionId ?? sessionId,
+					correlationId: input.correlationId ?? correlationId,
+				});
+			},
+		},
 		_config: config,
 	};
 }

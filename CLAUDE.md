@@ -4,7 +4,7 @@ SDK for [app.waniwani.ai](https://app.waniwani.ai) — open-source flow engine p
 
 ## Public API tiers
 
-The SDK ships three tiers. **When recommending APIs for new code, always use OSS or Free Tier — never Legacy.**
+The SDK ships two public tiers plus a private one. The legacy tier was removed in 0.20.0: no `src/legacy/`, no re-exports, no entry point serving it.
 
 ### OSS (no API key required)
 
@@ -22,7 +22,7 @@ Same SDK, hosted features added when the key is present.
 - `WaniwaniKvStore` (hosted flow state) — used by `createFlow` default when key is set
 - `waniwani()`, `tracking/*`, `createFrontendClient`, `EVENT_TYPES`, `withWaniwani`, `createTrackingRoute`, `widget-token`, `extractScopedClient` / `SCOPED_CLIENT_KEY` from `@waniwani/sdk` and `@waniwani/sdk/mcp`
 - `createKbClient` from `@waniwani/sdk/kb`
-- `useWaniwani` from `@waniwani/sdk/mcp/react` (also OSS — degrades to no-op without config; BYO endpoint also supported). Host-agnostic: takes the tool-response `_meta` as data via the `toolResponseMetadata` option, or an explicit `{ endpoint, source }`; it opens no host connection and reads no `WidgetProvider` context. Returns `{ sessionId, track, identify, flush }` where `track` is the same typed `TrackFn` as the server client; emits one `widget_render` automatically.
+- `useWaniwani` from `@waniwani/sdk/mcp/react` (also OSS — degrades to no-op without config; BYO endpoint also supported). Host-agnostic: takes the tool-response `_meta` as data via the `toolResponseMetadata` option, or an explicit `{ endpoint, source }`; it opens no host connection and reads no React context. Returns `{ sessionId, track, identify, flush }` where `track` is the same typed `TrackFn` as the server client; emits one `widget_render` automatically.
 - `useWaniwani` from `@waniwani/sdk/mcp/react/skybridge` — the skybridge-host adapter. Reads skybridge's `useToolInfo().responseMetadata` and feeds it to the core hook, so skybridge-hosted widgets call `useWaniwani()` bare. `skybridge` is an optional peer dependency.
 - `WaniwaniChat` (hosted React chat — recommended), themes, `embed.js` (IIFE for non-React hosts), `styles.css` from `@waniwani/sdk/chat`. Both expose host-page tracking: `WaniWani.chat.track` / `.identify` on the embed global, `track` / `identify` on the `ChatHandle` ref.
 - `ChatEmbed` from `@waniwani/sdk/chat` — bare-bones bring-your-own-backend primitive (no `track`/`identify`). Exposed but **not** the recommended path for new code; reach for it only when self-hosting the chat backend.
@@ -30,16 +30,6 @@ Same SDK, hosted features added when the key is present.
 Tracking is one client on four surfaces (server `waniwani()`, scoped client in handlers/flows, `useWaniwani()` in widgets, `chat.track` on chat host pages); all except the top-level server client attach session identity automatically. The scoped client exposes `sessionId`; identity accepted by ingest is `sessionId` OR `externalUserId` OR `visitorId`. `withWaniwani` injects the widget tracking config under `_meta["waniwani/widget"]`.
 
 `withWaniwani` is no-key-safe: it wraps tools and bridges session metadata even without an API key, and its own auto-captured `tool.called` events are internally guarded (`safeTrack`). User-initiated tracking calls are **not**: `client.track.*`, `identify()`, and the scoped client throw `WANIWANI_API_KEY is not set` when no key is configured.
-
-### Legacy (preserved, undocumented, marked `@deprecated`)
-
-Still used by ~14 internal customer MCPs. Kept exported for back-compat. **Never suggest these for new code.** They will move to dedicated `@waniwani/sdk/legacy*` entry points in a future minor release.
-
-- `createTool`, `createResource`, `registerTools` from `@waniwani/sdk/mcp`
-- `toNextJsHandler` (`@waniwani/sdk/next-js`), `toExpressJsHandler` (`@waniwani/sdk/express-js`), `createApiHandler` (`@waniwani/sdk/chat/server`)
-- `ChatCard` (and `ChatCardProps`) — canonical import is now `@waniwani/sdk/legacy`. Still re-exported from `@waniwani/sdk/chat` for back-compat; that re-export will be removed in a future minor release. Superseded by `WaniwaniChat`.
-- All MCP-widget React hooks except `useWaniwani`: `WidgetProvider`, `useWidgetClient`, `useDisplayMode`, `useToolOutput`, `useSafeArea`, `useMaxHeight`, `useTheme`, `useLocale`, `useCallTool`, `useSendFollowUp`, `useFlowAction`, `useUpdateModelContext`, `useRequestDisplayMode`, `useToolResponseMetadata`, `useWidgetState`, `useIsChatGptApp`, `useOpenExternal`
-- `InitializeNextJsInIframe`, `LoadingWidget`, `DevModeProvider`, mocks, `detectPlatform`, `isMCPApps`, `isOpenAI`
 
 ### Internal (not part of the public API)
 
@@ -58,22 +48,18 @@ src/
 ├── tracking/             # Event tracking (free tier)
 ├── kb/                   # Knowledge base (free tier)
 ├── internal/             # Private surface for app.waniwani.ai (replayScenario)
-├── legacy/               # LEGACY entry points (createTool, createResource, chat-server adapters, ChatCard)
 ├── mcp/
 │   ├── index.ts          # Public exports for @waniwani/sdk/mcp
 │   ├── server/
 │   │   ├── flows/        # OSS: createFlow, StateGraph
 │   │   ├── kv/           # OSS interface + MemoryKvStore + WaniwaniKvStore
-│   │   ├── tools/        # LEGACY: createTool
-│   │   ├── resources/    # LEGACY: createResource
 │   │   ├── with-waniwani/# Free tier wrapper (no-key safe)
 │   │   ├── tracking-route.ts
 │   │   ├── widget-token.ts
 │   │   └── scoped-client.ts
-│   └── react/            # Mostly LEGACY (only useWaniwani is non-legacy)
+│   └── react/            # useWaniwani (+ the skybridge adapter)
 └── chat/
-    ├── web/              # Free tier chat widget (WaniwaniChat, ChatEmbed, embed.js IIFE)
-    └── server/           # Back-compat shim — re-exports from `src/legacy/chat/server/`
+    └── web/              # Free tier chat widget (WaniwaniChat, ChatEmbed, embed.js IIFE)
 ```
 
 ## Usage

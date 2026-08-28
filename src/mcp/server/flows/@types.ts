@@ -7,7 +7,6 @@ import type {
 	ToolAnnotations,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
-import type { RegisteredTool } from "../../../legacy/mcp/tools/types";
 import type { ScopedWaniWaniClient } from "../scoped-client";
 import type { McpServer } from "../types";
 import type { FieldSchemaInfo } from "./field-schema";
@@ -17,6 +16,21 @@ import type { FlowOutputSchema } from "./output-schema";
 export type { FieldSchemaInfo };
 
 export type { McpServer };
+
+/**
+ * A tool object `showWidget` can render, as opposed to a bare tool name.
+ *
+ * Structural on purpose: anything carrying these four members satisfies it,
+ * so a server that registers its tools by hand keeps working without
+ * importing a factory from this package.
+ */
+export type RegisteredTool = {
+	id: string;
+	title: string;
+	description: string;
+	/** Register the tool on the server */
+	register: (server: McpServer) => Promise<void>;
+};
 
 // ============================================================================
 // Sentinel constants
@@ -442,6 +456,35 @@ export type FlowGraph = {
 // Flow config & compiled output
 // ============================================================================
 
+/**
+ * The intro delivered the first time a session touches the flow.
+ *
+ * A bare string is shorthand for `{ verbatim: "…" }`.
+ *
+ * - `verbatim` — reproduced word for word by the assistant. Use it for legal
+ *   notices (GDPR, data controller, retention) that must survive intact.
+ * - `instructions` — guidance the assistant writes its own opening from.
+ *
+ * Set both and the assistant writes the surrounding prose from
+ * `instructions` while keeping the `verbatim` text untouched.
+ */
+export type FlowIntro =
+	| string
+	| {
+			/** Text the assistant must reproduce word for word. */
+			verbatim?: string;
+			/** How the assistant should write the introduction around it. */
+			instructions?: string;
+	  };
+
+/** Normalized intro as it appears in the flow tool response. */
+export type FlowIntroPayload = {
+	/** Deliver word for word — no paraphrase, no translation, no reformatting. */
+	verbatim?: string;
+	/** Guidance for the assistant's own wording. */
+	instructions?: string;
+};
+
 export type FlowConfig = {
 	/** Unique identifier for the flow (becomes the MCP tool name) */
 	id: string;
@@ -449,6 +492,26 @@ export type FlowConfig = {
 	title: string;
 	/** Description for the AI (explains when to use this flow) */
 	description: string;
+	/**
+	 * Opening message for the session's first flow response — an introduction,
+	 * a GDPR notice, or both. Attached to whichever response the engine returns
+	 * first, so it lands even when pre-filled state skips the flow's opening
+	 * nodes, and it is never repeated once delivered.
+	 *
+	 * @example
+	 * ```ts
+	 * intro: "Acme is the data controller. Your answers are used for this quote only."
+	 * ```
+	 *
+	 * @example
+	 * ```ts
+	 * intro: {
+	 *   verbatim: "Acme is the data controller. Your answers are deleted after 30 days.",
+	 *   instructions: "Introduce yourself as Léa from Acme in one short sentence first.",
+	 * }
+	 * ```
+	 */
+	intro?: FlowIntro;
 	/**
 	 * Define the flow's state — each field the flow collects.
 	 * Keys are the field names used in `interrupt({ field })`,
@@ -563,11 +626,36 @@ export type FlowToolInput = {
 	sessionId?: string;
 };
 
+/**
+ * The engine's own state for a session, persisted in the same record as the
+ * flow's state and kept strictly apart from it.
+ *
+ * Not flow state: nothing here is declared by the author, reaches a node, or
+ * can be written through `stateUpdates`.
+ *
+ * One optional field per engine feature that carries something across calls. A
+ * field is seeded when the session starts and taken off once the engine has
+ * used it, so presence means "still pending" and absence means "done". Seeding,
+ * reading and persisting all go through `internal-state.ts`, which carries
+ * unrecognized fields through untouched: a field a newer version wrote survives
+ * a call served by an older one, and adding a field never strands sessions
+ * across a deploy.
+ */
+export type FlowInternalState = {
+	/**
+	 * The flow's intro, waiting to ride on the session's first response. Gone
+	 * once delivered, so later responses in the same conversation leave it out.
+	 */
+	intro?: FlowIntroPayload;
+};
+
 export type FlowTokenContent = {
 	step?: string;
 	state: Record<string, unknown>;
 	field?: string;
 	widgetId?: string;
+	/** The engine's own state for this session. Never flow state. */
+	internal?: FlowInternalState;
 };
 
 export type InterruptQuestionData = {
@@ -585,6 +673,8 @@ export type InterruptQuestionData = {
 
 export type FlowInterruptContent = {
 	status: "interrupt";
+	/** Opening message for the session's first flow response. */
+	intro?: FlowIntroPayload;
 	/** Single-question shorthand */
 	question?: string;
 	field?: string;
@@ -598,6 +688,8 @@ export type FlowInterruptContent = {
 
 export type FlowWidgetContent = {
 	status: "widget";
+	/** Opening message for the session's first flow response. */
+	intro?: FlowIntroPayload;
 	/** Display tool to call */
 	tool: string;
 	/** Data to pass to the display tool */
@@ -618,6 +710,8 @@ export type FlowWidgetContent = {
 
 export type FlowCompleteContent = {
 	status: "complete";
+	/** Opening message for the session's first flow response. */
+	intro?: FlowIntroPayload;
 };
 
 export type FlowErrorContent = {

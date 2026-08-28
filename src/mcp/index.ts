@@ -9,12 +9,15 @@ export type {
 	AddNodeConfig,
 	ConditionFn,
 	FlowConfig,
+	FlowIntro,
+	FlowIntroPayload,
 	FlowTestResult,
 	InferFlowState,
 	InterruptSignal,
 	NodeContext,
 	NodeHandler,
 	RegisteredFlow,
+	RegisteredTool,
 	TypedInterrupt,
 	TypedShowWidget,
 	WidgetSignal,
@@ -30,7 +33,6 @@ export {
 // Generic key-value store — OSS interface, free-tier hosted impl
 export type { KvStore, KvStoreSetOptions } from "./server/kv";
 export { MemoryKvStore, WaniwaniKvStore } from "./server/kv";
-// Scoped client — free tier (used inside withWaniwani-wrapped tools)
 export type { ScopedWaniWaniClient } from "./server/scoped-client";
 export { extractScopedClient, SCOPED_CLIENT_KEY } from "./server/scoped-client";
 // Tracking helpers — free tier
@@ -38,42 +40,7 @@ export type { TrackingRouteOptions } from "./server/tracking-route";
 export { createTrackingRoute } from "./server/tracking-route";
 // Shared MCP server types (non-legacy)
 export type { McpServer, ZodRawShapeCompat } from "./server/types";
+// Scoped client — free tier (used inside withWaniwani-wrapped tools)
+export type { AttachedFile } from "./server/utils";
 export type { WithWaniwaniOptions } from "./server/with-waniwani/index";
 export { withWaniwani } from "./server/with-waniwani/index";
-
-// ----------------------------------------------------------------------------
-// Legacy — preserved for back-compat. Prefer `@waniwani/sdk/legacy` for new code
-// that still needs these primitives. These exports will be removed from
-// `@waniwani/sdk/mcp` in a future major release.
-// ----------------------------------------------------------------------------
-
-// Platform detection (legacy widget host detection)
-export type { WidgetPlatform } from "../legacy/mcp/react/widgets/platform";
-export {
-	detectPlatform,
-	isMCPApps,
-	isOpenAI,
-} from "../legacy/mcp/react/widgets/platform";
-// Widget client types (legacy)
-export type {
-	HostContext,
-	ToolCallResult,
-	ToolResult,
-	UnifiedWidgetClient,
-} from "../legacy/mcp/react/widgets/widget-client";
-// Resources (legacy)
-export type {
-	RegisteredResource,
-	ResourceConfig,
-	WidgetCSP,
-} from "../legacy/mcp/resources";
-export { createResource } from "../legacy/mcp/resources";
-// Tool creation (legacy)
-export { createTool, registerTools } from "../legacy/mcp/tools/create-tool";
-export type {
-	RegisteredTool,
-	ToolConfig,
-	ToolHandler,
-	ToolHandlerContext,
-	ToolToolCallback,
-} from "../legacy/mcp/tools/types";

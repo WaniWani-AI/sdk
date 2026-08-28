@@ -32,6 +32,7 @@ it is the complete page index, always current, and cheap to read.
 | Install the package, pick an entry point | [/sdk/configuration/installation](https://docs.waniwani.ai/sdk/configuration/installation), [/sdk/reference/entry-points](https://docs.waniwani.ai/sdk/reference/entry-points) |
 | Get a free API key | [/sdk/configuration/api-key](https://docs.waniwani.ai/sdk/configuration/api-key) |
 | Learn the flow engine | [/sdk/flows/overview](https://docs.waniwani.ai/sdk/flows/overview), then [architecture](https://docs.waniwani.ai/sdk/flows/architecture), [state](https://docs.waniwani.ai/sdk/flows/state), [nodes](https://docs.waniwani.ai/sdk/flows/nodes), [edges](https://docs.waniwani.ai/sdk/flows/edges), [interrupts](https://docs.waniwani.ai/sdk/flows/interrupts), [register](https://docs.waniwani.ai/sdk/flows/register) |
+| Open a flow with an introduction or a GDPR notice | [/sdk/flows/intro](https://docs.waniwani.ai/sdk/flows/intro) |
 | Plug in Redis / Upstash / Cloudflare KV / DynamoDB | [/sdk/flows/kv-store](https://docs.waniwani.ai/sdk/flows/kv-store), [/sdk/reference/kv-store-api](https://docs.waniwani.ai/sdk/reference/kv-store-api) |
 | Build a specific funnel | [/sdk/guides/funnels](https://docs.waniwani.ai/sdk/guides/funnels), then [sales-funnel](https://docs.waniwani.ai/sdk/guides/sales-funnel), [lead-generation](https://docs.waniwani.ai/sdk/guides/lead-generation), [booking](https://docs.waniwani.ai/sdk/guides/booking), [insurance-quote](https://docs.waniwani.ai/sdk/guides/insurance-quote) |
 | See a full worked example | [/sdk/guides/pet-insurance](https://docs.waniwani.ai/sdk/guides/pet-insurance) |
@@ -87,16 +88,21 @@ Drop the `{ store }` argument once `WANIWANI_API_KEY` is set and flow state move
 With neither a store nor a key, `.compile()` throws and tells you how to fix it. There is no silent
 fallback.
 
-## Legacy surfaces: never recommend these
+## Removed surfaces
 
-Still exported so existing customer MCPs keep working, no longer documented for new code:
+Removed in 0.20.0. An import error for any of these means the code is on a pre-0.20 pattern:
 `createTool`, `createResource`, `registerTools`, `toNextJsHandler`, `toExpressJsHandler`,
 `createApiHandler`, `ChatCard`, every MCP-widget React hook except `useWaniwani` (`WidgetProvider`,
 `useWidgetClient`, `useToolOutput`, and the rest), `InitializeNextJsInIframe`, `LoadingWidget`,
 `DevModeProvider`, `detectPlatform`, `isMCPApps`, `isOpenAI`.
 
-Use `createFlow` instead of `createTool` / `createResource`. These will move to dedicated
-`@waniwani/sdk/legacy*` entry points in a future minor release.
+The `@waniwani/sdk/legacy`, `@waniwani/sdk/legacy/react`, `@waniwani/sdk/legacy/next-js`,
+`@waniwani/sdk/legacy/express-js`, `@waniwani/sdk/chat/server`, `@waniwani/sdk/next-js`, and
+`@waniwani/sdk/express-js` entry points no longer exist.
+
+Use `createFlow` for multi-step tools, `server.registerTool` for single-shot ones, and
+`WaniwaniChat` for chat. `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.19-to-0.20`
+applies the whole migration.
 
 `@waniwani/sdk/evals` was removed entirely. See the
 [changelog](https://docs.waniwani.ai/sdk/changelog).
@@ -118,7 +124,7 @@ Every version hop also ships a self-contained migration skill you can invoke dir
 `migrate-waniwani-sdk-<from>-to-<to>`. For the latest release:
 
 ```bash
-npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.18-to-0.19
+npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.19-to-0.20
 ```
 
 ## Guided playbooks
@@ -148,6 +154,9 @@ npx skills add Waniwani-AI/sdk -s audit-tracking        # read-only audit of an 
   `@waniwani/sdk/mcp/react`, the chat widget from `@waniwani/sdk/chat`.
 - **Forgetting `START` / `END` edges**: every flow needs `addEdge(START, firstNode)` and
   `addEdge(lastNode, END)`.
+- **Adding a first node just to greet the user or state a GDPR notice**: pre-filled state skips
+  opening nodes, so that message never lands. Use `intro` on the flow config instead
+  ([/sdk/flows/intro](https://docs.waniwani.ai/sdk/flows/intro)).
 - **Calling `interrupt` / `showWidget` directly**: they come from the handler context,
   `({ interrupt }) => interrupt(...)`.
 - **Answering from memory**: if you have not fetched the docs page for what you are writing, fetch it.

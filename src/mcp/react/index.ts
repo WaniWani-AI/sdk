@@ -1,62 +1,9 @@
 // `@waniwani/sdk/mcp/react` entry point.
 //
-// Non-legacy: `useWaniwani` (standalone tracking hook) — see ./hooks/index.ts.
-// Legacy: everything else (MCP-widget-in-host bridge) — re-exported from
-// `src/legacy/mcp/react` for back-compat. New code should depend on
-// `@waniwani/sdk/legacy/react` for the legacy bits.
+// `useWaniwani` — the standalone tracking hook. Host-agnostic: it takes the
+// tool-response `_meta` as data, opens no host connection, and reads no
+// provider context. Skybridge-hosted widgets use the adapter at
+// `@waniwani/sdk/mcp/react/skybridge` instead of calling this directly.
 
-// Legacy — re-exported from src/legacy/mcp/react
-export type {
-	DeviceType,
-	DisplayMode,
-	FlowActionResult,
-	HostContext,
-	ModelContextContentBlock,
-	ModelContextUpdate,
-	SafeArea,
-	SafeAreaInsets,
-	SendFollowUpOptions,
-	Theme,
-	ToolCallResult,
-	ToolResult,
-	UnifiedWidgetClient,
-	UnknownObject,
-	UnstableSendFollowUpWithGhostGuardResult,
-	UserAgent,
-	WidgetPlatform,
-} from "../../legacy/mcp/react";
-export {
-	DevModeProvider,
-	detectPlatform,
-	getMockState,
-	InitializeNextJsInIframe,
-	initializeMockOpenAI,
-	isMCPApps,
-	isOpenAI,
-	LoadingWidget,
-	unstable_useSendFollowUpWithGhostGuard,
-	updateMockDisplayMode,
-	updateMockGlobal,
-	updateMockTheme,
-	updateMockToolOutput,
-	useCallTool,
-	useDisplayMode,
-	useFlowAction,
-	useIsChatGptApp,
-	useLocale,
-	useMaxHeight,
-	useOpenExternal,
-	useRequestDisplayMode,
-	useSafeArea,
-	useSendFollowUp,
-	useTheme,
-	useToolOutput,
-	useToolResponseMetadata,
-	useUpdateModelContext,
-	useWidgetClient,
-	useWidgetState,
-	WidgetProvider,
-} from "../../legacy/mcp/react";
-// Non-legacy
 export type { UseWaniwaniOptions, WaniwaniWidget } from "./hooks/index";
 export { useWaniwani } from "./hooks/index";
