@@ -120,16 +120,28 @@ interface RemoteConfigResponse {
 	visibility?: VisibilityRules | null;
 	/**
 	 * Documents module state for the project behind this token. Absent on
-	 * servers that predate the field, which the widget reads as off.
+	 * servers that predate the field, which the widget reads as off. Every member
+	 * is `unknown` because this one decides whether the uploader exists and what
+	 * caps it enforces, so a half-filled payload must not become a half-configured
+	 * uploader.
 	 */
-	documentUpload?: unknown;
+	documentUpload?: RemoteDocumentUpload | null;
 }
 
-function parseDocumentUpload(value: unknown): DocumentUploadConfig | null {
-	if (typeof value !== "object" || value === null) {
+interface RemoteDocumentUpload {
+	enabled?: unknown;
+	maxBytes?: unknown;
+	maxPdfPages?: unknown;
+	maxFiles?: unknown;
+	accept?: unknown;
+}
+
+function parseDocumentUpload(
+	raw: RemoteDocumentUpload | null | undefined,
+): DocumentUploadConfig | null {
+	if (typeof raw !== "object" || raw === null) {
 		return null;
 	}
-	const raw = value as Record<string, unknown>;
 	if (typeof raw.enabled !== "boolean") {
 		return null;
 	}
