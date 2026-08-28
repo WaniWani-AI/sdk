@@ -127,6 +127,21 @@ export default defineConfig([
 		outDir: "dist",
 		external: ["ai"],
 	},
+	// Documents (Node.js, server-side). `zod` stays external: a caller reaches
+	// this entry by passing a Zod schema, so it is always present.
+	{
+		entry: { "documents/index": "src/documents/index.ts" },
+		format: ["esm"],
+		target: "node20",
+		dts: true,
+		clean: false,
+		shims: true,
+		splitting: true,
+		sourcemap: true,
+		minify: true,
+		outDir: "dist",
+		external: ["zod"],
+	},
 	// Chat embed (self-contained IIFE for any website)
 	{
 		entry: { "chat/embed": "src/chat/web/embed/embed.ts" },

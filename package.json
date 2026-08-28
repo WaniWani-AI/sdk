@@ -36,6 +36,11 @@
       "import": "./dist/kb/index.js",
       "default": "./dist/kb/index.js"
     },
+    "./documents": {
+      "types": "./dist/documents/index.d.ts",
+      "import": "./dist/documents/index.js",
+      "default": "./dist/documents/index.js"
+    },
     "./internal": {
       "types": "./dist/internal/index.d.ts",
       "import": "./dist/internal/index.js",

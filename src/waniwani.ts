@@ -1,5 +1,6 @@
 // Waniwani SDK - Main Entry
 
+import { createDocumentsClient } from "./documents/client.js";
 import { createKbClient } from "./kb/client.js";
 import {
 	getGlobalConfig,
@@ -7,7 +8,11 @@ import {
 	type WaniWaniProjectConfig,
 } from "./project-config.js";
 import { createTrackingClient } from "./tracking/index.js";
-import type { WaniWaniClient, WaniWaniConfig } from "./types.js";
+import {
+	DEFAULT_API_URL,
+	type WaniWaniClient,
+	type WaniWaniConfig,
+} from "./types.js";
 
 /**
  * Create a Waniwani SDK client
@@ -38,9 +43,7 @@ export function waniwani(
 		| undefined;
 
 	const apiUrl =
-		effective?.apiUrl ??
-		process.env.WANIWANI_API_URL ??
-		"https://app.waniwani.ai";
+		effective?.apiUrl ?? process.env.WANIWANI_API_URL ?? DEFAULT_API_URL;
 	const apiKey = effective?.apiKey ?? process.env.WANIWANI_API_KEY;
 	const trackingConfig = {
 		endpointPath:
@@ -59,10 +62,12 @@ export function waniwani(
 	// Compose client from modules
 	const trackingClient = createTrackingClient(internalConfig);
 	const kbClient = createKbClient(internalConfig);
+	const documentsClient = createDocumentsClient(internalConfig);
 
 	return {
 		...trackingClient,
 		kb: kbClient,
+		documents: documentsClient,
 		_config: internalConfig,
 	};
 }

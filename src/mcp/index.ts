@@ -33,7 +33,6 @@ export {
 // Generic key-value store — OSS interface, free-tier hosted impl
 export type { KvStore, KvStoreSetOptions } from "./server/kv";
 export { MemoryKvStore, WaniwaniKvStore } from "./server/kv";
-// Scoped client — free tier (used inside withWaniwani-wrapped tools)
 export type { ScopedWaniWaniClient } from "./server/scoped-client";
 export { extractScopedClient, SCOPED_CLIENT_KEY } from "./server/scoped-client";
 // Tracking helpers — free tier
@@ -41,5 +40,7 @@ export type { TrackingRouteOptions } from "./server/tracking-route";
 export { createTrackingRoute } from "./server/tracking-route";
 // Shared MCP server types (non-legacy)
 export type { McpServer, ZodRawShapeCompat } from "./server/types";
+// Scoped client — free tier (used inside withWaniwani-wrapped tools)
+export type { AttachedFile } from "./server/utils";
 export type { WithWaniwaniOptions } from "./server/with-waniwani/index";
 export { withWaniwani } from "./server/with-waniwani/index";
