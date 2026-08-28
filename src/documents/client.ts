@@ -16,14 +16,31 @@ interface ExtractWireResponse {
 	documentId: string;
 }
 
-/** The platform names what it refused in the envelope's `message`; the raw body is the fallback. */
+/**
+ * The platform puts the machine-readable code on `message` and the human reason
+ * on `detail`, so a refusal reads as "UNSUPPORTED_DOCUMENT_TYPE: photo.heic is
+ * not one of ...". The raw body is the fallback.
+ */
 function refusalMessage(body: string, status: number): string {
 	try {
 		const parsed: unknown = JSON.parse(body);
-		if (parsed !== null && typeof parsed === "object" && "message" in parsed) {
-			const { message } = parsed;
-			if (typeof message === "string" && message.length > 0) {
-				return message;
+		if (parsed !== null && typeof parsed === "object") {
+			const code =
+				"message" in parsed && typeof parsed.message === "string"
+					? parsed.message
+					: "";
+			const detail =
+				"detail" in parsed && typeof parsed.detail === "string"
+					? parsed.detail
+					: "";
+			if (code && detail) {
+				return `${code}: ${detail}`;
+			}
+			if (code) {
+				return code;
+			}
+			if (detail) {
+				return detail;
 			}
 		}
 	} catch {
