@@ -79,6 +79,20 @@ export interface PageSuggestionsEntry {
  * public token. It only carries display-facing fields (title, welcome message,
  * placeholder, suggestions) — system prompt and step budget stay server-side.
  */
+/**
+ * Where the page finds the MCP server whose tools it publishes to a browsing
+ * agent, and whether to publish them at all.
+ */
+export interface WebMcpEmbedConfig {
+	/**
+	 * On unless explicitly switched off.
+	 *
+	 * The page's own switch, for markup that wants the chat but not the tools on
+	 * this particular page.
+	 */
+	enabled?: boolean;
+}
+
 export interface EmbedConfig {
 	/** Waniwani chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
 	api?: string;
@@ -101,6 +115,18 @@ export interface EmbedConfig {
 	visitorId?: VisitorIdInput;
 	/** Override MCP server URL (optional — resolved from environment by default). */
 	mcpServerUrl?: string;
+	/**
+	 * WebMCP: publish this site's MCP tools to a browsing agent standing on the
+	 * page, via `document.modelContext`.
+	 *
+	 * A third surface for the same flows, alongside the connector and this chat.
+	 * On by default, and needs no configuration: the token identifies the
+	 * environment and the hosted API resolves its MCP server per request, the
+	 * same way `/config` and `/resource` already do.
+	 *
+	 * Surfaced as `data-webmcp` on the script tag.
+	 */
+	webmcp?: WebMcpEmbedConfig;
 	/**
 	 * Agent channel ID. Sent to the chat API so the Waniwani app routes the
 	 * conversation to the right agent. Surfaced as `data-channel-id` on the
@@ -361,6 +387,15 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const mcpServerUrl = str("data-mcp-server-url");
 	if (mcpServerUrl) {
 		config.mcpServerUrl = mcpServerUrl;
+	}
+
+	// Declines the surface on a page that should stay quiet, without touching
+	// the channel every other page shares.
+	const webmcpFlag = str("data-webmcp");
+	if (webmcpFlag) {
+		config.webmcp = {
+			enabled: webmcpFlag !== "false" && webmcpFlag !== "off",
+		};
 	}
 
 	const channelId = str("data-channel-id");
