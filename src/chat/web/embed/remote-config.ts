@@ -335,7 +335,10 @@ export function useRemoteEmbedConfig(
 				api,
 				token,
 				channelId: channelId ?? remote.channelId,
-				mode: initialConfig.mode,
+				// `WidgetMode` names the surfaces that can be on screen, and
+				// `mode: "off"` mounts none — this hook only runs inside a mounted
+				// chat, so the branch is unreachable and reports no surface.
+				mode: initialConfig.mode === "off" ? undefined : initialConfig.mode,
 				source: remote.source,
 			});
 		};

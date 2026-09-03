@@ -215,10 +215,17 @@ export interface EmbedConfig {
 	 *   pills) into `[data-waniwani-embed]`, sized by your own CSS — a hero
 	 *   search box, a card in a help page. Sending the first message opens the
 	 *   same panel `"floating"` uses, over the page.
+	 * - `"off"` mounts no chat surface at all: no dock, no inline box, no
+	 *   panel. The script still publishes the site's tools over WebMCP and
+	 *   still exposes `WaniWani.chat.track` / `.identify` on the host page, so
+	 *   a site can carry the tag (and be reachable by a browsing agent)
+	 *   without showing a widget to its visitors. The chat methods
+	 *   (`open()`, `sendMessage()`, …) are no-ops, and no `page.viewed` event
+	 *   fires because no chat loads its channel config.
 	 *
 	 * Surfaced as `data-mode` on the embed script tag.
 	 */
-	mode?: "inline" | "floating" | "composer";
+	mode?: "inline" | "floating" | "composer" | "off";
 	/**
 	 * Default height for the inline embed container. Any CSS length
 	 * (`"500px"`, `"80vh"`, …) or a bare number (treated as `px`). Applied to
@@ -460,7 +467,8 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	if (
 		modeRaw === "inline" ||
 		modeRaw === "floating" ||
-		modeRaw === "composer"
+		modeRaw === "composer" ||
+		modeRaw === "off"
 	) {
 		config.mode = modeRaw;
 	}

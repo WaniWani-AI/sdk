@@ -576,6 +576,34 @@ function mountFloating(
 }
 
 // ---------------------------------------------------------------------------
+// Mount — off
+// ---------------------------------------------------------------------------
+
+// `mode: "off"` — nothing on screen. No host element, no shadow root, no React
+// root: the chat is not mounted, so the visitor sees no dock and no inline box.
+// What survives is everything that isn't the widget: `init()` still starts
+// WebMCP (a browsing agent standing on the page gets the site's tools) and
+// still hands the page a live `WaniWani.chat.track` / `.identify`. The chat
+// methods answer as no-ops rather than throwing, so host code written against
+// a visible embed keeps running when the tag is switched off.
+function mountOff(): MountedEmbed {
+	return {
+		destroy: () => {
+			currentInstance = null;
+		},
+		open: () => {},
+		close: () => {},
+		toggle: () => {},
+		sendMessage: () => {},
+		sendMessageAndWait: async () => undefined,
+		reset: () => {},
+		focus: () => {},
+		getMessages: () => [],
+		getSessionId: () => undefined,
+	};
+}
+
+// ---------------------------------------------------------------------------
 // Mount — composer
 // ---------------------------------------------------------------------------
 
@@ -730,7 +758,9 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 	applyVisitorId(config.visitorId);
 
 	let mounted: MountedEmbed;
-	if (config.mode === "floating") {
+	if (config.mode === "off") {
+		mounted = mountOff();
+	} else if (config.mode === "floating") {
 		mounted = mountFloating(config, options, scriptConfig);
 	} else if (config.mode === "composer") {
 		mounted = mountComposer(config, options, scriptConfig, scriptEl);
