@@ -4,6 +4,35 @@
 // OSS / Free Tier (non-legacy) — recommended for all new code
 // ----------------------------------------------------------------------------
 
+// Widget/view binding, shared with the chat surface — OSS
+export type { MetaCarrier } from "../shared/view-uri";
+export {
+	autoHeightFromMeta,
+	isDisplayTool,
+	resourceUriFromMeta,
+	viewUriFor,
+} from "../shared/view-uri";
+// WebMCP — the site's tools, callable by a browsing agent on the page. OSS.
+export type {
+	WebMcpBridge,
+	WebMcpBridgeOptions,
+	WebMcpCallResponse,
+	WebMcpCallResult,
+	WebMcpContentBlock,
+	WebMcpListResponse,
+	WebMcpPageContext,
+	WebMcpRequest,
+	WebMcpTool,
+	WebMcpWidgetPayload,
+	WidgetStep,
+	WidgetStepStatus,
+} from "../webmcp";
+export {
+	createWebMcpBridge,
+	readWidgetStep,
+	rewriteForAgent,
+	supportsWebMcp,
+} from "../webmcp";
 // Flow framework — OSS
 export type {
 	AddNodeConfig,

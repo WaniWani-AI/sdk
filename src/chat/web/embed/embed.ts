@@ -27,16 +27,12 @@ import {
 	parseConfigFromScript,
 	resolveConfig,
 } from "./config";
+import { injectEmbedCss } from "./embed-css";
 import { FloatingChat, type FloatingChatHandle } from "./floating-chat";
 import { InlineChat, type InlineChatHandle } from "./inline-chat";
 import { loadCachedConfig } from "./remote-config";
 import { isVisibleForPath } from "./visibility";
-
-// ---------------------------------------------------------------------------
-// CSS placeholder — replaced at build time with the actual CSS string
-// ---------------------------------------------------------------------------
-
-const EMBED_CSS = "__WANIWANI_EMBED_CSS__";
+import { startWebMcp, type WebMcpHandle } from "./webmcp-bootstrap";
 
 // ---------------------------------------------------------------------------
 // Global type augmentation
@@ -243,11 +239,7 @@ function applyContainerAppearance(
 // ---------------------------------------------------------------------------
 
 function injectStyles(shadowRoot: ShadowRoot, config: EmbedConfig): void {
-	if (EMBED_CSS && EMBED_CSS !== "__WANIWANI_EMBED_CSS__") {
-		const style = document.createElement("style");
-		style.textContent = EMBED_CSS;
-		shadowRoot.appendChild(style);
-	}
+	injectEmbedCss(shadowRoot);
 
 	// In the embed.js path the outer `[data-waniwani-embed]` container draws
 	// panel border + shadow (see `CONTAINER_CHROME_CSS`). CSS variables
@@ -769,6 +761,17 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 				"no public token configured (set data-token or pass token to init())",
 			);
 
+	// The site's own tools, published to a browsing agent standing on the page.
+	// Independent of the chat: it mounts its own root, and a widget step reaches
+	// the visitor whether the panel is open or not. Returns null on every browser
+	// without `modelContext`, which is nearly all of them.
+	let webmcp: WebMcpHandle | null = null;
+	try {
+		webmcp = startWebMcp(config);
+	} catch (error) {
+		console.error("[Waniwani] WebMCP setup failed", error);
+	}
+
 	currentInstance = {
 		...mounted,
 		track: trackClient.track,
@@ -777,6 +780,7 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 		getVisitorId: () => getOrCreateVisitorId(),
 		destroy: () => {
 			void trackClient.shutdown();
+			webmcp?.destroy();
 			mounted.destroy();
 		},
 	};

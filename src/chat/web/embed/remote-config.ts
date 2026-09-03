@@ -126,6 +126,12 @@ interface RemoteConfigResponse {
 	 * uploader.
 	 */
 	documentUpload?: RemoteDocumentUpload | null;
+	/**
+	 * The channel's WebMCP switch. Absent on servers that predate the field,
+	 * which reads as on: the surface needs no configuration to work, so the only
+	 * thing worth sending is a channel that has declined it.
+	 */
+	webmcp?: { enabled?: boolean | null } | null;
 }
 
 interface RemoteDocumentUpload {
@@ -250,6 +256,11 @@ function remoteToConfigPartial(
 	}
 	if (typeof data.enableThreadHistory === "boolean") {
 		out.enableThreadHistory = data.enableThreadHistory;
+	}
+	// WebMCP is on by default and derives its endpoints from the token, so the
+	// only thing a channel can say about it is that it declines.
+	if (typeof data.webmcp?.enabled === "boolean") {
+		out.webmcp = { enabled: data.webmcp.enabled };
 	}
 	if (data.toolCallDisplay === "full") {
 		out.showToolCalls = true;

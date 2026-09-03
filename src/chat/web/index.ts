@@ -17,6 +17,8 @@ export type {
 	McpAppFrameProps,
 } from "./components/mcp-app-frame";
 export { McpAppFrame } from "./components/mcp-app-frame";
+export type { WebMcpOverlayProps } from "./embed/webmcp-overlay";
+export { WebMcpOverlay } from "./embed/webmcp-overlay";
 export type {
 	WidgetEvent,
 	WidgetEventName,
