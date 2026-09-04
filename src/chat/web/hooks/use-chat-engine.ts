@@ -125,6 +125,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	const {
 		api = "/api/waniwani",
 		headers: userHeaders,
+		uploadHeaders,
 		body,
 		onMessageSent,
 		onResponseReceived,
@@ -148,6 +149,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	const widgetEvents = useWidgetEvents();
 
 	const headersRef = useRef(userHeaders);
+	const uploadHeadersRef = useRef(uploadHeaders);
 	const bodyRef = useRef(body);
 	const enableThreadHistoryRef = useRef(enableThreadHistory);
 	useEffect(() => {
@@ -256,7 +258,8 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	useEffect(() => {
 		headersRef.current = userHeaders;
-	}, [userHeaders]);
+		uploadHeadersRef.current = uploadHeaders;
+	}, [userHeaders, uploadHeaders]);
 
 	useEffect(() => {
 		bodyRef.current = body;
@@ -638,7 +641,8 @@ export function useChatEngine(props: ChatBaseProps) {
 					void discardDocument({
 						documentId: document.documentId,
 						api,
-						headers: headersRef.current ?? {},
+						headers: headersRef.current,
+						uploadHeaders: uploadHeadersRef.current,
 					});
 				}
 			}
