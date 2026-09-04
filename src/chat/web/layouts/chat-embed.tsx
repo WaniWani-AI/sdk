@@ -11,10 +11,6 @@ import {
 } from "react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import type { ChatEmbedProps, ChatHandle } from "../@types";
-import type {
-	AttachmentError,
-	AttachmentUploader,
-} from "../ai-elements/prompt-input";
 import {
 	PromptInput,
 	PromptInputAddAttachments,
@@ -153,6 +149,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		const uploads = useDocumentUpload({
 			api,
 			headers: props.headers,
+			uploadHeaders: props.uploadHeaders,
 			sessionId: engine.sessionId,
 			documentUpload,
 			allowAttachments,

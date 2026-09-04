@@ -183,6 +183,14 @@ export interface ChatBaseProps {
 	visitorId?: VisitorIdInput;
 	/** Additional headers to send with chat API requests */
 	headers?: Record<string, string>;
+	/**
+	 * Extra headers for the document upload and discard requests, merged over
+	 * `headers` for those calls only. Set it where those endpoints take a
+	 * different credential than the chat; everything else in `headers` still
+	 * goes out. Matching names replace, case-insensitively. Browser-visible, so
+	 * public credentials only.
+	 */
+	uploadHeaders?: Record<string, string>;
 	/** Additional body fields to send with each chat request */
 	body?: Record<string, unknown>;
 	/** Enable file attachments in the input. Defaults to false. */

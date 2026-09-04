@@ -43,6 +43,18 @@ export function uploadUrlEndpoint(api: string): string {
 	return documentsEndpoint(api, "/upload-url");
 }
 
+/** `Headers.set` is what makes a differently-cased override actually override. */
+function requestHeaders(
+	headers: Record<string, string> | undefined,
+	overrides: Record<string, string> | undefined,
+): Headers {
+	const merged = new Headers(headers);
+	new Headers(overrides).forEach((value, name) => {
+		merged.set(name, value);
+	});
+	return merged;
+}
+
 interface MintedUpload {
 	documentId: string;
 	uploadUrl: string;
@@ -168,12 +180,13 @@ function putBytes(input: {
 export async function discardDocument(input: {
 	documentId: string;
 	api: string;
-	headers: Record<string, string>;
+	headers?: Record<string, string>;
+	uploadHeaders?: Record<string, string>;
 }): Promise<void> {
 	try {
 		await fetch(documentsEndpoint(input.api, `/${input.documentId}`), {
 			method: "DELETE",
-			headers: input.headers,
+			headers: requestHeaders(input.headers, input.uploadHeaders),
 		});
 	} catch {
 		// Nothing the visitor can do about it, and the lifecycle rule still applies.
@@ -183,7 +196,8 @@ export async function discardDocument(input: {
 export async function uploadDocument(input: {
 	file: File;
 	api: string;
-	headers: Record<string, string>;
+	headers?: Record<string, string>;
+	uploadHeaders?: Record<string, string>;
 	sessionId?: string;
 	signal: AbortSignal;
 	onProgress?: (fraction: number) => void;
@@ -197,9 +211,11 @@ export async function uploadDocument(input: {
 
 	let response: Response;
 	try {
+		const mintHeaders = requestHeaders(input.headers, input.uploadHeaders);
+		mintHeaders.set("Content-Type", "application/json");
 		response = await fetch(uploadUrlEndpoint(input.api), {
 			method: "POST",
-			headers: { ...input.headers, "Content-Type": "application/json" },
+			headers: mintHeaders,
 			signal: mint.signal,
 			body: JSON.stringify({
 				filename: input.file.name,

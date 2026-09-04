@@ -14,6 +14,8 @@ const ERROR_VISIBLE_MS = 6000;
 export interface DocumentUploadInput {
 	api: string;
 	headers?: Record<string, string>;
+	/** Merged over `headers` for the upload and discard calls only. */
+	uploadHeaders?: Record<string, string>;
 	sessionId?: string;
 	/** What the platform says about this project. Absent on a bring-your-own-backend embed. */
 	documentUpload?: DocumentUploadConfig;
@@ -36,7 +38,14 @@ export interface DocumentUploadHandles {
 export function useDocumentUpload(
 	input: DocumentUploadInput,
 ): DocumentUploadHandles {
-	const { api, headers, sessionId, documentUpload, allowAttachments } = input;
+	const {
+		api,
+		headers,
+		uploadHeaders,
+		sessionId,
+		documentUpload,
+		allowAttachments,
+	} = input;
 	const [error, setError] = useState<AttachmentError | null>(null);
 
 	const upload: AttachmentUploader = useCallback(
@@ -44,12 +53,13 @@ export function useDocumentUpload(
 			uploadDocument({
 				file,
 				api,
-				headers: headers ?? {},
+				headers,
+				uploadHeaders,
 				sessionId,
 				signal,
 				onProgress,
 			}),
-		[api, headers, sessionId],
+		[api, headers, uploadHeaders, sessionId],
 	);
 
 	const onDiscard = useCallback(
@@ -57,10 +67,11 @@ export function useDocumentUpload(
 			void discardDocument({
 				documentId: document.documentId,
 				api,
-				headers: headers ?? {},
+				headers,
+				uploadHeaders,
 			});
 		},
-		[api, headers],
+		[api, headers, uploadHeaders],
 	);
 
 	useEffect(() => {
