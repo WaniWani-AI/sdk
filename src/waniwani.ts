@@ -13,6 +13,9 @@ import {
 	type WaniWaniClient,
 	type WaniWaniConfig,
 } from "./types.js";
+import { createLogger } from "./utils/logger.js";
+
+const log = createLogger("config");
 
 /**
  * Create a Waniwani SDK client
@@ -58,6 +61,15 @@ export function waniwani(
 	};
 
 	const internalConfig = { apiUrl, apiKey, tracking: trackingConfig };
+
+	const logLevel =
+		process.env.WANIWANI_LOG_LEVEL ??
+		(process.env.WANIWANI_DEBUG ? "debug" : "none");
+	log(
+		`resolved config: apiUrl=${apiUrl}, apiKey=${
+			apiKey ? `present (len=${apiKey.length})` : "absent"
+		}, configSource=${config ? "explicit" : "project/env"}, logLevel=${logLevel}`,
+	);
 
 	// Compose client from modules
 	const trackingClient = createTrackingClient(internalConfig);
