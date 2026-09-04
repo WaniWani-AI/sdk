@@ -55,10 +55,12 @@ export interface KbSource {
 /** KB client for server-side knowledge base operations */
 export interface KbClient {
 	/**
-	 * Ingest files into the knowledge base.
+	 * Push markdown files into the agent's knowledge base.
 	 *
-	 * **Warning**: This is destructive — it deletes ALL existing chunks
-	 * for the environment before ingesting the new files.
+	 * The push replaces only the sources named in the payload and lands in the
+	 * agent's draft. Nothing goes live until someone publishes the draft in the
+	 * WaniWani app. A production key reads live knowledge; any other key reads
+	 * the draft while one is open.
 	 */
 	ingest(files: KbIngestFile[]): Promise<KbIngestResult>;
 
