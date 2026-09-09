@@ -37,6 +37,7 @@ export default defineConfig([
 		entry: { "mcp/react": "src/mcp/react/index.ts" },
 		format: ["esm"],
 		target: "es2022",
+		platform: "browser",
 		dts: true,
 		clean: false,
 		shims: false,
@@ -59,6 +60,7 @@ export default defineConfig([
 		entry: { "mcp/react/skybridge": "src/mcp/react/skybridge.ts" },
 		format: ["esm"],
 		target: "es2022",
+		platform: "browser",
 		dts: true,
 		clean: false,
 		shims: false,
@@ -76,11 +78,12 @@ export default defineConfig([
 			js: '"use client";',
 		},
 	},
-	// Chat widget (React component)
+	// Chat widget. platform "browser" keeps nanoid and streamdown → unified → vfile off their Node entries, which leak bare crypto/path/process/url imports.
 	{
 		entry: { "chat/index": "src/chat/web/index.ts" },
 		format: ["esm"],
 		target: "es2022",
+		platform: "browser",
 		dts: true,
 		clean: false,
 		shims: false,

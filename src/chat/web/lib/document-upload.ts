@@ -5,6 +5,7 @@
  */
 
 import type { AttachedDocument } from "../../../documents/types";
+import { platformEndpoint } from "./api-url";
 
 const DOCUMENTS_PATH = "/api/mcp/modules/documents";
 
@@ -30,16 +31,11 @@ export class DocumentUploadError extends Error {
 	}
 }
 
-/** Derives a module endpoint from the chat `api` base, which may be absolute or root-relative. */
-function documentsEndpoint(api: string, path: string): string {
-	try {
-		return `${new URL(api).origin}${DOCUMENTS_PATH}${path}`;
-	} catch {
-		return `${DOCUMENTS_PATH}${path}`;
-	}
+function documentsEndpoint(api: string, path: string): string | null {
+	return platformEndpoint(api, `${DOCUMENTS_PATH}${path}`);
 }
 
-export function uploadUrlEndpoint(api: string): string {
+export function uploadUrlEndpoint(api: string): string | null {
 	return documentsEndpoint(api, "/upload-url");
 }
 
@@ -183,8 +179,12 @@ export async function discardDocument(input: {
 	headers?: Record<string, string>;
 	uploadHeaders?: Record<string, string>;
 }): Promise<void> {
+	const endpoint = documentsEndpoint(input.api, `/${input.documentId}`);
+	if (!endpoint) {
+		return;
+	}
 	try {
-		await fetch(documentsEndpoint(input.api, `/${input.documentId}`), {
+		await fetch(endpoint, {
 			method: "DELETE",
 			headers: requestHeaders(input.headers, input.uploadHeaders),
 		});
@@ -204,6 +204,14 @@ export async function uploadDocument(input: {
 }): Promise<AttachedDocument> {
 	input.signal.throwIfAborted();
 
+	const mintUrl = uploadUrlEndpoint(input.api);
+	if (!mintUrl) {
+		throw new DocumentUploadError(
+			"upload_disabled",
+			"This agent does not accept document uploads.",
+		);
+	}
+
 	const mint = new AbortController();
 	const giveUp = setTimeout(() => mint.abort(), MINT_TIMEOUT_MS);
 	const passOn = () => mint.abort(input.signal.reason);
@@ -213,7 +221,7 @@ export async function uploadDocument(input: {
 	try {
 		const mintHeaders = requestHeaders(input.headers, input.uploadHeaders);
 		mintHeaders.set("Content-Type", "application/json");
-		response = await fetch(uploadUrlEndpoint(input.api), {
+		response = await fetch(mintUrl, {
 			method: "POST",
 			headers: mintHeaders,
 			signal: mint.signal,

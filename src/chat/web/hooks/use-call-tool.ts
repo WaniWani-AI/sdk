@@ -2,6 +2,7 @@
 
 import { useCallback, useRef } from "react";
 import type { CallToolHandler } from "../@types";
+import { buildApiUrl } from "../lib/api-url";
 
 type CallToolParams = Parameters<CallToolHandler>[0];
 type CallToolResult = Awaited<ReturnType<CallToolHandler>>;
@@ -27,7 +28,7 @@ export function useCallTool(props: {
 				return onCallTool(params);
 			}
 
-			const endpoint = `${api ?? "/api/waniwani"}/tool`;
+			const endpoint = buildApiUrl(api ?? "/api/waniwani", "/tool");
 			const normalizedSessionId =
 				typeof sessionId === "string" && sessionId.trim().length > 0
 					? sessionId.trim()
