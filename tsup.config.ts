@@ -1,4 +1,13 @@
+import { createRequire } from "node:module";
 import { defineConfig } from "tsup";
+
+// `decode-named-character-reference` picks `index.dom.js` under the browser
+// condition, and that file runs `document.createElement` at module load, so any
+// SSR import of the chat entry throws. Node's resolver never applies `browser`,
+// so this hands back the isomorphic `index.js`.
+const isomorphicEntityDecoder = createRequire(import.meta.url).resolve(
+	"decode-named-character-reference",
+);
 
 export default defineConfig([
 	// Core tracking SDK
@@ -99,6 +108,12 @@ export default defineConfig([
 		],
 		banner: {
 			js: '"use client";',
+		},
+		esbuildOptions(options) {
+			options.alias = {
+				...options.alias,
+				"decode-named-character-reference": isomorphicEntityDecoder,
+			};
 		},
 	},
 	// Internal SDK surface (mounted at @waniwani/sdk/internal — not public).
