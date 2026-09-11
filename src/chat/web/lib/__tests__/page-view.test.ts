@@ -118,6 +118,21 @@ describe("firePageView", () => {
 		}
 	});
 
+	test("sends nothing when the chat api is a customer runtime", async () => {
+		const { calls, restore } = mockFetch();
+		try {
+			await firePageView({
+				api: "https://acme.example/agent/v1/chat",
+				token: "wwp_test",
+				channelId: "chan_1",
+				source: "acme-web",
+			});
+			expect(calls).toHaveLength(0);
+		} finally {
+			restore();
+		}
+	});
+
 	test("fires without a source tag when the channel has no configured source", async () => {
 		const { calls, restore } = mockFetch();
 		try {

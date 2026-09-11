@@ -494,7 +494,13 @@ export function useChatEngine(props: ChatBaseProps) {
 		void refreshToolDefinitions();
 	}, [refreshToolDefinitions]);
 
-	const { messages, sendMessage, setMessages, status } = useChat({
+	const {
+		messages,
+		sendMessage,
+		setMessages,
+		status,
+		stop: stopStream,
+	} = useChat({
 		messages: props.initialMessages,
 		transport: transportRef.current,
 		onFinish({ message, isAbort, isDisconnect, isError }) {
@@ -530,6 +536,29 @@ export function useChatEngine(props: ChatBaseProps) {
 	useEffect(() => {
 		messagesRef.current = messages;
 	}, [messages]);
+
+	// Dropping the stream leaves the server generating. `/cancel` is what stops
+	// the turn itself; a host that does not serve it answers 404, which is fine
+	// because the abort above already happened.
+	const stop = useCallback(async () => {
+		await stopStream();
+		const sessionId = sessionIdRef.current;
+		if (!sessionId) {
+			return;
+		}
+		try {
+			await fetch(buildApiUrl(api, "/cancel"), {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					...headersRef.current,
+				},
+				body: JSON.stringify({ sessionId }),
+			});
+		} catch {
+			// Same reasoning as a 404: the visitor already got their stop.
+		}
+	}, [api, stopStream]);
 
 	// Hydrate persisted history when it's enabled *after* mount — commonly via
 	// the remote embed config (the dashboard toggle, not a data-attr/prop). The
@@ -1033,6 +1062,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		hasMessages,
 		sendMessage,
 		sendMessageAndWait,
+		stop,
 		reset,
 		queuedMessages,
 		queueFull,

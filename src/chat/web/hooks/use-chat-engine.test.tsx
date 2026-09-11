@@ -68,6 +68,7 @@ let capturedOnFinish:
 let capturedOnError: ((error: Error) => void) | undefined;
 const mockSendMessage = mock((..._args: unknown[]) => {});
 const mockSetMessages = mock(() => {});
+const mockStop = mock(async () => {});
 
 // @ts-expect-error -- bun:test `mock.module` exists at runtime but has no TS type
 mock.module("@ai-sdk/react", () => ({
@@ -82,6 +83,7 @@ mock.module("@ai-sdk/react", () => ({
 			sendMessage: mockSendMessage,
 			setMessages: mockSetMessages,
 			status: useChatStatus,
+			stop: mockStop,
 		};
 	},
 }));
@@ -131,11 +133,13 @@ type HookReturn = ReturnType<typeof useChatEngine>;
 function Harness({
 	resultRef,
 	body,
+	api = "/api/waniwani",
 }: {
 	resultRef: { current: HookReturn | null };
 	body?: Record<string, unknown>;
+	api?: string;
 }) {
-	const engine = useChatEngine({ api: "/api/waniwani", body });
+	const engine = useChatEngine({ api, body });
 	resultRef.current = engine;
 	return null;
 }
@@ -153,6 +157,7 @@ beforeEach(() => {
 	capturedOnFinish = undefined;
 	capturedOnError = undefined;
 	mockSendMessage.mockClear();
+	mockStop.mockClear();
 
 	container = document.createElement("div");
 	document.body.appendChild(container);
@@ -804,5 +809,145 @@ describe("useChatEngine – the sent turn carries its documents as message metad
 		const body = capturedTransportBody();
 		expect(body.documents).toEqual([DOC]);
 		expect(body).not.toHaveProperty("metadata");
+	});
+});
+
+describe("useChatEngine – cancellation", () => {
+	interface RecordedCall {
+		url: string;
+		init: RequestInit;
+	}
+
+	function recordFetch(
+		reply?: (url: string) => Promise<Response>,
+	): RecordedCall[] {
+		const calls: RecordedCall[] = [];
+		globalThis.fetch = (async (input: unknown, init: RequestInit = {}) => {
+			const url = String(input);
+			calls.push({ url, init });
+			return reply ? await reply(url) : Response.json({ tools: [] });
+		}) as unknown as typeof fetch;
+		return calls;
+	}
+
+	async function mountAt(api: string, sessionId?: string) {
+		act(() => {
+			root.render(
+				createElement(Harness, {
+					resultRef: hookRef,
+					api,
+					body: sessionId ? { sessionId } : undefined,
+				}),
+			);
+		});
+		await flushAsync();
+		const engine = hookRef.current;
+		if (!engine) {
+			throw new Error("Engine not mounted");
+		}
+		if (sessionId) {
+			act(() => {
+				capturedTransportBody?.();
+			});
+		}
+		return engine;
+	}
+
+	function cancels(calls: RecordedCall[]): RecordedCall[] {
+		return calls.filter((c) => c.url.includes("/cancel"));
+	}
+
+	test("aborts the local stream, then cancels the turn on the customer runtime", async () => {
+		const engine = await mountAt(
+			"https://acme.example/agent/v1/chat",
+			"sess_1",
+		);
+		let stoppedBeforeCancel = 0;
+		const calls = recordFetch(async (url) => {
+			if (url.includes("/cancel")) {
+				stoppedBeforeCancel = mockStop.mock.calls.length;
+			}
+			return Response.json({ ok: true });
+		});
+
+		await act(async () => {
+			await engine.stop();
+		});
+
+		expect(mockStop).toHaveBeenCalledTimes(1);
+		const [cancel] = cancels(calls);
+		expect(cancel).toBeDefined();
+		expect(cancel.url).toBe("https://acme.example/agent/v1/chat/cancel");
+		expect(cancel.init.method).toBe("POST");
+		expect(JSON.parse(cancel.init.body as string)).toEqual({
+			sessionId: "sess_1",
+		});
+		expect(stoppedBeforeCancel).toBe(1);
+	});
+
+	test("keeps a query marker on the base when building the cancel url", async () => {
+		const engine = await mountAt(
+			"https://dev.waniwani.ai/api/mcp/chat?test=1",
+			"sess_9",
+		);
+		const calls = recordFetch();
+
+		await act(async () => {
+			await engine.stop();
+		});
+
+		expect(cancels(calls)[0]?.url).toBe(
+			"https://dev.waniwani.ai/api/mcp/chat/cancel?test=1",
+		);
+	});
+
+	test("with no session id the local abort is the whole of it", async () => {
+		const engine = await mountAt("https://acme.example/agent/v1/chat");
+		const calls = recordFetch();
+
+		await act(async () => {
+			await engine.stop();
+		});
+
+		expect(mockStop).toHaveBeenCalledTimes(1);
+		expect(cancels(calls)).toHaveLength(0);
+	});
+
+	test("a runtime that answers 404 still leaves the stream aborted", async () => {
+		const engine = await mountAt(
+			"https://acme.example/agent/v1/chat",
+			"sess_2",
+		);
+		const calls = recordFetch(async (url) =>
+			url.includes("/cancel")
+				? new Response(null, { status: 404 })
+				: Response.json({ tools: [] }),
+		);
+
+		await act(async () => {
+			await expect(engine.stop()).resolves.toBeUndefined();
+		});
+
+		expect(mockStop).toHaveBeenCalledTimes(1);
+		expect(cancels(calls)).toHaveLength(1);
+	});
+
+	test("a cancel request that never lands is swallowed", async () => {
+		const engine = await mountAt(
+			"https://acme.example/agent/v1/chat",
+			"sess_3",
+		);
+		recordFetch(async (url) => {
+			if (url.includes("/cancel")) {
+				throw new Error("network down");
+			}
+			return Response.json({ tools: [] });
+		});
+
+		await act(async () => {
+			await expect(engine.stop()).resolves.toBeUndefined();
+		});
+
+		expect(mockStop).toHaveBeenCalledTimes(1);
 	});
 });

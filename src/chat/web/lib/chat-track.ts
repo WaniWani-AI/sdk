@@ -1,15 +1,3 @@
-// ============================================================================
-// Host-page tracking client for the chat widget.
-//
-// The chat surfaces (the `<script>` embed and `WaniwaniChat`) already hold
-// everything tracking needs: the public `wwp_` token, the channel, and the
-// server-assigned session id. This wires those into the shared frontend
-// tracking client so host pages get the same `track` surface as the server
-// (`track({ event })`, `track.converted()`, ...) with identity attached
-// automatically: `sessionId` once the first exchange assigns one, the
-// anonymous `visitorId` before that.
-// ============================================================================
-
 import {
 	createFrontendClient,
 	type FrontendTrackingClient,
@@ -22,35 +10,29 @@ export interface CreateChatTrackClientOptions {
 	api: string;
 	/** Public token (`wwp_...`). */
 	token: string;
-	/**
-	 * Agent channel ID, when known. Stamped as `properties.channelId`. Accepts
-	 * a getter (like `getSource`) so a token-only embed can pick up the
-	 * channel the resolved remote `/config` reports once the fetch lands.
-	 */
+	/** Stamped as `properties.channelId`. A getter lets a token-only embed pick the channel up once the remote `/config` lands. */
 	channelId?: string | (() => string | undefined);
-	/**
-	 * Channel-specific event source, read live so the value from the resolved
-	 * remote `/config` is picked up once the fetch lands.
-	 */
 	getSource: () => string | undefined;
 	/** Server-assigned session id, read live (undefined before the first message). */
 	getSessionId: () => string | undefined;
 }
 
-/**
- * Create the tracking client backing `chat.track` / `ChatHandle.track`.
- */
+/** Backs `chat.track` / `ChatHandle.track`. */
 export function createChatTrackClient(
 	options: CreateChatTrackClientOptions,
 ): FrontendTrackingClient {
+	const endpoint = eventsEndpoint(options.api);
+	if (!endpoint) {
+		return createNoopChatTrackClient(
+			"the chat api does not point at a Waniwani event ingest",
+		);
+	}
 	return createFrontendClient({
-		endpoint: eventsEndpoint(options.api),
+		endpoint,
 		token: options.token,
 		channelId: options.channelId,
 		source: options.getSource,
-		// Resolve the visitor id per event (not captured once) so it is present
-		// on the first event before any session exists, and so a host-supplied
-		// override via `setVisitorId()` is reflected on later events.
+		// Per event, never captured once: the first event predates any session, and `setVisitorId()` can land between two events.
 		identity: () => ({
 			sessionId: options.getSessionId(),
 			visitorId: getOrCreateVisitorId(),
@@ -58,10 +40,7 @@ export function createChatTrackClient(
 	});
 }
 
-/**
- * Tracking client stand-in for surfaces missing their `wwp_` token: warns
- * once, then silently discards every call so the host page never breaks.
- */
+/** Stand-in for surfaces with nowhere to send: warns once, then silently discards every call so the host page keeps working. */
 export function createNoopChatTrackClient(
 	reason: string,
 ): FrontendTrackingClient {

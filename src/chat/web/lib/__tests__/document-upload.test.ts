@@ -171,26 +171,46 @@ describe("uploadUrlEndpoint", () => {
 		);
 	});
 
-	test("never resolves to the chat endpoint itself, whatever the api is named", () => {
+	test("survives a query marker on the base", () => {
+		expect(
+			uploadUrlEndpoint("https://app.waniwani.ai/api/mcp/chat?test=1"),
+		).toBe("https://app.waniwani.ai/api/mcp/modules/documents/upload-url");
+	});
+
+	test("is null off the platform mount, where the module does not exist", () => {
 		for (const api of [
 			"/api/waniwani",
 			"/api/waniwani/",
 			"/chat",
 			"/api/agent/messages",
-			"",
-			"https://app.waniwani.ai/api/mcp/chat?test=1",
+			"https://customer.example/agent/v1/chat",
 		]) {
-			expect(uploadUrlEndpoint(api)).toContain(
-				"/api/mcp/modules/documents/upload-url",
-			);
+			expect(uploadUrlEndpoint(api)).toBeNull();
 		}
 	});
 
-	test("an api it cannot parse still names the module, never the chat route", () => {
+	test("an api it cannot parse names nothing at all", () => {
 		for (const api of ["", "   ", "not a url", "://nope"]) {
-			expect(uploadUrlEndpoint(api)).toBe(
-				"/api/mcp/modules/documents/upload-url",
-			);
+			expect(uploadUrlEndpoint(api)).toBeNull();
+		}
+	});
+
+	test("a customer host is refused before any request goes out", async () => {
+		const originalFetch = globalThis.fetch;
+		let called = false;
+		globalThis.fetch = (async () => {
+			called = true;
+			return new Response(null, { status: 200 });
+		}) as unknown as typeof fetch;
+		try {
+			const error = await upload({
+				api: "https://customer.example/agent/v1/chat",
+			}).catch((e: unknown) => e);
+			expect(error).toBeInstanceOf(DocumentUploadError);
+			expect((error as DocumentUploadError).code).toBe("upload_disabled");
+			expect(called).toBe(false);
+		} finally {
+			globalThis.fetch = originalFetch;
 		}
 	});
 });
