@@ -1162,3 +1162,78 @@ describe("PromptInputAddAttachments — an icon-only button still announces itse
 		expect(paperclipLabel()).toBe("Remove all attachments");
 	});
 });
+
+describe("PromptInputSubmit — Stop and the full-queue guard are separate states", () => {
+	function mountWithSubmit(submitProps: Record<string, unknown>) {
+		act(() => {
+			root.render(
+				createElement(
+					PromptInput,
+					{
+						onSubmit: (message: MessageType) => {
+							submissions.push(message);
+						},
+					} as PromptInputPropsType,
+					createElement(Fragment, null, [
+						createElement(PromptInputTextarea, { key: "text" }),
+						createElement(PromptInputSubmit, { key: "submit", ...submitProps }),
+					]),
+				),
+			);
+		});
+	}
+
+	function countedSubmits(): () => number {
+		const form = container.querySelector("form");
+		if (!form) {
+			throw new Error("no form rendered");
+		}
+		let requested = 0;
+		form.requestSubmit = () => {
+			requested += 1;
+		};
+		return () => requested;
+	}
+
+	function pressEnter() {
+		const textarea = container.querySelector("textarea");
+		if (!textarea) {
+			throw new Error("no textarea rendered");
+		}
+		act(() => {
+			textarea.dispatchEvent(
+				new win.KeyboardEvent("keydown", {
+					key: "Enter",
+					bubbles: true,
+					cancelable: true,
+				}) as unknown as KeyboardEvent,
+			);
+		});
+	}
+
+	test("Enter is refused while the composer is blocked, and Stop stays clickable", () => {
+		mountWithSubmit({ status: "streaming", disabled: true, onStop: () => {} });
+		const submits = countedSubmits();
+		const button = container.querySelector("button");
+		expect(button?.getAttribute("type")).toBe("button");
+		expect(button?.hasAttribute("disabled")).toBe(false);
+		pressEnter();
+		expect(submits()).toBe(0);
+	});
+
+	test("Enter submits when nothing blocks the composer", () => {
+		mountWithSubmit({ status: "ready" });
+		const submits = countedSubmits();
+		pressEnter();
+		expect(submits()).toBe(1);
+	});
+
+	test("a disabled submit button blocks Enter when there is no Stop to keep live", () => {
+		mountWithSubmit({ status: "ready", disabled: true });
+		const submits = countedSubmits();
+		const button = container.querySelector("button");
+		expect(button?.hasAttribute("disabled")).toBe(true);
+		pressEnter();
+		expect(submits()).toBe(0);
+	});
+});

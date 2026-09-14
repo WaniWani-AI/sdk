@@ -1,82 +1,47 @@
-// ============================================================================
-// Page-view event — fired once when the chat widget initializes on a host page.
-//
-// This is the top of the conversion funnel: "X people landed where the widget
-// is" vs "Y started a conversation". It is attributed to the anonymous
-// `visitorId` (sent as `correlation.visitorId`), and deliberately carries NO
-// session — a page view must not create a session, otherwise sessions would
-// equal page views and the funnel collapses.
-//
-// It goes to the SAME canonical ingest every other event uses
-// (`POST /api/mcp/events/v2/batch`, the V2 batch envelope), authenticated with
-// the public `wwp_` token the widget already holds for `/chat` and `/config`.
-// No widget JWT is involved: that only exists for MCP-App widgets which have no
-// public token. The chat widget has one, and it identifies the channel.
-// ============================================================================
-
 import type { WidgetMode } from "../embed/widget-events";
+import { platformEndpoint } from "./api-url";
 import { debugLog } from "./debug";
 import { collectVisitorContext } from "./visitor-context";
 
+const EVENTS_PATH = "/api/mcp/events/v2/batch";
+
 export interface FirePageViewOptions {
-	/** Chat API base, e.g. `https://app.waniwani.ai/api/mcp/chat`. */
 	api: string;
 	/** Public token (`wwp_...`). */
 	token: string;
-	/** Agent channel ID, when known. */
 	channelId?: string;
-	/** Embed mode the widget initialized in. */
 	mode?: WidgetMode;
-	/**
-	 * Channel-specific event source from the resolved `/config`, used as the
-	 * event's `source` tag so events can be sliced by channel. Optional: the
-	 * event attributes to its channel via `properties.channelId` regardless, so
-	 * a channel with no configured source still records page views. Omitted from
-	 * the event entirely when blank.
-	 */
+	/** Channel-specific event source from the resolved `/config`, sent as the event's `source` tag. Omitted entirely when the channel has none; attribution then rides on `properties.channelId`. */
 	source?: string;
 }
 
-// Fire-at-most-once per (api|token|channelId) for the lifetime of the page.
-// Guards against React StrictMode's double-mount, repeat mounts, and an inline
-// + floating widget sharing the same channel from double-counting a landing.
+// One landing per (api|token|channelId) per page: StrictMode double-mounts, and an inline plus a floating widget share a channel.
 const fired = new Set<string>();
 
 function dedupeKey(api: string, token: string, channelId?: string): string {
 	return `${api}|${token}|${channelId ?? ""}`;
 }
 
-/**
- * Derive the canonical V2 batch ingest URL from the chat `api` base. The chat
- * api is a full path (`.../api/mcp/chat`); events live as a sibling at
- * `.../api/mcp/events/v2/batch`, same as `injectWidgetConfig` builds it
- * server-side. Falls back to a suffix swap for non-standard bases.
- */
-export function eventsEndpoint(api: string): string {
-	try {
-		return `${new URL(api).origin}/api/mcp/events/v2/batch`;
-	} catch {
-		return api.replace(/\/$/, "").replace(/\/chat$/, "/events/v2/batch");
-	}
+/** The canonical V2 batch ingest, resolved against the platform origin `api` sits on. `null` off the platform, where no such route exists. */
+export function eventsEndpoint(api: string): string | null {
+	return platformEndpoint(api, EVENTS_PATH);
 }
 
-/**
- * Emit a `page.viewed` event for the current widget load. Fire-and-forget:
- * resolves once the request is dispatched (or skipped) and never throws —
- * tracking must never break the host page or the widget.
- */
+/** Fire-and-forget: resolves once the request is dispatched (or skipped) and never throws, so a tracking failure stays away from the host page. */
 export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 	const { api, token, channelId, mode, source } = opts;
 	if (typeof window === "undefined" || !api || !token) {
 		return;
 	}
 
-	// Ingest attributes an event to a channel via `properties.channelId` or the
-	// `source` tag; `page.viewed` deliberately carries no session, so with
-	// neither in hand the event is guaranteed to be dropped server-side. Skip
-	// the send instead — degrades safely against a `/config` that does not
-	// report the token's channel. Skipping happens before the once-per-page
-	// guard, so a later call that does resolve a channel still fires.
+	const endpoint = eventsEndpoint(api);
+	if (!endpoint) {
+		debugLog("page.viewed skipped: the chat api is not a Waniwani endpoint");
+		return;
+	}
+
+	// Ingest attributes to a channel via `properties.channelId` or the `source` tag, and this event carries no session, so with neither in hand it is dropped server-side.
+	// Skipping precedes the once-per-page guard, so a later call that resolves a channel still fires.
 	if (!channelId && !source) {
 		debugLog("page.viewed skipped: no channelId or source to attribute it");
 		return;
@@ -92,11 +57,7 @@ export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 		const ctx = await collectVisitorContext();
 		const now = new Date().toISOString();
 
-		// V2 batch envelope, so this lands in the same ingest pipeline as every
-		// other event. The
-		// anonymous device id is the identity (`correlation` carries no sessionId);
-		// the server stores it in its own `visitor_id` column, never PII-hashed,
-		// separate from the identified-user `externalUserId`.
+		// The anonymous device id is the whole identity: a landing mints no session, which keeps "landed" and "started a conversation" separate in the funnel.
 		const body = JSON.stringify({
 			sentAt: now,
 			source: { sdk: "@waniwani/sdk", version: "0.1.0" },
@@ -122,7 +83,7 @@ export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 			],
 		});
 
-		await fetch(eventsEndpoint(api), {
+		await fetch(endpoint, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",

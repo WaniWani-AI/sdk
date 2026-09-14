@@ -3,6 +3,7 @@
 import type { UIMessage } from "@ai-sdk/react";
 import { useState } from "react";
 import { useTranslation } from "../i18n";
+import { buildApiUrl } from "../lib/api-url";
 
 interface ExportSessionButtonProps {
 	messages: UIMessage[];
@@ -31,7 +32,7 @@ export function ExportSessionButton({
 		setFeedback(null);
 
 		try {
-			const res = await fetch(`${api}/scenarios`, {
+			const res = await fetch(buildApiUrl(api, "/scenarios"), {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(session),

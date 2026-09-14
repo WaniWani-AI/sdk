@@ -51,7 +51,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && bun run typecheck && bun run lint && tsup && bun run build:chat-css && bun run build:embed-css",
+    "build": "rm -rf dist && bun run typecheck && bun run lint && tsup && bun run build:chat-css && bun run build:embed-css && bun run check:browser-bundles",
+    "check:browser-bundles": "bun scripts/check-browser-bundles.ts",
     "build:chat-css": "tailwindcss -i src/chat/web/tailwind.css -o dist/chat/styles.css --minify",
     "build:embed-css": "bun run scripts/inline-embed-css.ts",
     "dev": "tsx --watch src/index.ts",

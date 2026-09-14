@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildApiUrl } from "../api-url";
+import { buildApiUrl, platformEndpoint } from "../api-url";
 
 describe("buildApiUrl", () => {
 	test("appends a sibling path to a clean base", () => {
@@ -44,5 +44,67 @@ describe("buildApiUrl", () => {
 		expect(buildApiUrl("/api/waniwani", "/config")).toBe(
 			"/api/waniwani/config",
 		);
+	});
+
+	test("keeps the cancel route under a customer runtime's own mount", () => {
+		expect(buildApiUrl("https://acme.example/agent/v1/chat", "/cancel")).toBe(
+			"https://acme.example/agent/v1/chat/cancel",
+		);
+	});
+});
+
+describe("platformEndpoint", () => {
+	test("swaps the whole path for a platform route on the same origin", () => {
+		expect(
+			platformEndpoint(
+				"https://app.waniwani.ai/api/mcp/chat",
+				"/api/mcp/events/v2/batch",
+			),
+		).toBe("https://app.waniwani.ai/api/mcp/events/v2/batch");
+	});
+
+	test("honours a self-hosted platform origin", () => {
+		expect(
+			platformEndpoint(
+				"https://eu.app.waniwani.ai/api/mcp/chat",
+				"/api/mcp/events/v2/batch",
+			),
+		).toBe("https://eu.app.waniwani.ai/api/mcp/events/v2/batch");
+	});
+
+	test("ignores the base's query string", () => {
+		expect(
+			platformEndpoint(
+				"https://dev.waniwani.ai/api/mcp/chat?test=1",
+				"/api/mcp/events/v2/batch",
+			),
+		).toBe("https://dev.waniwani.ai/api/mcp/events/v2/batch");
+	});
+
+	test("a root-relative platform base yields a root-relative route", () => {
+		expect(platformEndpoint("/api/mcp/chat", "/api/mcp/events/v2/batch")).toBe(
+			"/api/mcp/events/v2/batch",
+		);
+	});
+
+	test("null for a customer runtime, which serves no platform route", () => {
+		expect(
+			platformEndpoint(
+				"https://acme.example/agent/v1/chat",
+				"/api/mcp/events/v2/batch",
+			),
+		).toBeNull();
+	});
+
+	test("null for a bring-your-own base off the platform mount", () => {
+		for (const api of ["/api/waniwani", "/chat", "/api/agent/messages"]) {
+			expect(platformEndpoint(api, "/api/mcp/events/v2/batch")).toBeNull();
+		}
+	});
+
+	test("null for anything it cannot read as a url or a path", () => {
+		for (const api of ["", "   ", "not a url", "://nope"]) {
+			expect(platformEndpoint(api, "/api/mcp/events/v2/batch")).toBeNull();
+		}
 	});
 });
