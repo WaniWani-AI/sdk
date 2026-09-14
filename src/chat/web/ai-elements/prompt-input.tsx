@@ -696,6 +696,9 @@ export const PromptInputTextarea = ({
 				e.preventDefault();
 
 				const { form } = e.currentTarget;
+				if (form?.querySelector('[data-submit-blocked="true"]')) {
+					return;
+				}
 				const submitButton = form?.querySelector(
 					'button[type="submit"]',
 				) as HTMLButtonElement | null;
@@ -781,10 +784,15 @@ export const PromptInputSubmit = ({
 	onStop,
 	onClick,
 	children,
+	disabled,
 	...props
 }: PromptInputSubmitProps) => {
 	const { t } = useTranslation();
 	const isGenerating = status === "submitted" || status === "streaming";
+	// `disabled` says the composer will not take another message. While this
+	// button is Stop it has to stay clickable, so the state moves to an attribute
+	// the Enter handler reads instead of riding on the button being disabled.
+	const isStop = isGenerating && onStop !== undefined;
 
 	let Icon = <ArrowUpIcon className="ww:size-4" />;
 	if (status === "submitted") {
@@ -812,9 +820,11 @@ export const PromptInputSubmit = ({
 				"ww:bg-foreground ww:text-background ww:hover:bg-foreground ww:rounded-full",
 				className,
 			)}
+			data-submit-blocked={disabled ? "true" : undefined}
+			disabled={isStop ? false : disabled}
 			onClick={handleClick}
 			size="icon-sm"
-			type={isGenerating && onStop ? "button" : "submit"}
+			type={isStop ? "button" : "submit"}
 			variant="ghost"
 			{...props}
 		>
