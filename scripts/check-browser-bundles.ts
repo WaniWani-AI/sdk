@@ -4,6 +4,7 @@
  * Both leave the build green and break a consumer instead: the second one broke
  * app.waniwani.ai, which prerenders `chat` on the server.
  */
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -46,30 +47,43 @@ for (const entry of ENTRIES) {
 			/(?:from|import)\s*["']([^"'.][^"']*)["']/g,
 		)) {
 			if (builtins.has(spec)) {
+				const carrier = file.slice(dist.length + 1);
 				failures.push(
-					`${entry}: imports the Node builtin "${spec}" (via ${file.slice(dist.length + 1)})`,
+					`${entry} imports the Node builtin "${spec}"${carrier === entry ? "" : `, reached through ${carrier}`}`,
 				);
 			}
 		}
 	}
 }
 
-// Bun's runtime has no DOM, which is the environment an SSR render provides.
+// node, not bun: `--enable-source-maps` turns the frame inside the bundle back
+// into the dependency that ran the DOM code, and prints the line itself.
 for (const entry of ENTRIES) {
-	try {
-		await import(resolve(dist, entry));
-	} catch (error) {
-		failures.push(
-			`${entry}: fails to import without a DOM — ${(error as Error).message.split("\n")[0]}`,
-		);
+	const probe = spawnSync(
+		"node",
+		["--enable-source-maps", "-e", `import(${JSON.stringify(resolve(dist, entry))})`],
+		{ encoding: "utf8" },
+	);
+	if (probe.error) {
+		throw probe.error;
+	}
+	if (probe.status !== 0) {
+		const reported = probe.stderr.trim().split("\n").slice(0, 8).join("\n    ");
+		failures.push(`${entry} does not import without a DOM:\n    ${reported}`);
 	}
 }
 
 if (failures.length > 0) {
-	console.error("Browser bundle check failed:");
-	for (const failure of failures) {
-		console.error(`  - ${failure}`);
+	console.error("Browser bundle check failed:\n");
+	for (const failure of new Set(failures)) {
+		console.error(`  ${failure}\n`);
 	}
+	console.error(
+		"A dependency resolved to its Node or DOM-only build. Alias it to the isomorphic\n" +
+			"entry in tsup.config.ts, the way decode-named-character-reference is, or drop the\n" +
+			"dependency. Reverting `platform: \"browser\"` is not the fix: that is what keeps the\n" +
+			"bare crypto/url/process imports out in the first place.",
+	);
 	process.exit(1);
 }
 
