@@ -1,14 +1,8 @@
 /**
- * Post-build: hold the browser entries to both halves of their contract.
- *
- * `platform: "browser"` in tsup.config.ts picks the browser export condition,
- * which is what keeps nanoid and the streamdown chain off their Node entries
- * and their bare `crypto`/`url`/`process` imports out of the bundle. The same
- * condition also opts packages into DOM-only builds that touch `document` at
- * module load — and a Next.js app renders these entries on the server first,
- * so one of those crashes every SSR import.
- *
- * CI runs `bun run build` and nothing else, so both checks live here.
+ * `platform: "browser"` keeps bare `crypto`/`url`/`process` out of these entries
+ * and opts some packages into DOM-only builds that run `document` at import.
+ * Both leave the build green and break a consumer instead: the second one broke
+ * app.waniwani.ai, which prerenders `chat` on the server.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { builtinModules } from "node:module";
