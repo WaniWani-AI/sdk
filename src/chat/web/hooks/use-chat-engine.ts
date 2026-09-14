@@ -540,13 +540,21 @@ export function useChatEngine(props: ChatBaseProps) {
 	// Dropping the stream leaves the server generating. `/cancel` is what stops
 	// the turn itself; a host that does not serve it answers 404, which is fine
 	// because the abort above already happened.
+	// Aborting the stream flips `status` to "ready" straight away, which is the
+	// condition the queue drain waits on, while /cancel is still in flight and
+	// names only the session. Draining then hands the server a fresh turn for the
+	// cancellation to land on. Holding the queue until this settles is what keeps
+	// Stop pointed at the turn the visitor stopped.
+	const [cancelling, setCancelling] = useState(false);
+
 	const stop = useCallback(async () => {
-		await stopStream();
-		const sessionId = sessionIdRef.current;
-		if (!sessionId) {
-			return;
-		}
+		setCancelling(true);
 		try {
+			await stopStream();
+			const sessionId = sessionIdRef.current;
+			if (!sessionId) {
+				return;
+			}
 			await fetch(buildApiUrl(api, "/cancel"), {
 				method: "POST",
 				headers: {
@@ -556,7 +564,10 @@ export function useChatEngine(props: ChatBaseProps) {
 				body: JSON.stringify({ sessionId }),
 			});
 		} catch {
-			// Same reasoning as a 404: the visitor already got their stop.
+			// Same reasoning as a 404: the visitor already got their stop. Nothing
+			// here may reject, because the caller is an onClick that drops the promise.
+		} finally {
+			setCancelling(false);
 		}
 	}, [api, stopStream]);
 
@@ -764,7 +775,7 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	// Flush first queued message once the current response finishes
 	useEffect(() => {
-		if (status !== "ready") {
+		if (status !== "ready" || cancelling) {
 			return;
 		}
 		if (queuedMessages.length === 0) {
@@ -785,7 +796,14 @@ export function useChatEngine(props: ChatBaseProps) {
 		});
 		onMessageSent?.(first.text);
 		widgetEvents.emit({ name: "message.sent" });
-	}, [status, sendMessage, onMessageSent, queuedMessages, widgetEvents]);
+	}, [
+		status,
+		cancelling,
+		sendMessage,
+		onMessageSent,
+		queuedMessages,
+		widgetEvents,
+	]);
 
 	const reset = useCallback(() => {
 		setMessages([]);
