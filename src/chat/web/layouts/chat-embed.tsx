@@ -654,6 +654,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 										<PromptInputSubmit
 											status={engine.status}
 											disabled={engine.queueFull}
+											onStop={engine.stop}
 										/>
 									</div>
 								</PromptInput>

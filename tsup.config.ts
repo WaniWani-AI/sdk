@@ -1,4 +1,13 @@
+import { createRequire } from "node:module";
 import { defineConfig } from "tsup";
+
+// `decode-named-character-reference` picks `index.dom.js` under the browser
+// condition, and that file runs `document.createElement` at module load, so any
+// SSR import of the chat entry throws. Node's resolver never applies `browser`,
+// so this hands back the isomorphic `index.js`.
+const isomorphicEntityDecoder = createRequire(import.meta.url).resolve(
+	"decode-named-character-reference",
+);
 
 export default defineConfig([
 	// Core tracking SDK
@@ -37,6 +46,7 @@ export default defineConfig([
 		entry: { "mcp/react": "src/mcp/react/index.ts" },
 		format: ["esm"],
 		target: "es2022",
+		platform: "browser",
 		dts: true,
 		clean: false,
 		shims: false,
@@ -59,6 +69,7 @@ export default defineConfig([
 		entry: { "mcp/react/skybridge": "src/mcp/react/skybridge.ts" },
 		format: ["esm"],
 		target: "es2022",
+		platform: "browser",
 		dts: true,
 		clean: false,
 		shims: false,
@@ -76,11 +87,12 @@ export default defineConfig([
 			js: '"use client";',
 		},
 	},
-	// Chat widget (React component)
+	// Chat widget. platform "browser" keeps nanoid and streamdown → unified → vfile off their Node entries, which leak bare crypto/path/process/url imports.
 	{
 		entry: { "chat/index": "src/chat/web/index.ts" },
 		format: ["esm"],
 		target: "es2022",
+		platform: "browser",
 		dts: true,
 		clean: false,
 		shims: false,
@@ -96,6 +108,12 @@ export default defineConfig([
 		],
 		banner: {
 			js: '"use client";',
+		},
+		esbuildOptions(options) {
+			options.alias = {
+				...options.alias,
+				"decode-named-character-reference": isomorphicEntityDecoder,
+			};
 		},
 	},
 	// Internal SDK surface (mounted at @waniwani/sdk/internal — not public).

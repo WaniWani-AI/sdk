@@ -494,7 +494,13 @@ export function useChatEngine(props: ChatBaseProps) {
 		void refreshToolDefinitions();
 	}, [refreshToolDefinitions]);
 
-	const { messages, sendMessage, setMessages, status } = useChat({
+	const {
+		messages,
+		sendMessage,
+		setMessages,
+		status,
+		stop: stopStream,
+	} = useChat({
 		messages: props.initialMessages,
 		transport: transportRef.current,
 		onFinish({ message, isAbort, isDisconnect, isError }) {
@@ -530,6 +536,40 @@ export function useChatEngine(props: ChatBaseProps) {
 	useEffect(() => {
 		messagesRef.current = messages;
 	}, [messages]);
+
+	// Dropping the stream leaves the server generating. `/cancel` is what stops
+	// the turn itself; a host that does not serve it answers 404, which is fine
+	// because the abort above already happened.
+	// Aborting the stream flips `status` to "ready" straight away, which is the
+	// condition the queue drain waits on, while /cancel is still in flight and
+	// names only the session. Draining then hands the server a fresh turn for the
+	// cancellation to land on. Holding the queue until this settles is what keeps
+	// Stop pointed at the turn the visitor stopped.
+	const [cancelling, setCancelling] = useState(false);
+
+	const stop = useCallback(async () => {
+		setCancelling(true);
+		try {
+			await stopStream();
+			const sessionId = sessionIdRef.current;
+			if (!sessionId) {
+				return;
+			}
+			await fetch(buildApiUrl(api, "/cancel"), {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					...headersRef.current,
+				},
+				body: JSON.stringify({ sessionId }),
+			});
+		} catch {
+			// Same reasoning as a 404: the visitor already got their stop. Nothing
+			// here may reject, because the caller is an onClick that drops the promise.
+		} finally {
+			setCancelling(false);
+		}
+	}, [api, stopStream]);
 
 	// Hydrate persisted history when it's enabled *after* mount — commonly via
 	// the remote embed config (the dashboard toggle, not a data-attr/prop). The
@@ -735,7 +775,7 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	// Flush first queued message once the current response finishes
 	useEffect(() => {
-		if (status !== "ready") {
+		if (status !== "ready" || cancelling) {
 			return;
 		}
 		if (queuedMessages.length === 0) {
@@ -756,7 +796,14 @@ export function useChatEngine(props: ChatBaseProps) {
 		});
 		onMessageSent?.(first.text);
 		widgetEvents.emit({ name: "message.sent" });
-	}, [status, sendMessage, onMessageSent, queuedMessages, widgetEvents]);
+	}, [
+		status,
+		cancelling,
+		sendMessage,
+		onMessageSent,
+		queuedMessages,
+		widgetEvents,
+	]);
 
 	const reset = useCallback(() => {
 		setMessages([]);
@@ -1033,6 +1080,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		hasMessages,
 		sendMessage,
 		sendMessageAndWait,
+		stop,
 		reset,
 		queuedMessages,
 		queueFull,
