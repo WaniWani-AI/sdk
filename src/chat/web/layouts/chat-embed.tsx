@@ -33,6 +33,13 @@ import { useSuggestionRow } from "../hooks/use-suggestion-row";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
+import {
+	bearerToken,
+	sendTiming,
+	type TimingTarget,
+	type WidgetTimingSink,
+} from "../lib/timing";
+import { WidgetTimingProvider } from "../lib/timing-context";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import { Button } from "../ui/button";
@@ -143,6 +150,27 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		// without having to pass an `mcp` config. Mirrors ChatCard.
 		const resourceEndpoint =
 			mcp?.resourceEndpoint ?? buildResourceEndpoint(api, props.headers);
+
+		// Read through a ref so the sink identity stays stable as the session id
+		// lands, which would otherwise re-render every mounted widget frame.
+		const timingTargetRef = useRef<TimingTarget>({});
+		timingTargetRef.current = {
+			api,
+			token: bearerToken(props.headers),
+			channelId:
+				typeof props.body?.channelId === "string"
+					? props.body.channelId
+					: undefined,
+			sessionId: engine.sessionId,
+		};
+		const widgetTiming = useCallback<WidgetTimingSink>((report) => {
+			sendTiming(
+				"widget",
+				timingTargetRef.current,
+				{ widget: report.widget, outcome: report.outcome },
+				report.metrics,
+			);
+		}, []);
 
 		const animatedPlaceholder = useTypingPlaceholder(placeholder, !engine.text);
 
@@ -554,40 +582,42 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							fullscreenToolCallId && "ww:!py-0",
 						)}
 					>
-						<MessageList
-							messages={engine.messages}
-							status={engine.status}
-							welcomeMessage={welcomeMessage}
-							welcome={welcome}
-							onSuggestionSelect={handleSuggestionSelect}
-							resourceEndpoint={resourceEndpoint}
-							chatSessionId={engine.sessionId}
-							isDark={isDark}
-							onFollowUp={handleWidgetMessage}
-							onCallTool={handleCallTool}
-							fullscreenToolCallId={fullscreenToolCallId}
-							debug={debug}
-							showToolCalls={showToolCalls}
-							toolDefinitions={engine.toolDefinitions}
-							messageClassNames={{
-								message: classNames?.message,
-								userBubble: classNames?.userBubble,
-								assistantBubble: classNames?.assistantBubble,
-							}}
-							onWidgetDisplayModeChange={(mode, widget) => {
-								if (mode === "fullscreen") {
-									// Read the height while the embed is still laid out inline
-									// (before this state change collapses an unbounded parent).
-									const h =
-										rootRef.current?.getBoundingClientRect().height ?? 0;
-									setFrozenHeight(h > 0 ? h : null);
-									setFullscreenToolCallId(widget.toolCallId);
-								} else {
-									setFrozenHeight(null);
-									setFullscreenToolCallId(null);
-								}
-							}}
-						/>
+						<WidgetTimingProvider value={widgetTiming}>
+							<MessageList
+								messages={engine.messages}
+								status={engine.status}
+								welcomeMessage={welcomeMessage}
+								welcome={welcome}
+								onSuggestionSelect={handleSuggestionSelect}
+								resourceEndpoint={resourceEndpoint}
+								chatSessionId={engine.sessionId}
+								isDark={isDark}
+								onFollowUp={handleWidgetMessage}
+								onCallTool={handleCallTool}
+								fullscreenToolCallId={fullscreenToolCallId}
+								debug={debug}
+								showToolCalls={showToolCalls}
+								toolDefinitions={engine.toolDefinitions}
+								messageClassNames={{
+									message: classNames?.message,
+									userBubble: classNames?.userBubble,
+									assistantBubble: classNames?.assistantBubble,
+								}}
+								onWidgetDisplayModeChange={(mode, widget) => {
+									if (mode === "fullscreen") {
+										// Read the height while the embed is still laid out inline
+										// (before this state change collapses an unbounded parent).
+										const h =
+											rootRef.current?.getBoundingClientRect().height ?? 0;
+										setFrozenHeight(h > 0 ? h : null);
+										setFullscreenToolCallId(widget.toolCallId);
+									} else {
+										setFrozenHeight(null);
+										setFullscreenToolCallId(null);
+									}
+								}}
+							/>
+						</WidgetTimingProvider>
 						<div ref={bottomRef} aria-hidden style={{ height: 1 }} />
 					</div>
 					{!atBottom && !fullscreenToolCallId && (

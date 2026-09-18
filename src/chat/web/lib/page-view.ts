@@ -1,6 +1,7 @@
 import type { WidgetMode } from "../embed/widget-events";
 import { platformEndpoint } from "./api-url";
 import { debugLog } from "./debug";
+import { markBoot } from "./timing";
 import { collectVisitorContext } from "./visitor-context";
 
 const EVENTS_PATH = "/api/mcp/events/v2/batch";
@@ -83,7 +84,7 @@ export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 			],
 		});
 
-		await fetch(endpoint, {
+		const sent = fetch(endpoint, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -93,6 +94,8 @@ export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 			// Survive the request even if the user navigates away right after load.
 			keepalive: true,
 		});
+		markBoot("pageViewSent");
+		await sent;
 	} catch {
 		// Roll back the guard so a transient failure can retry on the next mount.
 		fired.delete(key);

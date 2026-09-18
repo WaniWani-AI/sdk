@@ -6,6 +6,9 @@
 // shadow DOM for style isolation.
 // ============================================================================
 
+// First, and before anything else in the bundle: `boot-clock` reads the clock
+// and the page's pre-existing globals on the first line the IIFE runs.
+import "./boot-clock";
 import type { UIMessage } from "ai";
 import React from "react";
 import ReactDOM from "react-dom/client";

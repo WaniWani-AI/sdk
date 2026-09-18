@@ -35,6 +35,7 @@ import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
+import { useBootTiming } from "../lib/timing-context";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
@@ -295,6 +296,15 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				widgetEvents.emit({ name: "chat.ready" });
 			}
 		}, [ready, widgetEvents]);
+
+		useBootTiming({
+			api: config.api,
+			token: config.token,
+			channelId: config.channelId,
+			mode: "floating",
+			paintMark: "launcherPainted",
+			painted: ready && visible,
+		});
 
 		// Open/close transitions. Watching `phase` covers every path that opens
 		// or closes the panel: dock focus, suggestion click, the imperative API,

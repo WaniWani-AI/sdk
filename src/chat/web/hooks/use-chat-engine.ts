@@ -22,6 +22,12 @@ import {
 	type StoredThread,
 	upsertThread,
 } from "../lib/thread-store";
+import {
+	bearerToken,
+	startTurn,
+	type TimingTarget,
+	type TurnTimer,
+} from "../lib/timing";
 import type { VisitorContext } from "../lib/visitor-context";
 import {
 	applyVisitorId,
@@ -327,6 +333,29 @@ export function useChatEngine(props: ChatBaseProps) {
 		};
 	}, []);
 
+	const turnRef = useRef<TurnTimer | null>(null);
+	const bodyString = useCallback((key: string): string | undefined => {
+		const value = bodyRef.current?.[key];
+		return typeof value === "string" ? value : undefined;
+	}, []);
+	const timingTarget = useCallback(
+		(): TimingTarget => ({
+			api,
+			token: bearerToken(headersRef.current),
+			channelId: bodyString("channelId"),
+			sessionId: sessionIdRef.current,
+		}),
+		[api, bodyString],
+	);
+	const reportTurn = useCallback(
+		(outcome: "ok" | "error") => {
+			const turn = turnRef.current;
+			turnRef.current = null;
+			turn?.report(timingTarget(), { mode: bodyString("mode"), outcome });
+		},
+		[timingTarget, bodyString],
+	);
+
 	const transportRef = useRef(
 		new LenientChatTransport({
 			api,
@@ -444,11 +473,13 @@ export function useChatEngine(props: ChatBaseProps) {
 				return resolvedBody;
 			},
 			fetch: (async (input, init) => {
+				const turn = turnRef.current;
+				turn?.mark("requestStart");
 				try {
 					const response = await fetch(input, init);
 					pendingModelContextRef.current = undefined;
 					setSessionId(response.headers.get(SESSION_HEADER_NAME));
-					return response;
+					return turn ? turn.instrument(response) : response;
 				} finally {
 					// A request that never landed still consumed its documents; the
 					// next turn must not re-attach them.
@@ -504,6 +535,8 @@ export function useChatEngine(props: ChatBaseProps) {
 		messages: props.initialMessages,
 		transport: transportRef.current,
 		onFinish({ message, isAbort, isDisconnect, isError }) {
+			turnRef.current?.mark("streamEnd");
+			reportTurn(isAbort || isDisconnect || isError ? "error" : "ok");
 			// `onFinish` also runs for aborted/disconnected/errored requests.
 			// `onResponseReceived` fires for all of them; the widget event is
 			// emitted only for a successful assistant reply.
@@ -518,6 +551,7 @@ export function useChatEngine(props: ChatBaseProps) {
 			}
 		},
 		onError(error) {
+			reportTurn("error");
 			console.warn("[Waniwani] Chat error:", error.message);
 			widgetEvents.emit({
 				name: "chat.error",
@@ -536,6 +570,12 @@ export function useChatEngine(props: ChatBaseProps) {
 	useEffect(() => {
 		messagesRef.current = messages;
 	}, [messages]);
+
+	const beginTurn = useCallback(() => {
+		turnRef.current = startTurn(
+			messagesRef.current.filter((m) => m.role === "user").length + 1,
+		);
+	}, []);
 
 	// Dropping the stream leaves the server generating. `/cancel` is what stops
 	// the turn itself; a host that does not serve it answers 404, which is fine
@@ -738,6 +778,7 @@ export function useChatEngine(props: ChatBaseProps) {
 				return;
 			}
 
+			beginTurn();
 			pendingModelContextRef.current = message.modelContext;
 			pendingDocumentsRef.current = message.documents;
 			sendMessage({
@@ -758,6 +799,7 @@ export function useChatEngine(props: ChatBaseProps) {
 			isLoading,
 			queuedMessages.length,
 			widgetEvents,
+			beginTurn,
 		],
 	);
 
@@ -765,12 +807,13 @@ export function useChatEngine(props: ChatBaseProps) {
 		(text: string): Promise<unknown> => {
 			return new Promise((resolve, reject) => {
 				pendingWaitRef.current = { resolve, reject };
+				beginTurn();
 				sendMessage({ text });
 				onMessageSent?.(text);
 				widgetEvents.emit({ name: "message.sent" });
 			});
 		},
-		[sendMessage, onMessageSent, widgetEvents],
+		[sendMessage, onMessageSent, widgetEvents, beginTurn],
 	);
 
 	// Flush first queued message once the current response finishes
@@ -785,6 +828,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		const [first, ...rest] = queuedMessages;
 		setQueuedMessages(rest);
 
+		beginTurn();
 		pendingModelContextRef.current = first.modelContext;
 		pendingDocumentsRef.current = first.documents;
 		sendMessage({
@@ -803,6 +847,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		onMessageSent,
 		queuedMessages,
 		widgetEvents,
+		beginTurn,
 	]);
 
 	const reset = useCallback(() => {

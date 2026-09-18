@@ -10,6 +10,7 @@ import type { DocumentUploadConfig } from "../@types";
 import { buildApiUrl } from "../lib/api-url";
 import { debugLog } from "../lib/debug";
 import { firePageView } from "../lib/page-view";
+import { markBoot, markConfigSource } from "../lib/timing";
 import type { EmbedConfig } from "./config";
 import { resolveConfig } from "./config";
 import { parsePageSuggestions } from "./use-suggestions";
@@ -196,6 +197,7 @@ export async function fetchRemoteConfig(
 	signal?: AbortSignal,
 	channelId?: string,
 ): Promise<Partial<EmbedConfig>> {
+	markBoot("configStart");
 	try {
 		const url = buildApiUrl(
 			api,
@@ -225,6 +227,8 @@ export async function fetchRemoteConfig(
 		return remoteToConfigPartial(data);
 	} catch {
 		return {};
+	} finally {
+		markBoot("configEnd");
 	}
 }
 
@@ -347,6 +351,7 @@ export function useRemoteEmbedConfig(
 			try {
 				const resolved = resolveConfig(programmatic, cached, scriptConfig);
 				setConfig(resolved);
+				markConfigSource("cache");
 				setReady(true);
 				debugLog("config resolved (sessionStorage cache)", {
 					config: resolved,
@@ -358,7 +363,10 @@ export function useRemoteEmbedConfig(
 			}
 		}
 		const controller = new AbortController();
-		const safety = setTimeout(() => setReady(true), READINESS_TIMEOUT_MS);
+		const safety = setTimeout(() => {
+			markConfigSource("timeout");
+			setReady(true);
+		}, READINESS_TIMEOUT_MS);
 		void fetchRemoteConfig(api, token, controller.signal, channelId)
 			.then((remote) => {
 				if (controller.signal.aborted) {
@@ -381,6 +389,7 @@ export function useRemoteEmbedConfig(
 						console.error("[Waniwani] Failed to apply remote config:", err);
 					}
 				}
+				markConfigSource("remote");
 				setReady(true);
 				pageView(remote);
 			})

@@ -36,6 +36,8 @@ import {
 	createNoopChatTrackClient,
 } from "../lib/chat-track";
 import { firePageView } from "../lib/page-view";
+import { markConfigSource } from "../lib/timing";
+import { useBootTiming } from "../lib/timing-context";
 import { ChatEmbed } from "./chat-embed";
 
 /**
@@ -318,11 +320,15 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			const cached = loadCachedConfig(resolvedApi, token, channelId);
 			if (cached) {
 				setRemote(cached);
+				markConfigSource("cache");
 				setReady(true);
 				pageView(cached);
 			}
 			const controller = new AbortController();
-			const safety = setTimeout(() => setReady(true), READINESS_TIMEOUT_MS);
+			const safety = setTimeout(() => {
+				markConfigSource("timeout");
+				setReady(true);
+			}, READINESS_TIMEOUT_MS);
 			void fetchRemoteConfig(resolvedApi, token, controller.signal, channelId)
 				.then((r) => {
 					if (controller.signal.aborted) {
@@ -332,6 +338,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 						saveCachedConfig(resolvedApi, token, channelId, r);
 						setRemote(r);
 					}
+					markConfigSource("remote");
 					setReady(true);
 					pageView(r);
 				})
@@ -451,6 +458,15 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 		// in a shared layout. Held until `ready` so a hidden page never flashes;
 		// re-evaluates on SPA route changes.
 		const visible = useVisibilityGate(config.visibility, ready);
+
+		useBootTiming({
+			api: config.api ?? resolvedApi,
+			token: config.token ?? token,
+			channelId: config.channelId ?? channelId,
+			mode: "inline",
+			paintMark: "chatVisible",
+			painted: ready && visible,
+		});
 
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.

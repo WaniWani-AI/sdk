@@ -5,9 +5,19 @@ import { defineConfig } from "tsup";
 // condition, and that file runs `document.createElement` at module load, so any
 // SSR import of the chat entry throws. Node's resolver never applies `browser`,
 // so this hands back the isomorphic `index.js`.
-const isomorphicEntityDecoder = createRequire(import.meta.url).resolve(
+const nodeRequire = createRequire(import.meta.url);
+
+const isomorphicEntityDecoder = nodeRequire.resolve(
 	"decode-named-character-reference",
 );
+
+// The chat surfaces report their own version in timing telemetry, so it is read
+// from package.json rather than restated in a source constant that would drift.
+const sdkVersion: Record<string, string> = {
+	__WANIWANI_SDK_VERSION__: JSON.stringify(
+		(nodeRequire("./package.json") as { version: string }).version,
+	),
+};
 
 export default defineConfig([
 	// Core tracking SDK
@@ -109,6 +119,7 @@ export default defineConfig([
 		banner: {
 			js: '"use client";',
 		},
+		define: sdkVersion,
 		esbuildOptions(options) {
 			options.alias = {
 				...options.alias,
@@ -179,6 +190,7 @@ export default defineConfig([
 		platform: "browser",
 		define: {
 			"process.env.NODE_ENV": '"production"',
+			...sdkVersion,
 		},
 		esbuildOptions(options) {
 			// Lighter alternatives for the embed IIFE bundle.
