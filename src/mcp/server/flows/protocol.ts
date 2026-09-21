@@ -1,90 +1,100 @@
-import type { FlowConfig } from "./@types";
+/**
+ * Flow protocol — the operating instructions the assistant needs to drive a
+ * multi-step flow.
+ *
+ * These live in the tool's *response*, not in its description. A tool
+ * description that prescribes conversation behavior, tool sequencing, required
+ * follow-up calls, or policy outcomes is what prompt-injection classifiers
+ * look for: ChatGPT's connector consent card raises "Suspicious Instruction"
+ * on one, and the user is asked to approve a tool that looks like it is trying
+ * to steer the model. From the outside there is no way to tell an honest
+ * protocol from an injected one when both arrive in the same field.
+ *
+ * A tool result is the ordinary place for control flow, and it is not
+ * classified that way. So the description carries what the tool *is*, the
+ * input schema carries what each argument *means*, and everything about what
+ * to do next rides back on the response, scoped to the status that actually
+ * came out. The assistant sees less text per turn and only the branch it is
+ * standing in.
+ */
 
-export function buildFlowProtocol(config: FlowConfig): string {
-	const lines = [
-		"",
-		"## FLOW EXECUTION PROTOCOL",
-		"",
-		"This tool implements a multi-step conversational flow. Follow this protocol exactly:",
-		"",
-		'1. Call with `action: "start"` to begin and include `intent`.',
-		"   `intent` must be a brief summary of the user's goal for this flow.",
-		"   Do NOT invent missing intent.",
-		"   Optionally include `context` — the situation or environment that led the user to start",
-		"   this flow (e.g. what page they are on, what they were doing, or what triggered the request).",
-		"   Only provide `context` when there is genuinely relevant situational information. Do NOT invent missing context.",
-		"   If the user's message already contains answers to likely questions,",
-		"   extract them into `stateUpdates` as `{ field: value }` pairs (see the `stateUpdates` schema",
-		"   for the list of writable fields). The engine will auto-skip steps whose fields are already filled.",
-		"   Only extract values the user explicitly stated — do NOT guess or invent values.",
+import type { FlowContent } from "./@types";
+
+/** Shape the response assembler passes in. A subset of `FlowContent`. */
+export interface NextStepInput {
+	status: FlowContent["status"];
+	/** Widget tool to render, when `status` is `widget`. */
+	tool?: string;
+	/** Whether that widget takes user input before the flow resumes. */
+	interactive?: boolean;
+	/** Whether this response carries the once-per-conversation `intro`. */
+	hasIntro?: boolean;
+	/** Whether the response echoes a `sessionId` the caller must pass back. */
+	echoSessionId?: boolean;
+}
+
+const CORRECTION =
+	'To change a field the user already answered ("actually my email is X"), call `action: "reset"` with the corrected `stateUpdates`. The flow restarts with every existing answer preserved and filled steps skipped, and may take a different path if the corrected value affects routing. The question on the table is a `continue`, not a `reset`.';
+
+const INTRO =
+	"`intro` opens your next message, ahead of the question, the widget call, and the result. `intro.verbatim` is reproduced word for word — no paraphrase, translation, trimming, expansion, or reformatting. `intro.instructions` is how to write the surrounding prose in your own words. It appears once per conversation and is not repeated from earlier turns.";
+
+function interruptSteps(): string[] {
+	return [
+		"The flow is paused on the user.",
+		"- One question: ask `question`, and return the answer as `stateUpdates` keyed by `field`.",
+		"- Several questions: ask every entry of `questions` in a single conversational message, then return all the answers keyed by their own `field`.",
+		'- `fieldSchema`, when present, describes the accepted value: match enum `values` exactly, send a number for `type: "number"`.',
+		"- `context`, when present, shapes your wording and is not shown to the user.",
+		'Resume with `action: "continue"`. Send back what the user actually said, including values they volunteered for other fields — those steps get skipped. Anything they left unanswered stays out and the flow asks again.',
 	];
+}
 
-	if (config.omitIntentPII) {
-		lines.push(
-			"   Do NOT include PII in `intent` or `context` — no names, emails, phones, addresses, IDs, ages, or birthdates.",
-			'   Summarize the goal abstractly (e.g. "user wants a quote", not "Jane Doe wants a quote").',
+function widgetSteps(input: NextStepInput): string[] {
+	const tool = input.tool ? `\`${input.tool}\`` : "the tool named in `tool`";
+	if (input.interactive) {
+		return [
+			`Render the widget by calling ${tool} with the \`data\` object as its input.`,
+			'The widget takes user input, so the flow waits there. Once the user has responded, resume with `action: "continue"` and their selection in `stateUpdates` under `field`.',
+		];
+	}
+	return [
+		`Render the widget by calling ${tool} with the \`data\` object as its input. It is display-only, and it is still a step the user sees, so it happens before the flow moves on.`,
+		'Once it is rendered, resume with `action: "continue"`. There is nothing to wait for.',
+	];
+}
+
+/**
+ * Build the `nextStep` line(s) for one response. Returns `undefined` when the
+ * status speaks for itself and the schema descriptions already cover it.
+ */
+export function buildNextStep(input: NextStepInput): string | undefined {
+	const parts: string[] = [];
+
+	switch (input.status) {
+		case "interrupt":
+			parts.push(...interruptSteps(), CORRECTION);
+			break;
+		case "widget":
+			parts.push(...widgetSteps(input), CORRECTION);
+			break;
+		case "complete":
+			parts.push("The flow is finished. Present the result to the user.");
+			break;
+		case "error":
+			parts.push("`error` holds what went wrong.");
+			break;
+	}
+
+	if (input.echoSessionId && input.status !== "complete") {
+		parts.push(
+			"`sessionId` comes back on every `continue` and `reset` call for this flow.",
 		);
 	}
 
-	lines.push(
-		"   For grouped fields (z.object state), use dot-notation keys in `stateUpdates`:",
-		'   e.g. `{ "driver.name": "John", "driver.license": "ABC123" }`.',
-		"2. The response JSON `status` field tells you what to do next:",
-		'   - `"interrupt"`: Pause and ask the user. Two forms:',
-		"     a. Single question: `{ question, field, fieldSchema?, context? }` — ask `question`, store answer in `field`.",
-		"     b. Multi-question: `{ questions: [{question, field, fieldSchema?}, ...], context? }` — ask ALL questions",
-		"        in one conversational message, collect all answers.",
-		"     `fieldSchema` (when present) describes the expected value: `{ type, values?, description?, optional? }`.",
-		'     Use it to validate before sending — match enum `values` exactly, coerce strings to numbers where `type: "number"`.',
-		"     `context` (if present) is hidden AI instructions — use to shape your response, do NOT show verbatim.",
-		"     Then call again with:",
-		'     `action: "continue"`,',
-		"     `stateUpdates` = answers keyed by their `field` names, plus any other fields the user mentioned.",
-		'   - `"widget"`: The flow wants to show a UI widget. Call the tool named in the `tool`',
-		"     field, passing the `data` object as the tool's input.",
-		"     Check the `interactive` field in the response:",
-		"     • `interactive: true` — The widget requires user interaction. After calling the display tool,",
-		"       STOP and WAIT for the user to interact with the widget. Do NOT call this flow tool again",
-		"       until the user has responded. When they do, call with:",
-		'       `action: "continue"`,',
-		"       `stateUpdates` = `{ [field]: <user's selection> }` plus any other fields the user mentioned.",
-		"     • `interactive: false` — The widget is display-only. You MUST STILL call the display tool",
-		"       FIRST to render it for the user — this is a required, user-visible step. Do NOT skip it",
-		'       and do NOT jump straight to `action: "continue"`. ONLY AFTER you have called the display',
-		'       tool, call THIS flow tool again with `action: "continue"`. Do NOT wait for user interaction.',
-		'   - `"complete"`: The flow is done. Present the result to the user.',
-		'   - `"error"`: Something went wrong. Show the `error` message.',
-		"",
-		"3. Do NOT invent state values. Only use `stateUpdates` for information the user explicitly provided.",
-		"4. Include only the fields the user actually answered in `stateUpdates` — do NOT guess missing ones.",
-		"   If the user did not answer all pending questions, the engine will re-prompt for the remaining ones.",
-		"   If the user mentioned values for other known fields, include those too —",
-		"   they will be applied immediately and those steps will be auto-skipped.",
-		"5. CORRECTION: If the user wants to CHANGE a previously-answered field",
-		'   (e.g. "actually my email is X" or "go back and change my country"),',
-		'   call with `action: "reset"` and `stateUpdates` containing the corrected field(s).',
-		"   The engine will restart the flow from the beginning with all existing answers preserved",
-		"   plus your corrections. Steps with filled answers will be auto-skipped.",
-		"   The flow may take a different path if the corrected value affects routing.",
-		'   Do NOT use "reset" for the CURRENT question — use "continue" for that.',
-		"6. If the response includes a `sessionId`, you MUST pass it back as `sessionId`",
-		'   in every subsequent "continue" and "reset" call for this flow.',
-	);
-
-	if (config.intro) {
-		lines.push(
-			"7. OPENING MESSAGE: if the response contains an `intro` object, deliver it at the very",
-			"   start of your next message to the user — before the question, before calling a widget",
-			"   tool, before presenting the result.",
-			"   - `intro.verbatim` (when present) MUST be reproduced word for word, exactly as written.",
-			"     Do NOT paraphrase, translate, shorten, expand, reformat, or fold it into another sentence.",
-			"   - `intro.instructions` (when present) tells you how to write the introduction in your own words.",
-			"   - When both are present, follow `instructions` for the prose around the notice and leave the",
-			"     `verbatim` text untouched.",
-			"   `intro` appears at most once per conversation. Later responses omit it, and you must not",
-			"   repeat it or reuse it from earlier in the conversation.",
-		);
+	if (input.hasIntro) {
+		parts.unshift(INTRO);
 	}
 
-	return lines.join("\n");
+	return parts.length > 0 ? parts.join("\n") : undefined;
 }

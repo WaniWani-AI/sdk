@@ -157,6 +157,11 @@ npx skills add Waniwani-AI/sdk -s audit-tracking        # read-only audit of an 
 - **Adding a first node just to greet the user or state a GDPR notice**: pre-filled state skips
   opening nodes, so that message never lands. Use `intro` on the flow config instead
   ([/sdk/flows/intro](https://docs.waniwani.ai/sdk/flows/intro)).
+- **Writing instructions into `createFlow({ description })`**: the description is the whole consent
+  card a ChatGPT user approves. Numbered protocols, `Do NOT`, `You MUST call X first` and other
+  attempts to steer the model get flagged as a **Suspicious Instruction** on that card. Describe what
+  the flow does in a sentence or two; the engine puts the protocol on each response as `nextStep`
+  ([/sdk/reference/flow-tool-contract](https://docs.waniwani.ai/sdk/reference/flow-tool-contract)).
 - **Calling `interrupt` / `showWidget` directly**: they come from the handler context,
   `({ interrupt }) => interrupt(...)`.
 - **Answering from memory**: if you have not fetched the docs page for what you are writing, fetch it.
