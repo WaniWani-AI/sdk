@@ -36,7 +36,10 @@ const INSTRUCTIONS =
 	"Introduce yourself as Léa from Acme in one short friendly sentence.";
 
 type IntroPayload = { verbatim?: string; instructions?: string };
-type Payload = Record<string, unknown> & { intro?: IntroPayload };
+type Payload = Record<string, unknown> & {
+	intro?: IntroPayload;
+	nextStep?: string;
+};
 
 const quotePicker: RegisteredTool = {
 	id: "quote_picker",
@@ -387,13 +390,28 @@ describe("flow intro", () => {
 		} as FlowTokenContent["internal"]);
 	});
 
-	test("the protocol block only mentions intro when the flow declares one", async () => {
+	test("the intro guidance rides the response carrying the intro, never the description", async () => {
 		const { flow: withIntro } = quoteFlow({ intro: VERBATIM });
-		const { flow: without } = quoteFlow();
+		const handler = await handlerFor(withIntro);
 
-		expect(withIntro.config.description).toContain("OPENING MESSAGE");
-		expect(withIntro.config.description).toContain("word for word");
-		expect(without.config.description).not.toContain("OPENING MESSAGE");
+		const first = parsePayload(
+			await handler({ action: "start", intent: INTENT }, EXTRA),
+		);
+		expect(first.intro).toEqual({ verbatim: VERBATIM });
+		expect(first.nextStep).toContain("word for word");
+
+		// Second turn: no intro, so no intro guidance either.
+		const second = parsePayload(
+			await handler(
+				{ action: "continue", stateUpdates: { address: "12 rue de Rivoli" } },
+				EXTRA,
+			),
+		);
+		expect(second.intro).toBeUndefined();
+		expect(second.nextStep).not.toContain("word for word");
+
+		expect(withIntro.config.description).not.toContain("word for word");
+		expect(withIntro.config.description).not.toContain("intro");
 	});
 
 	test("an empty intro fails at compile time", () => {
