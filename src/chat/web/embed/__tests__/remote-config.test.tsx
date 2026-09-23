@@ -42,11 +42,15 @@ const { createRoot } = await import("react-dom/client");
 type Root = ReturnType<typeof createRoot>;
 
 const { __resetPageViewGuard } = await import("../../lib/page-view");
+const { __resetBootTiming, sendTiming } = await import("../../lib/timing");
 const { resolveConfig } = await import("../config");
 type EmbedConfigType = import("../config").EmbedConfig;
-const { fetchRemoteConfig, useRemoteEmbedConfig } = await import(
-	"../remote-config"
-);
+const {
+	fetchRemoteConfig,
+	loadCachedConfig,
+	saveCachedConfig,
+	useRemoteEmbedConfig,
+} = await import("../remote-config");
 
 // ---------------------------------------------------------------------------
 // Fetch stub — serves `GET {api}/config` and captures the V2 batch ingest POST
@@ -126,6 +130,7 @@ function mountHook(programmatic: Partial<EmbedConfigType>): {
 
 beforeEach(() => {
 	__resetPageViewGuard();
+	__resetBootTiming();
 	win.sessionStorage.clear();
 	win.localStorage.clear();
 });
@@ -455,5 +460,104 @@ describe("fetchRemoteConfig — documentUpload", () => {
 		const partial = await partialFor({ ...DOCUMENT_UPLOAD, maxFiles: 1 });
 
 		expect(partial.documentUpload?.maxFiles).toBe(1);
+	});
+});
+
+describe("chatTimingLogs metadata", () => {
+	const timingTarget = { api: API, token: "wwp_test" };
+	const ON = { chatTimingLogs: "true" };
+
+	function stubTiming(config: Promise<Record<string, unknown>>): {
+		timing: string[];
+		restore: () => void;
+	} {
+		const timing: string[] = [];
+		const real = globalThis.fetch;
+		// biome-ignore lint/suspicious/noExplicitAny: test stub
+		(globalThis as any).fetch = async (url: any) => {
+			const href = String(url);
+			if (href.includes("/config")) {
+				return Response.json({ success: true, data: await config });
+			}
+			if (href.includes("/timing")) {
+				timing.push(href);
+			}
+			return new Response(null, { status: 202 });
+		};
+		return {
+			timing,
+			restore: () => {
+				globalThis.fetch = real;
+			},
+		};
+	}
+
+	async function beaconsAfter(data: Record<string, unknown>) {
+		const { timing, restore } = stubTiming(Promise.resolve(data));
+		try {
+			const partial = await fetchRemoteConfig(API, "wwp_test");
+			sendTiming("boot", timingTarget, {}, {});
+			return { partial, timing };
+		} finally {
+			restore();
+		}
+	}
+
+	test('chatTimingLogs: "true" sends', async () => {
+		const { partial, timing } = await beaconsAfter({ metadata: ON });
+		expect(partial.metadata).toEqual(ON);
+		expect(timing).toHaveLength(1);
+	});
+
+	test('chatTimingLogs: "false" sends nothing', async () => {
+		const { timing } = await beaconsAfter({
+			metadata: { chatTimingLogs: "false" },
+		});
+		expect(timing).toHaveLength(0);
+	});
+
+	test("metadata without the key sends nothing", async () => {
+		const { timing } = await beaconsAfter({ metadata: { plan: "gold" } });
+		expect(timing).toHaveLength(0);
+	});
+
+	test("null metadata sends nothing", async () => {
+		const { partial, timing } = await beaconsAfter({ metadata: null });
+		expect(partial.metadata).toBeUndefined();
+		expect(timing).toHaveLength(0);
+	});
+
+	test("a /config without the field sends nothing", async () => {
+		const { timing } = await beaconsAfter({ title: "Hi" });
+		expect(timing).toHaveLength(0);
+	});
+
+	test("a cached config without the field reads as off", async () => {
+		saveCachedConfig(API, "wwp_test", undefined, { title: "Cached" });
+		const { timing, restore } = stubTiming(new Promise(() => {}));
+		try {
+			const { latest } = mountHook({ token: "wwp_test" });
+			await waitFor(() => latest().title === "Cached");
+			sendTiming("boot", timingTarget, {}, {});
+			expect(timing).toHaveLength(0);
+		} finally {
+			restore();
+		}
+	});
+
+	test("a fresh fetch overrides the cached verdict and updates the cache", async () => {
+		saveCachedConfig(API, "wwp_test", undefined, { title: "Cached" });
+		const { timing, restore } = stubTiming(
+			Promise.resolve({ title: "Fresh", metadata: ON }),
+		);
+		try {
+			const { latest } = mountHook({ token: "wwp_test" });
+			await waitFor(() => latest().title === "Fresh");
+			sendTiming("boot", timingTarget, {}, {});
+			expect(timing).toHaveLength(1);
+			expect(loadCachedConfig(API, "wwp_test")?.metadata).toEqual(ON);
+		} finally {
+			restore();
+		}
 	});
 });

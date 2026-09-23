@@ -10,7 +10,7 @@ import type { DocumentUploadConfig } from "../@types";
 import { buildApiUrl } from "../lib/api-url";
 import { debugLog } from "../lib/debug";
 import { firePageView } from "../lib/page-view";
-import { markBoot, markConfigSource } from "../lib/timing";
+import { markBoot, markConfigSource, setTimingMetadata } from "../lib/timing";
 import type { EmbedConfig } from "./config";
 import { resolveConfig } from "./config";
 import { parsePageSuggestions } from "./use-suggestions";
@@ -133,6 +133,8 @@ interface RemoteConfigResponse {
 	 * thing worth sending is a channel that has declined it.
 	 */
 	webmcp?: { enabled?: boolean | null } | null;
+	/** The channel's custom key:value pairs. Absent on servers that predate the field. */
+	metadata?: Record<string, string> | null;
 }
 
 interface RemoteDocumentUpload {
@@ -198,6 +200,20 @@ export async function fetchRemoteConfig(
 	channelId?: string,
 ): Promise<Partial<EmbedConfig>> {
 	markBoot("configStart");
+	const remote = await requestRemoteConfig(api, token, signal, channelId);
+	markBoot("configEnd");
+	if (!signal?.aborted) {
+		setTimingMetadata(remote.metadata);
+	}
+	return remote;
+}
+
+async function requestRemoteConfig(
+	api: string,
+	token: string,
+	signal: AbortSignal | undefined,
+	channelId: string | undefined,
+): Promise<Partial<EmbedConfig>> {
 	try {
 		const url = buildApiUrl(
 			api,
@@ -227,8 +243,6 @@ export async function fetchRemoteConfig(
 		return remoteToConfigPartial(data);
 	} catch {
 		return {};
-	} finally {
-		markBoot("configEnd");
 	}
 }
 
@@ -279,6 +293,9 @@ function remoteToConfigPartial(
 	const documentUpload = parseDocumentUpload(data.documentUpload);
 	if (documentUpload) {
 		out.documentUpload = documentUpload;
+	}
+	if (data.metadata && typeof data.metadata === "object") {
+		out.metadata = data.metadata;
 	}
 	return out;
 }
@@ -352,6 +369,7 @@ export function useRemoteEmbedConfig(
 				const resolved = resolveConfig(programmatic, cached, scriptConfig);
 				setConfig(resolved);
 				markConfigSource("cache");
+				setTimingMetadata(cached.metadata);
 				setReady(true);
 				debugLog("config resolved (sessionStorage cache)", {
 					config: resolved,

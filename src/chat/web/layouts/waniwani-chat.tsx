@@ -36,7 +36,7 @@ import {
 	createNoopChatTrackClient,
 } from "../lib/chat-track";
 import { firePageView } from "../lib/page-view";
-import { markConfigSource } from "../lib/timing";
+import { markConfigSource, setTimingMetadata } from "../lib/timing";
 import { useBootTiming } from "../lib/timing-context";
 import { ChatEmbed } from "./chat-embed";
 
@@ -321,6 +321,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			if (cached) {
 				setRemote(cached);
 				markConfigSource("cache");
+				setTimingMetadata(cached.metadata);
 				setReady(true);
 				pageView(cached);
 			}

@@ -37,8 +37,13 @@ const { act, createElement } = await import("react");
 const { createRoot } = await import("react-dom/client");
 type Root = ReturnType<typeof createRoot>;
 
-const { __resetBootTiming, markBoot, markConfigSource, reportBoot } =
-	await import("../timing");
+const {
+	__resetBootTiming,
+	markBoot,
+	markConfigSource,
+	reportBoot,
+	setTimingMetadata,
+} = await import("../timing");
 const { useBootTiming } = await import("../timing-context");
 
 interface Captured {
@@ -76,6 +81,7 @@ describe("reportBoot", () => {
 		markBoot("configEnd", 90);
 		markConfigSource("cache");
 		markConfigSource("remote");
+		setTimingMetadata({ chatTimingLogs: "true" });
 
 		reportBoot({ ...target, mode: "floating" });
 
@@ -88,6 +94,21 @@ describe("reportBoot", () => {
 		expect(payload.tags.mode).toBe("floating");
 		expect(payload.tags.configSource).toBe("cache");
 		expect(payload.tags.secondSdk).toBe(false);
+	});
+
+	test("waits for the config verdict and goes out when it is true", () => {
+		reportBoot({ ...target, mode: "inline" });
+		expect(calls).toHaveLength(0);
+		setTimingMetadata({ chatTimingLogs: "true" });
+		expect(calls).toHaveLength(1);
+		expect(JSON.parse(String(calls[0].init.body)).kind).toBe("boot");
+	});
+
+	test("waits for the config verdict and is dropped when it is false", () => {
+		reportBoot({ ...target, mode: "inline" });
+		setTimingMetadata({ chatTimingLogs: "false" });
+		setTimingMetadata({ chatTimingLogs: "true" });
+		expect(calls).toHaveLength(0);
 	});
 });
 
@@ -117,6 +138,7 @@ describe("useBootTiming", () => {
 	}
 
 	test("stays quiet until the surface has painted, then reports once", async () => {
+		setTimingMetadata({ chatTimingLogs: "true" });
 		act(() => {
 			root.render(createElement(Probe, { painted: false }));
 		});

@@ -16,9 +16,11 @@ for (const key of [
 (globalThis as any).window = win;
 
 import {
+	__resetBootTiming,
 	buildTimingPayload,
 	createRecorder,
 	sendTiming,
+	setTimingMetadata,
 	startTurn,
 	startWidget,
 } from "../timing";
@@ -52,6 +54,8 @@ const target = {
 };
 
 beforeEach(() => {
+	__resetBootTiming();
+	setTimingMetadata({ chatTimingLogs: "true" });
 	try {
 		localStorage.clear();
 	} catch {
@@ -175,6 +179,72 @@ describe("sendTiming", () => {
 			expect(() => sendTiming("boot", target, {}, {})).not.toThrow();
 		} finally {
 			globalThis.fetch = real;
+		}
+	});
+});
+
+describe("setTimingMetadata", () => {
+	test("holds beacons until the verdict, then sends them on true", () => {
+		__resetBootTiming();
+		const { calls, restore } = mockFetch();
+		try {
+			sendTiming("boot", target, {}, { chatVisible: 1 });
+			sendTiming("turn", target, {}, { streamEnd: 2 });
+			expect(calls).toHaveLength(0);
+			setTimingMetadata({ chatTimingLogs: "true" });
+			expect(calls).toHaveLength(2);
+			sendTiming("widget", target, {}, {});
+			expect(calls).toHaveLength(3);
+		} finally {
+			restore();
+		}
+	});
+
+	test("drops the held beacons on false and sends nothing after", () => {
+		__resetBootTiming();
+		const { calls, restore } = mockFetch();
+		try {
+			sendTiming("boot", target, {}, { chatVisible: 1 });
+			setTimingMetadata({ chatTimingLogs: "false" });
+			sendTiming("turn", target, {}, {});
+			expect(calls).toHaveLength(0);
+		} finally {
+			restore();
+		}
+	});
+
+	test("reads chatTimingLogs trimmed and case-insensitive", () => {
+		const cases: Array<[Record<string, string> | null | undefined, number]> = [
+			[{ chatTimingLogs: " TRUE " }, 1],
+			[{ chatTimingLogs: "yes" }, 0],
+			[{ other: "true" }, 0],
+			[null, 0],
+			[undefined, 0],
+		];
+		for (const [metadata, expected] of cases) {
+			__resetBootTiming();
+			const { calls, restore } = mockFetch();
+			try {
+				setTimingMetadata(metadata);
+				sendTiming("turn", target, {}, {});
+				expect(calls).toHaveLength(expected);
+			} finally {
+				restore();
+			}
+		}
+	});
+
+	test("sends nothing when no remote config ever answers", async () => {
+		__resetBootTiming();
+		const { calls, restore } = mockFetch();
+		try {
+			sendTiming("boot", target, {}, {});
+			sendTiming("turn", target, {}, {});
+			sendTiming("widget", target, {}, {});
+			await new Promise((resolve) => setTimeout(resolve, 10));
+			expect(calls).toHaveLength(0);
+		} finally {
+			restore();
 		}
 	});
 });

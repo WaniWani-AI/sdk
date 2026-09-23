@@ -144,27 +144,55 @@ export function buildTimingPayload(
 	};
 }
 
+/** Undecided until a channel config answers; beacons wait in `pending` until then. */
+let beacons: boolean | undefined;
+let pending: Array<() => void> = [];
+
+/** The channel opts in with custom metadata `chatTimingLogs: true`. On flushes the held beacons, off drops them. */
+export function setTimingMetadata(
+	metadata: Record<string, string> | null | undefined,
+): void {
+	const enabled =
+		String(metadata?.chatTimingLogs).trim().toLowerCase() === "true";
+	beacons = enabled;
+	const held = pending;
+	pending = [];
+	if (enabled) {
+		for (const send of held) {
+			send();
+		}
+	}
+}
+
 export function sendTiming(
 	kind: TimingKind,
 	target: TimingTarget,
 	tags: TimingTags,
 	metrics: Record<string, number>,
 ): void {
-	if (typeof window === "undefined" || !target.api || !target.token) {
+	const { api, token } = target;
+	if (typeof window === "undefined" || !api || !token || beacons === false) {
 		return;
 	}
 	try {
 		const payload = buildTimingPayload(kind, target, tags, metrics);
-		debugLog("timing", payload);
-		void fetch(buildApiUrl(target.api, "/timing"), {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${target.token}`,
-			},
-			body: JSON.stringify(payload),
-			keepalive: true,
-		}).catch(() => {});
+		const send = () => {
+			debugLog("timing", payload);
+			void fetch(buildApiUrl(api, "/timing"), {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
+				body: JSON.stringify(payload),
+				keepalive: true,
+			}).catch(() => {});
+		};
+		if (beacons) {
+			send();
+		} else if (pending.length < 20) {
+			pending.push(send);
+		}
 	} catch {
 		// Telemetry never reaches the host page.
 	}
@@ -174,10 +202,12 @@ export function sendTiming(
 let boot = createRecorder("boot", 0);
 let configSource: string | undefined;
 
-/** Test-only: drop the page-level boot marks. */
+/** Test-only: drop the page-level boot marks and the beacon verdict. */
 export function __resetBootTiming(): void {
 	boot = createRecorder("boot", 0);
 	configSource = undefined;
+	beacons = undefined;
+	pending = [];
 }
 
 export function markBoot(name: string, at?: number): void {
