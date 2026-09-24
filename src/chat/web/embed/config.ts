@@ -189,6 +189,12 @@ export interface EmbedConfig {
 	 */
 	documentUpload?: DocumentUploadConfig;
 	/**
+	 * The channel's custom metadata, as `/config` serves it. Timing beacons read
+	 * it from the remote config only; setting it here sends nothing.
+	 * @internal
+	 */
+	metadata?: Record<string, string>;
+	/**
 	 * Theme preset + per-property overrides. The script tag exposes the
 	 * preset via `data-theme="light|dark|auto"`; programmatic callers can
 	 * additionally pass `variables` to tweak individual colours.

@@ -16,6 +16,7 @@ import {
 import type { ChatHandle } from "../@types";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { ChatEmbed } from "../layouts/chat-embed";
+import { useBootTiming } from "../lib/timing-context";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { useVisibilityGate } from "./use-pathname";
@@ -100,6 +101,15 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		useEffect(() => {
 			onVisibilityChange?.(visible);
 		}, [visible, onVisibilityChange]);
+
+		useBootTiming({
+			api: config.api,
+			token: config.token,
+			channelId: config.channelId,
+			mode: "inline",
+			paintMark: "chatVisible",
+			painted: ready,
+		});
 
 		useImperativeHandle(
 			ref,

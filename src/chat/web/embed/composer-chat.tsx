@@ -43,6 +43,7 @@ import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
+import { useBootTiming } from "../lib/timing-context";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
@@ -124,6 +125,15 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 		useEffect(() => {
 			onVisibilityChange?.(visible);
 		}, [visible, onVisibilityChange]);
+
+		useBootTiming({
+			api: config.api,
+			token: config.token,
+			channelId: config.channelId,
+			mode: "composer",
+			paintMark: "chatVisible",
+			painted: ready,
+		});
 
 		const chatRef = useRef<ChatHandle>(null);
 		// One emitter per mount. The session id getter reads through the chat
