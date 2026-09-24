@@ -40,6 +40,72 @@ export interface ChatAppearance {
 }
 
 /**
+ * Visual treatment of the in-flow composer (`mode: "composer"`). The surface
+ * is page content, so it has to sit inside designs the SDK never sees: a hero
+ * band, a card in a help center, a row of filters.
+ *
+ * - `"glow"` (default) — filled box on a card shadow, with the one-off border
+ *   glow sweep once the config resolves. The attention-grabbing option.
+ * - `"outline"` — the same box without the sweep. Sits quietly inside a card
+ *   or a form that already carries its own chrome.
+ *
+ * Two, because a variant is a starting point rather than the ceiling. Radius,
+ * fill, border, shadow and the send button read from `--ww-composer-*` CSS
+ * custom properties, so a host restyles the box from its own stylesheet
+ * instead of waiting for a variant here (a fully rounded search bar is
+ * `--ww-composer-radius: 9999px`). See the chat embed docs for the list.
+ */
+export type ComposerVariant = "glow" | "outline";
+
+/** Composer scale. Padding, text size and send-button size move together. */
+export type ComposerSize = "sm" | "md" | "lg";
+
+/**
+ * Presentation options for the `mode: "composer"` surface. Every field is
+ * cosmetic — behavior (first message opens the panel) is the same throughout.
+ */
+export interface ComposerAppearance {
+	/** Visual treatment. Defaults to `"glow"`. */
+	variant?: ComposerVariant;
+	/** Scale. Defaults to `"md"`. */
+	size?: ComposerSize;
+	/**
+	 * Render the channel's suggestion pills under the box. Defaults to `true`;
+	 * set `false` for a bare input in a tight layout.
+	 */
+	showSuggestions?: boolean;
+	/**
+	 * Horizontal alignment of the suggestion pills, and of the label when the
+	 * composer renders as a trigger. Defaults to `"start"`.
+	 */
+	align?: "start" | "center";
+	/**
+	 * Render the composer as a tap target instead of a live input: nothing is
+	 * typed in the page, and a click opens the panel where the caret lands.
+	 * Defaults to `false`.
+	 *
+	 * For hosts that want one tap into the full chat and no in-page composing.
+	 * The box keeps its variant's chrome and whatever CSS is set on it — only
+	 * the textarea is swapped for the trigger. `mobileTrigger` applies the same
+	 * swap on phones only; this one applies at every width.
+	 */
+	trigger?: boolean;
+	/**
+	 * On phone-width viewports, render the composer as a tap target instead of
+	 * a live input: one tap opens the full-screen panel and types there.
+	 * Defaults to `true`.
+	 *
+	 * Typing into an in-page box on a phone is the worse half of the handoff —
+	 * the soft keyboard covers the composer, the first message opens a
+	 * full-screen panel over it, and focus has to move mid-sentence. Going
+	 * straight to the panel skips all of it. The box keeps its variant's
+	 * chrome and whatever CSS is set on it; only the input is swapped for the
+	 * trigger. Set `false` to keep a real input at every width.
+	 */
+	mobileTrigger?: boolean;
+}
+
+/**
  * Tool-call activity rendering mode. Steps are grouped into one collapsible
  * "chain of thought".
  *
@@ -232,6 +298,14 @@ export interface EmbedConfig {
 	 * Surfaced as `data-mode` on the embed script tag.
 	 */
 	mode?: "inline" | "floating" | "composer" | "off";
+	/**
+	 * Presentation of the in-flow composer. Only applies when `mode` is
+	 * `"composer"`. Surfaced as `data-composer-variant`, `data-composer-size`,
+	 * `data-composer-suggestions`, `data-composer-align`,
+	 * `data-composer-trigger` and `data-composer-mobile-trigger` on the embed
+	 * script tag.
+	 */
+	composer?: ComposerAppearance;
 	/**
 	 * Default height for the inline embed container. Any CSS length
 	 * (`"500px"`, `"80vh"`, …) or a bare number (treated as `px`). Applied to
@@ -479,6 +553,35 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.mode = modeRaw;
 	}
 
+	const composer: ComposerAppearance = {};
+	const composerVariant = str("data-composer-variant")?.trim().toLowerCase();
+	if (composerVariant === "glow" || composerVariant === "outline") {
+		composer.variant = composerVariant;
+	}
+	const composerSize = str("data-composer-size")?.trim().toLowerCase();
+	if (composerSize === "sm" || composerSize === "md" || composerSize === "lg") {
+		composer.size = composerSize;
+	}
+	const composerSuggestions = bool("data-composer-suggestions");
+	if (composerSuggestions !== undefined) {
+		composer.showSuggestions = composerSuggestions;
+	}
+	const composerAlign = str("data-composer-align")?.trim().toLowerCase();
+	if (composerAlign === "start" || composerAlign === "center") {
+		composer.align = composerAlign;
+	}
+	const composerTrigger = bool("data-composer-trigger");
+	if (composerTrigger !== undefined) {
+		composer.trigger = composerTrigger;
+	}
+	const composerMobileTrigger = bool("data-composer-mobile-trigger");
+	if (composerMobileTrigger !== undefined) {
+		composer.mobileTrigger = composerMobileTrigger;
+	}
+	if (Object.keys(composer).length > 0) {
+		config.composer = composer;
+	}
+
 	const height = str("data-height");
 	if (height) {
 		config.height = height;
@@ -549,6 +652,12 @@ export function resolveConfig(
 	const fromScript = scriptConfig ?? parseConfigFromScript();
 
 	const appearance = mergeAppearance(remote, fromScript, programmatic);
+	const composer: ComposerAppearance = {
+		...(remote?.composer ?? {}),
+		...compact(fromScript.composer),
+		...compact(programmatic?.composer),
+	};
+	const hasComposer = Object.keys(composer).length > 0;
 
 	const merged: EmbedConfig = {
 		token: "",
@@ -557,6 +666,7 @@ export function resolveConfig(
 		...compact(fromScript),
 		...compact(programmatic),
 		...(appearance ? { appearance } : {}),
+		...(hasComposer ? { composer } : {}),
 	};
 
 	if (!merged.token) {

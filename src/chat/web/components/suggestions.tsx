@@ -8,12 +8,15 @@ export interface SuggestionsProps
 	suggestions: string[];
 	isLoading?: boolean;
 	onSelect: (suggestion: string) => void;
+	/** Horizontal alignment of the pill row. Defaults to `"start"`. */
+	align?: "start" | "center";
 }
 
 export function Suggestions({
 	suggestions,
 	isLoading,
 	onSelect,
+	align = "start",
 	className,
 	...props
 }: SuggestionsProps) {
@@ -23,7 +26,12 @@ export function Suggestions({
 
 	return (
 		<div className={cn("ww:px-4 ww:py-2", className)} {...props}>
-			<div className="ww:mx-auto ww:w-full ww:max-w-3xl ww:flex ww:flex-wrap ww:gap-2">
+			<div
+				className={cn(
+					"ww:mx-auto ww:w-full ww:max-w-3xl ww:flex ww:flex-wrap ww:gap-2",
+					align === "center" && "ww:justify-center",
+				)}
+			>
 				{isLoading
 					? [0, 1, 2].map((i) => (
 							<div

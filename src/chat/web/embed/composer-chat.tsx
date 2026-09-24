@@ -26,6 +26,7 @@
 import type { UIMessage } from "ai";
 import { ArrowUp, Minus } from "lucide-react";
 import {
+	type CSSProperties,
 	forwardRef,
 	useCallback,
 	useEffect,
@@ -38,6 +39,7 @@ import { createPortal } from "react-dom";
 import type { ChatHandle } from "../@types";
 import BorderGlow from "../components/border-glow";
 import { Suggestions } from "../components/suggestions";
+import { useNarrowViewport } from "../hooks/use-narrow-viewport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
@@ -46,12 +48,83 @@ import { resolveSuggestions } from "../lib/resolve-suggestions";
 import { useBootTiming } from "../lib/timing-context";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
-import type { EmbedConfig } from "./config";
+import type { ComposerSize, EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { useVisibilityGate } from "./use-pathname";
 import { useSuggestions } from "./use-suggestions";
 import { createWidgetEventEmitter } from "./widget-events";
 import { WidgetEventsProvider } from "./widget-events-context";
+
+// ----------------------------------------------------------------------------
+// Presentation tables
+//
+// The composer is page content, dropped into designs the SDK never sees, so
+// its chrome is configurable (`config.composer`). Size and variant are kept as
+// data here rather than as branches in the JSX: every variant renders the same
+// row, only the shell around it and the spacing change.
+// ----------------------------------------------------------------------------
+
+interface SizeStyle {
+	/** Padding + gap on the row that holds icon, textarea and send button. */
+	row: string;
+	/** Vertical padding and type scale on the textarea itself. */
+	field: string;
+	/** Send button box. */
+	send: string;
+	/** Glyph inside the send button. */
+	sendIcon: string;
+	/** Corner radius in px, shared with BorderGlow (which takes a number). */
+	radius: number;
+}
+
+// `text-base` (16px) on mobile is load-bearing at every size: iOS Safari
+// auto-zooms a focused input under 16px. `sm:text-sm` restores the smaller
+// text where the zoom rule doesn't apply. Do not drop the 16px mobile size.
+const SIZE_STYLES: Record<ComposerSize, SizeStyle> = {
+	sm: {
+		row: "ww:gap-1 ww:pl-3 ww:pr-1 ww:py-1",
+		field: "ww:py-1 ww:text-base ww:sm:text-sm",
+		send: "ww:size-7",
+		sendIcon: "ww:size-3.5",
+		radius: 12,
+	},
+	md: {
+		row: "ww:gap-1 ww:pl-3.5 ww:pr-1.5 ww:py-1.5 ww:sm:pl-4 ww:sm:pr-2 ww:sm:py-2",
+		field: "ww:py-1.5 ww:text-base ww:sm:text-sm",
+		send: "ww:size-8",
+		sendIcon: "ww:size-4",
+		radius: 16,
+	},
+	lg: {
+		row: "ww:gap-2 ww:pl-5 ww:pr-2 ww:py-2.5 ww:sm:pl-6 ww:sm:pr-2.5 ww:sm:py-3",
+		field: "ww:py-2 ww:text-base",
+		send: "ww:size-10",
+		sendIcon: "ww:size-5",
+		radius: 20,
+	},
+};
+
+// ----------------------------------------------------------------------------
+// Restyling hooks
+//
+// A variant is a starting point, not the ceiling. Every visual property of the
+// box reads from a `--ww-composer-*` custom property whose fallback is the
+// variant's own value, so a host restyles the composer from its own stylesheet
+// (`[data-waniwani-embed] { --ww-composer-bg: transparent; … }`) without the
+// SDK growing a variant per taste. Custom properties inherit through the
+// widget's shadow root, which is what makes this work at all.
+//
+// An untouched embed resolves every one of these to what it rendered before.
+// ----------------------------------------------------------------------------
+
+/** Box fill. */
+const BG = "var(--ww-composer-bg, var(--ww-color-input))";
+/** Border color and width, as a `border-*` pair so `0` flattens the box. */
+const BORDER_COLOR = "var(--ww-composer-border-color, var(--ww-color-border))";
+const BORDER_WIDTH = "var(--ww-composer-border-width, 1px)";
+/** Send button fill and glyph. */
+const SEND_BG = "var(--ww-composer-send-bg, var(--ww-color-foreground))";
+const SEND_FG = "var(--ww-composer-send-fg, var(--ww-color-background))";
 
 export interface ComposerChatProps {
 	config: EmbedConfig;
@@ -155,6 +228,8 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 		}, [onEvent, widgetEvents]);
 
 		const textareaRef = useRef<HTMLTextAreaElement>(null);
+		// The `button` variant renders no textarea; `focus()` lands here instead.
+		const triggerRef = useRef<HTMLButtonElement>(null);
 		const [open, setOpen] = useState(false);
 		const [composerText, setComposerText] = useState("");
 		// Bumped to request focusing the chat input once the panel has opened.
@@ -220,14 +295,36 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 			});
 		}, [visible, composerRow, composerTexts, widgetEvents]);
 
+		// Presentation. Behavior is identical across variants: the first message
+		// (typed, pill, or a tap on a trigger) opens the panel.
+		const look = config.composer ?? {};
+		const variant = look.variant ?? "glow";
+		const size = SIZE_STYLES[look.size ?? "md"];
+		const showSuggestions = look.showSuggestions ?? true;
+		const centered = look.align === "center";
+
+		// Whether the box is a tap target rather than a live input. `trigger`
+		// asks for that at every width. On a phone it is the default anyway:
+		// typing into an in-page box there is the worse half of the handoff —
+		// the soft keyboard covers the composer, the first message opens a
+		// full-screen panel over it, and focus moves mid-sentence. A tap target
+		// skips straight to the panel, which is already the full-screen surface
+		// at that width.
+		const narrow = useNarrowViewport();
+		const asTrigger =
+			(look.trigger ?? false) || (narrow && (look.mobileTrigger ?? true));
+
 		// The composer is the chat's entry point, so it shows the configured input
 		// placeholder by default (`data-launcher-text` overrides it for an
 		// entry-specific prompt). Typed out like the in-chat input.
 		const composerPlaceholder =
 			config.launcherText ?? config.placeholder ?? t.launcher.prompt;
+		// A trigger shows the placeholder as a static label, so there is nothing
+		// for the animation to drive — skipping it keeps a phone off a timer
+		// that re-renders the tree every 80ms for no visible change.
 		const animatedPlaceholder = useTypingPlaceholder(
 			composerPlaceholder,
-			composerText.length === 0,
+			!asTrigger && composerText.length === 0,
 		);
 
 		// Card shadow shared by the composer and the panel — matches the inline
@@ -320,7 +417,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 					if (open) {
 						setFocusNonce((n) => n + 1);
 					} else {
-						textareaRef.current?.focus();
+						(textareaRef.current ?? triggerRef.current)?.focus();
 					}
 				},
 				getMessages: () => chatRef.current?.messages ?? [],
@@ -368,6 +465,129 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 			</button>
 		);
 
+		const fieldRow = (
+			<div className={cn("ww:flex ww:items-end", size.row)}>
+				<textarea
+					ref={textareaRef}
+					rows={1}
+					value={composerText}
+					placeholder={animatedPlaceholder}
+					onChange={(e) => setComposerText(e.target.value)}
+					onFocus={onComposerFocus}
+					onKeyDown={(e) => {
+						if (e.key === "Enter" && !e.shiftKey) {
+							e.preventDefault();
+							submitComposer();
+						}
+					}}
+					className={cn(
+						"ww:min-w-0 ww:flex-1 ww:resize-none ww:bg-transparent ww:max-h-36 ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground",
+						size.field,
+						// An empty composer is one row tall (the grow effect leaves it
+						// at its natural height), so a placeholder wider than the box
+						// wraps onto a second line with nowhere to go. Clamp the
+						// placeholder to one line and ellipsize it. Dropped as soon as
+						// there is a value, so typed text wraps and grows as before.
+						!composerText &&
+							"ww:overflow-hidden ww:whitespace-nowrap ww:text-ellipsis ww:placeholder:overflow-hidden ww:placeholder:text-ellipsis",
+					)}
+				/>
+				<button
+					type="button"
+					onClick={submitComposer}
+					disabled={!composerText.trim()}
+					aria-label={t.promptInput.submit}
+					className={cn(
+						"ww:relative ww:flex ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40",
+						size.send,
+					)}
+					style={{ background: SEND_BG, color: SEND_FG }}
+				>
+					<ArrowUp className={size.sendIcon} />
+				</button>
+			</div>
+		);
+
+		// The whole box is one tap target. It carries no shell classes of its
+		// own: the shell below wraps it, so a trigger keeps whichever variant's
+		// chrome the host configured. The send circle is decorative here — there
+		// is nothing to send yet, and the button itself is the control.
+		const triggerRow = (
+			<button
+				ref={triggerRef}
+				type="button"
+				onClick={() => openWith("")}
+				className={cn(
+					"ww:flex ww:w-full ww:items-center ww:text-left ww:cursor-pointer",
+					size.row,
+					centered && "ww:justify-center",
+				)}
+			>
+				<span
+					className={cn(
+						"ww:min-w-0 ww:flex-1 ww:truncate ww:text-muted-foreground",
+						size.field,
+						centered && "ww:flex-none",
+					)}
+				>
+					{composerPlaceholder}
+				</span>
+				<span
+					aria-hidden
+					className={cn(
+						"ww:flex ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full",
+						size.send,
+						centered && "ww:ml-3",
+					)}
+					style={{ background: SEND_BG, color: SEND_FG }}
+				>
+					<ArrowUp className={size.sendIcon} />
+				</span>
+			</button>
+		);
+
+		const content = asTrigger ? triggerRow : fieldRow;
+
+		// The size scale's own values, which become the fallbacks the host's CSS
+		// overrides.
+		const radius = `var(--ww-composer-radius, ${size.radius}px)`;
+
+		const boxStyle = {
+			borderRadius: radius,
+			background: BG,
+			borderColor: BORDER_COLOR,
+			borderWidth: BORDER_WIDTH,
+			borderStyle: "solid",
+			boxShadow: `var(--ww-composer-shadow, ${cardShadow})`,
+		} satisfies CSSProperties;
+
+		// The box around the content. `glow` renders through BorderGlow for its
+		// one-off sweep; `boxStyle` spreads over BorderGlow's own background and
+		// radius, so both paths land on the same custom properties.
+		const box =
+			variant === "glow" ? (
+				<BorderGlow
+					animated={ready}
+					backgroundColor={BG}
+					borderRadius={radius}
+					edgeSensitivity={30}
+					coneSpread={25}
+					colors={["#c084fc", "#f472b6", "#38bdf8"]}
+					style={boxStyle}
+				>
+					{content}
+				</BorderGlow>
+			) : (
+				<div
+					className={cn(
+						asTrigger && "ww:transition-colors hover:ww:border-primary/40",
+					)}
+					style={boxStyle}
+				>
+					{content}
+				</div>
+			);
+
 		// The in-flow composer. Fills the host's container so the host's own CSS
 		// decides how wide it is; height is content-driven (no `data-height`).
 		const composer = (
@@ -375,6 +595,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 				data-waniwani-chat=""
 				data-color-scheme={preset === "auto" ? "auto" : undefined}
 				data-waniwani-composer="input"
+				data-composer-variant={variant}
 				// While the panel is open the composer is content behind an
 				// overlay: keep it in layout (removing it would shift the page)
 				// but inert, so tabbing inside the panel can't walk into the box
@@ -388,52 +609,9 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 				)}
 				style={cssVars}
 			>
-				{/* Composer wrapped in the ReactBits border glow. Background + radius
-				    are themed to match the input surface; the glow plays a one-off
-				    sweep once the config has resolved. */}
-				<BorderGlow
-					animated={ready}
-					backgroundColor="var(--ww-color-input)"
-					borderRadius={16}
-					edgeSensitivity={30}
-					coneSpread={25}
-					colors={["#c084fc", "#f472b6", "#38bdf8"]}
-					className="ww:border-border"
-					style={{ boxShadow: cardShadow }}
-				>
-					<div className="ww:flex ww:items-end ww:gap-1 ww:pl-3.5 ww:pr-1.5 ww:py-1.5 ww:sm:pl-4 ww:sm:pr-2 ww:sm:py-2">
-						{/* `text-base` (16px) on mobile is load-bearing: iOS Safari
-						    auto-zooms a focused input under 16px. `sm:text-sm` restores
-						    the smaller text where the zoom rule doesn't apply. Do not
-						    drop the 16px mobile size. */}
-						<textarea
-							ref={textareaRef}
-							rows={1}
-							value={composerText}
-							placeholder={animatedPlaceholder}
-							onChange={(e) => setComposerText(e.target.value)}
-							onFocus={onComposerFocus}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" && !e.shiftKey) {
-									e.preventDefault();
-									submitComposer();
-								}
-							}}
-							className="ww:min-w-0 ww:flex-1 ww:resize-none ww:bg-transparent ww:py-1.5 ww:max-h-36 ww:text-base ww:sm:text-sm ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground"
-						/>
-						<button
-							type="button"
-							onClick={submitComposer}
-							disabled={!composerText.trim()}
-							aria-label={t.promptInput.submit}
-							className="ww:relative ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:bg-foreground ww:text-background ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40"
-						>
-							<ArrowUp className="ww:size-4" />
-						</button>
-					</div>
-				</BorderGlow>
+				{box}
 
-				{composerTexts.length > 0 && (
+				{showSuggestions && composerTexts.length > 0 && (
 					<Suggestions
 						suggestions={composerTexts}
 						onSelect={(text) => {
@@ -449,6 +627,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 						}}
 						// In-flow pills sit under the box, so they only need the
 						// horizontal alignment of the input's own padding.
+						align={centered ? "center" : "start"}
 						className="ww:px-0.5 ww:pt-2.5 ww:pb-0"
 					/>
 				)}
