@@ -24,11 +24,11 @@ import { StateGraph } from "./state-graph";
  * })
  *   .addNode({
  *     id: "ask_name",
- *     run: () => interrupt({ question: "What's your name?", field: "name" }),
+ *     run: () => interrupt({ name: { question: "What's your name?" } }),
  *   })
  *   .addNode({
  *     id: "ask_email",
- *     run: () => interrupt({ question: "What's your email?", field: "email" }),
+ *     run: () => interrupt({ email: { question: "What's your email?" } }),
  *   })
  *   .addEdge(START, "ask_name")
  *   .addEdge("ask_name", "ask_email")
