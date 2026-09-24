@@ -1,6 +1,7 @@
 // Waniwani SDK - Core Types
 
 import type { DocumentsClient } from "./documents/types.js";
+import type { EmailClient } from "./email/types.js";
 import type { KbClient } from "./kb/types.js";
 import type { TrackingClient, TrackingConfig } from "./tracking/@types.js";
 
@@ -53,6 +54,8 @@ export interface WaniWaniClient extends TrackingClient {
 	readonly kb: KbClient;
 	/** Documents client for reading a file into typed fields */
 	readonly documents: DocumentsClient;
+	/** Email client for sending from the agent behind your API key */
+	readonly email: EmailClient;
 }
 
 // ============================================================================

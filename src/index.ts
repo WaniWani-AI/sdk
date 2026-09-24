@@ -11,6 +11,11 @@ export type {
 	DocumentSchema,
 	DocumentsClient,
 } from "./documents/types.js";
+export type {
+	EmailClient,
+	EmailSendInput,
+	EmailSendResult,
+} from "./email/types.js";
 export { WaniWaniError } from "./error.js";
 
 // Types - KB Client

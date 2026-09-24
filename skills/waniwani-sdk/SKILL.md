@@ -42,6 +42,7 @@ it is the complete page index, always current, and cheap to read.
 | Know where each event belongs in a flow | [/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation) |
 | Check a typed event payload | [/sdk/reference/event-schema](https://docs.waniwani.ai/sdk/reference/event-schema) |
 | Add knowledge-base search | [/sdk/knowledge-base/overview](https://docs.waniwani.ai/sdk/knowledge-base/overview) |
+| Send an email from a tool or flow node | [/sdk/modules/email](https://docs.waniwani.ai/sdk/modules/email) |
 | Embed the chat widget | [/sdk/chat/embed](https://docs.waniwani.ai/sdk/chat/embed) (script tag), [/sdk/chat/react](https://docs.waniwani.ai/sdk/chat/react) |
 | Read the exact tool contract a flow compiles to | [/sdk/reference/flow-tool-contract](https://docs.waniwani.ai/sdk/reference/flow-tool-contract) |
 | Tunnel a dev server for remote testing | [/sdk/guides/tunnel](https://docs.waniwani.ai/sdk/guides/tunnel) |
@@ -55,7 +56,7 @@ Dashboard and free API key: [app.waniwani.ai](https://app.waniwani.ai).
 - **Open source, no API key.** `createFlow`, `StateGraph`, `START`, `END`, the `KvStore` interface,
   `MemoryKvStore`. Runs against any state backend you implement.
 - **Free tier, one env var (`WANIWANI_API_KEY`).** Same SDK, plus hosted flow state, event tracking,
-  funnel analytics, knowledge base, chat widget, and the dashboard playground.
+  funnel analytics, knowledge base, email, chat widget, and the dashboard playground.
 
 Default to the OSS path. Reach for the free tier when the user asks for tracking, analytics, hosted
 state, KB, or chat, and say plainly that it needs a key.

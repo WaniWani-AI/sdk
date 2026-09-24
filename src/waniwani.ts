@@ -1,6 +1,7 @@
 // Waniwani SDK - Main Entry
 
 import { createDocumentsClient } from "./documents/client.js";
+import { createEmailClient } from "./email/client.js";
 import { createKbClient } from "./kb/client.js";
 import {
 	getGlobalConfig,
@@ -63,11 +64,13 @@ export function waniwani(
 	const trackingClient = createTrackingClient(internalConfig);
 	const kbClient = createKbClient(internalConfig);
 	const documentsClient = createDocumentsClient(internalConfig);
+	const emailClient = createEmailClient(internalConfig);
 
 	return {
 		...trackingClient,
 		kb: kbClient,
 		documents: documentsClient,
+		email: emailClient,
 		_config: internalConfig,
 	};
 }
