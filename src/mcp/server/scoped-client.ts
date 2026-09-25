@@ -4,6 +4,12 @@ import type {
 	DocumentExtractResult,
 	DocumentsClient,
 } from "../../documents/types.js";
+import { createEmailClient } from "../../email/client.js";
+import type {
+	EmailClient,
+	EmailSendInput,
+	EmailSendResult,
+} from "../../email/types.js";
 import type { KbClient } from "../../kb/types.js";
 import type {
 	CallableTrack,
@@ -87,6 +93,8 @@ export interface ScopedWaniWaniClient {
 	readonly attachedDocuments: AttachedDocument[];
 	/** Documents client; `sessionId` and `correlationId` are carried from the request. */
 	readonly documents: DocumentsClient;
+	/** Email client; `sessionId` is carried from the request unless you pass one. */
+	readonly email: EmailClient;
 	/** @internal Resolved API config from withWaniwani(). */
 	readonly _config?: { apiUrl?: string; apiKey?: string };
 }
@@ -118,10 +126,12 @@ export function createScopedClient(
 
 	const sessionId = extractSessionId(meta);
 	const correlationId = extractCorrelationId(meta);
-	const documents = createDocumentsClient({
+	const clientConfig = {
 		apiUrl: config?.apiUrl ?? process.env.WANIWANI_API_URL ?? DEFAULT_API_URL,
 		apiKey: config?.apiKey,
-	});
+	};
+	const documents = createDocumentsClient(clientConfig);
+	const email = createEmailClient(clientConfig);
 
 	return {
 		sessionId,
@@ -142,6 +152,14 @@ export function createScopedClient(
 					...input,
 					sessionId: input.sessionId ?? sessionId,
 					correlationId: input.correlationId ?? correlationId,
+				});
+			},
+		},
+		email: {
+			send(input: EmailSendInput): Promise<EmailSendResult> {
+				return email.send({
+					...input,
+					sessionId: input.sessionId ?? sessionId,
 				});
 			},
 		},
