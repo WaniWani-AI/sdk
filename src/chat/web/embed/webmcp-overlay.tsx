@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { autoHeightFromMeta } from "../../../shared/view-uri";
-import type { WebMcpWidgetPayload } from "../../../webmcp";
+import type { WebMcpBridge, WebMcpWidgetPayload } from "../../../webmcp";
 import { McpAppFrame } from "../components/mcp-app-frame";
 import { cn } from "../lib/utils";
 
@@ -58,10 +58,11 @@ const VIEWPORT_MARGIN = 32;
 export type WebMcpOverlayProps = {
 	/** The step to show, or `null` for nothing. */
 	widget: WebMcpWidgetPayload | null;
-	/** The tools endpoint, so a view's own `tools/call` can be proxied. */
-	toolsEndpoint: string;
-	/** Auth for that endpoint, matching what the bridge sends. */
-	headers?: Record<string, string>;
+	/**
+	 * Proxies a view's own `tools/call`. Pass the bridge's `callTool` so the
+	 * request carries the same auth and session identity as the agent's calls.
+	 */
+	onCallTool: WebMcpBridge["callTool"];
 	/**
 	 * Where view HTML is fetched from, resolved from the token the same way the
 	 * chat's own widget iframes resolve theirs.
@@ -74,9 +75,8 @@ export type WebMcpOverlayProps = {
 
 export function WebMcpOverlay({
 	widget,
-	toolsEndpoint,
+	onCallTool,
 	resourceEndpoint,
-	headers,
 	onClose,
 	isDark = false,
 }: WebMcpOverlayProps) {
@@ -125,22 +125,9 @@ export function WebMcpOverlay({
 	}, [widget]);
 
 	const callTool = useCallback(
-		async (params: { name: string; arguments: Record<string, unknown> }) => {
-			const response = await fetch(toolsEndpoint, {
-				method: "POST",
-				headers: { "content-type": "application/json", ...headers },
-				body: JSON.stringify({ action: "call", ...params }),
-			});
-			if (!response.ok) {
-				throw new Error(`webmcp tool call failed: ${response.status}`);
-			}
-			return (await response.json()) as {
-				content?: Array<{ type: string; text?: string }>;
-				structuredContent?: Record<string, unknown>;
-				_meta?: Record<string, unknown>;
-			};
-		},
-		[toolsEndpoint, headers],
+		(params: { name: string; arguments: Record<string, unknown> }) =>
+			onCallTool(params.name, params.arguments),
+		[onCallTool],
 	);
 
 	if (!widget) {

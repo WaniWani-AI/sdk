@@ -121,11 +121,12 @@ function createWidgetRelay() {
 
 /** Owns the widget on screen. */
 function WebMcpHost({
-	toolsEndpoint,
 	resourceEndpoint,
 	subscribe,
-}: Pick<WebMcpEndpoints, "toolsEndpoint" | "resourceEndpoint"> & {
+	callTool,
+}: Pick<WebMcpEndpoints, "resourceEndpoint"> & {
 	subscribe: (listener: WidgetListener) => () => void;
+	callTool: WebMcpBridge["callTool"];
 }) {
 	const [widget, setWidget] = React.useState<WebMcpWidgetPayload | null>(null);
 	const [isDark, setIsDark] = React.useState(prefersDark);
@@ -147,7 +148,7 @@ function WebMcpHost({
 	return (
 		<WebMcpOverlay
 			widget={widget}
-			toolsEndpoint={toolsEndpoint}
+			onCallTool={callTool}
 			resourceEndpoint={resourceEndpoint}
 			isDark={isDark}
 			onClose={() => setWidget(null)}
@@ -221,12 +222,17 @@ export function startWebMcp(config: EmbedConfig): WebMcpHandle | null {
 			console.error("[webmcp] could not publish site tools", error);
 		});
 
+	const callTool: WebMcpBridge["callTool"] = (name, args) =>
+		bridge
+			? bridge.callTool(name, args)
+			: Promise.reject(new Error("webmcp bridge is not registered"));
+
 	const root = ReactDOM.createRoot(container);
 	root.render(
 		<WebMcpHost
-			toolsEndpoint={resolved.toolsEndpoint}
 			resourceEndpoint={resolved.resourceEndpoint}
 			subscribe={relay.subscribe}
+			callTool={callTool}
 		/>,
 	);
 

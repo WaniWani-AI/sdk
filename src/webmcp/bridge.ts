@@ -106,6 +106,14 @@ export type WebMcpBridgeOptions = {
 export type WebMcpBridge = {
 	/** Tools successfully registered with the browser. */
 	readonly tools: WebMcpTool[];
+	/**
+	 * Call a tool with the bridge's auth and identity, for a mounted view's own
+	 * `tools/call`. Resolves to the raw response; widgets are not re-dispatched.
+	 */
+	callTool: (
+		name: string,
+		args?: Record<string, unknown>,
+	) => Promise<WebMcpCallResponse>;
 	/** Unregister everything. Idempotent. */
 	dispose: () => void;
 };
@@ -285,6 +293,13 @@ export async function createWebMcpBridge(
 		get tools() {
 			return registered;
 		},
+		callTool: (name, args) =>
+			post<WebMcpCallResponse>({
+				...identity(),
+				action: "call",
+				name,
+				arguments: args ?? {},
+			}),
 		dispose,
 	};
 }
