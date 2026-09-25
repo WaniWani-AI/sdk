@@ -24,7 +24,7 @@
 // ============================================================================
 
 import type { UIMessage } from "ai";
-import { ArrowUp, Minus } from "lucide-react";
+import { ArrowUp, XIcon } from "lucide-react";
 import {
 	type CSSProperties,
 	forwardRef,
@@ -461,7 +461,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 				aria-label={t.launcher.close}
 				className="ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer"
 			>
-				<Minus className="ww:size-4" />
+				<XIcon className="ww:size-4" />
 			</button>
 		);
 
