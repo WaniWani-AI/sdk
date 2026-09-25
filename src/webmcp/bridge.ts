@@ -52,6 +52,15 @@ export type WebMcpBridgeOptions = {
 	/** Absolute URL of the server's page-facing tools endpoint. */
 	endpoint: string;
 	/**
+	 * A `GET` URL that answers the tool listing on its own, credentials in the
+	 * query string.
+	 *
+	 * Fetched with no request headers, so the browser sends no preflight and a
+	 * CDN can answer it. A server that does not serve it (a `404` or `405`)
+	 * falls back to the `list` post on `endpoint`.
+	 */
+	listEndpoint?: string;
+	/**
 	 * Extra request headers, merged over `content-type`.
 	 *
 	 * The hosted API authenticates with `Authorization: Bearer <public token>`
@@ -146,8 +155,15 @@ function pageContext(): WebMcpPageContext {
 export async function createWebMcpBridge(
 	options: WebMcpBridgeOptions,
 ): Promise<WebMcpBridge | null> {
-	const { endpoint, headers, sessionId, visitorId, channelId, onWidget } =
-		options;
+	const {
+		endpoint,
+		listEndpoint,
+		headers,
+		sessionId,
+		visitorId,
+		channelId,
+		onWidget,
+	} = options;
 	const log = options.logger ?? console;
 
 	const mc = readModelContext();
@@ -196,13 +212,23 @@ export async function createWebMcpBridge(
 		return (await response.json()) as T;
 	}
 
+	async function list(): Promise<WebMcpListResponse> {
+		if (listEndpoint) {
+			const response = await fetch(listEndpoint);
+			if (response.ok) {
+				return await response.json();
+			}
+			if (response.status !== 404 && response.status !== 405) {
+				throw new Error(`webmcp list failed: ${response.status}`);
+			}
+		}
+		return post<WebMcpListResponse>({ ...identity(), action: "list" });
+	}
+
 	let tools: WebMcpTool[] = [];
 	try {
-		const listed = await post<WebMcpListResponse>({
-			...identity(),
-			action: "list",
-		});
-		tools = listed?.tools ?? [];
+		const listed = await list();
+		tools = Array.isArray(listed?.tools) ? listed.tools : [];
 	} catch (error) {
 		log.error("[webmcp] could not list site tools", error);
 		dispose();

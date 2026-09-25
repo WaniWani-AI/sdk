@@ -87,48 +87,50 @@ function prefersDark(): boolean {
 	}
 }
 
+type WidgetListener = (widget: WebMcpWidgetPayload) => void;
+
 /**
- * Owns the widget on screen, and the bridge that produces them.
- *
- * The bridge starts in an effect rather than before mount so its `onWidget`
- * can set state directly. The cost is one frame against four network round
- * trips, which is not where this surface's latency lives.
+ * Hands widget steps from the bridge to the overlay. The bridge starts before
+ * React mounts, so a step arriving first is held for the first subscriber.
  */
+function createWidgetRelay() {
+	let listener: WidgetListener | null = null;
+	let held: WebMcpWidgetPayload | null = null;
+	return {
+		emit(widget: WebMcpWidgetPayload) {
+			if (listener) {
+				listener(widget);
+			} else {
+				held = widget;
+			}
+		},
+		subscribe(next: WidgetListener) {
+			listener = next;
+			if (held) {
+				next(held);
+				held = null;
+			}
+			return () => {
+				if (listener === next) {
+					listener = null;
+				}
+			};
+		},
+	};
+}
+
+/** Owns the widget on screen. */
 function WebMcpHost({
 	toolsEndpoint,
 	resourceEndpoint,
-	headers,
-	channelId,
-	onBridge,
-}: WebMcpEndpoints & { onBridge: (bridge: WebMcpBridge | null) => void }) {
+	subscribe,
+}: Pick<WebMcpEndpoints, "toolsEndpoint" | "resourceEndpoint"> & {
+	subscribe: (listener: WidgetListener) => () => void;
+}) {
 	const [widget, setWidget] = React.useState<WebMcpWidgetPayload | null>(null);
 	const [isDark, setIsDark] = React.useState(prefersDark);
 
-	React.useEffect(() => {
-		let disposed = false;
-		let bridge: WebMcpBridge | null = null;
-
-		void createWebMcpBridge({
-			endpoint: toolsEndpoint,
-			headers,
-			channelId,
-			sessionId: tabSessionId(),
-			visitorId: getOrCreateVisitorId(),
-			onWidget: (payload) => setWidget(payload),
-		}).then((created) => {
-			bridge = created;
-			if (disposed) {
-				created?.dispose();
-				return;
-			}
-			onBridge(created);
-		});
-
-		return () => {
-			disposed = true;
-			bridge?.dispose();
-		};
-	}, [toolsEndpoint, headers, channelId, onBridge]);
+	React.useEffect(() => subscribe(setWidget), [subscribe]);
 
 	React.useEffect(() => {
 		let media: MediaQueryList;
@@ -176,6 +178,31 @@ export function startWebMcp(config: EmbedConfig): WebMcpHandle | null {
 		return null;
 	}
 
+	// Before any DOM work, so the listing is on the wire while the overlay
+	// mounts.
+	const relay = createWidgetRelay();
+	let bridge: WebMcpBridge | null = null;
+	let destroyed = false;
+	void createWebMcpBridge({
+		endpoint: resolved.toolsEndpoint,
+		listEndpoint: resolved.listEndpoint,
+		headers: resolved.headers,
+		channelId: resolved.channelId,
+		sessionId: tabSessionId(),
+		visitorId: getOrCreateVisitorId(),
+		onWidget: relay.emit,
+	})
+		.then((created) => {
+			if (destroyed) {
+				created?.dispose();
+				return;
+			}
+			bridge = created;
+		})
+		.catch((error) => {
+			console.error("[webmcp] could not publish site tools", error);
+		});
+
 	// Its own host element and shadow root, independent of the chat's. A widget
 	// step arrives whether the panel is open or not, whether the chat mounted
 	// inline or floating, and whether it mounted at all.
@@ -190,23 +217,19 @@ export function startWebMcp(config: EmbedConfig): WebMcpHandle | null {
 	const container = document.createElement("div");
 	shadow.appendChild(container);
 
-	let bridge: WebMcpBridge | null = null;
 	const root = ReactDOM.createRoot(container);
 	root.render(
 		<WebMcpHost
 			toolsEndpoint={resolved.toolsEndpoint}
 			resourceEndpoint={resolved.resourceEndpoint}
-			headers={resolved.headers}
-			channelId={resolved.channelId}
-			onBridge={(created) => {
-				bridge = created;
-			}}
+			subscribe={relay.subscribe}
 		/>,
 	);
 
 	return {
 		getTools: () => (bridge?.tools ?? []).map((tool) => tool.name),
 		destroy: () => {
+			destroyed = true;
 			bridge?.dispose();
 			root.unmount();
 			host.remove();
