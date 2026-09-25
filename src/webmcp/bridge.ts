@@ -56,8 +56,8 @@ export type WebMcpBridgeOptions = {
 	 * query string.
 	 *
 	 * Fetched with no request headers, so the browser sends no preflight and a
-	 * CDN can answer it. A server that does not serve it (a `404` or `405`)
-	 * falls back to the `list` post on `endpoint`.
+	 * CDN can answer it. Any failed `GET` falls back to the `list` post on
+	 * `endpoint`.
 	 */
 	listEndpoint?: string;
 	/**
@@ -110,10 +110,10 @@ export type WebMcpBridge = {
 	 * Call a tool with the bridge's auth and identity, for a mounted view's own
 	 * `tools/call`. Resolves to the raw response; widgets are not re-dispatched.
 	 */
-	callTool: (
-		name: string,
-		args?: Record<string, unknown>,
-	) => Promise<WebMcpCallResponse>;
+	callTool: (params: {
+		name: string;
+		arguments?: Record<string, unknown>;
+	}) => Promise<WebMcpCallResponse>;
 	/** Unregister everything. Idempotent. */
 	dispose: () => void;
 };
@@ -293,7 +293,7 @@ export async function createWebMcpBridge(
 		get tools() {
 			return registered;
 		},
-		callTool: (name, args) =>
+		callTool: ({ name, arguments: args }) =>
 			post<WebMcpCallResponse>({
 				...identity(),
 				action: "call",

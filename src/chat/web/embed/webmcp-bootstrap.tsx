@@ -222,10 +222,17 @@ export function startWebMcp(config: EmbedConfig): WebMcpHandle | null {
 			console.error("[webmcp] could not publish site tools", error);
 		});
 
-	const callTool: WebMcpBridge["callTool"] = (name, args) =>
-		bridge
-			? bridge.callTool(name, args)
-			: Promise.reject(new Error("webmcp bridge is not registered"));
+	const callTool: WebMcpBridge["callTool"] = async (params) => {
+		if (!bridge) {
+			throw new Error("webmcp bridge is not registered");
+		}
+		const response = await bridge.callTool(params);
+		// A view's call that advances its flow answers with the next step.
+		if (response.widget?.interactive) {
+			relay.emit(response.widget);
+		}
+		return response;
+	};
 
 	const root = ReactDOM.createRoot(container);
 	root.render(

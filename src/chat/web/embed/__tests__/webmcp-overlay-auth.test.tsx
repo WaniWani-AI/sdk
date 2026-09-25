@@ -231,7 +231,13 @@ describe("WebMcpOverlay", () => {
 		const root = createRoot(container);
 
 		const seen: Array<[string, Record<string, unknown> | undefined]> = [];
-		const onCallTool = async (name: string, args?: Record<string, unknown>) => {
+		const onCallTool = async ({
+			name,
+			arguments: args,
+		}: {
+			name: string;
+			arguments?: Record<string, unknown>;
+		}) => {
 			seen.push([name, args]);
 			return {
 				content: [{ type: "text" as const, text: `ran ${name}` }],

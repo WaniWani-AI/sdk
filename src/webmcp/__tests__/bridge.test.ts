@@ -445,7 +445,10 @@ describe("bridge.callTool", () => {
 			channelId: "ch-1",
 			logger: SILENT,
 		});
-		await bridge?.callTool("book_demo", { slot: "09:00", seats: 2 });
+		await bridge?.callTool({
+			name: "book_demo",
+			arguments: { slot: "09:00", seats: 2 },
+		});
 
 		const call = requests.at(-1);
 		expect(call?.url).toBe(ENDPOINT);
@@ -472,7 +475,7 @@ describe("bridge.callTool", () => {
 			headers: { Authorization: "Bearer wwp_abc" },
 			logger: SILENT,
 		});
-		await bridge?.callTool("search", { q: "x" });
+		await bridge?.callTool({ name: "search", arguments: { q: "x" } });
 
 		const call = requests.at(-1);
 		expect(call?.body.action).toBe("call");
@@ -500,7 +503,7 @@ describe("bridge.callTool", () => {
 
 		const args = { q: "pricing", filters: { lang: "en" } };
 		await registered[0]?.execute(args);
-		await bridge?.callTool("search", args);
+		await bridge?.callTool({ name: "search", arguments: args });
 
 		const [agentCall, viewCall] = requests.slice(-2);
 		expect(viewCall?.rawBody).toBe(agentCall?.rawBody ?? "missing");
@@ -522,11 +525,11 @@ describe("bridge.callTool", () => {
 
 		win.history.pushState(null, "", "/checkout?plan=pro");
 		win.document.title = "Checkout";
-		await bridge?.callTool("search", {});
+		await bridge?.callTool({ name: "search", arguments: {} });
 
 		win.history.pushState(null, "", "/thanks#done");
 		win.document.title = "Thanks";
-		await bridge?.callTool("search", {});
+		await bridge?.callTool({ name: "search", arguments: {} });
 
 		const pages = requests.map((r) => r.body.page);
 		expect(pages).toEqual([
@@ -545,7 +548,7 @@ describe("bridge.callTool", () => {
 			sessionId: "s1",
 			logger: SILENT,
 		});
-		await bridge?.callTool("search");
+		await bridge?.callTool({ name: "search" });
 
 		const call = requests.at(-1);
 		expect(call?.body.action).toBe("call");
@@ -563,7 +566,7 @@ describe("bridge.callTool", () => {
 			sessionId: "s1",
 			logger: SILENT,
 		});
-		await bridge?.callTool("search", {});
+		await bridge?.callTool({ name: "search", arguments: {} });
 
 		expect(requests.at(-1)?.rawBody).toContain('"arguments":{}');
 	});
@@ -582,7 +585,7 @@ describe("bridge.callTool", () => {
 				logger: SILENT,
 			});
 
-			const outcome = bridge?.callTool("search", {});
+			const outcome = bridge?.callTool({ name: "search", arguments: {} });
 			await expect(outcome).rejects.toThrow(String(status));
 		});
 	}
@@ -607,7 +610,9 @@ describe("bridge.callTool", () => {
 			sessionId: "s1",
 			logger: SILENT,
 		});
-		await expect(bridge?.callTool("search", {})).rejects.toThrow("304");
+		await expect(
+			bridge?.callTool({ name: "search", arguments: {} }),
+		).rejects.toThrow("304");
 		expect(requests).toEqual(["list", "call"]);
 	});
 
@@ -628,9 +633,9 @@ describe("bridge.callTool", () => {
 			sessionId: "s1",
 			logger: SILENT,
 		});
-		await expect(bridge?.callTool("search", {})).rejects.toThrow(
-			"Failed to fetch",
-		);
+		await expect(
+			bridge?.callTool({ name: "search", arguments: {} }),
+		).rejects.toThrow("Failed to fetch");
 	});
 
 	test("resolves to the raw response, widget and all, without calling onWidget", async () => {
@@ -658,7 +663,7 @@ describe("bridge.callTool", () => {
 			logger: SILENT,
 		});
 
-		const result = await bridge?.callTool("search", {});
+		const result = await bridge?.callTool({ name: "search", arguments: {} });
 		expect(result).toEqual(payload);
 		expect(seen).toEqual([]);
 	});
@@ -687,7 +692,7 @@ describe("bridge.callTool", () => {
 			logger: SILENT,
 		});
 
-		await bridge?.callTool("search", {});
+		await bridge?.callTool({ name: "search", arguments: {} });
 		expect(seen).toEqual([]);
 		await registered[0]?.execute({});
 		expect(seen).toEqual([widget]);
@@ -702,7 +707,7 @@ describe("bridge.callTool", () => {
 			sessionId: "s1",
 			logger: SILENT,
 		});
-		await bridge?.callTool("search", {});
+		await bridge?.callTool({ name: "search", arguments: {} });
 
 		const call = requests.at(-1);
 		expect(call?.body).not.toHaveProperty("visitorId");
@@ -720,7 +725,7 @@ describe("bridge.callTool", () => {
 			sessionId: "s1",
 			logger: SILENT,
 		});
-		await bridge?.callTool("search", {});
+		await bridge?.callTool({ name: "search", arguments: {} });
 
 		expect(requests.at(-1)?.headers).toEqual({
 			"content-type": "application/json",
@@ -743,8 +748,8 @@ describe("bridge.callTool", () => {
 			logger: SILENT,
 		});
 		const [a, b] = await Promise.all([
-			bridge?.callTool("alpha", { n: 1 }),
-			bridge?.callTool("beta", { n: 2 }),
+			bridge?.callTool({ name: "alpha", arguments: { n: 1 } }),
+			bridge?.callTool({ name: "beta", arguments: { n: 2 } }),
 		]);
 
 		expect(a?.content).toEqual([{ type: "text", text: "a" }]);

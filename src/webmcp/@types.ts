@@ -133,6 +133,7 @@ export type WebMcpCallResponse = {
 	content: WebMcpContentBlock[];
 	structuredContent?: Record<string, unknown>;
 	isError?: boolean;
+	_meta?: Record<string, unknown>;
 	/** Present and non-null only when the call produced a resolvable widget step. */
 	widget: WebMcpWidgetPayload | null;
 };

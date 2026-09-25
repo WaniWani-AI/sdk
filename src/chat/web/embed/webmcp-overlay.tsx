@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { autoHeightFromMeta } from "../../../shared/view-uri";
-import type { WebMcpBridge, WebMcpWidgetPayload } from "../../../webmcp";
+import type {
+	WebMcpBridge,
+	WebMcpCallResponse,
+	WebMcpWidgetPayload,
+} from "../../../webmcp";
 import { McpAppFrame } from "../components/mcp-app-frame";
 import { cn } from "../lib/utils";
 
@@ -62,7 +66,11 @@ export type WebMcpOverlayProps = {
 	 * Proxies a view's own `tools/call`. Pass the bridge's `callTool` so the
 	 * request carries the same auth and session identity as the agent's calls.
 	 */
-	onCallTool: WebMcpBridge["callTool"];
+	onCallTool?: WebMcpBridge["callTool"];
+	/** @deprecated Pass `onCallTool`. Removed in 0.23.0. */
+	toolsEndpoint?: string;
+	/** @deprecated Pass `onCallTool`. Removed in 0.23.0. */
+	headers?: Record<string, string>;
 	/**
 	 * Where view HTML is fetched from, resolved from the token the same way the
 	 * chat's own widget iframes resolve theirs.
@@ -76,6 +84,8 @@ export type WebMcpOverlayProps = {
 export function WebMcpOverlay({
 	widget,
 	onCallTool,
+	toolsEndpoint,
+	headers,
 	resourceEndpoint,
 	onClose,
 	isDark = false,
@@ -125,9 +135,25 @@ export function WebMcpOverlay({
 	}, [widget]);
 
 	const callTool = useCallback(
-		(params: { name: string; arguments: Record<string, unknown> }) =>
-			onCallTool(params.name, params.arguments),
-		[onCallTool],
+		async (params: { name: string; arguments: Record<string, unknown> }) => {
+			if (onCallTool) {
+				return onCallTool(params);
+			}
+			if (!toolsEndpoint) {
+				throw new Error("webmcp overlay needs onCallTool");
+			}
+			const response = await fetch(toolsEndpoint, {
+				method: "POST",
+				headers: { "content-type": "application/json", ...headers },
+				body: JSON.stringify({ action: "call", ...params }),
+			});
+			if (!response.ok) {
+				throw new Error(`webmcp tool call failed: ${response.status}`);
+			}
+			const result: WebMcpCallResponse = await response.json();
+			return result;
+		},
+		[onCallTool, toolsEndpoint, headers],
 	);
 
 	if (!widget) {
