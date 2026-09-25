@@ -563,7 +563,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							/>
 						)}
 						{/* Rendered last so embed-host actions (e.g. the floating
-						    minimize button) sit at the far right of the header. */}
+						    close button) sit at the far right of the header. */}
 						{headerActions}
 					</div>
 				)}

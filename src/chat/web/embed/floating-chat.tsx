@@ -17,7 +17,7 @@
 // ============================================================================
 
 import type { UIMessage } from "ai";
-import { ArrowUp, Minus, XIcon } from "lucide-react";
+import { ArrowUp, XIcon } from "lucide-react";
 import {
 	forwardRef,
 	useCallback,
@@ -435,7 +435,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				aria-label={t.launcher.close}
 				className="ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer"
 			>
-				<Minus className="ww:size-4" />
+				<XIcon className="ww:size-4" />
 			</button>
 		);
 
@@ -618,7 +618,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									appearance={config.appearance}
 									title={config.title}
 									headerActions={closeButton}
-									// Force the header on in floating mode: the minimize control
+									// Force the header on in floating mode: the close control
 									// lives in `headerActions`, so honoring `hideHeader` here would
 									// leave an opened (full-screen on mobile) panel with no in-UI
 									// way back to the dock. The panel is its own chrome anyway.
