@@ -178,8 +178,23 @@ export function startWebMcp(config: EmbedConfig): WebMcpHandle | null {
 		return null;
 	}
 
-	// Before any DOM work, so the listing is on the wire while the overlay
-	// mounts.
+	// Its own host element and shadow root, independent of the chat's. A widget
+	// step arrives whether the panel is open or not, whether the chat mounted
+	// inline or floating, and whether it mounted at all.
+	const host = document.createElement("div");
+	host.setAttribute("data-waniwani-webmcp", "");
+	document.body.appendChild(host);
+	const shadow = host.attachShadow({ mode: "open" });
+	// Its own copy of the stylesheet. The overlay is a sibling of the chat, not a
+	// child, so it inherits nothing from the chat's root — and it has to render
+	// correctly on a page where the chat never mounted at all.
+	injectEmbedCss(shadow);
+	const container = document.createElement("div");
+	shadow.appendChild(container);
+
+	// After the host exists, so a DOM failure never leaves tools registered
+	// with no owner, and before the render, so the listing is on the wire
+	// while the overlay mounts.
 	const relay = createWidgetRelay();
 	let bridge: WebMcpBridge | null = null;
 	let destroyed = false;
@@ -202,20 +217,6 @@ export function startWebMcp(config: EmbedConfig): WebMcpHandle | null {
 		.catch((error) => {
 			console.error("[webmcp] could not publish site tools", error);
 		});
-
-	// Its own host element and shadow root, independent of the chat's. A widget
-	// step arrives whether the panel is open or not, whether the chat mounted
-	// inline or floating, and whether it mounted at all.
-	const host = document.createElement("div");
-	host.setAttribute("data-waniwani-webmcp", "");
-	document.body.appendChild(host);
-	const shadow = host.attachShadow({ mode: "open" });
-	// Its own copy of the stylesheet. The overlay is a sibling of the chat, not a
-	// child, so it inherits nothing from the chat's root — and it has to render
-	// correctly on a page where the chat never mounted at all.
-	injectEmbedCss(shadow);
-	const container = document.createElement("div");
-	shadow.appendChild(container);
 
 	const root = ReactDOM.createRoot(container);
 	root.render(

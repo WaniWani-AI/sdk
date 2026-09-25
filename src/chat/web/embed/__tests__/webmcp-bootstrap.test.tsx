@@ -322,6 +322,25 @@ describe("startWebMcp", () => {
 		});
 	});
 
+	test("a host page whose DOM setup throws starts no bridge and requests nothing", () => {
+		installModelContext();
+		const seen = installServer([SEARCH_TOOL]);
+		const shadowSpy = spyOn(
+			win.HTMLElement.prototype,
+			"attachShadow",
+		).mockImplementation(() => {
+			throw new Error("attachShadow blocked");
+		});
+
+		try {
+			expect(() => start(config())).toThrow("attachShadow blocked");
+		} finally {
+			shadowSpy.mockRestore();
+		}
+
+		expect(seen).toEqual([]);
+	});
+
 	test("lists and calls with the channel the cached config resolved when the markup names none", async () => {
 		const { registered } = installModelContext();
 		const seen = installServer([SEARCH_TOOL]);
@@ -376,7 +395,7 @@ describe("startWebMcp", () => {
 		expect(registered).toEqual([]);
 	});
 
-	test("a failed listing publishes nothing and is logged", async () => {
+	test("a listing whose GET and POST both fail publishes nothing and is logged", async () => {
 		const { registered } = installModelContext();
 		const seen = installFetch(() => new Response("down", { status: 500 }));
 
@@ -385,7 +404,7 @@ describe("startWebMcp", () => {
 
 		expect(handle?.getTools()).toEqual([]);
 		expect(registered).toEqual([]);
-		expect(seen).toHaveLength(1);
+		expect(seen.map(({ method }) => method)).toEqual(["GET", "POST"]);
 		expect(consoleErrors.length).toBeGreaterThan(0);
 	});
 

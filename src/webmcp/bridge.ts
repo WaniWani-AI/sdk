@@ -214,12 +214,14 @@ export async function createWebMcpBridge(
 
 	async function list(): Promise<WebMcpListResponse> {
 		if (listEndpoint) {
-			const response = await fetch(listEndpoint);
-			if (response.ok) {
-				return await response.json();
-			}
-			if (response.status !== 404 && response.status !== 405) {
-				throw new Error(`webmcp list failed: ${response.status}`);
+			try {
+				const response = await fetch(listEndpoint);
+				if (response.ok) {
+					return await response.json();
+				}
+				log.info(`[webmcp] list GET answered ${response.status}, using POST`);
+			} catch (error) {
+				log.info("[webmcp] list GET failed, using POST", error);
 			}
 		}
 		return post<WebMcpListResponse>({ ...identity(), action: "list" });

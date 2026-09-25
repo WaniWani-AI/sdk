@@ -230,18 +230,43 @@ describe("createWebMcpBridge with a listEndpoint", () => {
 		]);
 	});
 
-	for (const status of [404, 405]) {
-		describe(`a ${status} on the GET`, () => {
+	const STATUSES = [400, 401, 403, 404, 405, 406, 410, 500, 502, 503];
+	const getFailures: Array<[string, () => Response]> = [
+		...STATUSES.map((status): [string, () => Response] => [
+			`a ${status}`,
+			() => new Response("not here", { status }),
+		]),
+		[
+			"a network or CORS failure",
+			() => {
+				throw new TypeError("Failed to fetch");
+			},
+		],
+		[
+			"a 200 whose body is not JSON",
+			() =>
+				new Response("<!doctype html><title>Shop</title>", {
+					status: 200,
+					headers: { "content-type": "text/html" },
+				}),
+		],
+		["a 204 with no body", () => new Response(null, { status: 204 })],
+	];
+
+	for (const [failure, failGet] of getFailures) {
+		describe(`${failure} on the GET`, () => {
 			test("falls back to the list POST on the tools endpoint, with the headers", async () => {
 				installModelContext();
 				const seen = installFetch((request) =>
 					request.method === "GET"
-						? new Response("not here", { status })
+						? failGet()
 						: Response.json({ tools: [SEARCH_TOOL] }),
 				);
-				const { logger } = recordingLogger();
+				const { logger, errors } = recordingLogger();
 
 				const bridge = await createWebMcpBridge({ ...OPTIONS, logger });
+
+				expect(errors).toEqual([]);
 
 				expect(seen.map(({ url, method }) => ({ url, method }))).toEqual([
 					{ url: LIST, method: "GET" },
@@ -261,32 +286,19 @@ describe("createWebMcpBridge with a listEndpoint", () => {
 				expect(bridge?.tools.map((tool) => tool.name)).toEqual(["search"]);
 			});
 
-			test("ignores any tools in the refusal's own body", async () => {
-				installModelContext();
-				installFetch((request) =>
-					request.method === "GET"
-						? Response.json({ tools: [{ name: "stale" }] }, { status })
-						: Response.json({ tools: [SEARCH_TOOL] }),
-				);
-				const { logger } = recordingLogger();
-
-				const bridge = await createWebMcpBridge({ ...OPTIONS, logger });
-
-				expect(bridge?.tools.map((tool) => tool.name)).toEqual(["search"]);
-			});
-
-			test("and a failing POST behind it is a failed listing", async () => {
+			test("and a failing POST behind it is a failed listing: logged, disposed, null", async () => {
 				const { registered } = installModelContext();
 				const seen = installFetch((request) =>
 					request.method === "GET"
-						? new Response(null, { status })
+						? failGet()
 						: new Response("boom", { status: 500 }),
 				);
-				const { logger, errors } = recordingLogger();
+				const { logger, errors, infos } = recordingLogger();
 
 				const bridge = await createWebMcpBridge({ ...OPTIONS, logger });
 
 				expect(bridge).toBeNull();
+				expect(infos).toHaveLength(1);
 				expect(seen).toHaveLength(2);
 				expect(registered).toEqual([]);
 				expect(errors).toHaveLength(1);
@@ -296,7 +308,7 @@ describe("createWebMcpBridge with a listEndpoint", () => {
 				installModelContext();
 				installFetch((request) => {
 					if (request.method === "GET") {
-						return new Response(null, { status });
+						return failGet();
 					}
 					throw new TypeError("Failed to fetch");
 				});
@@ -307,6 +319,34 @@ describe("createWebMcpBridge with a listEndpoint", () => {
 			});
 		});
 	}
+
+	for (const status of STATUSES) {
+		test(`a ${status} GET's own tools are ignored in favour of the POST's`, async () => {
+			installModelContext();
+			installFetch((request) =>
+				request.method === "GET"
+					? Response.json({ tools: [{ name: "stale" }] }, { status })
+					: Response.json({ tools: [SEARCH_TOOL] }),
+			);
+			const { logger } = recordingLogger();
+
+			const bridge = await createWebMcpBridge({ ...OPTIONS, logger });
+
+			expect(bridge?.tools.map((tool) => tool.name)).toEqual(["search"]);
+		});
+	}
+
+	test("a 2xx JSON GET is used with no POST and nothing logged as a fallback", async () => {
+		installModelContext();
+		const seen = installFetch(() => Response.json({ tools: [SEARCH_TOOL] }));
+		const { logger, errors, infos } = recordingLogger();
+
+		await createWebMcpBridge({ ...OPTIONS, logger });
+
+		expect(seen.map(({ method }) => method)).toEqual(["GET"]);
+		expect(errors).toEqual([]);
+		expect(infos.some((args) => String(args[0]).includes("POST"))).toBe(false);
+	});
 
 	test("the fallback POST leaves out the ids it was not given", async () => {
 		installModelContext();
@@ -332,44 +372,7 @@ describe("createWebMcpBridge with a listEndpoint", () => {
 		expect(seen[1]?.headers).toEqual({ "content-type": "application/json" });
 	});
 
-	for (const status of [400, 401, 403, 406, 410, 500, 502, 503]) {
-		describe(`a ${status} on the GET`, () => {
-			test("is a failed listing: logged, nothing registered, no POST, null", async () => {
-				const { registered } = installModelContext();
-				const seen = installFetch((request) =>
-					isListPost(request)
-						? Response.json({ tools: [SEARCH_TOOL] })
-						: new Response("nope", { status }),
-				);
-				const { logger, errors } = recordingLogger();
-
-				const bridge = await createWebMcpBridge({ ...OPTIONS, logger });
-
-				expect(bridge).toBeNull();
-				expect(seen.map(({ method }) => method)).toEqual(["GET"]);
-				expect(registered).toEqual([]);
-				expect(errors).toHaveLength(1);
-			});
-		});
-	}
-
-	test("a GET that never reaches the server is a failed listing with no POST", async () => {
-		const { registered } = installModelContext();
-		const seen = installFetch((request) => {
-			if (isListPost(request)) {
-				return Response.json({ tools: [SEARCH_TOOL] });
-			}
-			throw new TypeError("Failed to fetch");
-		});
-		const { logger, errors } = recordingLogger();
-
-		expect(await createWebMcpBridge({ ...OPTIONS, logger })).toBeNull();
-		expect(seen).toHaveLength(1);
-		expect(registered).toEqual([]);
-		expect(errors).toHaveLength(1);
-	});
-
-	test("a failed GET listing takes its pagehide listener back off the window", async () => {
+	test("a failed listing (GET and POST both 500) takes its pagehide listener back off the window", async () => {
 		installModelContext();
 		installFetch(() => new Response(null, { status: 500 }));
 		const added: unknown[] = [];
@@ -406,37 +409,6 @@ describe("createWebMcpBridge with a listEndpoint", () => {
 	});
 
 	describe("a 2xx whose body is not a tool list", () => {
-		test("a body that is not JSON is a failed listing with no POST", async () => {
-			installModelContext();
-			const seen = installFetch((request) =>
-				isListPost(request)
-					? Response.json({ tools: [SEARCH_TOOL] })
-					: new Response("<!doctype html><title>Shop</title>", {
-							status: 200,
-							headers: { "content-type": "text/html" },
-						}),
-			);
-			const { logger, errors } = recordingLogger();
-
-			expect(await createWebMcpBridge({ ...OPTIONS, logger })).toBeNull();
-			expect(seen).toHaveLength(1);
-			expect(errors).toHaveLength(1);
-		});
-
-		test("a 204 with no body is a failed listing with no POST", async () => {
-			installModelContext();
-			const seen = installFetch((request) =>
-				isListPost(request)
-					? Response.json({ tools: [SEARCH_TOOL] })
-					: new Response(null, { status: 204 }),
-			);
-			const { logger, errors } = recordingLogger();
-
-			expect(await createWebMcpBridge({ ...OPTIONS, logger })).toBeNull();
-			expect(seen).toHaveLength(1);
-			expect(errors).toHaveLength(1);
-		});
-
 		const degenerate: Array<[string, unknown]> = [
 			["an object without tools", {}],
 			["JSON null", null],
