@@ -183,6 +183,9 @@ export function startWebMcp(config: EmbedConfig): WebMcpHandle | null {
 	// inline or floating, and whether it mounted at all.
 	const host = document.createElement("div");
 	host.setAttribute("data-waniwani-webmcp", "");
+	// One rung above the chat panel's host, which is appended after this one
+	// and would otherwise paint over a widget at the same z-index.
+	host.style.cssText = "position:relative;z-index:2147483001;";
 	document.body.appendChild(host);
 	const shadow = host.attachShadow({ mode: "open" });
 	// Its own copy of the stylesheet. The overlay is a sibling of the chat, not a
