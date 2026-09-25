@@ -113,6 +113,38 @@ describe("email.send: request", () => {
 		});
 	});
 
+	test("sends cc and bcc as given, one address or a list", async () => {
+		const calls = stubFetch(() => envelope({ id: LOG_ID }));
+
+		await client().send({
+			...EMAIL,
+			cc: "manager@example.com",
+			bcc: ["audit@example.com", "archive@example.com"],
+		});
+
+		expect(calls[0]?.body.cc).toBe("manager@example.com");
+		expect(calls[0]?.body.bcc).toEqual([
+			"audit@example.com",
+			"archive@example.com",
+		]);
+	});
+
+	test("sends a text-only email with no html key", async () => {
+		const calls = stubFetch(() => envelope({ id: LOG_ID }));
+
+		await client().send({
+			to: EMAIL.to,
+			subject: EMAIL.subject,
+			text: "Bonjour",
+		});
+
+		expect(Object.keys(calls[0]?.body ?? {}).sort()).toEqual([
+			"subject",
+			"text",
+			"to",
+		]);
+	});
+
 	test("does not forward a key outside the contract, such as a from address", async () => {
 		const calls = stubFetch(() => envelope({ id: LOG_ID }));
 		const input = { ...EMAIL, from: "Someone <someone@example.com>" };

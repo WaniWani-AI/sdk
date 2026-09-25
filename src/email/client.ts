@@ -26,6 +26,8 @@ export function createEmailClient(
 				},
 				body: JSON.stringify({
 					to: input.to,
+					cc: input.cc,
+					bcc: input.bcc,
 					subject: input.subject,
 					html: input.html,
 					text: input.text,
