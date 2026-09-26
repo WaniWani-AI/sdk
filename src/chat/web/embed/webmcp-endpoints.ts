@@ -8,8 +8,15 @@ import type { EmbedConfig } from "./config";
  */
 
 export type WebMcpEndpoints = {
-	/** Where `list` and `call` are posted. */
+	/** Where `call` is posted, and `list` when `listEndpoint` is not served. */
 	toolsEndpoint: string;
+	/**
+	 * The tool listing as a `GET` carrying the token and channel in its query
+	 * string, the way `resourceEndpoint` carries its token: no header means no
+	 * preflight, and a URL that names everything the answer depends on is one
+	 * the edge can cache.
+	 */
+	listEndpoint: string;
 	/**
 	 * The channel to attribute calls to, when one is known.
 	 *
@@ -79,13 +86,18 @@ export function resolveWebMcpEndpoints(
 		? { mcpServerUrl: config.mcpServerUrl }
 		: undefined;
 
+	// Author-set wins over the one the server resolved from the token, the same
+	// precedence the chat's own tracking client uses.
+	const channelId = config.channelId ?? resolvedChannelId;
+
 	return {
 		toolsEndpoint: buildApiUrl(api, "/webmcp", override),
-		// Author-set wins over the one the server resolved from the token, the
-		// same precedence the chat's own tracking client uses.
-		...((config.channelId ?? resolvedChannelId) && {
-			channelId: config.channelId ?? resolvedChannelId,
+		listEndpoint: buildApiUrl(api, "/webmcp/tools", {
+			token: config.token,
+			...(channelId && { channel: channelId }),
+			...override,
 		}),
+		...(channelId && { channelId }),
 		// A POST can carry a header, so it does. The resource endpoint below
 		// cannot: an iframe navigates by GET, so its token goes in the URL, where
 		// it is no more exposed than it already is in `data-token`.

@@ -386,3 +386,378 @@ describe("createWebMcpBridge", () => {
 		expect(seenSignal).toBe(controller.signal);
 	});
 });
+
+describe("bridge.callTool", () => {
+	type Captured = {
+		url: string;
+		headers: Record<string, string>;
+		rawBody: string;
+		body: Record<string, unknown>;
+		signal: AbortSignal | undefined;
+	};
+
+	/**
+	 * Records every request verbatim and answers `list` with `tools` and each
+	 * `call` with the next queued `{ status, payload }`.
+	 */
+	function installRecordingFetch(
+		tools: unknown[],
+		answers: Array<{ status?: number; payload: unknown }> = [],
+	) {
+		const requests: Captured[] = [];
+		const queue = [...answers];
+		// biome-ignore lint/suspicious/noExplicitAny: test setup
+		(globalThis as any).fetch = async (input: unknown, init?: RequestInit) => {
+			const rawBody = String(init?.body);
+			const body = JSON.parse(rawBody) as Record<string, unknown>;
+			requests.push({
+				url: String(input),
+				headers: { ...(init?.headers as Record<string, string>) },
+				rawBody,
+				body,
+				signal: init?.signal ?? undefined,
+			});
+			if (body.action === "list") {
+				return new Response(JSON.stringify({ tools }), { status: 200 });
+			}
+			const next = queue.shift() ?? { payload: { content: [] } };
+			return new Response(JSON.stringify(next.payload), {
+				status: next.status ?? 200,
+			});
+		};
+		return { requests };
+	}
+
+	afterEach(() => {
+		win.history.replaceState(null, "", "https://shop.example/pricing");
+		win.document.title = "";
+	});
+
+	test("posts to the bridge endpoint with its identity and the exact call envelope", async () => {
+		installModelContext();
+		const { requests } = installRecordingFetch([SEARCH_TOOL]);
+		win.document.title = "Pricing";
+
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "tab-session",
+			visitorId: "visitor-42",
+			channelId: "ch-1",
+			logger: SILENT,
+		});
+		await bridge?.callTool({
+			name: "book_demo",
+			arguments: { slot: "09:00", seats: 2 },
+		});
+
+		const call = requests.at(-1);
+		expect(call?.url).toBe(ENDPOINT);
+		expect(call?.body).toEqual({
+			sessionId: "tab-session",
+			visitorId: "visitor-42",
+			channelId: "ch-1",
+			page: { url: "https://shop.example/pricing", title: "Pricing" },
+			action: "call",
+			name: "book_demo",
+			arguments: { slot: "09:00", seats: 2 },
+		});
+	});
+
+	// The bug this guards: a view's own call went out without auth and without a
+	// session, and the server refused it.
+	test("sends the bridge's Authorization header alongside content-type", async () => {
+		installModelContext();
+		const { requests } = installRecordingFetch([SEARCH_TOOL]);
+
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "s1",
+			headers: { Authorization: "Bearer wwp_abc" },
+			logger: SILENT,
+		});
+		await bridge?.callTool({ name: "search", arguments: { q: "x" } });
+
+		const call = requests.at(-1);
+		expect(call?.body.action).toBe("call");
+		expect(call?.headers).toEqual({
+			"content-type": "application/json",
+			Authorization: "Bearer wwp_abc",
+		});
+		expect(typeof call?.body.sessionId).toBe("string");
+		expect(String(call?.body.sessionId).length).toBeGreaterThan(0);
+	});
+
+	test("a view's call is byte-identical to the agent's call for the same tool and arguments", async () => {
+		const { registered } = installModelContext();
+		const { requests } = installRecordingFetch([SEARCH_TOOL]);
+		win.document.title = "Docs";
+
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "tab-session",
+			visitorId: "visitor-42",
+			channelId: "ch-1",
+			headers: { Authorization: "Bearer wwp_abc" },
+			logger: SILENT,
+		});
+
+		const args = { q: "pricing", filters: { lang: "en" } };
+		await registered[0]?.execute(args);
+		await bridge?.callTool({ name: "search", arguments: args });
+
+		const [agentCall, viewCall] = requests.slice(-2);
+		expect(viewCall?.rawBody).toBe(agentCall?.rawBody ?? "missing");
+		expect(viewCall?.headers).toEqual(agentCall?.headers ?? {});
+		expect(viewCall?.url).toBe(agentCall?.url ?? "missing");
+	});
+
+	// A single-page app navigates without re-registering the bridge.
+	test("reads page url and title at call time, not at registration time", async () => {
+		installModelContext();
+		const { requests } = installRecordingFetch([SEARCH_TOOL]);
+		win.document.title = "Pricing";
+
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "s1",
+			logger: SILENT,
+		});
+
+		win.history.pushState(null, "", "/checkout?plan=pro");
+		win.document.title = "Checkout";
+		await bridge?.callTool({ name: "search", arguments: {} });
+
+		win.history.pushState(null, "", "/thanks#done");
+		win.document.title = "Thanks";
+		await bridge?.callTool({ name: "search", arguments: {} });
+
+		const pages = requests.map((r) => r.body.page);
+		expect(pages).toEqual([
+			{ url: "https://shop.example/pricing", title: "Pricing" },
+			{ url: "https://shop.example/checkout?plan=pro", title: "Checkout" },
+			{ url: "https://shop.example/thanks#done", title: "Thanks" },
+		]);
+	});
+
+	test("omitted arguments go out as an empty object", async () => {
+		installModelContext();
+		const { requests } = installRecordingFetch([SEARCH_TOOL]);
+
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "s1",
+			logger: SILENT,
+		});
+		await bridge?.callTool({ name: "search" });
+
+		const call = requests.at(-1);
+		expect(call?.body.action).toBe("call");
+		expect(call?.body.name).toBe("search");
+		expect(call?.body).toHaveProperty("arguments");
+		expect(call?.body.arguments).toEqual({});
+	});
+
+	test("an empty arguments object is sent as-is", async () => {
+		installModelContext();
+		const { requests } = installRecordingFetch([SEARCH_TOOL]);
+
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "s1",
+			logger: SILENT,
+		});
+		await bridge?.callTool({ name: "search", arguments: {} });
+
+		expect(requests.at(-1)?.rawBody).toContain('"arguments":{}');
+	});
+
+	for (const status of [400, 401, 403, 404, 500, 503]) {
+		test(`rejects on HTTP ${status} with the status in the message`, async () => {
+			installModelContext();
+			installRecordingFetch(
+				[SEARCH_TOOL],
+				[{ status, payload: { error: "no" } }],
+			);
+
+			const bridge = await createWebMcpBridge({
+				endpoint: ENDPOINT,
+				sessionId: "s1",
+				logger: SILENT,
+			});
+
+			const outcome = bridge?.callTool({ name: "search", arguments: {} });
+			await expect(outcome).rejects.toThrow(String(status));
+		});
+	}
+
+	test("a 3xx-ish non-ok response rejects rather than resolving to garbage", async () => {
+		installModelContext();
+		const requests: string[] = [];
+		// biome-ignore lint/suspicious/noExplicitAny: test setup
+		(globalThis as any).fetch = async (_input: unknown, init?: RequestInit) => {
+			const body = JSON.parse(String(init?.body)) as { action: string };
+			requests.push(body.action);
+			if (body.action === "list") {
+				return new Response(JSON.stringify({ tools: [SEARCH_TOOL] }), {
+					status: 200,
+				});
+			}
+			return new Response(null, { status: 304 });
+		};
+
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "s1",
+			logger: SILENT,
+		});
+		await expect(
+			bridge?.callTool({ name: "search", arguments: {} }),
+		).rejects.toThrow("304");
+		expect(requests).toEqual(["list", "call"]);
+	});
+
+	test("a network failure rejects", async () => {
+		installModelContext();
+		let calls = 0;
+		// biome-ignore lint/suspicious/noExplicitAny: test setup
+		(globalThis as any).fetch = async () => {
+			calls += 1;
+			if (calls === 1) {
+				return new Response(JSON.stringify({ tools: [] }), { status: 200 });
+			}
+			throw new TypeError("Failed to fetch");
+		};
+
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "s1",
+			logger: SILENT,
+		});
+		await expect(
+			bridge?.callTool({ name: "search", arguments: {} }),
+		).rejects.toThrow("Failed to fetch");
+	});
+
+	test("resolves to the raw response, widget and all, without calling onWidget", async () => {
+		installModelContext();
+		const widget = {
+			viewUri: "ui://views/ext-apps/book.html?v=abc",
+			tool: "show-book-call",
+			data: { slot: "09:00" },
+			result: { content: [] },
+			interactive: true,
+		};
+		const payload = {
+			content: [{ type: "text", text: "booked" }],
+			structuredContent: { ok: true },
+			_meta: { trace: "t1" },
+			widget,
+		};
+		installRecordingFetch([SEARCH_TOOL], [{ payload }]);
+
+		const seen: unknown[] = [];
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "s1",
+			onWidget: (w) => seen.push(w),
+			logger: SILENT,
+		});
+
+		const result = await bridge?.callTool({ name: "search", arguments: {} });
+		expect(result).toEqual(payload);
+		expect(seen).toEqual([]);
+	});
+
+	test("the agent path still dispatches widgets after a view call skipped one", async () => {
+		const { registered } = installModelContext();
+		const widget = {
+			viewUri: "ui://v",
+			tool: "t",
+			data: {},
+			result: { content: [] },
+		};
+		installRecordingFetch(
+			[SEARCH_TOOL],
+			[
+				{ payload: { content: [], widget } },
+				{ payload: { content: [], widget } },
+			],
+		);
+
+		const seen: unknown[] = [];
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "s1",
+			onWidget: (w) => seen.push(w),
+			logger: SILENT,
+		});
+
+		await bridge?.callTool({ name: "search", arguments: {} });
+		expect(seen).toEqual([]);
+		await registered[0]?.execute({});
+		expect(seen).toEqual([widget]);
+	});
+
+	test("undefined visitorId and channelId are left off the wire", async () => {
+		installModelContext();
+		const { requests } = installRecordingFetch([SEARCH_TOOL]);
+
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "s1",
+			logger: SILENT,
+		});
+		await bridge?.callTool({ name: "search", arguments: {} });
+
+		const call = requests.at(-1);
+		expect(call?.body).not.toHaveProperty("visitorId");
+		expect(call?.body).not.toHaveProperty("channelId");
+		expect(call?.rawBody).not.toContain("undefined");
+		expect(call?.rawBody).not.toContain("null");
+	});
+
+	test("no headers option means content-type only, with no stray keys", async () => {
+		installModelContext();
+		const { requests } = installRecordingFetch([SEARCH_TOOL]);
+
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "s1",
+			logger: SILENT,
+		});
+		await bridge?.callTool({ name: "search", arguments: {} });
+
+		expect(requests.at(-1)?.headers).toEqual({
+			"content-type": "application/json",
+		});
+	});
+
+	test("concurrent view calls each carry their own name and arguments", async () => {
+		installModelContext();
+		const { requests } = installRecordingFetch(
+			[SEARCH_TOOL],
+			[
+				{ payload: { content: [{ type: "text", text: "a" }] } },
+				{ payload: { content: [{ type: "text", text: "b" }] } },
+			],
+		);
+
+		const bridge = await createWebMcpBridge({
+			endpoint: ENDPOINT,
+			sessionId: "s1",
+			logger: SILENT,
+		});
+		const [a, b] = await Promise.all([
+			bridge?.callTool({ name: "alpha", arguments: { n: 1 } }),
+			bridge?.callTool({ name: "beta", arguments: { n: 2 } }),
+		]);
+
+		expect(a?.content).toEqual([{ type: "text", text: "a" }]);
+		expect(b?.content).toEqual([{ type: "text", text: "b" }]);
+		const calls = requests.filter((r) => r.body.action === "call");
+		expect(calls.map((r) => [r.body.name, r.body.arguments])).toEqual([
+			["alpha", { n: 1 }],
+			["beta", { n: 2 }],
+		]);
+	});
+});

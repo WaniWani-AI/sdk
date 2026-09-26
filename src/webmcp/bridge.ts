@@ -52,6 +52,15 @@ export type WebMcpBridgeOptions = {
 	/** Absolute URL of the server's page-facing tools endpoint. */
 	endpoint: string;
 	/**
+	 * A `GET` URL that answers the tool listing on its own, credentials in the
+	 * query string.
+	 *
+	 * Fetched with no request headers, so the browser sends no preflight and a
+	 * CDN can answer it. Any failed `GET` falls back to the `list` post on
+	 * `endpoint`.
+	 */
+	listEndpoint?: string;
+	/**
 	 * Extra request headers, merged over `content-type`.
 	 *
 	 * The hosted API authenticates with `Authorization: Bearer <public token>`
@@ -97,6 +106,14 @@ export type WebMcpBridgeOptions = {
 export type WebMcpBridge = {
 	/** Tools successfully registered with the browser. */
 	readonly tools: WebMcpTool[];
+	/**
+	 * Call a tool with the bridge's auth and identity, for a mounted view's own
+	 * `tools/call`. Resolves to the raw response; widgets are not re-dispatched.
+	 */
+	callTool: (params: {
+		name: string;
+		arguments?: Record<string, unknown>;
+	}) => Promise<WebMcpCallResponse>;
 	/** Unregister everything. Idempotent. */
 	dispose: () => void;
 };
@@ -146,8 +163,15 @@ function pageContext(): WebMcpPageContext {
 export async function createWebMcpBridge(
 	options: WebMcpBridgeOptions,
 ): Promise<WebMcpBridge | null> {
-	const { endpoint, headers, sessionId, visitorId, channelId, onWidget } =
-		options;
+	const {
+		endpoint,
+		listEndpoint,
+		headers,
+		sessionId,
+		visitorId,
+		channelId,
+		onWidget,
+	} = options;
 	const log = options.logger ?? console;
 
 	const mc = readModelContext();
@@ -196,13 +220,25 @@ export async function createWebMcpBridge(
 		return (await response.json()) as T;
 	}
 
+	async function list(): Promise<WebMcpListResponse> {
+		if (listEndpoint) {
+			try {
+				const response = await fetch(listEndpoint);
+				if (response.ok) {
+					return await response.json();
+				}
+				log.info(`[webmcp] list GET answered ${response.status}, using POST`);
+			} catch (error) {
+				log.info("[webmcp] list GET failed, using POST", error);
+			}
+		}
+		return post<WebMcpListResponse>({ ...identity(), action: "list" });
+	}
+
 	let tools: WebMcpTool[] = [];
 	try {
-		const listed = await post<WebMcpListResponse>({
-			...identity(),
-			action: "list",
-		});
-		tools = listed?.tools ?? [];
+		const listed = await list();
+		tools = Array.isArray(listed?.tools) ? listed.tools : [];
 	} catch (error) {
 		log.error("[webmcp] could not list site tools", error);
 		dispose();
@@ -257,6 +293,13 @@ export async function createWebMcpBridge(
 		get tools() {
 			return registered;
 		},
+		callTool: ({ name, arguments: args }) =>
+			post<WebMcpCallResponse>({
+				...identity(),
+				action: "call",
+				name,
+				arguments: args ?? {},
+			}),
 		dispose,
 	};
 }

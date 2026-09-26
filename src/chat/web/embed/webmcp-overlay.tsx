@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { autoHeightFromMeta } from "../../../shared/view-uri";
-import type { WebMcpWidgetPayload } from "../../../webmcp";
+import type {
+	WebMcpBridge,
+	WebMcpCallResponse,
+	WebMcpWidgetPayload,
+} from "../../../webmcp";
 import { McpAppFrame } from "../components/mcp-app-frame";
 import { cn } from "../lib/utils";
 
@@ -58,9 +62,14 @@ const VIEWPORT_MARGIN = 32;
 export type WebMcpOverlayProps = {
 	/** The step to show, or `null` for nothing. */
 	widget: WebMcpWidgetPayload | null;
-	/** The tools endpoint, so a view's own `tools/call` can be proxied. */
-	toolsEndpoint: string;
-	/** Auth for that endpoint, matching what the bridge sends. */
+	/**
+	 * Proxies a view's own `tools/call`. Pass the bridge's `callTool` so the
+	 * request carries the same auth and session identity as the agent's calls.
+	 */
+	onCallTool?: WebMcpBridge["callTool"];
+	/** @deprecated Pass `onCallTool`. Removed in 0.23.0. */
+	toolsEndpoint?: string;
+	/** @deprecated Pass `onCallTool`. Removed in 0.23.0. */
 	headers?: Record<string, string>;
 	/**
 	 * Where view HTML is fetched from, resolved from the token the same way the
@@ -74,9 +83,10 @@ export type WebMcpOverlayProps = {
 
 export function WebMcpOverlay({
 	widget,
+	onCallTool,
 	toolsEndpoint,
-	resourceEndpoint,
 	headers,
+	resourceEndpoint,
 	onClose,
 	isDark = false,
 }: WebMcpOverlayProps) {
@@ -126,6 +136,12 @@ export function WebMcpOverlay({
 
 	const callTool = useCallback(
 		async (params: { name: string; arguments: Record<string, unknown> }) => {
+			if (onCallTool) {
+				return onCallTool(params);
+			}
+			if (!toolsEndpoint) {
+				throw new Error("webmcp overlay needs onCallTool");
+			}
 			const response = await fetch(toolsEndpoint, {
 				method: "POST",
 				headers: { "content-type": "application/json", ...headers },
@@ -134,13 +150,10 @@ export function WebMcpOverlay({
 			if (!response.ok) {
 				throw new Error(`webmcp tool call failed: ${response.status}`);
 			}
-			return (await response.json()) as {
-				content?: Array<{ type: string; text?: string }>;
-				structuredContent?: Record<string, unknown>;
-				_meta?: Record<string, unknown>;
-			};
+			const result: WebMcpCallResponse = await response.json();
+			return result;
 		},
-		[toolsEndpoint, headers],
+		[onCallTool, toolsEndpoint, headers],
 	);
 
 	if (!widget) {

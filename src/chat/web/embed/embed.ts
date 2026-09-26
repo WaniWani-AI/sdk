@@ -760,6 +760,18 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 	// `WaniWani.chat.setVisitorId()`.
 	applyVisitorId(config.visitorId);
 
+	// The site's own tools, published to a browsing agent standing on the page.
+	// Started before the chat mounts so the listing is on the wire first.
+	// Independent of the chat: it mounts its own root, and a widget step reaches
+	// the visitor whether the panel is open or not. Returns null on every browser
+	// without `modelContext`, which is nearly all of them.
+	let webmcp: WebMcpHandle | null = null;
+	try {
+		webmcp = startWebMcp(config);
+	} catch (error) {
+		console.error("[Waniwani] WebMCP setup failed", error);
+	}
+
 	let mounted: MountedEmbed;
 	if (config.mode === "off") {
 		mounted = mountOff();
@@ -793,17 +805,6 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 		: createNoopChatTrackClient(
 				"no public token configured (set data-token or pass token to init())",
 			);
-
-	// The site's own tools, published to a browsing agent standing on the page.
-	// Independent of the chat: it mounts its own root, and a widget step reaches
-	// the visitor whether the panel is open or not. Returns null on every browser
-	// without `modelContext`, which is nearly all of them.
-	let webmcp: WebMcpHandle | null = null;
-	try {
-		webmcp = startWebMcp(config);
-	} catch (error) {
-		console.error("[Waniwani] WebMCP setup failed", error);
-	}
 
 	currentInstance = {
 		...mounted,
