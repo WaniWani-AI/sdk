@@ -2,6 +2,7 @@
 
 import { WaniWaniError } from "../error.js";
 import type { InternalConfig } from "../types.js";
+import { createLogger } from "../utils/logger.js";
 import { recordKbSearch } from "./retrieval-context.js";
 import type {
 	KbClient,
@@ -13,6 +14,8 @@ import type {
 } from "./types.js";
 
 const SDK_NAME = "@waniwani/sdk";
+
+const log = createLogger("kb");
 
 export function createKbClient(config: InternalConfig): KbClient {
 	const { apiUrl, apiKey } = config;
@@ -44,7 +47,12 @@ export function createKbClient(config: InternalConfig): KbClient {
 			init.body = JSON.stringify(body);
 		}
 
+		const startedAt = Date.now();
+		log(`${method} ${url}`);
 		const response = await fetch(url, init);
+		log(
+			`${method} ${url} -> ${response.status} in ${Date.now() - startedAt}ms`,
+		);
 
 		if (!response.ok) {
 			const text = await response.text().catch(() => "");
