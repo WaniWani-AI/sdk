@@ -4,6 +4,7 @@ import { type EveEvent, uiMessageChunks } from "./ui-stream";
 const REFRESH_AHEAD_MS = 30_000;
 const NOT_READY_BUDGET_MS = 20_000;
 const RECONNECT_DELAY_MS = 250;
+const MAX_STREAM_FAILURES = 8;
 
 /** Where a conversation's turns go, as the app's session route answers it. */
 type NativeSession = {
@@ -128,6 +129,7 @@ export class NativeConversation {
 
 	private async follow(): Promise<void> {
 		const signal = this.stopped.signal;
+		let failures = 0;
 		while (!signal.aborted) {
 			try {
 				const url = new URL(this.url("/stream"));
@@ -139,6 +141,10 @@ export class NativeConversation {
 					cache: "no-store",
 					signal,
 				});
+				if (response.status === 401 || response.status === 403) {
+					this.fail(`The chat lost access to the agent (${response.status})`);
+					return;
+				}
 				if (!response.ok || !response.body) {
 					throw new Error(`stream ${response.status}`);
 				}
@@ -178,18 +184,27 @@ export class NativeConversation {
 						}
 					}
 				}
-			} catch {
+				failures = 0;
+			} catch (error) {
 				if (signal.aborted) {
 					return;
 				}
+				failures += 1;
+				if (failures >= MAX_STREAM_FAILURES) {
+					this.fail(
+						error instanceof Error ? error.message : "The agent stream failed",
+					);
+					return;
+				}
 			}
-			await sleep(RECONNECT_DELAY_MS, signal);
+			await sleep(RECONNECT_DELAY_MS * Math.min(failures + 1, 8), signal);
 		}
 	}
 
-	private async send(message: string): Promise<string> {
+	private async send(message: string, signal?: AbortSignal): Promise<string> {
 		const deadline = Date.now() + NOT_READY_BUDGET_MS;
 		for (let delay = 250; ; delay = Math.min(delay * 2, 2_000)) {
+			signal?.throwIfAborted();
 			const response = await fetch(this.url(), {
 				method: "POST",
 				headers: {
@@ -214,7 +229,7 @@ export class NativeConversation {
 			if (!notReady || Date.now() > deadline) {
 				throw new Error(`The agent refused the message (${response.status})`);
 			}
-			await sleep(delay);
+			await sleep(delay, signal);
 		}
 	}
 
@@ -227,6 +242,7 @@ export class NativeConversation {
 		const early: EveEvent[] = [];
 		let deliveryId: string | undefined;
 		let turnId: string | undefined;
+		let started = false;
 		let forward: ((event: EveEvent) => void) | undefined;
 		let finish: (() => void) | undefined;
 
@@ -235,9 +251,17 @@ export class NativeConversation {
 				early.push(event);
 				return;
 			}
-			if (!event.meta?.deliveryIds?.includes(deliveryId)) {
+			const ours = event.meta?.deliveryIds?.includes(deliveryId) === true;
+			// A session-wide terminal event names no delivery, and ends whichever turn is running.
+			const sessionWide =
+				isTurnBoundary(event) && event.meta?.deliveryIds === undefined;
+			if (
+				!ours &&
+				!(sessionWide && (started || event.type !== "session.waiting"))
+			) {
 				return;
 			}
+			started = true;
 			const data = event.data;
 			if (
 				!turnId &&
@@ -261,27 +285,40 @@ export class NativeConversation {
 					this.listeners.delete(listener);
 					controller.close();
 				};
-				this.listeners.add(listener);
-				abortSignal?.addEventListener(
-					"abort",
-					() => {
+				const stop = () => {
+					if (deliveryId) {
 						void this.cancel(turnId);
-						this.listeners.delete(listener);
-						try {
-							controller.close();
-						} catch {}
-					},
-					{ once: true },
-				);
-				this.send(message).then(
+					}
+					this.listeners.delete(listener);
+					try {
+						controller.close();
+					} catch {}
+				};
+				if (abortSignal?.aborted) {
+					controller.close();
+					return;
+				}
+				this.listeners.add(listener);
+				abortSignal?.addEventListener("abort", stop, { once: true });
+				this.send(message, abortSignal).then(
 					(accepted) => {
 						deliveryId = accepted;
+						if (abortSignal?.aborted) {
+							stop();
+							return;
+						}
 						for (const event of early.splice(0)) {
 							listener(event);
 						}
 					},
 					(error: unknown) => {
 						this.listeners.delete(listener);
+						if (abortSignal?.aborted) {
+							try {
+								controller.close();
+							} catch {}
+							return;
+						}
 						controller.error(error);
 					},
 				);
@@ -299,6 +336,15 @@ export class NativeConversation {
 			},
 			body: JSON.stringify(turnId ? { turnId } : {}),
 		}).catch(() => {});
+	}
+
+	/** Ends every waiting turn with a failure the chat can show, instead of streaming forever. */
+	private fail(message: string): void {
+		const event: EveEvent = { type: "session.failed", data: { message } };
+		for (const listener of this.listeners) {
+			listener(event);
+		}
+		this.close();
 	}
 
 	close(): void {

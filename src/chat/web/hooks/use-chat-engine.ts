@@ -500,15 +500,26 @@ export function useChatEngine(props: ChatBaseProps) {
 						visitor: { id: getOrCreateVisitorId() },
 					}),
 					fallback: appTransport.current,
+					needsFallback: () =>
+						enableThreadHistoryRef.current ||
+						Boolean(pendingDocumentsRef.current?.length) ||
+						hasModelContext(pendingModelContextRef.current),
+					onSession: setSessionId,
 				})
 			: appTransport.current,
 	);
+	// A host resolving its own visitor id asynchronously gets its session on the first send instead.
+	const prewarm = typeof propVisitorId !== "function";
 	useEffect(() => {
 		const transport = transportRef.current;
-		if (transport instanceof EveNativeTransport) {
+		if (!(transport instanceof EveNativeTransport)) {
+			return;
+		}
+		if (prewarm) {
 			transport.prepare();
 		}
-	}, []);
+		return () => transport.dispose();
+	}, [prewarm]);
 
 	const pendingWaitRef = useRef<{
 		resolve: (msg: unknown) => void;

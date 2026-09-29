@@ -86,31 +86,51 @@ export function sessionRoute(input: {
 /**
  * Sends turns straight to the agent runtime when the app's session route
  * admits the chat, and through `fallback` when it answers that the chat route
- * keeps serving it. A thread's first message opens a fresh runtime session.
+ * keeps serving it. A thread's first message opens a fresh runtime session, and
+ * a thread that needs what the runtime path does not carry (attachments, model
+ * context, saved thread history) stays on `fallback` for its whole length.
  */
 export class EveNativeTransport implements ChatTransport<UIMessage> {
 	private conversation: Promise<NativeConversation | null> | undefined;
+	private threadOnFallback = false;
+	private disposed = false;
 
 	constructor(
 		private readonly options: {
 			open: OpenSession;
 			body: Resolve<Record<string, unknown>>;
 			fallback: ChatTransport<UIMessage>;
+			needsFallback: Resolve<boolean>;
+			onSession: (sessionId: string) => void;
 		},
 	) {}
 
 	/** Opens the runtime session ahead of the first message, so that message pays no bootstrap. */
 	prepare(): void {
+		this.disposed = false;
 		this.conversation ??= this.start();
 	}
 
-	private start(): Promise<NativeConversation | null> {
+	dispose(): void {
+		this.disposed = true;
+		void this.conversation
+			?.then((conversation) => conversation?.close())
+			.catch(() => {});
+		this.conversation = undefined;
+	}
+
+	private async start(): Promise<NativeConversation | null> {
 		const body = this.options.body();
-		return NativeConversation.create({
+		const conversation = await NativeConversation.create({
 			open: this.options.open,
 			channelId: stringField(body, "channelId"),
 			visitorId: visitorIdOf(body),
 		});
+		if (conversation && this.disposed) {
+			conversation.close();
+			return null;
+		}
+		return conversation;
 	}
 
 	async sendMessages(
@@ -118,6 +138,19 @@ export class EveNativeTransport implements ChatTransport<UIMessage> {
 	): Promise<ReadableStream<UIMessageChunk>> {
 		const opensThread =
 			options.messages.filter((message) => message.role === "user").length <= 1;
+		if (opensThread) {
+			this.threadOnFallback = false;
+		}
+		const last = [...options.messages]
+			.reverse()
+			.find((message) => message.role === "user");
+		const carriesFiles =
+			last?.parts.some((part) => part.type === "file") ?? false;
+		if (this.threadOnFallback || carriesFiles || this.options.needsFallback()) {
+			this.threadOnFallback = true;
+			return await this.options.fallback.sendMessages(options);
+		}
+		this.disposed = false;
 		this.conversation ??= this.start();
 		let conversation = await this.conversation.catch(() => null);
 		if (conversation?.used && opensThread) {
@@ -126,8 +159,10 @@ export class EveNativeTransport implements ChatTransport<UIMessage> {
 			conversation = await this.conversation.catch(() => null);
 		}
 		if (!conversation) {
+			this.threadOnFallback = true;
 			return await this.options.fallback.sendMessages(options);
 		}
+		this.options.onSession(conversation.sessionId);
 		return conversation.turn(
 			lastUserText(options.messages),
 			options.abortSignal,
