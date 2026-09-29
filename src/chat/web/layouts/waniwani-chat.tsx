@@ -95,6 +95,8 @@ export interface WaniwaniChatOverrides {
 	api?: string;
 	/** Override the MCP server URL (rarely needed). */
 	mcpServerUrl?: string;
+	/** See `ChatBaseProps.sessionApi`. */
+	sessionApi?: string;
 	/**
 	 * AI transparency notice rendered under the input (EU AI Act compliance).
 	 * String overrides the default wording; `false` hides it.
@@ -489,6 +491,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				<ChatEmbed
 					ref={innerRef}
 					api={config.api ?? DEFAULT_API}
+					sessionApi={overrides?.sessionApi}
 					headers={{ Authorization: `Bearer ${config.token}` }}
 					visitorId={visitorId}
 					skipRemoteConfig

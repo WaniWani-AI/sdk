@@ -12,6 +12,7 @@ import type { PromptInputMessage } from "../ai-elements/prompt-input";
 import { useWidgetEvents } from "../embed/widget-events-context";
 import { buildApiUrl } from "../lib/api-url";
 import { discardDocument } from "../lib/document-upload";
+import { EveNativeTransport, sessionRoute } from "../lib/eve-native/transport";
 import { LenientChatTransport } from "../lib/lenient-chat-transport";
 import {
 	deleteThread as deleteThreadFromStore,
@@ -356,7 +357,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		[timingTarget, bodyString],
 	);
 
-	const transportRef = useRef(
+	const appTransport = useRef(
 		new LenientChatTransport({
 			api,
 			headers: () => ({
@@ -488,6 +489,26 @@ export function useChatEngine(props: ChatBaseProps) {
 			}) as typeof fetch,
 		}),
 	);
+
+	const { sessionApi } = props;
+	const transportRef = useRef(
+		sessionApi
+			? new EveNativeTransport({
+					open: sessionRoute({ sessionApi, headers: () => headersRef.current }),
+					body: () => ({
+						channelId: bodyString("channelId"),
+						visitor: { id: getOrCreateVisitorId() },
+					}),
+					fallback: appTransport.current,
+				})
+			: appTransport.current,
+	);
+	useEffect(() => {
+		const transport = transportRef.current;
+		if (transport instanceof EveNativeTransport) {
+			transport.prepare();
+		}
+	}, []);
 
 	const pendingWaitRef = useRef<{
 		resolve: (msg: unknown) => void;

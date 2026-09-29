@@ -147,6 +147,12 @@ export interface ChatBaseProps {
 	apiKey?: string;
 	/** Chat API endpoint URL. Defaults to Waniwani hosted endpoint */
 	api?: string;
+	/**
+	 * The app's direct-runtime session route (`/api/mcp/agent/session`). When
+	 * set, turns go straight to the agent runtime for a chat the route admits,
+	 * and through `api` for one it does not.
+	 */
+	sessionApi?: string;
 	/** Pre-loaded messages to display when the chat mounts. */
 	initialMessages?: import("ai").UIMessage[];
 
