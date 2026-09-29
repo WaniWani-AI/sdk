@@ -13,7 +13,11 @@ type SessionGrant = {
 	sessionId: string;
 	accessToken: string;
 	expiresAt: number;
+	followups: boolean;
 };
+
+/** What reopens a conversation after a page load. */
+export type SavedConversation = { conversationId: string; ownerSecret: string };
 
 export type SessionRequest =
 	| {
@@ -23,7 +27,11 @@ export type SessionRequest =
 			channelId?: string;
 			visitorId?: string;
 	  }
-	| { operation: "refresh"; conversationId: string; ownerSecret: string };
+	| {
+			operation: "resume" | "refresh";
+			conversationId: string;
+			ownerSecret: string;
+	  };
 
 /** `null` when the app keeps serving this chat through its chat route. */
 export type OpenSession = (
@@ -36,6 +44,46 @@ function ownerSecret(): string {
 		.replaceAll("+", "-")
 		.replaceAll("/", "_")
 		.replace(/=+$/, "");
+}
+
+function storageKey(channelId: string | undefined): string {
+	return `waniwani:eve-conversation:${channelId ?? ""}`;
+}
+
+export function savedConversation(
+	channelId: string | undefined,
+): SavedConversation | null {
+	try {
+		const parsed: unknown = JSON.parse(
+			localStorage.getItem(storageKey(channelId)) ?? "null",
+		);
+		return typeof parsed === "object" &&
+			parsed !== null &&
+			"conversationId" in parsed &&
+			typeof parsed.conversationId === "string" &&
+			"ownerSecret" in parsed &&
+			typeof parsed.ownerSecret === "string"
+			? {
+					conversationId: parsed.conversationId,
+					ownerSecret: parsed.ownerSecret,
+				}
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+export function saveConversation(
+	channelId: string | undefined,
+	saved: SavedConversation | null,
+): void {
+	try {
+		if (saved) {
+			localStorage.setItem(storageKey(channelId), JSON.stringify(saved));
+		} else {
+			localStorage.removeItem(storageKey(channelId));
+		}
+	} catch {}
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -70,14 +118,26 @@ export class EveSession {
 	private refreshing: Promise<string> | null = null;
 	private readonly listeners = new Set<(event: EveEvent) => void>();
 	private readonly stopped = new AbortController();
+	private readonly replayed: EveEvent[] = [];
+	private settleHistory: ((events: EveEvent[]) => void) | undefined;
+	private tail: number | undefined;
+	/** Every event the session held when it was resumed; empty for a new session. */
+	readonly history: Promise<EveEvent[]>;
 	used = false;
 
 	private constructor(
 		private readonly open: OpenSession,
 		private readonly secret: string,
 		grant: SessionGrant,
+		resumed: boolean,
 	) {
 		this.grant = grant;
+		this.history = new Promise((resolve) => {
+			this.settleHistory = resolve;
+		});
+		if (!resumed) {
+			this.settle();
+		}
 		void this.follow();
 	}
 
@@ -94,11 +154,53 @@ export class EveSession {
 			channelId: input.channelId,
 			visitorId: input.visitorId,
 		});
-		return session ? new EveSession(input.open, secret, session) : null;
+		return session ? new EveSession(input.open, secret, session, false) : null;
+	}
+
+	static async resume(input: {
+		open: OpenSession;
+		saved: SavedConversation;
+	}): Promise<EveSession | null> {
+		const session = await input.open({
+			operation: "resume",
+			...input.saved,
+		});
+		return session
+			? new EveSession(input.open, input.saved.ownerSecret, session, true)
+			: null;
 	}
 
 	get sessionId(): string {
 		return this.grant.sessionId;
+	}
+
+	get saved(): SavedConversation {
+		return {
+			conversationId: this.grant.conversationId,
+			ownerSecret: this.secret,
+		};
+	}
+
+	get followups(): boolean {
+		return this.grant.followups;
+	}
+
+	private settle(): void {
+		this.settleHistory?.(this.replayed);
+		this.settleHistory = undefined;
+	}
+
+	private record(event: EveEvent): void {
+		if (!this.settleHistory) {
+			return;
+		}
+		this.replayed.push(event);
+		if (event.type === "message.received") {
+			this.used = true;
+		}
+		if (this.tail !== undefined && this.position > this.tail) {
+			this.settle();
+		}
 	}
 
 	private url(suffix = ""): string {
@@ -136,6 +238,9 @@ export class EveSession {
 				if (this.position > 0) {
 					url.searchParams.set("startIndex", String(this.position));
 				}
+				if (this.settleHistory && this.tail === undefined) {
+					url.searchParams.set("includeTailIndex", "1");
+				}
 				const response = await fetch(url, {
 					headers: { authorization: `Bearer ${await this.bearer()}` },
 					cache: "no-store",
@@ -147,6 +252,14 @@ export class EveSession {
 				}
 				if (!response.ok || !response.body) {
 					throw new Error(`stream ${response.status}`);
+				}
+				if (this.settleHistory && this.tail === undefined) {
+					this.tail = Number(
+						response.headers.get("x-eve-stream-tail-index") ?? "-1",
+					);
+					if (!(this.position <= this.tail)) {
+						this.settle();
+					}
 				}
 				const reader = response.body
 					.pipeThrough(new TextDecoderStream())
@@ -179,6 +292,7 @@ export class EveSession {
 						}
 						this.position += 1;
 						const event = parsed as EveEvent;
+						this.record(event);
 						for (const listener of this.listeners) {
 							listener(event);
 						}
@@ -350,5 +464,6 @@ export class EveSession {
 	close(): void {
 		this.stopped.abort();
 		this.listeners.clear();
+		this.settle();
 	}
 }
