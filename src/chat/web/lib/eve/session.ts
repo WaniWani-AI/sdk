@@ -5,6 +5,7 @@ const REFRESH_AHEAD_MS = 30_000;
 const NOT_READY_BUDGET_MS = 20_000;
 const RECONNECT_DELAY_MS = 250;
 const MAX_STREAM_FAILURES = 8;
+const STREAM_IDLE_MS = 15_000;
 
 /** Where a session's turns go, as the app's session route answers it. */
 type SessionGrant = {
@@ -233,8 +234,13 @@ export class EveSession {
 		const signal = this.stopped.signal;
 		let failures = 0;
 		while (!signal.aborted) {
+			const connection = new AbortController();
+			const stop = () => connection.abort();
+			signal.addEventListener("abort", stop, { once: true });
+			let leaseEnded = false;
 			try {
 				const url = new URL(this.url("/stream"));
+				url.searchParams.set("streamControlVersion", "1");
 				if (this.position > 0) {
 					url.searchParams.set("startIndex", String(this.position));
 				}
@@ -244,7 +250,7 @@ export class EveSession {
 				const response = await fetch(url, {
 					headers: { authorization: `Bearer ${await this.bearer()}` },
 					cache: "no-store",
-					signal,
+					signal: connection.signal,
 				});
 				if (response.status === 401 || response.status === 403) {
 					this.fail(`The chat lost access to the agent (${response.status})`);
@@ -266,7 +272,16 @@ export class EveSession {
 					.getReader();
 				let buffer = "";
 				for (;;) {
-					const { value, done } = await reader.read();
+					let idle: ReturnType<typeof setTimeout> | undefined;
+					const { value, done } = await Promise.race([
+						reader.read(),
+						new Promise<never>((_, reject) => {
+							idle = setTimeout(
+								() => reject(new Error("The agent stream went quiet")),
+								STREAM_IDLE_MS,
+							);
+						}),
+					]).finally(() => clearTimeout(idle));
 					if (done) {
 						break;
 					}
@@ -282,12 +297,12 @@ export class EveSession {
 							continue;
 						}
 						const parsed: unknown = JSON.parse(line);
+						if (typeof parsed !== "object" || parsed === null) {
+							continue;
+						}
 						// Lease-renewal control records are transport, not session events.
-						if (
-							typeof parsed !== "object" ||
-							parsed === null ||
-							"$eve" in parsed
-						) {
+						if ("$eve" in parsed) {
+							leaseEnded = parsed.$eve === "stream.lease-ended";
 							continue;
 						}
 						this.position += 1;
@@ -310,8 +325,13 @@ export class EveSession {
 					);
 					return;
 				}
+			} finally {
+				signal.removeEventListener("abort", stop);
+				connection.abort();
 			}
-			await sleep(RECONNECT_DELAY_MS * Math.min(failures + 1, 8), signal);
+			if (!leaseEnded) {
+				await sleep(RECONNECT_DELAY_MS * Math.min(failures + 1, 8), signal);
+			}
 		}
 	}
 
