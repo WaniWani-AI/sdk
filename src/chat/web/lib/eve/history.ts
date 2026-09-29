@@ -10,7 +10,9 @@ function visitorText(data: unknown): string | undefined {
 		: undefined;
 }
 
-async function reply(events: EveEvent[]): Promise<UIMessage | undefined> {
+async function reply(
+	events: readonly EveEvent[],
+): Promise<UIMessage | undefined> {
 	const stream = new ReadableStream<EveEvent>({
 		start(controller) {
 			for (const event of events) {
@@ -28,7 +30,7 @@ async function reply(events: EveEvent[]): Promise<UIMessage | undefined> {
 
 /** A resumed session's events as the messages the chat shows. */
 export async function historyMessages(
-	events: EveEvent[],
+	events: readonly EveEvent[],
 ): Promise<UIMessage[]> {
 	const turns: { visitor: UIMessage; events: EveEvent[] }[] = [];
 	for (const event of events) {

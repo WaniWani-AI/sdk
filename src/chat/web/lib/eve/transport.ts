@@ -222,13 +222,17 @@ export class EveTransport
 	}
 
 	async restore(): Promise<UIMessage[]> {
-		if (this.options.needsFallback() || !savedConversation(this.channelId)) {
+		if (
+			this.options.needsFallback() ||
+			!("withResolvers" in Promise) ||
+			!savedConversation(this.channelId)
+		) {
 			return [];
 		}
 		this.prepare();
 		const conversation = await this.session?.catch(() => null);
 		return conversation
-			? await historyMessages(await conversation.history)
+			? await historyMessages(await conversation.history())
 			: [];
 	}
 
@@ -282,7 +286,12 @@ export class EveTransport
 			.find((message) => message.role === "user");
 		const carriesFiles =
 			last?.parts.some((part) => part.type === "file") ?? false;
-		if (this.threadOnFallback || carriesFiles || this.options.needsFallback()) {
+		if (
+			this.threadOnFallback ||
+			carriesFiles ||
+			this.options.needsFallback() ||
+			!("withResolvers" in Promise)
+		) {
 			this.threadOnFallback = true;
 			return await this.options.fallback.sendMessages(options);
 		}
@@ -309,9 +318,11 @@ export class EveTransport
 				suggest: (answerText, toolNames) =>
 					this.options.suggest({
 						...saved,
-						answerText,
-						recentUserMessages: texts.slice(-3),
-						toolNames,
+						answerText: answerText.slice(-8_000),
+						recentUserMessages: texts
+							.slice(-3)
+							.map((text) => text.slice(-2_000)),
+						toolNames: toolNames.slice(0, 20),
 					}),
 				signal: options.abortSignal,
 			}),
