@@ -148,11 +148,10 @@ export interface ChatBaseProps {
 	/** Chat API endpoint URL. Defaults to Waniwani hosted endpoint */
 	api?: string;
 	/**
-	 * The app's direct-runtime session route (`/api/mcp/agent/session`). When
-	 * set, turns go straight to the agent runtime for a chat the route admits,
-	 * and through `api` for one it does not.
+	 * Builds the transport turns are sent through. Defaults to the chat's own
+	 * HTTP transport to `api`, which it also hands the factory as `fallback`.
 	 */
-	sessionApi?: string;
+	transport?: ChatTransportFactory;
 	/** Pre-loaded messages to display when the chat mounts. */
 	initialMessages?: import("ai").UIMessage[];
 
@@ -448,3 +447,26 @@ export interface ChatHandle {
 		traits?: Record<string, unknown>,
 	) => Promise<{ eventId: string }>;
 }
+
+/** What the chat hands a transport factory. */
+export interface ChatTransportContext {
+	/** The chat's HTTP transport to `api`. */
+	fallback: import("ai").ChatTransport<import("ai").UIMessage>;
+	headers: () => Record<string, string> | undefined;
+	/** The channel and visitor a turn is attributed to. */
+	body: () => Record<string, unknown>;
+	/** True while the thread needs what only `fallback` carries: attachments, model context, saved history. */
+	needsFallback: () => boolean;
+	onSession: (sessionId: string) => void;
+}
+
+/** Optional hooks the chat calls on a transport: ahead of the first message, and on unmount. */
+export interface ChatTransportLifecycle {
+	prepare?(): void;
+	dispose?(): void;
+}
+
+export type ChatTransportFactory = (
+	context: ChatTransportContext,
+) => import("ai").ChatTransport<import("ai").UIMessage> &
+	ChatTransportLifecycle;

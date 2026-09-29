@@ -1,18 +1,17 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import type { FileUIPart, UIMessage } from "ai";
+import type { ChatTransport, FileUIPart, UIMessage } from "ai";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AttachedDocument } from "../../../documents/types";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import { hasModelContext } from "../../../shared/model-context";
-import type { ChatBaseProps } from "../@types";
+import type { ChatBaseProps, ChatTransportLifecycle } from "../@types";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
 import { useWidgetEvents } from "../embed/widget-events-context";
 import { buildApiUrl } from "../lib/api-url";
 import { discardDocument } from "../lib/document-upload";
-import { EveNativeTransport, sessionRoute } from "../lib/eve-native/transport";
 import { LenientChatTransport } from "../lib/lenient-chat-transport";
 import {
 	deleteThread as deleteThreadFromStore,
@@ -490,35 +489,31 @@ export function useChatEngine(props: ChatBaseProps) {
 		}),
 	);
 
-	const { sessionApi } = props;
-	const transportRef = useRef(
-		sessionApi
-			? new EveNativeTransport({
-					open: sessionRoute({ sessionApi, headers: () => headersRef.current }),
-					body: () => ({
-						channelId: bodyString("channelId"),
-						visitor: { id: getOrCreateVisitorId() },
-					}),
-					fallback: appTransport.current,
-					needsFallback: () =>
-						enableThreadHistoryRef.current ||
-						Boolean(pendingDocumentsRef.current?.length) ||
-						hasModelContext(pendingModelContextRef.current),
-					onSession: setSessionId,
-				})
-			: appTransport.current,
+	const transportRef = useRef<
+		ChatTransport<UIMessage> & ChatTransportLifecycle
+	>(
+		props.transport?.({
+			fallback: appTransport.current,
+			headers: () => headersRef.current,
+			body: () => ({
+				channelId: bodyString("channelId"),
+				visitor: { id: getOrCreateVisitorId() },
+			}),
+			needsFallback: () =>
+				enableThreadHistoryRef.current ||
+				Boolean(pendingDocumentsRef.current?.length) ||
+				hasModelContext(pendingModelContextRef.current),
+			onSession: setSessionId,
+		}) ?? appTransport.current,
 	);
 	// A host resolving its own visitor id asynchronously gets its session on the first send instead.
 	const prewarm = typeof propVisitorId !== "function";
 	useEffect(() => {
 		const transport = transportRef.current;
-		if (!(transport instanceof EveNativeTransport)) {
-			return;
-		}
 		if (prewarm) {
-			transport.prepare();
+			transport.prepare?.();
 		}
-		return () => transport.dispose();
+		return () => transport.dispose?.();
 	}, [prewarm]);
 
 	const pendingWaitRef = useRef<{

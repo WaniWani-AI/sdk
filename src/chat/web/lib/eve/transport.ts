@@ -1,9 +1,10 @@
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
-import {
-	NativeConversation,
-	type OpenSession,
-	type SessionRequest,
-} from "./conversation";
+import type {
+	ChatTransportContext,
+	ChatTransportFactory,
+	ChatTransportLifecycle,
+} from "../../@types";
+import { EveSession, type OpenSession, type SessionRequest } from "./session";
 
 type Resolve<T> = () => T;
 
@@ -90,38 +91,34 @@ export function sessionRoute(input: {
  * a thread that needs what the runtime path does not carry (attachments, model
  * context, saved thread history) stays on `fallback` for its whole length.
  */
-export class EveNativeTransport implements ChatTransport<UIMessage> {
-	private conversation: Promise<NativeConversation | null> | undefined;
+export class EveTransport
+	implements ChatTransport<UIMessage>, ChatTransportLifecycle
+{
+	private session: Promise<EveSession | null> | undefined;
 	private threadOnFallback = false;
 	private disposed = false;
 
 	constructor(
-		private readonly options: {
-			open: OpenSession;
-			body: Resolve<Record<string, unknown>>;
-			fallback: ChatTransport<UIMessage>;
-			needsFallback: Resolve<boolean>;
-			onSession: (sessionId: string) => void;
-		},
+		private readonly options: ChatTransportContext & { open: OpenSession },
 	) {}
 
 	/** Opens the runtime session ahead of the first message, so that message pays no bootstrap. */
 	prepare(): void {
 		this.disposed = false;
-		this.conversation ??= this.start();
+		this.session ??= this.start();
 	}
 
 	dispose(): void {
 		this.disposed = true;
-		void this.conversation
+		void this.session
 			?.then((conversation) => conversation?.close())
 			.catch(() => {});
-		this.conversation = undefined;
+		this.session = undefined;
 	}
 
-	private async start(): Promise<NativeConversation | null> {
+	private async start(): Promise<EveSession | null> {
 		const body = this.options.body();
-		const conversation = await NativeConversation.create({
+		const conversation = await EveSession.create({
 			open: this.options.open,
 			channelId: stringField(body, "channelId"),
 			visitorId: visitorIdOf(body),
@@ -151,12 +148,12 @@ export class EveNativeTransport implements ChatTransport<UIMessage> {
 			return await this.options.fallback.sendMessages(options);
 		}
 		this.disposed = false;
-		this.conversation ??= this.start();
-		let conversation = await this.conversation.catch(() => null);
+		this.session ??= this.start();
+		let conversation = await this.session.catch(() => null);
 		if (conversation?.used && opensThread) {
 			conversation.close();
-			this.conversation = this.start();
-			conversation = await this.conversation.catch(() => null);
+			this.session = this.start();
+			conversation = await this.session.catch(() => null);
 		}
 		if (!conversation) {
 			this.threadOnFallback = true;
@@ -172,9 +169,18 @@ export class EveNativeTransport implements ChatTransport<UIMessage> {
 	async reconnectToStream(
 		options: Parameters<ChatTransport<UIMessage>["reconnectToStream"]>[0],
 	): Promise<ReadableStream<UIMessageChunk> | null> {
-		const conversation = await this.conversation?.catch(() => null);
+		const conversation = await this.session?.catch(() => null);
 		return conversation
 			? null
 			: await this.options.fallback.reconnectToStream(options);
 	}
+}
+
+/** A transport factory for `useChatEngine` that talks to the agent runtime through `sessionApi`. */
+export function eveTransport(sessionApi: string): ChatTransportFactory {
+	return (context) =>
+		new EveTransport({
+			...context,
+			open: sessionRoute({ sessionApi, headers: context.headers }),
+		});
 }

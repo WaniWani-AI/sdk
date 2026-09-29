@@ -35,6 +35,7 @@ import {
 	createChatTrackClient,
 	createNoopChatTrackClient,
 } from "../lib/chat-track";
+import { eveTransport } from "../lib/eve/transport";
 import { firePageView } from "../lib/page-view";
 import { markConfigSource, setTimingMetadata } from "../lib/timing";
 import { useBootTiming } from "../lib/timing-context";
@@ -95,7 +96,11 @@ export interface WaniwaniChatOverrides {
 	api?: string;
 	/** Override the MCP server URL (rarely needed). */
 	mcpServerUrl?: string;
-	/** See `ChatBaseProps.sessionApi`. */
+	/**
+	 * The app's agent-runtime session route (`/api/mcp/agent/session`). Set,
+	 * turns go straight to the agent runtime for a chat the route admits, and
+	 * through `api` for one it does not.
+	 */
 	sessionApi?: string;
 	/**
 	 * AI transparency notice rendered under the input (EU AI Act compliance).
@@ -482,6 +487,12 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			body.channelId = config.channelId;
 		}
 
+		const sessionApi = overrides?.sessionApi;
+		const transport = useMemo(
+			() => (sessionApi ? eveTransport(sessionApi) : undefined),
+			[sessionApi],
+		);
+
 		if (!visible) {
 			return null;
 		}
@@ -491,7 +502,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				<ChatEmbed
 					ref={innerRef}
 					api={config.api ?? DEFAULT_API}
-					sessionApi={overrides?.sessionApi}
+					transport={transport}
 					headers={{ Authorization: `Bearer ${config.token}` }}
 					visitorId={visitorId}
 					skipRemoteConfig

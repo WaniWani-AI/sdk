@@ -6,8 +6,8 @@ const NOT_READY_BUDGET_MS = 20_000;
 const RECONNECT_DELAY_MS = 250;
 const MAX_STREAM_FAILURES = 8;
 
-/** Where a conversation's turns go, as the app's session route answers it. */
-type NativeSession = {
+/** Where a session's turns go, as the app's session route answers it. */
+type SessionGrant = {
 	conversationId: string;
 	eveHost: string;
 	sessionId: string;
@@ -28,7 +28,7 @@ export type SessionRequest =
 /** `null` when the app keeps serving this chat through its chat route. */
 export type OpenSession = (
 	request: SessionRequest,
-) => Promise<NativeSession | null>;
+) => Promise<SessionGrant | null>;
 
 function ownerSecret(): string {
 	const bytes = crypto.getRandomValues(new Uint8Array(32));
@@ -64,8 +64,8 @@ function isTurnBoundary(event: EveEvent): boolean {
  * One eve session held from the browser: a single session stream followed
  * across turns and lease renewals, and one POST per message.
  */
-export class NativeConversation {
-	private session: NativeSession;
+export class EveSession {
+	private grant: SessionGrant;
 	private position = 0;
 	private refreshing: Promise<string> | null = null;
 	private readonly listeners = new Set<(event: EveEvent) => void>();
@@ -75,9 +75,9 @@ export class NativeConversation {
 	private constructor(
 		private readonly open: OpenSession,
 		private readonly secret: string,
-		session: NativeSession,
+		grant: SessionGrant,
 	) {
-		this.session = session;
+		this.grant = grant;
 		void this.follow();
 	}
 
@@ -85,7 +85,7 @@ export class NativeConversation {
 		open: OpenSession;
 		channelId?: string;
 		visitorId?: string;
-	}): Promise<NativeConversation | null> {
+	}): Promise<EveSession | null> {
 		const secret = ownerSecret();
 		const session = await input.open({
 			operation: "create",
@@ -94,31 +94,31 @@ export class NativeConversation {
 			channelId: input.channelId,
 			visitorId: input.visitorId,
 		});
-		return session ? new NativeConversation(input.open, secret, session) : null;
+		return session ? new EveSession(input.open, secret, session) : null;
 	}
 
 	get sessionId(): string {
-		return this.session.sessionId;
+		return this.grant.sessionId;
 	}
 
 	private url(suffix = ""): string {
-		return `${this.session.eveHost}/eve/v1/session/${encodeURIComponent(this.session.sessionId)}${suffix}`;
+		return `${this.grant.eveHost}/eve/v1/session/${encodeURIComponent(this.grant.sessionId)}${suffix}`;
 	}
 
 	private async bearer(): Promise<string> {
-		if (this.session.expiresAt - REFRESH_AHEAD_MS > Date.now()) {
-			return this.session.accessToken;
+		if (this.grant.expiresAt - REFRESH_AHEAD_MS > Date.now()) {
+			return this.grant.accessToken;
 		}
 		this.refreshing ??= this.open({
 			operation: "refresh",
-			conversationId: this.session.conversationId,
+			conversationId: this.grant.conversationId,
 			ownerSecret: this.secret,
 		})
 			.then((next) => {
 				if (!next) {
 					throw new Error("The conversation left the direct runtime");
 				}
-				this.session = next;
+				this.grant = next;
 				return next.accessToken;
 			})
 			.finally(() => {
