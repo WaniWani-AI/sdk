@@ -222,18 +222,29 @@ export class EveTransport
 	}
 
 	async restore(): Promise<UIMessage[]> {
+		const saved = savedConversation(this.channelId);
 		if (
 			this.options.needsFallback() ||
 			!("withResolvers" in Promise) ||
-			!savedConversation(this.channelId)
+			!saved
 		) {
 			return [];
 		}
-		this.prepare();
-		const conversation = await this.session?.catch(() => null);
-		return conversation
-			? await historyMessages(await conversation.history())
-			: [];
+		this.disposed = false;
+		const resuming = EveSession.resume({
+			open: this.options.open,
+			saved,
+		}).catch(() => null);
+		this.session = resuming;
+		const conversation = await resuming;
+		if (!conversation) {
+			saveConversation(this.channelId, null);
+			if (this.session === resuming) {
+				this.session = undefined;
+			}
+			return [];
+		}
+		return await historyMessages(await conversation.history());
 	}
 
 	reset(): void {
@@ -252,20 +263,12 @@ export class EveTransport
 	private async start(): Promise<EveSession | null> {
 		const body = this.options.body();
 		const channelId = stringField(body, "channelId");
-		const saved = savedConversation(channelId);
-		let conversation = saved
-			? await EveSession.resume({ open: this.options.open, saved }).catch(
-					() => null,
-				)
-			: null;
-		if (!conversation) {
-			conversation = await EveSession.create({
-				open: this.options.open,
-				channelId,
-				visitorId: visitorIdOf(body),
-			});
-			saveConversation(channelId, conversation?.saved ?? null);
-		}
+		const conversation = await EveSession.create({
+			open: this.options.open,
+			channelId,
+			visitorId: visitorIdOf(body),
+		});
+		saveConversation(channelId, conversation?.saved ?? null);
 		if (conversation && this.disposed) {
 			conversation.close();
 			return null;

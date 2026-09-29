@@ -193,9 +193,8 @@ export class EveSession {
 		abortSignal?: AbortSignal,
 	): ReadableStream<UIMessageChunk> {
 		this.used = true;
-		abortSignal?.addEventListener("abort", () => void this.store.cancel(), {
-			once: true,
-		});
+		const cancel = () => void this.store.cancel();
+		abortSignal?.addEventListener("abort", cancel, { once: true });
 		const events = new ReadableStream<EveEvent>({
 			start: async (controller) => {
 				let failed = false;
@@ -213,6 +212,7 @@ export class EveSession {
 							reason instanceof Error ? reason : new Error(String(reason)),
 					);
 				this.forward = undefined;
+				abortSignal?.removeEventListener("abort", cancel);
 				if (error && !failed && !abortSignal?.aborted) {
 					controller.enqueue({
 						type: "session.failed",
