@@ -356,6 +356,43 @@ export function useChatEngine(props: ChatBaseProps) {
 		[timingTarget, bodyString],
 	);
 
+	// Auto-inject SDK-managed identifiers into `extra` so they reach MCP
+	// `_meta["waniwani/extra"]`. Caller-supplied `body.extra` keys win on collision.
+	const mcpExtra = useCallback(
+		(callerValue: unknown): Record<string, unknown> | undefined => {
+			const callerExtra =
+				typeof callerValue === "object" &&
+				callerValue !== null &&
+				!Array.isArray(callerValue)
+					? (callerValue as Record<string, unknown>)
+					: undefined;
+			const memoryUserId = visitorContextRef.current?.memoryUserId;
+			const locale = visitorContextRef.current?.language;
+			const autoExtra: Record<string, unknown> = {};
+			if (memoryUserId) {
+				autoExtra.memoryUserId = memoryUserId;
+			}
+			if (locale) {
+				autoExtra.locale = locale;
+			}
+			return Object.keys(autoExtra).length > 0 || callerExtra
+				? { ...autoExtra, ...(callerExtra ?? {}) }
+				: undefined;
+		},
+		[],
+	);
+
+	const ensureThreadId = useCallback((): string => {
+		let tid = activeThreadIdRef.current;
+		if (!tid) {
+			tid = generateThreadId();
+			threadCreatedAtRef.current = nowIso();
+			threadTitleRef.current = undefined;
+			setActiveThreadId(tid);
+		}
+		return tid;
+	}, [setActiveThreadId]);
+
 	const appTransport = useRef(
 		new LenientChatTransport({
 			api,
@@ -429,42 +466,15 @@ export function useChatEngine(props: ChatBaseProps) {
 					},
 				};
 
-				// Auto-inject SDK-managed identifiers into `extra` so the upstream
-				// API forwards them to MCP `_meta["waniwani/extra"]`.
-				// Caller-supplied `body.extra` keys win on collision.
-				const callerExtra =
-					typeof resolvedBody.extra === "object" &&
-					resolvedBody.extra !== null &&
-					!Array.isArray(resolvedBody.extra)
-						? (resolvedBody.extra as Record<string, unknown>)
-						: undefined;
-				const memoryUserId = visitorContextRef.current?.memoryUserId;
-				const locale = visitorContextRef.current?.language;
-				const autoExtra: Record<string, unknown> = {};
-				if (memoryUserId) {
-					autoExtra.memoryUserId = memoryUserId;
-				}
-				if (locale) {
-					autoExtra.locale = locale;
-				}
-				if (Object.keys(autoExtra).length > 0 || callerExtra) {
-					resolvedBody.extra = {
-						...autoExtra,
-						...(callerExtra ?? {}),
-					};
+				const extra = mcpExtra(resolvedBody.extra);
+				if (extra) {
+					resolvedBody.extra = extra;
 				}
 
 				if (enableThreadHistoryRef.current) {
 					const hasExplicitThreadId = Object.hasOwn(resolvedBody, "threadId");
 					if (!hasExplicitThreadId) {
-						let tid = activeThreadIdRef.current;
-						if (!tid) {
-							tid = generateThreadId();
-							threadCreatedAtRef.current = nowIso();
-							threadTitleRef.current = undefined;
-							setActiveThreadId(tid);
-						}
-						resolvedBody.threadId = tid;
+						resolvedBody.threadId = ensureThreadId();
 					} else if (typeof resolvedBody.threadId === "string") {
 						activeThreadIdRef.current = resolvedBody.threadId;
 					}
@@ -495,14 +505,25 @@ export function useChatEngine(props: ChatBaseProps) {
 		props.transport?.({
 			fallback: appTransport.current,
 			headers: () => headersRef.current,
-			body: () => ({
-				channelId: bodyString("channelId"),
-				visitor: { id: getOrCreateVisitorId() },
-			}),
-			needsFallback: () =>
-				enableThreadHistoryRef.current ||
-				Boolean(pendingDocumentsRef.current?.length) ||
-				hasModelContext(pendingModelContextRef.current),
+			body: () => {
+				const extra = mcpExtra(bodyRef.current?.extra);
+				return {
+					channelId: bodyString("channelId"),
+					visitor: { id: getOrCreateVisitorId() },
+					...(extra ? { extra } : {}),
+				};
+			},
+			threadHistory: () => enableThreadHistoryRef.current,
+			threadId: () =>
+				enableThreadHistoryRef.current ? ensureThreadId() : undefined,
+			hasMessages: (): boolean => messagesRef.current.length > 0,
+			// The runtime has nowhere to put model context; the chat route drops it too.
+			takeTurnInput: () => {
+				const documents = pendingDocumentsRef.current;
+				pendingDocumentsRef.current = undefined;
+				pendingModelContextRef.current = undefined;
+				return documents?.length ? { documents } : {};
+			},
 			onSession: setSessionId,
 		}) ?? appTransport.current,
 	);
@@ -1019,7 +1040,8 @@ export function useChatEngine(props: ChatBaseProps) {
 		// before any await, so subsequent ref mutations below don't taint
 		// the outgoing write.
 		void flushPendingPersist();
-		transportRef.current.reset?.();
+		// The outgoing thread keeps its runtime conversation for when it is reopened.
+		transportRef.current.dispose?.();
 		setMessages([]);
 		discardAllQueued();
 		clearSessionId();
@@ -1054,6 +1076,7 @@ export function useChatEngine(props: ChatBaseProps) {
 			if (!stored) {
 				return;
 			}
+			transportRef.current.dispose?.();
 			// Restore the session before announcing the switch, so the
 			// `thread.changed` event carries the target thread's session id.
 			if (stored.sessionId) {
@@ -1096,8 +1119,10 @@ export function useChatEngine(props: ChatBaseProps) {
 				}
 			}
 			await deleteThreadFromStore(threadId);
+			transportRef.current.forget?.(threadId);
 			await refreshThreads();
 			if (activeThreadIdRef.current === threadId) {
+				transportRef.current.dispose?.();
 				setMessages([]);
 				discardAllQueued();
 				clearSessionId();
@@ -1181,6 +1206,6 @@ export function useChatEngine(props: ChatBaseProps) {
 		startNewThread,
 		switchThread,
 		deleteThread,
-		keepsConversation: Boolean(transportRef.current.restore),
+		keepsConversation: transportRef.current.keepsConversation?.() ?? false,
 	};
 }

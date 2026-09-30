@@ -453,10 +453,18 @@ export interface ChatTransportContext {
 	/** The chat's HTTP transport to `api`. */
 	fallback: import("ai").ChatTransport<import("ai").UIMessage>;
 	headers: () => Record<string, string> | undefined;
-	/** The channel and visitor a turn is attributed to. */
+	/** The channel, visitor and MCP `extra` a turn is attributed to. */
 	body: () => Record<string, unknown>;
-	/** True while the thread needs what only `fallback` carries: attachments, model context, saved history. */
-	needsFallback: () => boolean;
+	/** Whether the chat keeps saved threads, whose messages the chat restores itself. */
+	threadHistory: () => boolean;
+	/** The active saved thread, started if there is none. Undefined without saved threads. */
+	threadId: () => string | undefined;
+	/** Whether the chat already shows messages the transport did not restore. */
+	hasMessages: () => boolean;
+	/** The documents attached to the message being sent, handed over once. */
+	takeTurnInput: () => {
+		documents?: import("../../documents/types").AttachedDocument[];
+	};
 	onSession: (sessionId: string) => void;
 }
 
@@ -468,6 +476,10 @@ export interface ChatTransportLifecycle {
 	restore?(): Promise<import("ai").UIMessage[]>;
 	/** The visitor started a new conversation. */
 	reset?(): void;
+	/** A saved thread was deleted. */
+	forget?(threadId: string): void;
+	/** Whether a page load brings the conversation back, which the New chat button needs. */
+	keepsConversation?(): boolean;
 	dispose?(): void;
 }
 

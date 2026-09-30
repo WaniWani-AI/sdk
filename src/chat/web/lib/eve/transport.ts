@@ -6,6 +6,7 @@ import type {
 } from "../../@types";
 import { historyMessages } from "./history";
 import {
+	conversationKey,
 	EveSession,
 	type OpenSession,
 	type SavedConversation,
@@ -189,25 +190,35 @@ export function sessionRoute(input: {
 	};
 }
 
+function extraOf(
+	body: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+	const extra = body.extra;
+	return typeof extra === "object" && extra !== null && !Array.isArray(extra)
+		? Object.fromEntries(Object.entries(extra))
+		: undefined;
+}
+
 /**
  * Sends turns straight to the agent runtime when the app's session route
  * admits the chat, and through `fallback` when it answers that the chat route
- * keeps serving it. The conversation is kept per channel across page loads and
- * resumed from the runtime's own event log. A thread that needs what the
- * runtime path does not carry (attachments, model context, saved thread
- * history) stays on `fallback` for its whole length.
+ * keeps serving it. The conversation is kept per channel, or per saved thread,
+ * across page loads and resumed from the runtime. A thread whose history only
+ * the browser holds, or whose message carries inline files, stays on
+ * `fallback` for its whole length.
  */
 export class EveTransport
 	implements ChatTransport<UIMessage>, ChatTransportLifecycle
 {
 	private session: Promise<EveSession | null> | undefined;
 	private threadOnFallback = false;
-	private disposed = false;
+	/** Bumped by `dispose`, so a session that opens afterwards is closed and never saved. */
+	private generation = 0;
 
 	constructor(
 		private readonly options: ChatTransportContext & {
-			open: OpenSession;
-			suggest: SuggestFollowups;
+			open: OpenSession | undefined;
+			suggest: SuggestFollowups | undefined;
 		},
 	) {}
 
@@ -215,26 +226,47 @@ export class EveTransport
 		return stringField(this.options.body(), "channelId");
 	}
 
+	private key(): string {
+		return conversationKey({
+			channelId: this.channelId,
+			threadId: this.options.threadId(),
+		});
+	}
+
+	keepsConversation(): boolean {
+		return this.options.open !== undefined;
+	}
+
 	/** Opens the runtime session ahead of the first message, so that message pays no bootstrap. */
 	prepare(): void {
-		this.disposed = false;
-		this.session ??= this.start();
+		this.open(this.options.hasMessages());
+	}
+
+	private open(continuing: boolean): void {
+		if (!this.options.open) {
+			return;
+		}
+		this.session ??= this.start(this.options.open, continuing);
 	}
 
 	async restore(): Promise<UIMessage[]> {
-		const saved = savedConversation(this.channelId);
-		if (this.options.needsFallback() || !saved) {
+		const { open } = this.options;
+		if (!open || this.options.threadHistory()) {
 			return [];
 		}
-		this.disposed = false;
-		const resuming = EveSession.resume({
-			open: this.options.open,
-			saved,
-		}).catch(() => null);
+		const key = this.key();
+		const saved = savedConversation(key);
+		if (!saved) {
+			return [];
+		}
+		const generation = this.generation;
+		const resuming = EveSession.resume({ open, saved })
+			.catch(() => null)
+			.then((conversation) => this.kept(conversation, generation));
 		this.session = resuming;
 		const conversation = await resuming;
 		if (!conversation) {
-			saveConversation(this.channelId, null);
+			saveConversation(key, null);
 			if (this.session === resuming) {
 				this.session = undefined;
 			}
@@ -244,28 +276,64 @@ export class EveTransport
 	}
 
 	reset(): void {
-		saveConversation(this.channelId, null);
+		saveConversation(this.key(), null);
 		this.dispose();
 	}
 
+	forget(threadId: string): void {
+		saveConversation(
+			conversationKey({ channelId: this.channelId, threadId }),
+			null,
+		);
+	}
+
 	dispose(): void {
-		this.disposed = true;
+		this.generation += 1;
+		this.threadOnFallback = false;
 		void this.session
 			?.then((conversation) => conversation?.close())
 			.catch(() => {});
 		this.session = undefined;
 	}
 
-	private async start(): Promise<EveSession | null> {
+	/** A thread that already has messages and no saved conversation began on `fallback`, which holds its history. */
+	private async start(
+		open: OpenSession,
+		continuing: boolean,
+	): Promise<EveSession | null> {
+		const generation = this.generation;
+		const key = this.key();
+		const saved = savedConversation(key);
+		if (saved) {
+			const resumed = await EveSession.resume({ open, saved }).catch(
+				() => null,
+			);
+			if (!resumed && generation === this.generation) {
+				saveConversation(key, null);
+			}
+			return this.kept(resumed, generation);
+		}
+		if (continuing) {
+			return null;
+		}
 		const body = this.options.body();
-		const channelId = stringField(body, "channelId");
-		const conversation = await EveSession.create({
-			open: this.options.open,
-			channelId,
+		const created = await EveSession.create({
+			open,
+			channelId: stringField(body, "channelId"),
 			visitorId: visitorIdOf(body),
 		});
-		saveConversation(channelId, conversation?.saved ?? null);
-		if (conversation && this.disposed) {
+		const conversation = this.kept(created, generation);
+		if (generation === this.generation) {
+			saveConversation(key, conversation?.saved ?? null);
+		}
+		return conversation;
+	}
+
+	private kept(
+		conversation: EveSession | null,
+		generation: number,
+	): EveSession | null {
+		if (conversation && generation !== this.generation) {
 			conversation.close();
 			return null;
 		}
@@ -285,15 +353,15 @@ export class EveTransport
 			.find((message) => message.role === "user");
 		const carriesFiles =
 			last?.parts.some((part) => part.type === "file") ?? false;
-		if (this.threadOnFallback || carriesFiles || this.options.needsFallback()) {
+		if (this.threadOnFallback || carriesFiles || !this.options.open) {
 			this.threadOnFallback = true;
 			return await this.options.fallback.sendMessages(options);
 		}
-		this.prepare();
+		this.open(!opensThread);
 		let conversation = await this.session?.catch(() => null);
 		if (conversation?.used && opensThread) {
 			this.reset();
-			this.prepare();
+			this.open(false);
 			conversation = await this.session?.catch(() => null);
 		}
 		if (!conversation) {
@@ -301,21 +369,32 @@ export class EveTransport
 			return await this.options.fallback.sendMessages(options);
 		}
 		this.options.onSession(conversation.sessionId);
+		const { documents } = this.options.takeTurnInput();
 		const texts = userTexts(options.messages);
-		const turn = conversation.turn(texts.at(-1) ?? "", options.abortSignal);
-		if (!conversation.followups) {
+		// eve refuses an empty message, and an attachment-only one has no text.
+		const typed = texts.at(-1) ?? "";
+		const text = typed.trim()
+			? typed
+			: (documents?.map((document) => document.filename).join(", ") ?? typed);
+		const turn = conversation.turn(
+			text,
+			{ documents, extra: extraOf(this.options.body()) },
+			options.abortSignal,
+		);
+		const { suggest } = this.options;
+		if (!conversation.followups || !suggest) {
 			return turn;
 		}
 		const { saved } = conversation;
 		return turn.pipeThrough(
 			withFollowups({
 				suggest: (answerText, toolNames) =>
-					this.options.suggest({
+					suggest({
 						...saved,
 						answerText: answerText.slice(-8_000),
 						recentUserMessages: texts
 							.slice(-3)
-							.map((text) => text.slice(-2_000)),
+							.map((entry) => entry.slice(-2_000)),
 						toolNames: toolNames.slice(0, 20),
 					}),
 				signal: options.abortSignal,
@@ -333,12 +412,33 @@ export class EveTransport
 	}
 }
 
-/** A transport factory for `useChatEngine` that talks to the agent runtime through `sessionApi`. */
-export function eveTransport(sessionApi: string): ChatTransportFactory {
-	return (context) =>
-		new EveTransport({
+/**
+ * A transport factory for `useChatEngine` that talks to the agent runtime
+ * through `sessionApi`. A resolver lets an embed pass the URL its remote config
+ * answers after mount; until it answers, turns go through `fallback`.
+ */
+export function eveTransport(
+	sessionApi: string | (() => string | undefined),
+): ChatTransportFactory {
+	const resolve =
+		typeof sessionApi === "string" ? () => sessionApi : sessionApi;
+	return (context) => {
+		const route = <T>(build: (api: string) => T): T | undefined => {
+			const api = resolve();
+			return api ? build(api) : undefined;
+		};
+		return new EveTransport({
 			...context,
-			open: sessionRoute({ sessionApi, headers: context.headers }),
-			suggest: followupsRoute({ sessionApi, headers: context.headers }),
+			get open() {
+				return route((api) =>
+					sessionRoute({ sessionApi: api, headers: context.headers }),
+				);
+			},
+			get suggest() {
+				return route((api) =>
+					followupsRoute({ sessionApi: api, headers: context.headers }),
+				);
+			},
 		});
+	};
 }

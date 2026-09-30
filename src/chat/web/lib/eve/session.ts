@@ -1,5 +1,6 @@
 import type { UIMessageChunk } from "ai";
 import { EveAgentStore, type MessageStreamEvent } from "eve/client";
+import type { AttachedDocument } from "../../../../documents/types";
 import { installEveShims } from "./shims";
 import { type EveEvent, uiMessageChunks } from "./ui-stream";
 
@@ -45,16 +46,25 @@ function ownerSecret(): string {
 		.replace(/=+$/, "");
 }
 
-function storageKey(channelId: string | undefined): string {
-	return `waniwani:eve-conversation:${channelId ?? ""}`;
+/** One conversation per channel, or per saved thread when the chat keeps threads. */
+export function conversationKey(input: {
+	channelId: string | undefined;
+	threadId: string | undefined;
+}): string {
+	const channel = input.channelId ?? "";
+	return input.threadId === undefined
+		? channel
+		: `${channel}:${input.threadId}`;
 }
 
-export function savedConversation(
-	channelId: string | undefined,
-): SavedConversation | null {
+function storageKey(key: string): string {
+	return `waniwani:eve-conversation:${key}`;
+}
+
+export function savedConversation(key: string): SavedConversation | null {
 	try {
 		const parsed: unknown = JSON.parse(
-			localStorage.getItem(storageKey(channelId)) ?? "null",
+			localStorage.getItem(storageKey(key)) ?? "null",
 		);
 		return typeof parsed === "object" &&
 			parsed !== null &&
@@ -73,16 +83,41 @@ export function savedConversation(
 }
 
 export function saveConversation(
-	channelId: string | undefined,
+	key: string,
 	saved: SavedConversation | null,
 ): void {
 	try {
 		if (saved) {
-			localStorage.setItem(storageKey(channelId), JSON.stringify(saved));
+			localStorage.setItem(storageKey(key), JSON.stringify(saved));
 		} else {
-			localStorage.removeItem(storageKey(channelId));
+			localStorage.removeItem(storageKey(key));
 		}
 	} catch {}
+}
+
+/** What a turn carries besides its text, into the MCP server's `_meta`. */
+export type TurnInput = {
+	documents?: readonly AttachedDocument[];
+	extra?: Record<string, unknown>;
+};
+
+/** Header values must be Latin-1, and a filename or an `extra` value may not be. */
+function asciiJson(value: unknown): string {
+	return JSON.stringify(value).replace(
+		/[\u007f-\uffff]/g,
+		(char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
+	);
+}
+
+function turnHeaders(input: TurnInput): Record<string, string> {
+	return {
+		...(input.documents?.length
+			? { "x-waniwani-documents": asciiJson(input.documents) }
+			: {}),
+		...(input.extra && Object.keys(input.extra).length > 0
+			? { "x-waniwani-extra": asciiJson(input.extra) }
+			: {}),
+	};
 }
 
 const noProjection = { initial: () => undefined, reduce: () => undefined };
@@ -131,7 +166,9 @@ export class EveSession {
 			channelId: input.channelId,
 			visitorId: input.visitorId,
 		});
-		return session ? new EveSession(input.open, secret, session) : null;
+		return session
+			? await new EveSession(input.open, secret, session).reachable()
+			: null;
 	}
 
 	static async resume(input: {
@@ -140,8 +177,25 @@ export class EveSession {
 	}): Promise<EveSession | null> {
 		const session = await input.open({ operation: "resume", ...input.saved });
 		return session
-			? new EveSession(input.open, input.saved.ownerSecret, session)
+			? await new EveSession(
+					input.open,
+					input.saved.ownerSecret,
+					session,
+				).reachable()
 			: null;
+	}
+
+	/**
+	 * A page whose CSP or network blocks the runtime host fails here, on the
+	 * stream the first send waits for anyway, so the chat can fall back first.
+	 */
+	private async reachable(): Promise<EveSession | null> {
+		await this.caughtUp;
+		if (this.store.snapshot.error === undefined) {
+			return this;
+		}
+		this.close();
+		return null;
 	}
 
 	get sessionId(): string {
@@ -192,6 +246,7 @@ export class EveSession {
 	/** The turn this message starts, from its acceptance to its boundary, as UI message chunks. */
 	turn(
 		message: string,
+		input: TurnInput,
 		abortSignal?: AbortSignal,
 	): ReadableStream<UIMessageChunk> {
 		this.used = true;
@@ -207,7 +262,7 @@ export class EveSession {
 				};
 				await this.caughtUp;
 				const error = await this.store
-					.send({ message, signal: abortSignal })
+					.send({ message, signal: abortSignal, headers: turnHeaders(input) })
 					.then(
 						() => this.store.snapshot.error,
 						(reason: unknown) =>

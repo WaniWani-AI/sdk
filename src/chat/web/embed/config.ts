@@ -254,6 +254,8 @@ export interface EmbedConfig {
 	 * paperclip, the drop target and paste only while `enabled` is true.
 	 */
 	documentUpload?: DocumentUploadConfig;
+	/** Where a chat opens a conversation with the agent runtime directly. Set by the platform's remote config only. */
+	sessionApi?: string;
 	/**
 	 * The channel's custom metadata, as `/config` serves it. Timing beacons read
 	 * it from the remote config only; setting it here sends nothing.
