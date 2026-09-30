@@ -120,6 +120,12 @@ export function buildTrackInput(
 		stripLocationFields?: readonly string[];
 		redactInput?: (input: unknown) => unknown;
 		funnelSync?: FunnelSyncPayload | null;
+		/**
+		 * Input keys `withWaniwani` added to this tool's schema (`intent`,
+		 * `context`). Tracked so the platform can tell a field Waniwani asked for
+		 * from a same-named field the tool declared itself.
+		 */
+		injectedInputFields?: readonly string[];
 	},
 	timing?: {
 		durationMs: number;
@@ -195,6 +201,10 @@ export function buildTrackInput(
 			type: toolType,
 			...(timing ?? {}),
 			...(input !== undefined && { input }),
+			...(options.injectedInputFields &&
+				options.injectedInputFields.length > 0 && {
+					injectedInputFields: [...options.injectedInputFields],
+				}),
 			...(output !== undefined && { output }),
 			...(kbSearch && kbSearch.length > 0 && { kbSearch }),
 		},

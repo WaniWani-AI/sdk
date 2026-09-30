@@ -30,6 +30,12 @@ import {
 	safeTrack,
 	type WaniwaniTracker,
 } from "./helpers.js";
+import type {
+	CaptureField,
+	CaptureIntentOptions,
+	IntentCapture,
+} from "./intent-capture.js";
+import { createIntentCapture, stripCapturedFields } from "./intent-capture.js";
 import { extractTransportSessionId } from "./transport-session.js";
 
 type UnknownRecord = Record<string, unknown>;
@@ -111,6 +117,24 @@ export type WithWaniwaniOptions = {
 	 * @default false
 	 */
 	applyFieldRedactions?: boolean;
+	/**
+	 * Capture why the user called each tool.
+	 *
+	 * Adds two optional arguments to every tool's input schema: `intent` (the
+	 * user's goal) and `context` (the situation that led them here). The calling
+	 * model fills them on its first call to the server and again when either
+	 * changes. Both are stripped before the tool's own handler runs and tracked as
+	 * `properties.input.intent` / `properties.input.context` on `tool.called`,
+	 * the same fields flow tools already record.
+	 *
+	 * A tool that already declares a field keeps its own (flow tools declare
+	 * both, so they are unchanged). Pass an object to narrow capture to specific
+	 * tools (`tools`) or ask the model to keep PII out (`omitPII`). Pass `false`
+	 * to leave every tool schema exactly as declared.
+	 *
+	 * @default true
+	 */
+	captureIntent?: boolean | CaptureIntentOptions;
 };
 
 const log = createLogger("mcp");
@@ -166,15 +190,65 @@ type WrapContext = {
 	tokenCache: WidgetTokenCache | null;
 	injectToken: boolean;
 	funnelSync: FunnelSyncPayload | null;
+	/** `null` when `captureIntent: false` turns capture off. */
+	intentCapture: IntentCapture | null;
+};
+
+type InjectedFields = {
+	fields: readonly CaptureField[];
+	/**
+	 * The tool declared no input schema of its own. The MCP SDK calls a schemaless
+	 * tool as `handler(extra)` and a schema-carrying one as `handler(args, extra)`,
+	 * so the injected schema shifts the call shape and the tool's own handler
+	 * still expects the single-argument form.
+	 */
+	schemaWasAbsent: boolean;
 };
 
 type UnknownRecordOrUndefined = UnknownRecord | undefined;
+
+/**
+ * Add the capture fields to one tool's input schema.
+ *
+ * Returns the extended schema together with what the wrapped handler has to
+ * strip again, or `undefined` when the tool is left alone: capture is off, the
+ * tool is outside the allow-list, the tool already declares both fields, or its
+ * schema is not an object we can extend.
+ *
+ * Both registration orders funnel through here: the intercepted `registerTool`
+ * (which puts the schema on the config) and the `_registeredTools` walk (which
+ * assigns `entry.inputSchema`).
+ */
+function captureFieldsFor(
+	toolName: string,
+	inputSchema: unknown,
+	ctx: WrapContext,
+): { schema: unknown; injected: InjectedFields } | undefined {
+	const capture = ctx.intentCapture;
+	if (!capture?.appliesTo(toolName)) {
+		return undefined;
+	}
+
+	const augmented = capture.augment(inputSchema);
+	if (!augmented) {
+		return undefined;
+	}
+
+	return {
+		schema: augmented.schema,
+		injected: {
+			fields: augmented.fields,
+			schemaWasAbsent: inputSchema === undefined || inputSchema === null,
+		},
+	};
+}
 
 function createWrappedHandler(
 	toolName: string,
 	originalHandler: RawHandler,
 	ctx: WrapContext,
 	definitionMeta: UnknownRecordOrUndefined,
+	injected: InjectedFields | undefined,
 ): MaybeWrappedHandler {
 	const { server, tracker, opts, tokenCache, injectToken } = ctx;
 
@@ -182,17 +256,35 @@ function createWrappedHandler(
 		opts.applyFieldRedactions === true
 			? buildStateUpdateRedactor(definitionMeta)
 			: undefined;
+
+	// The capture fields are ours, not the tool's: track them as part of the
+	// input, but hand the handler the parameters it actually declared, in the call
+	// shape it was registered with. Which shape applies is fixed at registration,
+	// so resolve it once here rather than on every call.
+	const invokeOriginal: RawHandler = !injected
+		? originalHandler
+		: injected.schemaWasAbsent
+			? // The tool declared no input schema, so its handler takes `extra`
+				// alone. The injected schema makes the MCP SDK call this wrapper as
+				// `(args, extra)`; a caller that still uses the single-argument shape
+				// passes the extra as `input` and nothing else.
+				(input, extra) =>
+					(originalHandler as unknown as (extra: unknown) => unknown)(
+						extra === undefined ? input : extra,
+					)
+			: (input, extra) =>
+					originalHandler(stripCapturedFields(input, injected.fields), extra);
+
 	const wrappedHandler: MaybeWrappedHandler = async (
 		input: unknown,
 		extra: unknown,
 	) => {
-		const effectiveOpts = stateUpdateRedactor
-			? {
-					...opts,
-					redactInput: stateUpdateRedactor,
-					funnelSync: ctx.funnelSync,
-				}
-			: { ...opts, funnelSync: ctx.funnelSync };
+		const effectiveOpts = {
+			...opts,
+			funnelSync: ctx.funnelSync,
+			...(stateUpdateRedactor && { redactInput: stateUpdateRedactor }),
+			...(injected && { injectedInputFields: injected.fields }),
+		};
 		// Inject scoped client into extra so createTool/flows can surface it
 		const meta = extractMeta(extra) ?? {};
 
@@ -245,7 +337,7 @@ function createWrappedHandler(
 		const startTime = performance.now();
 		try {
 			const result = await retrievalCollectorStore.run(retrievalCollector, () =>
-				originalHandler(input, extra),
+				invokeOriginal(input, extra),
 			);
 			const durationMs = Math.round(performance.now() - startTime);
 
@@ -361,6 +453,11 @@ function createWrappedHandler(
  * OpenAI's `_meta["openai/outputTemplate"]`) is also forwarded into each tool
  * result's `_meta`, so chat UIs that only see tool results (and not
  * `tools/list`) can still render widgets. Handler-set keys take precedence.
+ *
+ * Every tool's input schema also gains optional `intent` and `context`
+ * arguments so the calling model records why the user called it; the values are
+ * stripped before the tool's handler runs and tracked on `tool.called`. Pass
+ * `captureIntent: false` to leave tool schemas exactly as declared.
  */
 export async function withWaniwani(
 	server: McpServer,
@@ -391,6 +488,7 @@ export async function withWaniwani(
 		tokenCache,
 		injectToken,
 		funnelSync: null,
+		intentCapture: createIntentCapture(opts.captureIntent),
 	};
 
 	const originalRegisterTool = server.registerTool.bind(server) as (
@@ -414,13 +512,23 @@ export async function withWaniwani(
 				? ((config as UnknownRecord)._meta as UnknownRecord)
 				: undefined;
 
+		const capture = isRecord(config)
+			? captureFieldsFor(toolName, (config as UnknownRecord).inputSchema, ctx)
+			: undefined;
+
 		const wrapped = createWrappedHandler(
 			toolName,
 			handlerRaw as RawHandler,
 			ctx,
 			definitionMeta,
+			capture?.injected,
 		);
-		return originalRegisterTool(toolNameRaw, config, wrapped);
+
+		const effectiveConfig = capture
+			? { ...(config as UnknownRecord), inputSchema: capture.schema }
+			: config;
+
+		return originalRegisterTool(toolNameRaw, effectiveConfig, wrapped);
 	}) as McpServer["registerTool"];
 
 	// Wrap any tools that were already registered before withWaniwani() ran.
@@ -453,11 +561,31 @@ export async function withWaniwani(
 				? (entry._meta as UnknownRecord)
 				: undefined;
 
+			// Only a tool whose handler we wrap gets the fields: the wrapper is what
+			// strips them again and restores a schemaless tool's call shape. A task
+			// handler (an object, skipped above) keeps its schema as declared.
+			//
+			// The MCP SDK reads `entry.inputSchema` when it serves `tools/list` and
+			// when it validates a call, so reassigning it upgrades the tool in place.
+			// This is the schema half of the SDK's own
+			// `registeredTool.update({ paramsSchema })`; it skips the
+			// `tools/list_changed` notification that method also sends, because
+			// `withWaniwani` runs before `connect()` in every supported call order.
+			const capture = captureFieldsFor(
+				toolName,
+				(entry as UnknownRecord).inputSchema,
+				ctx,
+			);
+			if (capture) {
+				(entry as UnknownRecord).inputSchema = capture.schema;
+			}
+
 			entry.handler = createWrappedHandler(
 				toolName,
 				existing,
 				ctx,
 				definitionMeta,
+				capture?.injected,
 			);
 		}
 	}

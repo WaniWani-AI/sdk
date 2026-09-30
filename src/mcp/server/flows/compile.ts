@@ -12,6 +12,7 @@ import { reportSessionError } from "../session-errors/report";
 import {
 	extractSessionId,
 	FLOW_META_KEY,
+	OMIT_PII_NOTE,
 	SUGGESTIONS_META_KEY,
 	type SuggestionsMeta,
 } from "../utils";
@@ -50,9 +51,7 @@ function buildInputSchema(config: {
 	omitIntentPII?: boolean;
 	state?: Record<string, z.ZodType>;
 }) {
-	const piiNote = config.omitIntentPII
-		? " Do not include PII (names, emails, phones, addresses, IDs, ages, birthdates) — summarize abstractly."
-		: "";
+	const piiNote = config.omitIntentPII ? OMIT_PII_NOTE : "";
 
 	// When the flow declares state fields, expose them as typed (optional) keys
 	// on `stateUpdates` so the LLM sees field names, types, and descriptions in
@@ -181,9 +180,11 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 		if (args.action === "start") {
 			// `intent` is observational: the schema asks for it on start, but nothing
-			// in the engine reads it (it never reaches a node, the store, or an
-			// event). A missing value therefore costs a conversation turn and buys
-			// nothing, so trim it and carry on instead of failing the call.
+			// in the engine reads it (it never reaches a node or the store). It is
+			// tracked only because `withWaniwani` records the raw tool input on
+			// `tool.called`, which is also where plain tools' captured intent lands.
+			// A missing value therefore costs a conversation turn and buys nothing,
+			// so trim it and carry on instead of failing the call.
 			const intent =
 				typeof args.intent === "string" ? args.intent.trim() : undefined;
 			args.intent = intent || undefined;
