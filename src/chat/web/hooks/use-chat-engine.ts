@@ -506,15 +506,6 @@ export function useChatEngine(props: ChatBaseProps) {
 			onSession: setSessionId,
 		}) ?? appTransport.current,
 	);
-	// A host resolving its own visitor id asynchronously gets its session on the first send instead.
-	const prewarm = typeof propVisitorId !== "function";
-	useEffect(() => {
-		const transport = transportRef.current;
-		if (prewarm) {
-			transport.prepare?.();
-		}
-		return () => transport.dispose?.();
-	}, [prewarm]);
 
 	const pendingWaitRef = useRef<{
 		resolve: (msg: unknown) => void;
@@ -597,6 +588,20 @@ export function useChatEngine(props: ChatBaseProps) {
 	useEffect(() => {
 		messagesRef.current = messages;
 	}, [messages]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: restore once on mount
+	useEffect(() => {
+		const transport = transportRef.current;
+		void transport
+			.restore?.()
+			.then((restored) => {
+				if (restored.length > 0 && messagesRef.current.length === 0) {
+					setMessages(restored);
+				}
+			})
+			.catch(() => {});
+		return () => transport.dispose?.();
+	}, []);
 
 	const beginTurn = useCallback(() => {
 		turnRef.current = startTurn(
@@ -731,6 +736,14 @@ export function useChatEngine(props: ChatBaseProps) {
 	}, [status]);
 
 	const [text, setText] = useState("");
+	// A host resolving its own visitor id asynchronously gets its session on the first send instead.
+	const prewarm = typeof propVisitorId !== "function";
+	const typing = text.length > 0;
+	useEffect(() => {
+		if (prewarm && typing) {
+			transportRef.current.prepare?.();
+		}
+	}, [prewarm, typing]);
 	const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
 	const queuedMessagesRef = useRef<QueuedMessage[]>([]);
 	queuedMessagesRef.current = queuedMessages;
@@ -878,6 +891,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	]);
 
 	const reset = useCallback(() => {
+		transportRef.current.reset?.();
 		setMessages([]);
 		discardAllQueued();
 		clearSessionId();
@@ -1005,6 +1019,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		// before any await, so subsequent ref mutations below don't taint
 		// the outgoing write.
 		void flushPendingPersist();
+		transportRef.current.reset?.();
 		setMessages([]);
 		discardAllQueued();
 		clearSessionId();
@@ -1166,5 +1181,6 @@ export function useChatEngine(props: ChatBaseProps) {
 		startNewThread,
 		switchThread,
 		deleteThread,
+		keepsConversation: Boolean(transportRef.current.restore),
 	};
 }

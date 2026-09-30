@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { defineConfig } from "tsup";
+import type { Plugin } from "esbuild";
 
 // `decode-named-character-reference` picks `index.dom.js` under the browser
 // condition, and that file runs `document.createElement` at module load, so any
@@ -17,6 +18,17 @@ const sdkVersion: Record<string, string> = {
 	__WANIWANI_SDK_VERSION__: JSON.stringify(
 		(nodeRequire("./package.json") as { version: string }).version,
 	),
+};
+
+// eve's client pre-bundles its own copy of zod, which no bundler can tree-shake
+// or share, so it resolves to the zod this build already carries.
+const eveSharesZod: Plugin = {
+	name: "eve-shares-zod",
+	setup(build) {
+		build.onResolve({ filter: /^#compiled\/zod\/index\.js$/ }, (args) =>
+			build.resolve("zod", { kind: args.kind, resolveDir: args.resolveDir }),
+		);
+	},
 };
 
 export default defineConfig([
@@ -126,6 +138,7 @@ export default defineConfig([
 				"decode-named-character-reference": isomorphicEntityDecoder,
 			};
 		},
+		esbuildPlugins: [eveSharesZod],
 	},
 	// Internal SDK surface (mounted at @waniwani/sdk/internal — not public).
 	// Used by the Waniwani platform (app.waniwani.ai). Not for third parties.
@@ -188,6 +201,7 @@ export default defineConfig([
 			return { js: ".js" };
 		},
 		platform: "browser",
+		esbuildPlugins: [eveSharesZod],
 		define: {
 			"process.env.NODE_ENV": '"production"',
 			...sdkVersion,

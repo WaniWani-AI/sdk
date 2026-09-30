@@ -5,7 +5,7 @@
  * app.waniwani.ai, which prerenders `chat` on the server.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { dirname, resolve } from "node:path";
 
@@ -83,6 +83,16 @@ if (failures.length > 0) {
 			"entry in tsup.config.ts, the way decode-named-character-reference is, or drop the\n" +
 			"dependency. Reverting `platform: \"browser\"` is not the fix: that is what keeps the\n" +
 			"bare crypto/url/process imports out in the first place.",
+	);
+	process.exit(1);
+}
+
+const CHAT_MAX_BYTES = 450_000;
+const chatBytes = statSync(resolve(dist, "chat/index.js")).size;
+if (chatBytes > CHAT_MAX_BYTES) {
+	console.error(
+		`chat/index.js is ${chatBytes} bytes, over its ${CHAT_MAX_BYTES} cap. If eve's client grew it, check that\n` +
+			"`eveSharesZod` in tsup.config.ts still resolves eve's vendored zod to the shared one.",
 	);
 	process.exit(1);
 }

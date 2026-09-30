@@ -460,9 +460,14 @@ export interface ChatTransportContext {
 	onSession: (sessionId: string) => void;
 }
 
-/** Optional hooks the chat calls on a transport: ahead of the first message, and on unmount. */
+/** Optional hooks the chat calls on a transport. */
 export interface ChatTransportLifecycle {
+	/** The visitor started typing their first message. */
 	prepare?(): void;
+	/** On mount: the conversation this browser already holds, as messages to show. */
+	restore?(): Promise<import("ai").UIMessage[]>;
+	/** The visitor started a new conversation. */
+	reset?(): void;
 	dispose?(): void;
 }
 

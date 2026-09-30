@@ -4,26 +4,17 @@
  * path runs server-side.
  */
 import type { UIMessageChunk } from "ai";
+import type { MessageStreamEvent, SessionFailedStreamEvent } from "eve/client";
 
-/** One NDJSON line off an eve session stream. */
-export type EveEvent = {
-	readonly type: string;
-	readonly data?: unknown;
-	readonly meta?: {
-		readonly deliveryIds?: readonly string[];
-		readonly id?: string;
-	};
-};
+/** One event off an eve session stream, or a failure the transport raises itself. */
+export type EveEvent = MessageStreamEvent | SessionFailedStreamEvent;
 
 type Controller = TransformStreamDefaultController<UIMessageChunk>;
 
-type ToolAction = {
-	kind?: string;
-	callId?: string;
+type ToolCall = {
+	kind: string;
+	callId: string;
 	toolName?: string;
-	input?: unknown;
-	output?: unknown;
-	isError?: boolean;
 };
 
 export function uiMessageChunks(): TransformStream<EveEvent, UIMessageChunk> {
@@ -56,17 +47,17 @@ export function uiMessageChunks(): TransformStream<EveEvent, UIMessageChunk> {
 	};
 	const announce = (
 		controller: Controller,
-		call: ToolAction,
+		call: ToolCall,
 		input: unknown,
 	): void => {
-		if (!call.callId || announced.has(call.callId)) {
+		if (announced.has(call.callId)) {
 			return;
 		}
 		announced.add(call.callId);
 		controller.enqueue({
 			type: "tool-input-available",
 			toolCallId: call.callId,
-			toolName: call.toolName ?? call.kind ?? "tool",
+			toolName: call.toolName ?? call.kind,
 			input,
 			dynamic: true,
 		});
@@ -80,30 +71,22 @@ export function uiMessageChunks(): TransformStream<EveEvent, UIMessageChunk> {
 		transform(event, controller) {
 			switch (event.type) {
 				case "step.started": {
-					const { modelId, stepIndex } = event.data as {
-						modelId?: string;
-						stepIndex?: number;
-					};
-					if (typeof stepIndex === "number" && modelId) {
-						models.set(stepIndex, modelId);
-					}
+					models.set(event.data.stepIndex, event.data.modelId);
 					controller.enqueue({ type: "start-step" });
 					stepOpen = true;
 					break;
 				}
 
 				case "message.appended": {
-					const { messageDelta } = event.data as { messageDelta?: string };
-					if (messageDelta) {
-						write(controller, messageDelta);
+					if (event.data.messageDelta) {
+						write(controller, event.data.messageDelta);
 					}
 					break;
 				}
 
 				case "message.completed": {
-					const { message } = event.data as { message?: string };
-					if (!textId && message) {
-						write(controller, message);
+					if (!textId && event.data.message) {
+						write(controller, event.data.message);
 					}
 					endText(controller);
 					break;
@@ -111,27 +94,22 @@ export function uiMessageChunks(): TransformStream<EveEvent, UIMessageChunk> {
 
 				case "actions.requested": {
 					endText(controller);
-					const { actions } = event.data as { actions?: ToolAction[] };
-					for (const action of actions ?? []) {
+					for (const action of event.data.actions) {
 						announce(controller, action, action.input);
 					}
 					break;
 				}
 
 				case "action.result": {
-					const { result, status, error } = event.data as {
-						result?: ToolAction;
-						status?: string;
-						error?: { message?: string };
-					};
-					if (result?.kind !== "tool-result" || !result.callId) {
+					const { result, status, error } = event.data;
+					if (result.kind !== "tool-result") {
 						break;
 					}
 					announce(controller, result, {});
 
 					// A rejected or erroring call must never reach the embed as a success
 					// chunk: the widget would render an error body as its output.
-					if (result.isError === true || (status && status !== "completed")) {
+					if (result.isError === true || status !== "completed") {
 						controller.enqueue({
 							type: "tool-output-error",
 							toolCallId: result.callId,
@@ -150,31 +128,31 @@ export function uiMessageChunks(): TransformStream<EveEvent, UIMessageChunk> {
 				}
 
 				case "step.completed": {
-					const { stepIndex, usage } = event.data as {
-						stepIndex?: number;
-						usage?: unknown;
-					};
+					const { stepIndex, usage } = event.data;
 					endText(controller);
 					if (stepOpen) {
 						controller.enqueue({ type: "finish-step" });
 						stepOpen = false;
 					}
-					const modelId =
-						typeof stepIndex === "number" ? models.get(stepIndex) : undefined;
 					controller.enqueue({
 						type: "message-metadata",
-						messageMetadata: { "waniwani/step": { stepIndex, modelId, usage } },
+						messageMetadata: {
+							"waniwani/step": {
+								stepIndex,
+								modelId: models.get(stepIndex),
+								usage,
+							},
+						},
 					});
 					break;
 				}
 
 				case "turn.failed":
 				case "session.failed": {
-					const { message } = event.data as { message?: string };
 					failed = true;
 					controller.enqueue({
 						type: "error",
-						errorText: message ?? "The agent could not answer.",
+						errorText: event.data.message || "The agent could not answer.",
 					});
 					break;
 				}
