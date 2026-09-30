@@ -1,5 +1,5 @@
 import type { UIMessageChunk } from "ai";
-import { EveAgentStore } from "eve/client";
+import { EveAgentStore, type MessageStreamEvent } from "eve/client";
 import { type EveEvent, uiMessageChunks } from "./ui-stream";
 
 const REFRESH_AHEAD_MS = 30_000;
@@ -158,7 +158,7 @@ export class EveSession {
 	}
 
 	/** Every event the session held when it was opened. */
-	async history(): Promise<readonly EveEvent[]> {
+	async history(): Promise<readonly MessageStreamEvent[]> {
 		await this.caughtUp;
 		const { events } = this.store.snapshot;
 		this.used ||= events.some((event) => event.type === "message.received");
@@ -216,7 +216,11 @@ export class EveSession {
 				if (error && !failed && !abortSignal?.aborted) {
 					controller.enqueue({
 						type: "session.failed",
-						data: { message: error.message },
+						data: {
+							code: "transport_failed",
+							message: error.message,
+							sessionId: this.sessionId,
+						},
 					});
 				}
 				controller.close();

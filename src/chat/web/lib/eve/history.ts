@@ -1,14 +1,6 @@
 import { readUIMessageStream, type UIMessage } from "ai";
+import type { MessageStreamEvent } from "eve/client";
 import { type EveEvent, uiMessageChunks } from "./ui-stream";
-
-function visitorText(data: unknown): string | undefined {
-	if (typeof data !== "object" || data === null || "kind" in data) {
-		return undefined;
-	}
-	return "message" in data && typeof data.message === "string"
-		? data.message
-		: undefined;
-}
 
 async function reply(
 	events: readonly EveEvent[],
@@ -30,12 +22,14 @@ async function reply(
 
 /** A resumed session's events as the messages the chat shows. */
 export async function historyMessages(
-	events: readonly EveEvent[],
+	events: readonly MessageStreamEvent[],
 ): Promise<UIMessage[]> {
 	const turns: { visitor: UIMessage; events: EveEvent[] }[] = [];
 	for (const event of events) {
 		const text =
-			event.type === "message.received" ? visitorText(event.data) : undefined;
+			event.type === "message.received" && !event.data.kind
+				? event.data.message
+				: undefined;
 		if (text !== undefined) {
 			turns.push({
 				visitor: {
