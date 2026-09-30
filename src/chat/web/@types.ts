@@ -478,8 +478,8 @@ export interface ChatTransportLifecycle {
 	reset?(): void;
 	/** A saved thread was deleted. */
 	forget?(threadId: string): void;
-	/** Whether a page load brings the conversation back, which the New chat button needs. */
-	keepsConversation?(): boolean;
+	/** Whether a page load brings the session back, which the New chat button needs. */
+	keepsSession?(): boolean;
 	dispose?(): void;
 }
 

@@ -6,13 +6,13 @@ import type {
 } from "../../@types";
 import { historyMessages } from "./history";
 import {
-	conversationKey,
 	EveSession,
 	type OpenSession,
-	type SavedConversation,
+	type SavedSession,
 	type SessionRequest,
-	saveConversation,
-	savedConversation,
+	savedSession,
+	saveSession,
+	sessionKey,
 } from "./session";
 
 type Resolve<T> = () => T;
@@ -46,7 +46,7 @@ function userTexts(messages: UIMessage[]): string[] {
 }
 
 type SuggestFollowups = (
-	input: SavedConversation & {
+	input: SavedSession & {
 		answerText: string;
 		recentUserMessages: string[];
 		toolNames: string[];
@@ -202,7 +202,7 @@ function extraOf(
 /**
  * Sends turns straight to the agent runtime when the app's session route
  * admits the chat, and through `fallback` when it answers that the chat route
- * keeps serving it. The conversation is kept per channel, or per saved thread,
+ * keeps serving it. The session is kept per channel, or per saved thread,
  * across page loads and resumed from the runtime. A thread whose history only
  * the browser holds, or whose message carries inline files, stays on
  * `fallback` for its whole length.
@@ -210,7 +210,7 @@ function extraOf(
 export class EveTransport
 	implements ChatTransport<UIMessage>, ChatTransportLifecycle
 {
-	private session: Promise<EveSession | null> | undefined;
+	private pending: Promise<EveSession | null> | undefined;
 	private threadOnFallback = false;
 	/** Bumped by `dispose`, so a session that opens afterwards is closed and never saved. */
 	private generation = 0;
@@ -227,13 +227,13 @@ export class EveTransport
 	}
 
 	private key(): string {
-		return conversationKey({
+		return sessionKey({
 			channelId: this.channelId,
 			threadId: this.options.threadId(),
 		});
 	}
 
-	keepsConversation(): boolean {
+	keepsSession(): boolean {
 		return this.options.open !== undefined;
 	}
 
@@ -246,7 +246,7 @@ export class EveTransport
 		if (!this.options.open) {
 			return;
 		}
-		this.session ??= this.start(this.options.open, continuing);
+		this.pending ??= this.start(this.options.open, continuing);
 	}
 
 	async restore(): Promise<UIMessage[]> {
@@ -255,61 +255,56 @@ export class EveTransport
 			return [];
 		}
 		const key = this.key();
-		const saved = savedConversation(key);
+		const saved = savedSession(key);
 		if (!saved) {
 			return [];
 		}
 		const generation = this.generation;
 		const resuming = EveSession.resume({ open, saved })
 			.catch(() => null)
-			.then((conversation) => this.kept(conversation, generation));
-		this.session = resuming;
-		const conversation = await resuming;
-		if (!conversation) {
-			saveConversation(key, null);
-			if (this.session === resuming) {
-				this.session = undefined;
+			.then((session) => this.kept(session, generation));
+		this.pending = resuming;
+		const session = await resuming;
+		if (!session) {
+			saveSession(key, null);
+			if (this.pending === resuming) {
+				this.pending = undefined;
 			}
 			return [];
 		}
-		return await historyMessages(await conversation.history());
+		return await historyMessages(await session.history());
 	}
 
 	reset(): void {
-		saveConversation(this.key(), null);
+		saveSession(this.key(), null);
 		this.dispose();
 	}
 
 	forget(threadId: string): void {
-		saveConversation(
-			conversationKey({ channelId: this.channelId, threadId }),
-			null,
-		);
+		saveSession(sessionKey({ channelId: this.channelId, threadId }), null);
 	}
 
 	dispose(): void {
 		this.generation += 1;
 		this.threadOnFallback = false;
-		void this.session
-			?.then((conversation) => conversation?.close())
-			.catch(() => {});
-		this.session = undefined;
+		void this.pending?.then((session) => session?.close()).catch(() => {});
+		this.pending = undefined;
 	}
 
-	/** A thread that already has messages and no saved conversation began on `fallback`, which holds its history. */
+	/** A thread that already has messages and no saved session began on `fallback`, which holds its history. */
 	private async start(
 		open: OpenSession,
 		continuing: boolean,
 	): Promise<EveSession | null> {
 		const generation = this.generation;
 		const key = this.key();
-		const saved = savedConversation(key);
+		const saved = savedSession(key);
 		if (saved) {
 			const resumed = await EveSession.resume({ open, saved }).catch(
 				() => null,
 			);
 			if (!resumed && generation === this.generation) {
-				saveConversation(key, null);
+				saveSession(key, null);
 			}
 			return this.kept(resumed, generation);
 		}
@@ -322,22 +317,22 @@ export class EveTransport
 			channelId: stringField(body, "channelId"),
 			visitorId: visitorIdOf(body),
 		});
-		const conversation = this.kept(created, generation);
+		const session = this.kept(created, generation);
 		if (generation === this.generation) {
-			saveConversation(key, conversation?.saved ?? null);
+			saveSession(key, session?.saved ?? null);
 		}
-		return conversation;
+		return session;
 	}
 
 	private kept(
-		conversation: EveSession | null,
+		session: EveSession | null,
 		generation: number,
 	): EveSession | null {
-		if (conversation && generation !== this.generation) {
-			conversation.close();
+		if (session && generation !== this.generation) {
+			session.close();
 			return null;
 		}
-		return conversation;
+		return session;
 	}
 
 	async sendMessages(
@@ -358,17 +353,17 @@ export class EveTransport
 			return await this.options.fallback.sendMessages(options);
 		}
 		this.open(!opensThread);
-		let conversation = await this.session?.catch(() => null);
-		if (conversation?.used && opensThread) {
+		let session = await this.pending?.catch(() => null);
+		if (session?.used && opensThread) {
 			this.reset();
 			this.open(false);
-			conversation = await this.session?.catch(() => null);
+			session = await this.pending?.catch(() => null);
 		}
-		if (!conversation) {
+		if (!session) {
 			this.threadOnFallback = true;
 			return await this.options.fallback.sendMessages(options);
 		}
-		this.options.onSession(conversation.sessionId);
+		this.options.onSession(session.sessionId);
 		const { documents } = this.options.takeTurnInput();
 		const texts = userTexts(options.messages);
 		// eve refuses an empty message, and an attachment-only one has no text.
@@ -376,16 +371,16 @@ export class EveTransport
 		const text = typed.trim()
 			? typed
 			: (documents?.map((document) => document.filename).join(", ") ?? typed);
-		const turn = conversation.turn(
+		const turn = session.turn(
 			text,
 			{ documents, extra: extraOf(this.options.body()) },
 			options.abortSignal,
 		);
 		const { suggest } = this.options;
-		if (!conversation.followups || !suggest) {
+		if (!session.followups || !suggest) {
 			return turn;
 		}
-		const { saved } = conversation;
+		const { saved } = session;
 		return turn.pipeThrough(
 			withFollowups({
 				suggest: (answerText, toolNames) =>
@@ -405,8 +400,8 @@ export class EveTransport
 	async reconnectToStream(
 		options: Parameters<ChatTransport<UIMessage>["reconnectToStream"]>[0],
 	): Promise<ReadableStream<UIMessageChunk> | null> {
-		const conversation = await this.session?.catch(() => null);
-		return conversation
+		const session = await this.pending?.catch(() => null);
+		return session
 			? null
 			: await this.options.fallback.reconnectToStream(options);
 	}

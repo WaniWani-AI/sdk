@@ -982,7 +982,7 @@ function probeTransport(
 				probe.calls.push(`forget:${threadId}`);
 			},
 			...(options.restore ? { restore: async () => [] } : {}),
-			...(options.keeps ? { keepsConversation: options.keeps } : {}),
+			...(options.keeps ? { keepsSession: options.keeps } : {}),
 		};
 	};
 }
@@ -1040,11 +1040,11 @@ function contextOf(probe: TransportProbe): TransportContext {
 	return probe.context;
 }
 
-describe("useChatEngine – keepsConversation follows the transport", () => {
+describe("useChatEngine – keepsSession follows the transport", () => {
 	test("true when the transport keeps one", async () => {
 		const { engine } = await mountWithTransport({ keeps: () => true });
 
-		expect(engine.keepsConversation).toBe(true);
+		expect(engine.keepsSession).toBe(true);
 	});
 
 	test("false when the transport says it keeps none, even though it can restore", async () => {
@@ -1053,13 +1053,13 @@ describe("useChatEngine – keepsConversation follows the transport", () => {
 			restore: true,
 		});
 
-		expect(engine.keepsConversation).toBe(false);
+		expect(engine.keepsSession).toBe(false);
 	});
 
 	test("false for a transport that can restore but does not answer the question", async () => {
 		const { engine } = await mountWithTransport({ restore: true });
 
-		expect(engine.keepsConversation).toBe(false);
+		expect(engine.keepsSession).toBe(false);
 	});
 });
 
@@ -1259,7 +1259,7 @@ describe("useDirectTransport – a sessionApi the remote config answers after mo
 		render(undefined, []);
 		await flushAsync();
 
-		expect(hookRef.current?.keepsConversation).toBe(false);
+		expect(hookRef.current?.keepsSession).toBe(false);
 	});
 
 	test("hands the engine one transport factory for the chat's whole life", async () => {
@@ -1280,13 +1280,13 @@ describe("useDirectTransport – a sessionApi the remote config answers after mo
 		render("https://app.test/api/mcp/agent/session", []);
 		await flushAsync();
 
-		expect(hookRef.current?.keepsConversation).toBe(true);
+		expect(hookRef.current?.keepsSession).toBe(true);
 	});
 
 	test("a sessionApi known at mount keeps the conversation from the first render", async () => {
 		render("https://app.test/api/mcp/agent/session", []);
 		await flushAsync();
 
-		expect(hookRef.current?.keepsConversation).toBe(true);
+		expect(hookRef.current?.keepsSession).toBe(true);
 	});
 });

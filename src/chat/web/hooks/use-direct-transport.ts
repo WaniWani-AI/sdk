@@ -12,7 +12,7 @@ export function useDirectTransport(
 	sessionApi: string | undefined,
 ): ChatTransportFactory {
 	const latest = useRef(sessionApi);
-	// Written during render: the engine asks whether a conversation is kept in the same pass.
+	// Written during render: the engine asks whether a session is kept in the same pass.
 	latest.current = sessionApi;
 	const [factory] = useState(() => eveTransport(() => latest.current));
 	return factory;

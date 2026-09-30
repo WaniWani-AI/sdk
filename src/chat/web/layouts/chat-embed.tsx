@@ -499,10 +499,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		const showHeader =
 			!hideHeader &&
 			Boolean(
-				title ||
-					enableThreadHistory ||
-					engine.keepsConversation ||
-					headerActions,
+				title || enableThreadHistory || engine.keepsSession || headerActions,
 			);
 
 		// Hold opacity 0 until both the remote-config (caller-driven
@@ -556,7 +553,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							</div>
 						)}
 						{!title && <div className="ww:flex-1" />}
-						{!enableThreadHistory && engine.keepsConversation && (
+						{!enableThreadHistory && engine.keepsSession && (
 							<NewThreadButton onClick={engine.reset} />
 						)}
 						{enableThreadHistory && (

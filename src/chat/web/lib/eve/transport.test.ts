@@ -777,7 +777,7 @@ describe("eveTransport – a sessionApi resolved after mount", () => {
 		expect(runtime.sends).toHaveLength(0);
 	});
 
-	test("while the resolver answers undefined, restore() shows nothing and keepsConversation() is false", async () => {
+	test("while the resolver answers undefined, restore() shows nothing and keepsSession() is false", async () => {
 		win.localStorage.setItem(
 			keyFor(),
 			JSON.stringify({ conversationId: "conv_old", ownerSecret: "secret" }),
@@ -786,7 +786,7 @@ describe("eveTransport – a sessionApi resolved after mount", () => {
 		const transport = eveTransport(() => undefined)(context);
 
 		expect(await transport.restore?.()).toEqual([]);
-		expect(transport.keepsConversation?.()).toBe(false);
+		expect(transport.keepsSession?.()).toBe(false);
 		expect(fetchCalls).toHaveLength(0);
 	});
 
@@ -794,10 +794,10 @@ describe("eveTransport – a sessionApi resolved after mount", () => {
 		let sessionApi: string | undefined;
 		const { chat, context } = chatStub();
 		const transport = eveTransport(() => sessionApi)(context);
-		expect(transport.keepsConversation?.()).toBe(false);
+		expect(transport.keepsSession?.()).toBe(false);
 
 		sessionApi = "https://app.test/api/mcp/agent/session";
-		expect(transport.keepsConversation?.()).toBe(true);
+		expect(transport.keepsSession?.()).toBe(true);
 		await send(transport, conversationOf(1, "hi"));
 
 		expect(fetchCalls[0]?.url).toBe(sessionApi);
@@ -809,6 +809,6 @@ describe("eveTransport – a sessionApi resolved after mount", () => {
 		const { context } = chatStub();
 		const transport = eveTransport("https://app.test/api/session")(context);
 
-		expect(transport.keepsConversation?.()).toBe(true);
+		expect(transport.keepsSession?.()).toBe(true);
 	});
 });

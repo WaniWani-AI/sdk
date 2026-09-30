@@ -1040,7 +1040,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		// before any await, so subsequent ref mutations below don't taint
 		// the outgoing write.
 		void flushPendingPersist();
-		// The outgoing thread keeps its runtime conversation for when it is reopened.
+		// The outgoing thread keeps its runtime session for when it is reopened.
 		transportRef.current.dispose?.();
 		setMessages([]);
 		discardAllQueued();
@@ -1206,6 +1206,6 @@ export function useChatEngine(props: ChatBaseProps) {
 		startNewThread,
 		switchThread,
 		deleteThread,
-		keepsConversation: transportRef.current.keepsConversation?.() ?? false,
+		keepsSession: transportRef.current.keepsSession?.() ?? false,
 	};
 }

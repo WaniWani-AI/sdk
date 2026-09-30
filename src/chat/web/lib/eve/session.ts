@@ -17,7 +17,7 @@ type SessionGrant = {
 };
 
 /** What reopens a conversation after a page load. */
-export type SavedConversation = { conversationId: string; ownerSecret: string };
+export type SavedSession = { conversationId: string; ownerSecret: string };
 
 export type SessionRequest =
 	| {
@@ -46,8 +46,8 @@ function ownerSecret(): string {
 		.replace(/=+$/, "");
 }
 
-/** One conversation per channel, or per saved thread when the chat keeps threads. */
-export function conversationKey(input: {
+/** One session per channel, or per saved thread when the chat keeps threads. */
+export function sessionKey(input: {
 	channelId: string | undefined;
 	threadId: string | undefined;
 }): string {
@@ -61,7 +61,7 @@ function storageKey(key: string): string {
 	return `waniwani:eve-conversation:${key}`;
 }
 
-export function savedConversation(key: string): SavedConversation | null {
+export function savedSession(key: string): SavedSession | null {
 	try {
 		const parsed: unknown = JSON.parse(
 			localStorage.getItem(storageKey(key)) ?? "null",
@@ -82,10 +82,7 @@ export function savedConversation(key: string): SavedConversation | null {
 	}
 }
 
-export function saveConversation(
-	key: string,
-	saved: SavedConversation | null,
-): void {
+export function saveSession(key: string, saved: SavedSession | null): void {
 	try {
 		if (saved) {
 			localStorage.setItem(storageKey(key), JSON.stringify(saved));
@@ -173,7 +170,7 @@ export class EveSession {
 
 	static async resume(input: {
 		open: OpenSession;
-		saved: SavedConversation;
+		saved: SavedSession;
 	}): Promise<EveSession | null> {
 		const session = await input.open({ operation: "resume", ...input.saved });
 		return session
@@ -202,7 +199,7 @@ export class EveSession {
 		return this.grant.sessionId;
 	}
 
-	get saved(): SavedConversation {
+	get saved(): SavedSession {
 		return {
 			conversationId: this.grant.conversationId,
 			ownerSecret: this.secret,
