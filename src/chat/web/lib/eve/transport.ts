@@ -223,11 +223,7 @@ export class EveTransport
 
 	async restore(): Promise<UIMessage[]> {
 		const saved = savedConversation(this.channelId);
-		if (
-			this.options.needsFallback() ||
-			!("withResolvers" in Promise) ||
-			!saved
-		) {
+		if (this.options.needsFallback() || !saved) {
 			return [];
 		}
 		this.disposed = false;
@@ -289,12 +285,7 @@ export class EveTransport
 			.find((message) => message.role === "user");
 		const carriesFiles =
 			last?.parts.some((part) => part.type === "file") ?? false;
-		if (
-			this.threadOnFallback ||
-			carriesFiles ||
-			this.options.needsFallback() ||
-			!("withResolvers" in Promise)
-		) {
+		if (this.threadOnFallback || carriesFiles || this.options.needsFallback()) {
 			this.threadOnFallback = true;
 			return await this.options.fallback.sendMessages(options);
 		}

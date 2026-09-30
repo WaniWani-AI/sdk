@@ -1,5 +1,6 @@
 import type { UIMessageChunk } from "ai";
 import { EveAgentStore, type MessageStreamEvent } from "eve/client";
+import { installEveShims } from "./shims";
 import { type EveEvent, uiMessageChunks } from "./ui-stream";
 
 const REFRESH_AHEAD_MS = 30_000;
@@ -105,6 +106,7 @@ export class EveSession {
 		grant: SessionGrant,
 	) {
 		this.grant = grant;
+		installEveShims();
 		this.store = new EveAgentStore({
 			host: grant.eveHost,
 			auth: { bearer: () => this.bearer() },
