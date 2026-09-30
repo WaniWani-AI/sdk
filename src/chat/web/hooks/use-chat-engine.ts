@@ -1181,5 +1181,6 @@ export function useChatEngine(props: ChatBaseProps) {
 		startNewThread,
 		switchThread,
 		deleteThread,
+		keepsConversation: Boolean(transportRef.current.restore),
 	};
 }

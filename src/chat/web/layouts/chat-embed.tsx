@@ -22,6 +22,7 @@ import {
 import { AiDisclaimer } from "../components/ai-disclaimer";
 import { ChatQueue } from "../components/chat-queue";
 import { MessageList } from "../components/message-list";
+import { NewThreadButton } from "../components/new-thread-button";
 import { PoweredBy } from "../components/powered-by";
 import { Suggestions } from "../components/suggestions";
 import { ThreadMenu } from "../components/thread-menu";
@@ -496,7 +497,13 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		}, [triggerEvent, engine.handleSubmit, focusInput]);
 
 		const showHeader =
-			!hideHeader && Boolean(title || enableThreadHistory || headerActions);
+			!hideHeader &&
+			Boolean(
+				title ||
+					enableThreadHistory ||
+					engine.keepsConversation ||
+					headerActions,
+			);
 
 		// Hold opacity 0 until both the remote-config (caller-driven
 		// `initializing`) and the i18n auto-detect effect have settled.
@@ -549,6 +556,9 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							</div>
 						)}
 						{!title && <div className="ww:flex-1" />}
+						{!enableThreadHistory && engine.keepsConversation && (
+							<NewThreadButton onClick={engine.reset} />
+						)}
 						{enableThreadHistory && (
 							<ThreadMenu
 								threads={engine.threads}
