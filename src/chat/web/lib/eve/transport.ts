@@ -8,10 +8,11 @@ import { historyMessages } from "./history";
 import {
 	EveSession,
 	type OpenSession,
-	type SavedConversation,
+	type SavedSession,
 	type SessionRequest,
-	saveConversation,
-	savedConversation,
+	savedSession,
+	saveSession,
+	sessionKey,
 } from "./session";
 
 type Resolve<T> = () => T;
@@ -45,7 +46,7 @@ function userTexts(messages: UIMessage[]): string[] {
 }
 
 type SuggestFollowups = (
-	input: SavedConversation & {
+	input: SavedSession & {
 		answerText: string;
 		recentUserMessages: string[];
 		toolNames: string[];
@@ -189,25 +190,35 @@ export function sessionRoute(input: {
 	};
 }
 
+function extraOf(
+	body: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+	const extra = body.extra;
+	return typeof extra === "object" && extra !== null && !Array.isArray(extra)
+		? Object.fromEntries(Object.entries(extra))
+		: undefined;
+}
+
 /**
  * Sends turns straight to the agent runtime when the app's session route
  * admits the chat, and through `fallback` when it answers that the chat route
- * keeps serving it. The conversation is kept per channel across page loads and
- * resumed from the runtime's own event log. A thread that needs what the
- * runtime path does not carry (attachments, model context, saved thread
- * history) stays on `fallback` for its whole length.
+ * keeps serving it. The session is kept per channel, or per saved thread,
+ * across page loads and resumed from the runtime. A thread whose history only
+ * the browser holds, or whose message carries inline files, stays on
+ * `fallback` for its whole length.
  */
 export class EveTransport
 	implements ChatTransport<UIMessage>, ChatTransportLifecycle
 {
-	private session: Promise<EveSession | null> | undefined;
+	private pending: Promise<EveSession | null> | undefined;
 	private threadOnFallback = false;
-	private disposed = false;
+	/** Bumped by `dispose`, so a session that opens afterwards is closed and never saved. */
+	private generation = 0;
 
 	constructor(
 		private readonly options: ChatTransportContext & {
-			open: OpenSession;
-			suggest: SuggestFollowups;
+			open: OpenSession | undefined;
+			suggest: SuggestFollowups | undefined;
 		},
 	) {}
 
@@ -215,61 +226,113 @@ export class EveTransport
 		return stringField(this.options.body(), "channelId");
 	}
 
+	private key(): string {
+		return sessionKey({
+			channelId: this.channelId,
+			threadId: this.options.threadId(),
+		});
+	}
+
+	keepsSession(): boolean {
+		return this.options.open !== undefined;
+	}
+
 	/** Opens the runtime session ahead of the first message, so that message pays no bootstrap. */
 	prepare(): void {
-		this.disposed = false;
-		this.session ??= this.start();
+		this.open(this.options.hasMessages());
+	}
+
+	private open(continuing: boolean): void {
+		if (!this.options.open) {
+			return;
+		}
+		this.pending ??= this.start(this.options.open, continuing);
 	}
 
 	async restore(): Promise<UIMessage[]> {
-		const saved = savedConversation(this.channelId);
-		if (this.options.needsFallback() || !saved) {
+		const { open } = this.options;
+		if (!open || this.options.threadHistory()) {
 			return [];
 		}
-		this.disposed = false;
-		const resuming = EveSession.resume({
-			open: this.options.open,
-			saved,
-		}).catch(() => null);
-		this.session = resuming;
-		const conversation = await resuming;
-		if (!conversation) {
-			saveConversation(this.channelId, null);
-			if (this.session === resuming) {
-				this.session = undefined;
+		const key = this.key();
+		const saved = savedSession(key);
+		if (!saved) {
+			return [];
+		}
+		const generation = this.generation;
+		const resuming = EveSession.resume({ open, saved })
+			.catch(() => null)
+			.then((session) => this.kept(session, generation));
+		this.pending = resuming;
+		const session = await resuming;
+		if (!session) {
+			saveSession(key, null);
+			if (this.pending === resuming) {
+				this.pending = undefined;
 			}
 			return [];
 		}
-		return await historyMessages(await conversation.history());
+		return await historyMessages(await session.history());
 	}
 
 	reset(): void {
-		saveConversation(this.channelId, null);
+		saveSession(this.key(), null);
 		this.dispose();
 	}
 
-	dispose(): void {
-		this.disposed = true;
-		void this.session
-			?.then((conversation) => conversation?.close())
-			.catch(() => {});
-		this.session = undefined;
+	forget(threadId: string): void {
+		saveSession(sessionKey({ channelId: this.channelId, threadId }), null);
 	}
 
-	private async start(): Promise<EveSession | null> {
-		const body = this.options.body();
-		const channelId = stringField(body, "channelId");
-		const conversation = await EveSession.create({
-			open: this.options.open,
-			channelId,
-			visitorId: visitorIdOf(body),
-		});
-		saveConversation(channelId, conversation?.saved ?? null);
-		if (conversation && this.disposed) {
-			conversation.close();
+	dispose(): void {
+		this.generation += 1;
+		this.threadOnFallback = false;
+		void this.pending?.then((session) => session?.close()).catch(() => {});
+		this.pending = undefined;
+	}
+
+	/** A thread that already has messages and no saved session began on `fallback`, which holds its history. */
+	private async start(
+		open: OpenSession,
+		continuing: boolean,
+	): Promise<EveSession | null> {
+		const generation = this.generation;
+		const key = this.key();
+		const saved = savedSession(key);
+		if (saved) {
+			const resumed = await EveSession.resume({ open, saved }).catch(
+				() => null,
+			);
+			if (!resumed && generation === this.generation) {
+				saveSession(key, null);
+			}
+			return this.kept(resumed, generation);
+		}
+		if (continuing) {
 			return null;
 		}
-		return conversation;
+		const body = this.options.body();
+		const created = await EveSession.create({
+			open,
+			channelId: stringField(body, "channelId"),
+			visitorId: visitorIdOf(body),
+		});
+		const session = this.kept(created, generation);
+		if (generation === this.generation) {
+			saveSession(key, session?.saved ?? null);
+		}
+		return session;
+	}
+
+	private kept(
+		session: EveSession | null,
+		generation: number,
+	): EveSession | null {
+		if (session && generation !== this.generation) {
+			session.close();
+			return null;
+		}
+		return session;
 	}
 
 	async sendMessages(
@@ -285,37 +348,48 @@ export class EveTransport
 			.find((message) => message.role === "user");
 		const carriesFiles =
 			last?.parts.some((part) => part.type === "file") ?? false;
-		if (this.threadOnFallback || carriesFiles || this.options.needsFallback()) {
+		if (this.threadOnFallback || carriesFiles || !this.options.open) {
 			this.threadOnFallback = true;
 			return await this.options.fallback.sendMessages(options);
 		}
-		this.prepare();
-		let conversation = await this.session?.catch(() => null);
-		if (conversation?.used && opensThread) {
+		this.open(!opensThread);
+		let session = await this.pending?.catch(() => null);
+		if (session?.used && opensThread) {
 			this.reset();
-			this.prepare();
-			conversation = await this.session?.catch(() => null);
+			this.open(false);
+			session = await this.pending?.catch(() => null);
 		}
-		if (!conversation) {
+		if (!session) {
 			this.threadOnFallback = true;
 			return await this.options.fallback.sendMessages(options);
 		}
-		this.options.onSession(conversation.sessionId);
+		this.options.onSession(session.sessionId);
+		const { documents } = this.options.takeTurnInput();
 		const texts = userTexts(options.messages);
-		const turn = conversation.turn(texts.at(-1) ?? "", options.abortSignal);
-		if (!conversation.followups) {
+		// eve refuses an empty message, and an attachment-only one has no text.
+		const typed = texts.at(-1) ?? "";
+		const text = typed.trim()
+			? typed
+			: (documents?.map((document) => document.filename).join(", ") ?? typed);
+		const turn = session.turn(
+			text,
+			{ documents, extra: extraOf(this.options.body()) },
+			options.abortSignal,
+		);
+		const { suggest } = this.options;
+		if (!session.followups || !suggest) {
 			return turn;
 		}
-		const { saved } = conversation;
+		const { saved } = session;
 		return turn.pipeThrough(
 			withFollowups({
 				suggest: (answerText, toolNames) =>
-					this.options.suggest({
+					suggest({
 						...saved,
 						answerText: answerText.slice(-8_000),
 						recentUserMessages: texts
 							.slice(-3)
-							.map((text) => text.slice(-2_000)),
+							.map((entry) => entry.slice(-2_000)),
 						toolNames: toolNames.slice(0, 20),
 					}),
 				signal: options.abortSignal,
@@ -326,19 +400,40 @@ export class EveTransport
 	async reconnectToStream(
 		options: Parameters<ChatTransport<UIMessage>["reconnectToStream"]>[0],
 	): Promise<ReadableStream<UIMessageChunk> | null> {
-		const conversation = await this.session?.catch(() => null);
-		return conversation
+		const session = await this.pending?.catch(() => null);
+		return session
 			? null
 			: await this.options.fallback.reconnectToStream(options);
 	}
 }
 
-/** A transport factory for `useChatEngine` that talks to the agent runtime through `sessionApi`. */
-export function eveTransport(sessionApi: string): ChatTransportFactory {
-	return (context) =>
-		new EveTransport({
+/**
+ * A transport factory for `useChatEngine` that talks to the agent runtime
+ * through `sessionApi`. A resolver lets an embed pass the URL its remote config
+ * answers after mount; until it answers, turns go through `fallback`.
+ */
+export function eveTransport(
+	sessionApi: string | (() => string | undefined),
+): ChatTransportFactory {
+	const resolve =
+		typeof sessionApi === "string" ? () => sessionApi : sessionApi;
+	return (context) => {
+		const route = <T>(build: (api: string) => T): T | undefined => {
+			const api = resolve();
+			return api ? build(api) : undefined;
+		};
+		return new EveTransport({
 			...context,
-			open: sessionRoute({ sessionApi, headers: context.headers }),
-			suggest: followupsRoute({ sessionApi, headers: context.headers }),
+			get open() {
+				return route((api) =>
+					sessionRoute({ sessionApi: api, headers: context.headers }),
+				);
+			},
+			get suggest() {
+				return route((api) =>
+					followupsRoute({ sessionApi: api, headers: context.headers }),
+				);
+			},
 		});
+	};
 }

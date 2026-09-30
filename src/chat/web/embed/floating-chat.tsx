@@ -30,6 +30,7 @@ import {
 import type { ChatHandle } from "../@types";
 import BorderGlow from "../components/border-glow";
 import { Suggestions } from "../components/suggestions";
+import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
@@ -416,6 +417,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.
 		const body: Record<string, unknown> = { mode: "floating" };
+		const transport = useDirectTransport(config.sessionApi);
 		if (config.mcpServerUrl) {
 			body.mcpServerUrl = config.mcpServerUrl;
 		}
@@ -610,6 +612,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 								)}
 							>
 								<ChatEmbed
+									transport={transport}
 									ref={chatRef}
 									api={config.api ?? ""}
 									headers={{ Authorization: `Bearer ${config.token}` }}

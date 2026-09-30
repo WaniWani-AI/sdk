@@ -951,3 +951,342 @@ describe("useChatEngine – cancellation", () => {
 		expect(mockStop).toHaveBeenCalledTimes(1);
 	});
 });
+
+type TransportContext = import("../@types").ChatTransportContext;
+type TransportFactory = import("../@types").ChatTransportFactory;
+
+type TransportProbe = {
+	context: TransportContext | undefined;
+	calls: string[];
+};
+
+function probeTransport(
+	probe: TransportProbe,
+	options: { keeps?: () => boolean; restore?: boolean },
+): TransportFactory {
+	return (context) => {
+		probe.context = context;
+		return {
+			sendMessages: (request) => context.fallback.sendMessages(request),
+			reconnectToStream: async () => null,
+			prepare: () => {
+				probe.calls.push("prepare");
+			},
+			reset: () => {
+				probe.calls.push("reset");
+			},
+			dispose: () => {
+				probe.calls.push("dispose");
+			},
+			forget: (threadId: string) => {
+				probe.calls.push(`forget:${threadId}`);
+			},
+			...(options.restore ? { restore: async () => [] } : {}),
+			...(options.keeps ? { keepsSession: options.keeps } : {}),
+		};
+	};
+}
+
+function TransportHarness({
+	resultRef,
+	transport,
+	body,
+	enableThreadHistory,
+}: {
+	resultRef: { current: HookReturn | null };
+	transport: TransportFactory;
+	body?: Record<string, unknown>;
+	enableThreadHistory?: boolean;
+}) {
+	resultRef.current = useChatEngine({
+		api: "/api/waniwani",
+		body,
+		transport,
+		enableThreadHistory,
+	});
+	return null;
+}
+
+async function mountWithTransport(options: {
+	keeps?: () => boolean;
+	restore?: boolean;
+	body?: Record<string, unknown>;
+	enableThreadHistory?: boolean;
+}): Promise<{ engine: HookReturn; probe: TransportProbe }> {
+	const probe: TransportProbe = { context: undefined, calls: [] };
+	const transport = probeTransport(probe, options);
+	act(() => {
+		root.render(
+			createElement(TransportHarness, {
+				resultRef: hookRef,
+				transport,
+				body: options.body,
+				enableThreadHistory: options.enableThreadHistory,
+			}),
+		);
+	});
+	await flushAsync();
+	const engine = hookRef.current;
+	if (!engine) {
+		throw new Error("Engine not mounted");
+	}
+	return { engine, probe };
+}
+
+function contextOf(probe: TransportProbe): TransportContext {
+	if (!probe.context) {
+		throw new Error("transport factory never called");
+	}
+	return probe.context;
+}
+
+describe("useChatEngine – keepsSession follows the transport", () => {
+	test("true when the transport keeps one", async () => {
+		const { engine } = await mountWithTransport({ keeps: () => true });
+
+		expect(engine.keepsSession).toBe(true);
+	});
+
+	test("false when the transport says it keeps none, even though it can restore", async () => {
+		const { engine } = await mountWithTransport({
+			keeps: () => false,
+			restore: true,
+		});
+
+		expect(engine.keepsSession).toBe(false);
+	});
+
+	test("false for a transport that can restore but does not answer the question", async () => {
+		const { engine } = await mountWithTransport({ restore: true });
+
+		expect(engine.keepsSession).toBe(false);
+	});
+});
+
+describe("useChatEngine – what a direct turn is handed", () => {
+	test("body() carries the same MCP extra the fallback sends, host keys winning", async () => {
+		const { probe } = await mountWithTransport({
+			body: {
+				channelId: "chan_1",
+				extra: { locale: "xx-host", plan: "gold" },
+			},
+		});
+
+		const direct = contextOf(probe).body();
+		const fallback = capturedTransportBody?.();
+
+		expect(direct.extra).toEqual(fallback?.extra);
+		expect(direct.extra).toMatchObject({ locale: "xx-host", plan: "gold" });
+		expect(direct.channelId).toBe("chan_1");
+	});
+
+	test("takeTurnInput hands over the composer's documents exactly once", async () => {
+		const { engine, probe } = await mountWithTransport({});
+
+		act(() => {
+			engine.handleSubmit({ text: "read this", files: [], documents: [DOC] });
+		});
+
+		const context = contextOf(probe);
+		expect(context.takeTurnInput()).toEqual({ documents: [DOC] });
+		expect(context.takeTurnInput().documents).toBeUndefined();
+		expect(capturedTransportBody?.()).not.toHaveProperty("documents");
+	});
+
+	test("a turn without documents hands over none", async () => {
+		const { engine, probe } = await mountWithTransport({});
+
+		act(() => {
+			engine.handleSubmit({ text: "hello", files: [], documents: [] });
+		});
+
+		expect(contextOf(probe).takeTurnInput().documents).toBeUndefined();
+	});
+
+	test("the documents of a direct turn do not ride the next fallback turn", async () => {
+		const { engine, probe } = await mountWithTransport({});
+
+		act(() => {
+			engine.handleSubmit({ text: "read this", files: [], documents: [DOC] });
+		});
+		contextOf(probe).takeTurnInput();
+		act(() => {
+			engine.handleSubmit({ text: "and now?", files: [], documents: [] });
+		});
+
+		expect(capturedTransportBody?.()).not.toHaveProperty("documents");
+	});
+
+	test("model context is dropped on a direct turn and does not ride a later fallback turn", async () => {
+		const { engine, probe } = await mountWithTransport({});
+
+		act(() => {
+			engine.handleSubmit({
+				text: "with context",
+				files: [],
+				modelContext: { structuredContent: { plan: "gold" } },
+			});
+		});
+		expect(capturedTransportBody?.().modelContext).toEqual({
+			structuredContent: { plan: "gold" },
+		});
+
+		contextOf(probe).takeTurnInput();
+
+		expect(capturedTransportBody?.()).not.toHaveProperty("modelContext");
+	});
+});
+
+describe("useChatEngine – saved threads on a direct transport", () => {
+	test("threadId() names the active thread, the same one the fallback sends", async () => {
+		const { probe } = await mountWithTransport({ enableThreadHistory: true });
+		const context = contextOf(probe);
+
+		const threadId = context.threadId();
+
+		expect(context.threadHistory()).toBe(true);
+		expect(typeof threadId).toBe("string");
+		expect(context.threadId()).toBe(threadId);
+		expect(capturedTransportBody?.().threadId).toBe(threadId);
+	});
+
+	test("without saved threads threadId() is undefined", async () => {
+		const { probe } = await mountWithTransport({});
+		const context = contextOf(probe);
+
+		expect(context.threadHistory()).toBe(false);
+		expect(context.threadId()).toBeUndefined();
+	});
+
+	test("starting a new thread closes the runtime session without forgetting it, and moves threadId()", async () => {
+		const { engine, probe } = await mountWithTransport({
+			enableThreadHistory: true,
+		});
+		const context = contextOf(probe);
+		const first = context.threadId();
+		probe.calls.length = 0;
+
+		let next: string | undefined;
+		act(() => {
+			next = engine.startNewThread();
+		});
+
+		expect(probe.calls).toContain("dispose");
+		expect(probe.calls).not.toContain("reset");
+		expect(probe.calls.some((call) => call.startsWith("forget:"))).toBe(false);
+		expect(next).not.toBe(first);
+		expect(context.threadId()).toBe(next);
+	});
+
+	test("deleting a thread makes the transport forget it", async () => {
+		const { engine, probe } = await mountWithTransport({
+			enableThreadHistory: true,
+		});
+		probe.calls.length = 0;
+
+		await act(async () => {
+			await engine.deleteThread("thread_gone");
+		});
+
+		expect(probe.calls).toContain("forget:thread_gone");
+	});
+
+	test("deleting the active thread forgets it and closes its runtime session", async () => {
+		const { engine, probe } = await mountWithTransport({
+			enableThreadHistory: true,
+		});
+		const active = contextOf(probe).threadId();
+		if (!active) {
+			throw new Error("no active thread");
+		}
+		probe.calls.length = 0;
+
+		await act(async () => {
+			await engine.deleteThread(active);
+		});
+
+		expect(probe.calls).toContain(`forget:${active}`);
+		expect(probe.calls).toContain("dispose");
+		expect(probe.calls).not.toContain("reset");
+	});
+
+	test("New chat without saved threads resets the transport", async () => {
+		const { engine, probe } = await mountWithTransport({});
+		probe.calls.length = 0;
+
+		act(() => {
+			engine.reset();
+		});
+
+		expect(probe.calls).toContain("reset");
+	});
+});
+
+const { useDirectTransport } = await import("./use-direct-transport");
+
+describe("useDirectTransport – a sessionApi the remote config answers after mount", () => {
+	function DirectHarness({
+		resultRef,
+		sessionApi,
+		factories,
+	}: {
+		resultRef: { current: HookReturn | null };
+		sessionApi: string | undefined;
+		factories: TransportFactory[];
+	}) {
+		const transport = useDirectTransport(sessionApi);
+		factories.push(transport);
+		resultRef.current = useChatEngine({ api: "/api/waniwani", transport });
+		return null;
+	}
+
+	function render(
+		sessionApi: string | undefined,
+		factories: TransportFactory[],
+	) {
+		act(() => {
+			root.render(
+				createElement(DirectHarness, {
+					resultRef: hookRef,
+					sessionApi,
+					factories,
+				}),
+			);
+		});
+	}
+
+	test("keeps no conversation while the remote config has not answered", async () => {
+		render(undefined, []);
+		await flushAsync();
+
+		expect(hookRef.current?.keepsSession).toBe(false);
+	});
+
+	test("hands the engine one transport factory for the chat's whole life", async () => {
+		const factories: TransportFactory[] = [];
+		render(undefined, factories);
+		await flushAsync();
+		render("https://app.test/api/mcp/agent/session", factories);
+		await flushAsync();
+
+		expect(factories.length).toBeGreaterThan(1);
+		expect(new Set(factories).size).toBe(1);
+	});
+
+	test("the engine keeps the conversation once the sessionApi arrives", async () => {
+		render(undefined, []);
+		await flushAsync();
+
+		render("https://app.test/api/mcp/agent/session", []);
+		await flushAsync();
+
+		expect(hookRef.current?.keepsSession).toBe(true);
+	});
+
+	test("a sessionApi known at mount keeps the conversation from the first render", async () => {
+		render("https://app.test/api/mcp/agent/session", []);
+		await flushAsync();
+
+		expect(hookRef.current?.keepsSession).toBe(true);
+	});
+});

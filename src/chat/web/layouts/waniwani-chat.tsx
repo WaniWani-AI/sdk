@@ -29,13 +29,13 @@ import { useSuggestions } from "../embed/use-suggestions";
 import type { WidgetEvent } from "../embed/widget-events";
 import { createWidgetEventEmitter } from "../embed/widget-events";
 import { WidgetEventsProvider } from "../embed/widget-events-context";
+import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import type { Locale, MessageOverrides } from "../i18n";
 import {
 	createChatTrackClient,
 	createNoopChatTrackClient,
 } from "../lib/chat-track";
-import { eveTransport } from "../lib/eve/transport";
 import { firePageView } from "../lib/page-view";
 import { markConfigSource, setTimingMetadata } from "../lib/timing";
 import { useBootTiming } from "../lib/timing-context";
@@ -487,10 +487,8 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			body.channelId = config.channelId;
 		}
 
-		const sessionApi = overrides?.sessionApi;
-		const transport = useMemo(
-			() => (sessionApi ? eveTransport(sessionApi) : undefined),
-			[sessionApi],
+		const transport = useDirectTransport(
+			overrides?.sessionApi ?? config.sessionApi,
 		);
 
 		if (!visible) {
