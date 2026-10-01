@@ -399,11 +399,17 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		inputSchema,
 		outputSchema: flowOutputSchema,
 		annotations: config.annotations,
-		...(redactedStateFields.length > 0 && {
-			_meta: {
+		// The flow graph rides on the definition `_meta` itself, not only on what
+		// `register()` sends, because some servers register this config directly
+		// (the kit does, through skybridge). `withWaniwani` keys both funnel sync
+		// and telemetry capture on `_meta._flowGraph`; without it a flow tool is
+		// treated as a plain tool and gets a second, nested `telemetry` argument.
+		_meta: {
+			...(redactedStateFields.length > 0 && {
 				[REDACTED_STATE_UPDATE_FIELDS_META_KEY]: redactedStateFields,
-			},
-		}),
+			}),
+			_flowGraph: flowGraph,
+		},
 	};
 
 	const toolHandler = (async (args: FlowToolInput, extra: unknown) => {
@@ -555,15 +561,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		handler: toolHandler as unknown as FlowToolHandler,
 
 		async register(server: McpServer): Promise<void> {
-			const configWithGraph = {
-				...toolConfig,
-				_meta: { ...toolConfig._meta, _flowGraph: flowGraph },
-			};
-			server.registerTool(
-				config.id,
-				configWithGraph as typeof toolConfig,
-				toolHandler,
-			);
+			server.registerTool(config.id, toolConfig, toolHandler);
 		},
 		graph: input.graph,
 		flowGraph,
