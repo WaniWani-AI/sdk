@@ -2316,3 +2316,168 @@ describe("a thread switch or delete keeps the chat busy until it ends", () => {
 		expect(chatPosts).toHaveLength(1);
 	});
 });
+
+describe("overlapping thread actions never clear a newer conversation's busy state", () => {
+	test("an old switch finishing late keeps a new thread's page call: its answer and the queued message go out in order", async () => {
+		await clearThreads();
+		await storeThread("t_target", [OLDER_QUESTION]);
+		const answerNew = deferred<unknown>();
+		mount({
+			enableThreadHistory: true,
+			onToolCall: (call) =>
+				call.toolCallId === "c1" ? new Promise(() => {}) : answerNew.promise,
+		});
+		await until("history loaded", () => engine().isThreadHistoryReady);
+		act(() => {
+			engine().startNewThread();
+		});
+		await settle();
+		replies.push(
+			answerWithCalls([{ id: "c1", name: "t", input: {} }]),
+			answerWithCalls([{ id: "n1", name: "t", input: {} }]),
+			textAnswer("carried on"),
+			textAnswer("queued answer"),
+		);
+		send("go");
+		await until("stream ended", () =>
+			engine().messages.some((m) => m.role === "assistant"),
+		);
+		await settle();
+		const gate = deferred<void>();
+		let loading = false;
+		storeHolds.load = (id) => {
+			if (id !== "t_target") {
+				return Promise.resolve();
+			}
+			loading = true;
+			return gate.promise;
+		};
+
+		act(() => {
+			void engine().switchThread("t_target");
+		});
+		await until("switch parked on the target load", () => loading);
+		act(() => {
+			engine().startNewThread();
+		});
+		await settle();
+		send("new thread question");
+		await until("new answer", () => chatPosts.length === 2);
+		await until("new call streamed", () =>
+			engine().messages.some((m) =>
+				m.parts.some((p) => "toolCallId" in p && p.toolCallId === "n1"),
+			),
+		);
+		await settle();
+		send("queued in the new thread");
+		expect(engine().queuedMessages).toHaveLength(1);
+
+		gate.resolve();
+		await tick(300);
+		expect(engine().isLoading).toBe(true);
+		expect(chatPosts).toHaveLength(2);
+
+		await act(async () => {
+			answerNew.resolve("page answer");
+		});
+		await until("queued POST", () => chatPosts.length === 4);
+
+		expect(postPart(2, "n1")).toMatchObject({
+			state: "output-available",
+			output: "page answer",
+		});
+		expect(postPart(3, "n1")).toMatchObject({
+			state: "output-available",
+			output: "page answer",
+		});
+		const last = chatPosts[3]?.body.messages ?? [];
+		expect(last[last.length - 1]?.role).toBe("user");
+		expect(JSON.stringify(last[last.length - 1]?.parts)).toContain(
+			"queued in the new thread",
+		);
+	});
+
+	test("two overlapping switches, both loads held: busy until the second ends, then idle on it with nothing sent", async () => {
+		await pageWorkingInNewThread();
+		const gateTarget = deferred<void>();
+		const gateSecond = deferred<void>();
+		storeHolds.load = (id) =>
+			id === "t_target"
+				? gateTarget.promise
+				: id === "t_second"
+					? gateSecond.promise
+					: Promise.resolve();
+		send("queued meanwhile");
+
+		act(() => {
+			void engine().switchThread("t_target");
+		});
+		await until("stopped answers written", stoppedInEngine("c1"));
+		act(() => {
+			void engine().switchThread("t_second");
+		});
+		await tick(100);
+		gateTarget.resolve();
+		await tick(300);
+
+		expect(engine().isLoading).toBe(true);
+		expect(engine().queuedMessages).toHaveLength(1);
+		expect(chatPosts).toHaveLength(1);
+
+		gateSecond.resolve();
+		await until("second switch", () => engine().activeThreadId === "t_second");
+		await tick(300);
+
+		expect(engine().isLoading).toBe(false);
+		expect(engine().queuedMessages).toHaveLength(0);
+		expect(engine().messages.map((m) => m.id)).toEqual(["u_second"]);
+		expect(chatPosts).toHaveLength(1);
+	});
+
+	test("a plain Stop then a switch while the Stop is still writing: busy until the switch ends", async () => {
+		await clearThreads();
+		await storeThread("t_target", [OLDER_QUESTION]);
+		mount({
+			enableThreadHistory: true,
+			onToolCall: () => new Promise(() => {}),
+		});
+		await until("history loaded", () => engine().isThreadHistoryReady);
+		act(() => {
+			engine().startNewThread();
+		});
+		await settle();
+		replies.push(
+			answerWithCalls([
+				{ id: "a", name: "t", input: {} },
+				{ id: "b", name: "t", input: {} },
+			]),
+			textAnswer("only if a queued message goes out"),
+		);
+		send("go");
+		await until("stream ended", () =>
+			engine().messages.some((m) => m.role === "assistant"),
+		);
+		await settle();
+		send("queued meanwhile");
+		const release = holdLoad("t_target");
+
+		act(() => {
+			void engine().stop();
+			void engine().switchThread("t_target");
+		});
+		await until("stopped answers written", stoppedInEngine("b"));
+		await tick(300);
+
+		expect(engine().isLoading).toBe(true);
+		expect(engine().queuedMessages).toHaveLength(1);
+		expect(chatPosts).toHaveLength(1);
+
+		release();
+		await until("switched", () => engine().activeThreadId === "t_target");
+		await tick(300);
+
+		expect(engine().isLoading).toBe(false);
+		expect(engine().queuedMessages).toHaveLength(0);
+		expect(chatPosts).toHaveLength(1);
+	});
+});

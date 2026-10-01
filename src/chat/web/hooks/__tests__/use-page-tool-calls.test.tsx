@@ -859,3 +859,189 @@ describe("usePageToolCalls Stop with keepBusy", () => {
 		expect(chat.followUps).toBe(1);
 	});
 });
+
+describe("usePageToolCalls holds and release", () => {
+	test("a hold keeps the chat busy after its Stop finishes, and release ends it", async () => {
+		mountWith(() => new Promise(() => {}));
+
+		finish(assistant([pageCall("a")]));
+		await flush();
+		await act(async () => {
+			await hook().stop({ keepBusy: true });
+		});
+		await flush();
+		expect(hook().pending).toBe(true);
+
+		act(() => {
+			hook().release();
+		});
+		expect(hook().pending).toBe(false);
+	});
+
+	test("two holds: releasing one leaves the chat busy, releasing both ends it", async () => {
+		mountWith(() => new Promise(() => {}));
+
+		finish(assistant([pageCall("a")]));
+		await flush();
+		let first = false;
+		let second = false;
+		await act(async () => {
+			first = await hook().stop({ keepBusy: true });
+			second = await hook().stop({ keepBusy: true });
+		});
+		await flush();
+		expect(first).toBe(true);
+		expect(second).toBe(true);
+
+		act(() => {
+			hook().release();
+		});
+		expect(hook().pending).toBe(true);
+		act(() => {
+			hook().release();
+		});
+		expect(hook().pending).toBe(false);
+	});
+
+	test("a plain Stop then a keepBusy Stop while it is still writing: busy holds past the writes until release", async () => {
+		const chat = mountWith(() => new Promise(() => {}));
+
+		finish(assistant([pageCall("a"), pageCall("b")]));
+		await flush();
+		chat.holdWrites = true;
+		let plain: Promise<boolean> = Promise.resolve(false);
+		let held: Promise<boolean> = Promise.resolve(false);
+		act(() => {
+			plain = hook().stop();
+			held = hook().stop({ keepBusy: true });
+		});
+		chat.holdWrites = false;
+		await act(async () => {
+			await chat.releaseWrites();
+		});
+		await flush();
+
+		expect(await plain).toBe(true);
+		expect(await held).toBe(true);
+		expect(chat.written.filter((w) => w.toolCallId === "a")).toHaveLength(1);
+		expect(chat.written.filter((w) => w.toolCallId === "b")).toHaveLength(1);
+		expect(hook().pending).toBe(true);
+
+		act(() => {
+			hook().release();
+		});
+		expect(hook().pending).toBe(false);
+	});
+
+	test("a plain Stop takes no hold: busy clears when its writes finish", async () => {
+		const chat = mountWith(() => new Promise(() => {}));
+
+		finish(assistant([pageCall("a")]));
+		await flush();
+		chat.holdWrites = true;
+		act(() => {
+			void hook().stop();
+		});
+		chat.holdWrites = false;
+		await act(async () => {
+			await chat.releaseWrites();
+		});
+		await flush();
+
+		expect(hook().pending).toBe(false);
+	});
+
+	test("release with calls of a newer conversation still owed keeps the chat busy until the page answers", async () => {
+		let answerNew: (v: unknown) => void = () => {};
+		const chat = mountWith((call) =>
+			call.toolCallId === "old"
+				? new Promise(() => {})
+				: new Promise((r) => {
+						answerNew = r;
+					}),
+		);
+
+		finish(assistant([pageCall("old")]));
+		await flush();
+		await act(async () => {
+			await hook().stop({ keepBusy: true });
+		});
+		act(() => {
+			hook().drop();
+			hook().markRequest();
+		});
+		finish(assistant([pageCall("new")]));
+		await flush();
+
+		act(() => {
+			hook().release();
+		});
+		expect(hook().pending).toBe(true);
+
+		await act(async () => {
+			answerNew("page answer");
+		});
+		await flush();
+
+		expect(lastWrite(chat, "new")).toMatchObject({
+			state: "output-available",
+			output: "page answer",
+		});
+		expect(chat.followUps).toBe(1);
+		expect(hook().pending).toBe(false);
+	});
+
+	test("drop clears every hold, so a later answered call ends busy on its own", async () => {
+		const chat = mountWith((call) =>
+			call.toolCallId === "old" ? new Promise(() => {}) : "fresh",
+		);
+
+		finish(assistant([pageCall("old")]));
+		await flush();
+		await act(async () => {
+			await hook().stop({ keepBusy: true });
+			await hook().stop({ keepBusy: true });
+		});
+		act(() => {
+			hook().drop();
+		});
+		expect(hook().pending).toBe(false);
+
+		act(() => {
+			hook().markRequest();
+		});
+		finish(assistant([pageCall("new")]));
+		await flush();
+
+		expect(lastWrite(chat, "new")).toMatchObject({ output: "fresh" });
+		expect(chat.followUps).toBe(1);
+		expect(hook().pending).toBe(false);
+	});
+
+	test("a keepBusy Stop on an idle chat takes no hold, and stray releases do not block a later hold", async () => {
+		mountWith(() => new Promise(() => {}));
+
+		let idle = true;
+		await act(async () => {
+			idle = await hook().stop({ keepBusy: true });
+		});
+		expect(idle).toBe(false);
+		act(() => {
+			hook().release();
+			hook().release();
+		});
+		expect(hook().pending).toBe(false);
+
+		finish(assistant([pageCall("a")]));
+		await flush();
+		await act(async () => {
+			await hook().stop({ keepBusy: true });
+		});
+		await flush();
+		expect(hook().pending).toBe(true);
+		act(() => {
+			hook().release();
+		});
+		expect(hook().pending).toBe(false);
+	});
+});
