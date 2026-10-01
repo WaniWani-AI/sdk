@@ -73,3 +73,7 @@ export type { McpServer, ZodRawShapeCompat } from "./server/types";
 export type { AttachedDocument, AttachedFile } from "./server/utils";
 export type { WithWaniwaniOptions } from "./server/with-waniwani/index";
 export { withWaniwani } from "./server/with-waniwani/index";
+export type {
+	CaptureTelemetryOptions,
+	ToolTelemetry,
+} from "./server/with-waniwani/telemetry-capture";
