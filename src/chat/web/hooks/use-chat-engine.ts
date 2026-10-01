@@ -610,10 +610,21 @@ export function useChatEngine(props: ChatBaseProps) {
 		messagesRef.current = messages;
 	}, [messages]);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: restore once on mount
+	const keepsSession = transportRef.current.keepsSession?.() ?? false;
+	const restoredRef = useRef(false);
+
+	// An embed's transport keeps a session only once its remote config answers, after mount.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: restore when the transport starts keeping a session
 	useEffect(() => {
-		const transport = transportRef.current;
-		void transport
+		if (
+			!keepsSession ||
+			restoredRef.current ||
+			messagesRef.current.length > 0
+		) {
+			return;
+		}
+		restoredRef.current = true;
+		void transportRef.current
 			.restore?.()
 			.then((restored) => {
 				if (restored.length > 0 && messagesRef.current.length === 0) {
@@ -621,6 +632,10 @@ export function useChatEngine(props: ChatBaseProps) {
 				}
 			})
 			.catch(() => {});
+	}, [keepsSession]);
+
+	useEffect(() => {
+		const transport = transportRef.current;
 		return () => transport.dispose?.();
 	}, []);
 
@@ -1206,6 +1221,6 @@ export function useChatEngine(props: ChatBaseProps) {
 		startNewThread,
 		switchThread,
 		deleteThread,
-		keepsSession: transportRef.current.keepsSession?.() ?? false,
+		keepsSession,
 	};
 }
