@@ -401,6 +401,32 @@ export type ToolInputProps = HTMLAttributes<HTMLDivElement> & {
 	debug?: boolean;
 };
 
+/**
+ * The tool call arguments worth showing a user, outside debug mode.
+ *
+ * Drops `_meta` and `telemetry`. `telemetry` is the argument `withWaniwani`
+ * adds to every tool for analytics (`src/mcp/server/with-waniwani/
+ * telemetry-capture.ts`, not imported so the chat bundle stays free of server
+ * code); it is never part of the tool's own request. A tool that declares its
+ * own `telemetry` argument loses it from this view too, and debug mode still
+ * shows everything.
+ */
+export function toolInputForDisplay(
+	input: ToolUIPart["input"],
+	debug: boolean | undefined,
+): ToolUIPart["input"] {
+	if (
+		debug ||
+		typeof input !== "object" ||
+		input === null ||
+		Array.isArray(input)
+	) {
+		return input;
+	}
+	const { _meta, telemetry, ...rest } = input as Record<string, unknown>;
+	return rest;
+}
+
 /** Displays the tool call request parameters as a collapsible JSON section labeled "Request". */
 export function ToolInput({
 	className,
@@ -409,18 +435,10 @@ export function ToolInput({
 	...props
 }: ToolInputProps) {
 	const { t } = useTranslation();
-	const filtered = useMemo(() => {
-		if (
-			!debug &&
-			typeof input === "object" &&
-			input !== null &&
-			!Array.isArray(input)
-		) {
-			const { _meta, ...rest } = input as Record<string, unknown>;
-			return rest;
-		}
-		return input;
-	}, [input, debug]);
+	const filtered = useMemo(
+		() => toolInputForDisplay(input, debug),
+		[input, debug],
+	);
 
 	return (
 		<CollapsibleJSON
