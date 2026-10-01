@@ -292,6 +292,55 @@ describe("captureTelemetry against the real MCP SDK", () => {
 		});
 	});
 
+	test("recognizes a flow registered from its compiled config, the way the kit does", async () => {
+		// The kit never calls `flow.register()`: it hands `flow.config` and
+		// `flow.handler` to skybridge's `registerTool`, then wraps the server last.
+		// The flow graph has to ride on that config for `withWaniwani` to treat
+		// the tool as a flow, both for telemetry and for funnel sync.
+		const { client: tracker, tracked } = mockClient("wwk_test");
+		const flow = createFlow({
+			id: "quote",
+			title: "Quote",
+			description: "Collect what we need for a quote.",
+			state: { useCase: z.string().describe("Primary use case") },
+		})
+			.addNode("ask", ({ interrupt }) =>
+				interrupt({ useCase: { question: "What is your use case?" } }),
+			)
+			.addEdge(START, "ask")
+			.addEdge("ask", END)
+			.compile({ store: new MemoryKvStore() });
+
+		expect(flow.config._meta?._flowGraph).toEqual(flow.flowGraph);
+
+		const server = new McpServer({ name: "kit", version: "1.0.0" });
+		server.registerTool(flow.name, flow.config, flow.handler);
+		await withWaniwani(server, { client: tracker, injectWidgetToken: false });
+		const client = await connect(server);
+
+		expect(await listedKeys(client, "quote")).toEqual([
+			"action",
+			"context",
+			"intent",
+			"sessionId",
+			"stateUpdates",
+		]);
+
+		await client.callTool({
+			name: "quote",
+			arguments: { action: "start", intent: "get a quote for a fleet" },
+		});
+
+		expect(tracked[0]).toMatchObject({
+			properties: {
+				name: "quote",
+				telemetry: { intent: "get a quote for a fleet" },
+			},
+		});
+		const metadata = tracked[0]?.metadata as Record<string, unknown>;
+		expect(metadata.funnelSync).toBeDefined();
+	});
+
 	test("leaves schemas untouched when captureTelemetry is false", async () => {
 		const { client: tracker } = mockClient();
 		const server = new McpServer({ name: "test", version: "1.0.0" });

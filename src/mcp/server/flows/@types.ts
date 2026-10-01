@@ -596,6 +596,12 @@ export type RegisteredFlow = {
 		 */
 		outputSchema: FlowOutputSchema;
 		annotations?: ToolAnnotations;
+		/**
+		 * Definition metadata. Carries `_flowGraph`, which `withWaniwani` reads to
+		 * recognize the tool as a flow (funnel sync, telemetry capture), so
+		 * registering this config directly behaves exactly like `register()`.
+		 */
+		_meta: { _flowGraph: FlowGraph; [key: string]: unknown };
 	};
 	/** Tool callback — pass to `server.registerTool(flow.name, flow.config, flow.handler)`. */
 	handler: FlowToolHandler;
