@@ -581,6 +581,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		handleFinish: handPageToolCalls,
 		stop: stopPageToolCalls,
 		drop: dropPageToolCalls,
+		release: releasePageToolCalls,
 		markRequest: markPageToolRequest,
 	} = usePageToolCalls(props.transport ? undefined : props.onToolCall);
 
@@ -1173,7 +1174,7 @@ export function useChatEngine(props: ChatBaseProps) {
 				setText("");
 			} finally {
 				if (stopped) {
-					dropPageToolCalls();
+					releasePageToolCalls();
 				}
 			}
 		},
@@ -1185,6 +1186,7 @@ export function useChatEngine(props: ChatBaseProps) {
 			discardAllQueued,
 			stopPageToolCalls,
 			dropPageToolCalls,
+			releasePageToolCalls,
 			persistActiveThread,
 		],
 	);
@@ -1230,7 +1232,7 @@ export function useChatEngine(props: ChatBaseProps) {
 				}
 			} finally {
 				if (stopped) {
-					dropPageToolCalls();
+					releasePageToolCalls();
 				}
 			}
 		},
@@ -1241,6 +1243,7 @@ export function useChatEngine(props: ChatBaseProps) {
 			discardAllQueued,
 			stopPageToolCalls,
 			dropPageToolCalls,
+			releasePageToolCalls,
 		],
 	);
 

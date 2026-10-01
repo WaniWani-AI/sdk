@@ -51,6 +51,8 @@ export function usePageToolCalls(onToolCall: PageToolCallHandler | undefined) {
 	// The epoch the latest request started in; a finish from an older one hands nothing over.
 	const requestEpochRef = useRef(0);
 	const stoppingRef = useRef<Promise<boolean> | null>(null);
+	// Thread switches and deletes still keeping the chat busy, through `stop({ keepBusy: true })`.
+	const holdsRef = useRef(0);
 	const [pending, setPending] = useState(false);
 
 	useEffect(
@@ -180,14 +182,21 @@ export function usePageToolCalls(onToolCall: PageToolCallHandler | undefined) {
 		[answer],
 	);
 
-	/** Answers every owed call with an error, keeping answers already being written, and stays pending until all are in. */
+	/** Answers every owed call with an error, keeping answers being written; `keepBusy` holds busy until `release`, true when it held. */
 	const stop = useCallback(
 		({ keepBusy = false } = {}): Promise<boolean> => {
+			const busy =
+				stoppingRef.current !== null ||
+				owedRef.current.size > 0 ||
+				holdsRef.current > 0;
+			if (keepBusy && busy) {
+				holdsRef.current += 1;
+			}
 			if (stoppingRef.current) {
 				return stoppingRef.current;
 			}
 			if (owedRef.current.size === 0) {
-				return Promise.resolve(false);
+				return Promise.resolve(keepBusy && busy);
 			}
 			epochRef.current += 1;
 			const epoch = epochRef.current;
@@ -206,7 +215,7 @@ export function usePageToolCalls(onToolCall: PageToolCallHandler | undefined) {
 				if (stoppingRef.current === stopping) {
 					stoppingRef.current = null;
 				}
-				if (epoch === epochRef.current && !keepBusy) {
+				if (epoch === epochRef.current && holdsRef.current === 0) {
 					setPending(false);
 				}
 				return true;
@@ -222,7 +231,20 @@ export function usePageToolCalls(onToolCall: PageToolCallHandler | undefined) {
 		epochRef.current += 1;
 		owedRef.current.clear();
 		stoppingRef.current = null;
+		holdsRef.current = 0;
 		setPending(false);
+	}, []);
+
+	/** Ends a hold `stop({ keepBusy: true })` took; busy clears once no hold is left and nothing is owed. */
+	const release = useCallback(() => {
+		holdsRef.current = Math.max(0, holdsRef.current - 1);
+		if (
+			holdsRef.current === 0 &&
+			owedRef.current.size === 0 &&
+			!stoppingRef.current
+		) {
+			setPending(false);
+		}
 	}, []);
 
 	/** Call when the user sends a message, so its answer belongs to the current conversation. */
@@ -230,5 +252,13 @@ export function usePageToolCalls(onToolCall: PageToolCallHandler | undefined) {
 		requestEpochRef.current = epochRef.current;
 	}, []);
 
-	return { chatRef, pending, handleFinish, stop, drop, markRequest };
+	return {
+		chatRef,
+		pending,
+		handleFinish,
+		stop,
+		drop,
+		release,
+		markRequest,
+	};
 }
