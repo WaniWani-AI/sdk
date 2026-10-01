@@ -526,7 +526,7 @@ describe("usePageToolCalls drop", () => {
 		expect(chat.followUps).toBe(0);
 	});
 
-	test("a call from the new conversation is still handed over after a drop", async () => {
+	test("a call from the new conversation is handed over once the visitor sends after a drop", async () => {
 		const seen: string[] = [];
 		const chat = mountWith((call) => {
 			seen.push(call.toolCallId);
@@ -537,6 +537,7 @@ describe("usePageToolCalls drop", () => {
 		await flush();
 		act(() => {
 			hook().drop();
+			hook().markRequest();
 		});
 
 		finish(assistant([pageCall("new")]));
@@ -551,7 +552,7 @@ describe("usePageToolCalls drop", () => {
 		expect(hook().pending).toBe(false);
 	});
 
-	test("the same call id reappearing after a drop is handed over again", async () => {
+	test("the same call id reappearing in a request sent after a drop is handed over again", async () => {
 		let calls = 0;
 		const chat = mountWith(() => {
 			calls += 1;
@@ -562,6 +563,7 @@ describe("usePageToolCalls drop", () => {
 		await flush();
 		act(() => {
 			hook().drop();
+			hook().markRequest();
 		});
 		finish(assistant([pageCall("same")]));
 		await flush();
@@ -569,5 +571,188 @@ describe("usePageToolCalls drop", () => {
 		expect(calls).toBe(2);
 		expect(lastWrite(chat, "same")).toMatchObject({ output: "second time" });
 		expect(chat.followUps).toBe(1);
+	});
+
+	test("an answer whose request started before a drop hands nothing to the page", async () => {
+		let called = 0;
+		const chat = mountWith(() => {
+			called += 1;
+			return "x";
+		});
+
+		act(() => {
+			hook().markRequest();
+			hook().drop();
+		});
+		finish(assistant([pageCall("c1")]));
+		await flush();
+
+		expect(called).toBe(0);
+		expect(hook().pending).toBe(false);
+		expect(chat.written).toEqual([]);
+		expect(chat.followUps).toBe(0);
+	});
+});
+
+describe("usePageToolCalls requests and the conversation they belong to", () => {
+	test("an answer whose request started before a Stop hands nothing to the page", async () => {
+		const seen: string[] = [];
+		const chat = mountWith((call) => {
+			seen.push(call.toolCallId);
+			return new Promise(() => {});
+		});
+
+		finish(assistant([pageCall("first")]));
+		await flush();
+		await act(async () => {
+			await hook().stop();
+		});
+		finish(assistant([pageCall("stale")]));
+		await flush();
+
+		expect(seen).toEqual(["first"]);
+		expect(hook().pending).toBe(false);
+		expect(chat.written.some((w) => w.toolCallId === "stale")).toBe(false);
+	});
+
+	test("the answer to the hook's own carry-on request is handed over without a new send", async () => {
+		const seen: string[] = [];
+		const chat = mountWith((call) => {
+			seen.push(call.toolCallId);
+			return call.toolCallId;
+		});
+
+		finish(assistant([pageCall("one")]));
+		await flush();
+		expect(chat.followUps).toBe(1);
+
+		finish(assistant([pageCall("two")]));
+		await flush();
+
+		expect(seen).toEqual(["one", "two"]);
+		expect(chat.followUps).toBe(2);
+	});
+
+	test("an answer to a request sent after Stop is handed over", async () => {
+		const seen: string[] = [];
+		const chat = mountWith((call) => {
+			seen.push(call.toolCallId);
+			return call.toolCallId === "first" ? new Promise(() => {}) : "ok";
+		});
+
+		finish(assistant([pageCall("first")]));
+		await flush();
+		await act(async () => {
+			await hook().stop();
+		});
+		act(() => {
+			hook().markRequest();
+		});
+		finish(assistant([pageCall("next")]));
+		await flush();
+
+		expect(seen).toEqual(["first", "next"]);
+		expect(lastWrite(chat, "next")).toMatchObject({ output: "ok" });
+		expect(chat.followUps).toBe(1);
+	});
+});
+
+describe("usePageToolCalls Stop under pressure", () => {
+	test("Stop pressed twice while the stopped answers are written writes each answer once and both report true", async () => {
+		const chat = mountWith(() => new Promise(() => {}));
+
+		finish(assistant([pageCall("a"), pageCall("b")]));
+		await flush();
+		chat.holdWrites = true;
+
+		let first: Promise<boolean> = Promise.resolve(false);
+		let second: Promise<boolean> = Promise.resolve(false);
+		act(() => {
+			first = hook().stop();
+		});
+		act(() => {
+			second = hook().stop();
+		});
+		await flush();
+		expect(hook().pending).toBe(true);
+
+		chat.holdWrites = false;
+		await act(async () => {
+			await chat.releaseWrites();
+		});
+		await flush();
+
+		expect(await first).toBe(true);
+		expect(await second).toBe(true);
+		expect(chat.written.filter((w) => w.toolCallId === "a")).toHaveLength(1);
+		expect(chat.written.filter((w) => w.toolCallId === "b")).toHaveLength(1);
+		expect(hook().pending).toBe(false);
+		expect(chat.followUps).toBe(0);
+	});
+
+	test("Stop, then drop and a new waiting call: the old writes landing leave the new conversation busy", async () => {
+		const chat = mountWith(() => new Promise(() => {}));
+
+		finish(assistant([pageCall("old")]));
+		await flush();
+		chat.holdWrites = true;
+
+		let stopping: Promise<boolean> = Promise.resolve(false);
+		act(() => {
+			stopping = hook().stop();
+		});
+		act(() => {
+			hook().drop();
+			hook().markRequest();
+		});
+		finish(assistant([pageCall("new")]));
+		await flush();
+		expect(hook().pending).toBe(true);
+
+		chat.holdWrites = false;
+		await act(async () => {
+			await chat.releaseWrites();
+		});
+		await act(async () => {
+			await stopping;
+		});
+		await flush();
+
+		expect(hook().pending).toBe(true);
+		expect(chat.written.some((w) => w.toolCallId === "new")).toBe(false);
+		expect(chat.followUps).toBe(0);
+	});
+
+	test("a Stop after drop and a new waiting call stops the new call, not the old one again", async () => {
+		const chat = mountWith(() => new Promise(() => {}));
+
+		finish(assistant([pageCall("old")]));
+		await flush();
+		chat.holdWrites = true;
+		act(() => {
+			void hook().stop();
+		});
+		act(() => {
+			hook().drop();
+			hook().markRequest();
+		});
+		chat.holdWrites = false;
+		finish(assistant([pageCall("new")]));
+		await flush();
+
+		let stopped = false;
+		await act(async () => {
+			const stopping = hook().stop();
+			await chat.releaseWrites();
+			stopped = await stopping;
+		});
+		await flush();
+
+		expect(stopped).toBe(true);
+		expect(lastWrite(chat, "new")).toMatchObject({
+			state: "output-error",
+			errorText: STOPPED_TEXT,
+		});
+		expect(hook().pending).toBe(false);
 	});
 });

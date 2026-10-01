@@ -218,7 +218,7 @@ export interface ChatBaseProps {
 	onMessageSent?: (message: string) => void;
 	/** Callback fired when a response is received */
 	onResponseReceived?: () => void;
-	/** @experimental Answers tool calls the server left without a result: the return value goes back to the AI as the result, a throw as an error result, and the chat then carries on. */
+	/** @experimental Answers tool calls the server left without a result: the return value goes back to the AI as the result, a throw as an error result, and the chat then carries on. Ignored with a custom `transport`. */
 	onToolCall?: (call: {
 		toolCallId: string;
 		toolName: string;

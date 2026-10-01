@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import type { UIMessage, UIMessageChunk } from "ai";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { Window } from "happy-dom";
+import type { ChatTransportContext, ChatTransportFactory } from "../../@types";
 
 // Real `useChat` and real transport; only `fetch` is faked, answering chat
 // POSTs with scripted UI-message streams the way the server does.
@@ -28,6 +30,7 @@ for (const key of [
 	"requestAnimationFrame",
 	"cancelAnimationFrame",
 	"getComputedStyle",
+	"screen",
 ] as const) {
 	// biome-ignore lint/suspicious/noExplicitAny: test setup
 	(globalThis as any)[key] = (win as any)[key];
@@ -56,6 +59,8 @@ mock.module("@ai-sdk/react", () => ({ ...realAiSdkReact }));
 mock.module("../../lib/lenient-chat-transport", () => ({ ...realTransport }));
 
 const { useChatEngine } = await import("../use-chat-engine");
+const threadStore = await import("../../lib/thread-store");
+const { getOrCreateMemoryUserId } = await import("../../lib/memory-user-id");
 type HookReturn = ReturnType<typeof useChatEngine>;
 type EngineProps = Parameters<typeof useChatEngine>[0];
 type ToolCallHandler = NonNullable<EngineProps["onToolCall"]>;
@@ -69,7 +74,7 @@ const STOPPED_TEXT = "Stopped by the user before the page answered.";
 type Chunk = Record<string, unknown>;
 
 interface ChatPost {
-	body: {
+	body: Record<string, unknown> & {
 		messages: Array<{
 			role: string;
 			parts: Array<Record<string, unknown>>;
@@ -80,6 +85,7 @@ interface ChatPost {
 interface ControlledStream {
 	push: (chunk: Chunk) => void;
 	close: () => void;
+	fail: (error: Error) => void;
 }
 
 type Reply =
@@ -90,6 +96,7 @@ type Reply =
 let replies: Reply[] = [];
 let chatPosts: ChatPost[] = [];
 let cancelPosts: string[] = [];
+let onChatPost: (() => void) | undefined;
 const originalFetch = globalThis.fetch;
 
 const encoder = new TextEncoder();
@@ -130,6 +137,7 @@ function sseResponse(reply: Reply, signal?: AbortSignal | null): Response {
 					controller.enqueue(line("[DONE]"));
 					controller.close();
 				},
+				fail: (error) => controller.error(error),
 			});
 		},
 	});
@@ -146,6 +154,8 @@ function installFetch() {
 			cancelPosts.push(String(init.body));
 			return Response.json({ ok: true });
 		}
+		onChatPost?.();
+		onChatPost = undefined;
 		chatPosts.push({ body: JSON.parse(String(init.body)) });
 		const reply = replies.shift();
 		if (!reply) {
@@ -313,9 +323,11 @@ function postPart(postIndex: number, toolCallId: string) {
 }
 
 beforeEach(async () => {
+	win.history.replaceState(null, "", "/");
 	replies = [];
 	chatPosts = [];
 	cancelPosts = [];
+	onChatPost = undefined;
 	installFetch();
 	container = document.createElement("div");
 	document.body.appendChild(container);
@@ -1266,5 +1278,738 @@ describe("onToolCall set: failed answers are not handed over", () => {
 
 		expect(handled).toBe(0);
 		expect(chatPosts).toHaveLength(1);
+	});
+});
+
+// Round 3 helpers: open a controlled answer, and a clean thread store per test.
+function controlledReply(): {
+	reply: Reply;
+	opened: () => ControlledStream | undefined;
+} {
+	let stream: ControlledStream | undefined;
+	return {
+		reply: {
+			kind: "controlled",
+			onOpen: (s) => {
+				stream = s;
+			},
+		},
+		opened: () => stream,
+	};
+}
+
+async function streamToolCall(
+	opened: () => ControlledStream | undefined,
+	toolCallId: string,
+) {
+	await until("stream open", () => opened() !== undefined);
+	const stream = opened();
+	stream?.push({ type: "start" });
+	stream?.push({ type: "start-step" });
+	stream?.push({
+		type: "tool-input-available",
+		toolCallId,
+		toolName: "get_page_title",
+		input: {},
+	});
+	await until("tool part streamed", () =>
+		engine().messages.some((m) =>
+			m.parts.some((p) => "toolCallId" in p && p.toolCallId === toolCallId),
+		),
+	);
+	return stream;
+}
+
+function endStream(stream: ControlledStream | undefined) {
+	stream?.push({ type: "finish-step" });
+	stream?.push({ type: "finish" });
+	stream?.close();
+}
+
+async function clearThreads(): Promise<string> {
+	const memoryUserId = await getOrCreateMemoryUserId();
+	for (const t of await threadStore.listThreads(memoryUserId)) {
+		await threadStore.deleteThread(t.threadId);
+	}
+	return memoryUserId;
+}
+
+async function storeThread(threadId: string, messages: UIMessage[]) {
+	const now = new Date().toISOString();
+	await threadStore.upsertThread({
+		threadId,
+		memoryUserId: await getOrCreateMemoryUserId(),
+		title: threadId,
+		messages,
+		createdAt: now,
+		updatedAt: now,
+	});
+}
+
+function storedPart(thread: { messages: UIMessage[] } | null, id: string) {
+	for (const m of thread?.messages ?? []) {
+		for (const p of m.parts) {
+			if ("toolCallId" in p && p.toolCallId === id) {
+				return p;
+			}
+		}
+	}
+	return undefined;
+}
+
+const OLDER_QUESTION: UIMessage = {
+	id: "u_old",
+	role: "user",
+	parts: [{ type: "text", text: "an older question" }],
+};
+
+const UNANSWERED_HISTORY: UIMessage[] = [
+	{
+		id: "u_hist",
+		role: "user",
+		parts: [{ type: "text", text: "what page?" }],
+	},
+	{
+		id: "a_hist",
+		role: "assistant",
+		parts: [
+			{
+				type: "tool-get_page_title",
+				toolCallId: "historical",
+				state: "input-available",
+				input: {},
+			},
+		],
+	},
+];
+
+function fakeTransport(options: {
+	chunks?: UIMessageChunk[];
+	restored?: UIMessage[];
+}) {
+	const record: { sends: number; context: ChatTransportContext | undefined } = {
+		sends: 0,
+		context: undefined,
+	};
+	const factory: ChatTransportFactory = (context) => {
+		record.context = context;
+		return {
+			sendMessages: async () => {
+				record.sends += 1;
+				return new ReadableStream<UIMessageChunk>({
+					start(controller) {
+						for (const chunk of options.chunks ?? []) {
+							controller.enqueue(chunk);
+						}
+						controller.close();
+					},
+				});
+			},
+			reconnectToStream: async () => null,
+			...(options.restored
+				? {
+						keepsSession: () => true,
+						restore: async () => options.restored ?? [],
+					}
+				: {}),
+		};
+	};
+	return { factory, record };
+}
+
+const CUSTOM_ANSWER: UIMessageChunk[] = [
+	{ type: "start" },
+	{ type: "start-step" },
+	{
+		type: "tool-input-available",
+		toolCallId: "direct_1",
+		toolName: "get_page_title",
+		input: {},
+	},
+	{ type: "finish-step" },
+	{ type: "finish" },
+];
+
+describe("pageUrl on every ordinary HTTP chat request", () => {
+	test("a chat request carries the current page address as its own top-level field", async () => {
+		mount();
+		await settle();
+		replies.push(textAnswer("hi"));
+
+		send("hello");
+		await until("POST", () => chatPosts.length === 1);
+
+		expect(chatPosts[0]?.body.pageUrl).toBe("https://localhost/");
+	});
+
+	test("after a pushState route change the next request carries the new address", async () => {
+		mount();
+		await settle();
+		replies.push(textAnswer("one"), textAnswer("two"));
+
+		send("first");
+		await until("first answer", () => engine().status === "ready");
+		await until("first POST", () => chatPosts.length === 1);
+		await settle();
+		win.history.pushState({}, "", "/pricing?plan=pro#faq");
+		send("second");
+		await until("second POST", () => chatPosts.length === 2);
+
+		expect(chatPosts[0]?.body.pageUrl).toBe("https://localhost/");
+		expect(chatPosts[1]?.body.pageUrl).toBe(
+			"https://localhost/pricing?plan=pro#faq",
+		);
+	});
+
+	test("the carry-on request after the page answers reads the address again", async () => {
+		mount({
+			onToolCall: () => {
+				win.history.pushState({}, "", "/checkout");
+				return "navigated";
+			},
+		});
+		await settle();
+		replies.push(
+			answerWithCalls([{ id: "c1", name: "go_to_checkout", input: {} }]),
+			textAnswer("done"),
+		);
+
+		send("take me to checkout");
+		await until("follow-up POST", () => chatPosts.length === 2);
+
+		expect(chatPosts[0]?.body.pageUrl).toBe("https://localhost/");
+		expect(chatPosts[1]?.body.pageUrl).toBe("https://localhost/checkout");
+	});
+
+	test("a pageUrl the caller put in body wins", async () => {
+		mount({ body: { pageUrl: "https://caller.example/landing" } });
+		await settle();
+		replies.push(textAnswer("hi"));
+
+		send("hello");
+		await until("POST", () => chatPosts.length === 1);
+
+		expect(chatPosts[0]?.body.pageUrl).toBe("https://caller.example/landing");
+	});
+
+	test("a page object the caller passed is left exactly as it was, with pageUrl beside it", async () => {
+		const page = { url: "https://caller.example/p", title: "Caller page" };
+		mount({ body: { page } });
+		await settle();
+		replies.push(textAnswer("hi"));
+
+		send("hello");
+		await until("POST", () => chatPosts.length === 1);
+
+		expect(chatPosts[0]?.body.page).toEqual({
+			url: "https://caller.example/p",
+			title: "Caller page",
+		});
+		expect(page).toEqual({
+			url: "https://caller.example/p",
+			title: "Caller page",
+		});
+		expect(chatPosts[0]?.body.pageUrl).toBe("https://localhost/");
+	});
+
+	test("with no window the HTTP connection still sends the request, without pageUrl", async () => {
+		const { factory, record } = fakeTransport({ chunks: [] });
+		mount({ transport: factory });
+		await settle();
+		const fallback = record.context?.fallback;
+		if (!fallback) {
+			throw new Error("transport factory never called");
+		}
+		replies.push(textAnswer("hi"));
+
+		const saved = globalThis.window;
+		Reflect.deleteProperty(globalThis, "window");
+		onChatPost = () => {
+			Object.assign(globalThis, { window: saved });
+		};
+		try {
+			await fallback.sendMessages({
+				chatId: "c",
+				messages: [],
+				abortSignal: undefined,
+				trigger: "submit-message",
+				messageId: undefined,
+			});
+		} finally {
+			Object.assign(globalThis, { window: saved });
+		}
+
+		expect(chatPosts).toHaveLength(1);
+		expect(chatPosts[0]?.body).not.toHaveProperty("pageUrl");
+	});
+});
+
+describe("a custom transport: onToolCall is ignored and pageUrl is not sent", () => {
+	test("a tool call over a custom transport never reaches the handler and the chat ends idle", async () => {
+		let handled = 0;
+		const { factory, record } = fakeTransport({ chunks: CUSTOM_ANSWER });
+		mount({
+			transport: factory,
+			onToolCall: () => {
+				handled += 1;
+				return "x";
+			},
+		});
+		await settle();
+
+		send("go");
+		await until("answer finished", () =>
+			engine().messages.some((m) => m.role === "assistant"),
+		);
+		await settle();
+
+		expect(handled).toBe(0);
+		expect(record.sends).toBe(1);
+		expect(engine().status).toBe("ready");
+		expect(engine().isLoading).toBe(false);
+	});
+
+	test("the body the chat hands a custom transport carries no pageUrl", async () => {
+		const { factory, record } = fakeTransport({ chunks: [] });
+		mount({ transport: factory });
+		await settle();
+
+		const body = record.context?.body();
+
+		expect(body).toBeDefined();
+		expect(body).not.toHaveProperty("pageUrl");
+	});
+
+	test("a turn a custom transport sends through its HTTP fallback carries pageUrl", async () => {
+		const { factory, record } = fakeTransport({ chunks: [] });
+		mount({ transport: factory });
+		await settle();
+		const fallback = record.context?.fallback;
+		if (!fallback) {
+			throw new Error("transport factory never called");
+		}
+		replies.push(textAnswer("hi"));
+
+		await fallback.sendMessages({
+			chatId: "c",
+			messages: [],
+			abortSignal: undefined,
+			trigger: "submit-message",
+			messageId: undefined,
+		});
+
+		expect(chatPosts[0]?.body.pageUrl).toBe("https://localhost/");
+	});
+
+	test("unanswered calls a custom transport restores on mount are not handed to the page", async () => {
+		let handled = 0;
+		const { factory, record } = fakeTransport({
+			restored: UNANSWERED_HISTORY,
+		});
+		mount({
+			transport: factory,
+			onToolCall: () => {
+				handled += 1;
+				return "x";
+			},
+		});
+		await until("restored", () => engine().messages.length === 2);
+		await settle();
+
+		expect(handled).toBe(0);
+		expect(record.sends).toBe(0);
+		expect(engine().isLoading).toBe(false);
+	});
+});
+
+describe("restored history is never handed to the page", () => {
+	test("initial messages ending on an unanswered call: handler not called, chat idle, next message sent at once", async () => {
+		let handled = 0;
+		mount({
+			initialMessages: UNANSWERED_HISTORY,
+			onToolCall: () => {
+				handled += 1;
+				return "x";
+			},
+		});
+		await settle();
+		expect(handled).toBe(0);
+		expect(engine().isLoading).toBe(false);
+
+		replies.push(textAnswer("ok"));
+		send("new question");
+		await until("POST", () => chatPosts.length === 1);
+		await until("answered", () => engine().status === "ready");
+		await settle();
+
+		expect(handled).toBe(0);
+		expect(engine().queuedMessages).toHaveLength(0);
+	});
+
+	test("a saved thread loaded on mount with an unanswered call is not handed to the page", async () => {
+		await clearThreads();
+		await storeThread("t_restored", UNANSWERED_HISTORY);
+		let handled = 0;
+		mount({
+			enableThreadHistory: true,
+			onToolCall: () => {
+				handled += 1;
+				return "x";
+			},
+		});
+		await until("thread loaded", () => engine().messages.length === 2);
+		await settle();
+
+		expect(engine().activeThreadId).toBe("t_restored");
+		expect(handled).toBe(0);
+		expect(chatPosts).toHaveLength(0);
+		expect(engine().isLoading).toBe(false);
+	});
+});
+
+describe("no thread persistence while the page works", () => {
+	test("the thread is not saved with an unanswered call, and is saved answered once the chat carries on", async () => {
+		await clearThreads();
+		const d = deferred<unknown>();
+		mount({ enableThreadHistory: true, onToolCall: () => d.promise });
+		await settle();
+		replies.push(
+			answerWithCalls([{ id: "c1", name: "t", input: {} }]),
+			textAnswer("done"),
+		);
+
+		send("go");
+		await until("page working", () => engine().isLoading);
+		await until("stream ended", () =>
+			engine().messages.some((m) => m.role === "assistant"),
+		);
+		await tick(500);
+		const threadId = engine().activeThreadId;
+		if (!threadId) {
+			throw new Error("no active thread");
+		}
+
+		const during = await threadStore.loadThread(threadId);
+		expect(storedPart(during, "c1")).toBeUndefined();
+
+		await act(async () => {
+			d.resolve("answer");
+		});
+		await until("chat idle", () => engine().status === "ready");
+		await tick(500);
+
+		const after = await threadStore.loadThread(threadId);
+		expect(storedPart(after, "c1")).toMatchObject({
+			state: "output-available",
+			output: "answer",
+		});
+	});
+});
+
+describe("a finished answer that no longer belongs to the conversation hands nothing over", () => {
+	test("reset() called inside onResponseReceived: nothing handed to the page, no follow-up, chat idle", async () => {
+		let handled = 0;
+		mount({
+			onToolCall: () => {
+				handled += 1;
+				return "x";
+			},
+			onResponseReceived: () => {
+				hookRef.current?.reset();
+			},
+		});
+		await settle();
+		replies.push(
+			answerWithCalls([{ id: "c1", name: "t", input: {} }]),
+			textAnswer("should never be requested"),
+		);
+
+		send("go");
+		await until("POST", () => chatPosts.length === 1);
+		await until("finished", () => engine().status === "ready");
+		await settle();
+
+		expect(handled).toBe(0);
+		expect(chatPosts).toHaveLength(1);
+		expect(engine().isLoading).toBe(false);
+		expect(engine().messages).toHaveLength(0);
+	});
+
+	test("a network disconnect after the tool input arrived hands nothing over", async () => {
+		let handled = 0;
+		mount({
+			onToolCall: () => {
+				handled += 1;
+				return "x";
+			},
+		});
+		await settle();
+		const { reply, opened } = controlledReply();
+		replies.push(reply);
+
+		send("go");
+		const stream = await streamToolCall(opened, "c1");
+		stream?.fail(new TypeError("network error"));
+		await until("errored", () => engine().status === "error");
+		await settle();
+
+		expect(handled).toBe(0);
+		expect(chatPosts).toHaveLength(1);
+		expect(engine().isLoading).toBe(false);
+	});
+
+	test("a stream that finishes after a reset hands nothing to the page", async () => {
+		let handled = 0;
+		mount({
+			onToolCall: () => {
+				handled += 1;
+				return "x";
+			},
+		});
+		await settle();
+		const { reply, opened } = controlledReply();
+		replies.push(reply, textAnswer("should never be requested"));
+
+		send("go");
+		const stream = await streamToolCall(opened, "c1");
+		act(() => {
+			engine().reset();
+		});
+		endStream(stream);
+		await until("stream over", () => engine().status === "ready");
+		await settle();
+
+		expect(handled).toBe(0);
+		expect(chatPosts).toHaveLength(1);
+		expect(engine().isLoading).toBe(false);
+	});
+
+	test("a stream that finishes after a thread switch hands nothing to the page", async () => {
+		await clearThreads();
+		await storeThread("t_target", [OLDER_QUESTION]);
+		let handled = 0;
+		mount({
+			enableThreadHistory: true,
+			onToolCall: () => {
+				handled += 1;
+				return "x";
+			},
+		});
+		await until("history loaded", () => engine().isThreadHistoryReady);
+		act(() => {
+			engine().startNewThread();
+		});
+		await settle();
+		const { reply, opened } = controlledReply();
+		replies.push(reply, textAnswer("should never be requested"));
+
+		send("go");
+		const stream = await streamToolCall(opened, "c1");
+		await act(async () => {
+			await engine().switchThread("t_target");
+		});
+		endStream(stream);
+		await until("stream over", () => engine().status === "ready");
+		await settle();
+
+		expect(handled).toBe(0);
+		expect(chatPosts).toHaveLength(1);
+		expect(engine().isLoading).toBe(false);
+	});
+
+	test("a stream that finishes after the chat closed hands nothing to the page", async () => {
+		let handled = 0;
+		mount({
+			onToolCall: () => {
+				handled += 1;
+				return "x";
+			},
+		});
+		await settle();
+		const { reply, opened } = controlledReply();
+		replies.push(reply, textAnswer("should never be requested"));
+
+		send("go");
+		const stream = await streamToolCall(opened, "c1");
+		act(() => {
+			root.render(null);
+		});
+		endStream(stream);
+		await tick(100);
+
+		expect(handled).toBe(0);
+		expect(chatPosts).toHaveLength(1);
+	});
+
+	test("after a reset, the next answer's page call is handed over and the chat carries on", async () => {
+		const seen: string[] = [];
+		mount({
+			onToolCall: (call) => {
+				seen.push(call.toolCallId);
+				return call.toolCallId === "before" ? new Promise(() => {}) : "fresh";
+			},
+		});
+		await settle();
+		replies.push(
+			answerWithCalls([{ id: "before", name: "t", input: {} }]),
+			answerWithCalls([{ id: "after", name: "t", input: {} }]),
+			textAnswer("done"),
+		);
+
+		send("go");
+		await until("first handed", () => seen.length === 1);
+		act(() => {
+			engine().reset();
+		});
+		await settle();
+		send("again");
+		await until("carry-on POST", () => chatPosts.length === 3);
+
+		expect(seen).toEqual(["before", "after"]);
+		expect(postPart(2, "after").output).toBe("fresh");
+	});
+
+	test("after Stop, the next answer's page call is handed over", async () => {
+		const seen: string[] = [];
+		mount({
+			onToolCall: (call) => {
+				seen.push(call.toolCallId);
+				return call.toolCallId === "before" ? new Promise(() => {}) : "fresh";
+			},
+		});
+		await settle();
+		replies.push(
+			answerWithCalls([{ id: "before", name: "t", input: {} }]),
+			answerWithCalls([{ id: "after", name: "t", input: {} }]),
+			textAnswer("done"),
+		);
+
+		send("go");
+		await until("first handed", () => seen.length === 1);
+		await act(async () => {
+			await engine().stop();
+		});
+		await settle();
+		send("again");
+		await until("carry-on POST", () => chatPosts.length === 3);
+
+		expect(seen).toEqual(["before", "after"]);
+		expect(postPart(2, "after").output).toBe("fresh");
+	});
+});
+
+describe("a queued message and a thread change while the page works", () => {
+	test("switching thread with a message queued: the message is not sent to the old thread", async () => {
+		await clearThreads();
+		await storeThread("t_target", [OLDER_QUESTION]);
+		mount({
+			enableThreadHistory: true,
+			onToolCall: () => new Promise(() => {}),
+		});
+		await until("history loaded", () => engine().isThreadHistoryReady);
+		act(() => {
+			engine().startNewThread();
+		});
+		await settle();
+		replies.push(
+			answerWithCalls([{ id: "c1", name: "t", input: {} }]),
+			textAnswer("should never be requested"),
+		);
+
+		send("go");
+		await until("page working", () => engine().isLoading);
+		await until("stream ended", () =>
+			engine().messages.some((m) => m.role === "assistant"),
+		);
+		await settle();
+		send("queued meanwhile");
+		expect(engine().queuedMessages).toHaveLength(1);
+
+		act(() => {
+			void engine().switchThread("t_target");
+		});
+		await until("switched", () => engine().activeThreadId === "t_target");
+		await tick(400);
+
+		expect(chatPosts).toHaveLength(1);
+		expect(engine().queuedMessages).toHaveLength(0);
+		expect(engine().messages.map((m) => m.id)).toEqual(["u_old"]);
+		expect(engine().isLoading).toBe(false);
+	});
+
+	test("switching thread while the page works saves the outgoing thread with its calls answered", async () => {
+		await clearThreads();
+		await storeThread("t_target", [OLDER_QUESTION]);
+		mount({
+			enableThreadHistory: true,
+			onToolCall: () => new Promise(() => {}),
+		});
+		await until("history loaded", () => engine().isThreadHistoryReady);
+		act(() => {
+			engine().startNewThread();
+		});
+		await settle();
+		replies.push(
+			answerWithCalls([{ id: "c1", name: "t", input: {} }]),
+			textAnswer("should never be requested"),
+		);
+
+		send("go");
+		await until("page working", () => engine().isLoading);
+		await until("stream ended", () =>
+			engine().messages.some((m) => m.role === "assistant"),
+		);
+		await settle();
+		const outgoing = engine().activeThreadId;
+
+		act(() => {
+			void engine().switchThread("t_target");
+		});
+		await until("switched", () => engine().activeThreadId === "t_target");
+		await tick(400);
+
+		const saved = await threadStore.loadThread(outgoing ?? "");
+		expect(storedPart(saved, "c1")).toMatchObject({
+			state: "output-error",
+			errorText: STOPPED_TEXT,
+		});
+	});
+
+	test("deleting the active thread with a message queued: the message is never sent", async () => {
+		await clearThreads();
+		mount({
+			enableThreadHistory: true,
+			onToolCall: () => new Promise(() => {}),
+		});
+		await until("history loaded", () => engine().isThreadHistoryReady);
+		await settle();
+		replies.push(
+			answerWithCalls([{ id: "c1", name: "t", input: {} }]),
+			textAnswer("should never be requested"),
+		);
+
+		send("go");
+		await until("page working", () => engine().isLoading);
+		await until("stream ended", () =>
+			engine().messages.some((m) => m.role === "assistant"),
+		);
+		await settle();
+		const active = engine().activeThreadId;
+		if (!active) {
+			throw new Error("no active thread");
+		}
+		send("queued meanwhile");
+		expect(engine().queuedMessages).toHaveLength(1);
+
+		act(() => {
+			void engine().deleteThread(active);
+		});
+		await until("deleted", () => engine().activeThreadId === undefined);
+		await tick(400);
+
+		expect(chatPosts).toHaveLength(1);
+		expect(engine().queuedMessages).toHaveLength(0);
+		expect(engine().messages).toHaveLength(0);
+		expect(engine().isLoading).toBe(false);
 	});
 });

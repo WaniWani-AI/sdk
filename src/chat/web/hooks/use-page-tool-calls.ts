@@ -48,6 +48,8 @@ export function usePageToolCalls(onToolCall: PageToolCallHandler | undefined) {
 	const writesRef = useRef(new Map<string, Promise<void>>());
 	// Bumped by `stop`, `drop` and unmount, so an answer that lands afterwards is ignored.
 	const epochRef = useRef(0);
+	// The epoch the latest request started in; a finish from an older one hands nothing over.
+	const requestEpochRef = useRef(0);
 	const stoppingRef = useRef<Promise<boolean> | null>(null);
 	const [pending, setPending] = useState(false);
 
@@ -68,6 +70,8 @@ export function usePageToolCalls(onToolCall: PageToolCallHandler | undefined) {
 			}
 			try {
 				if (output.state === "output-available") {
+					// Throws on what the request body can't carry, such as a BigInt or a cycle.
+					JSON.stringify(output.output);
 					await chat.addToolOutput({
 						tool,
 						toolCallId,
@@ -121,6 +125,7 @@ export function usePageToolCalls(onToolCall: PageToolCallHandler | undefined) {
 				return;
 			}
 			setPending(false);
+			requestEpochRef.current = epochRef.current;
 			void chatRef.current?.sendMessage();
 		},
 		[write],
@@ -130,7 +135,7 @@ export function usePageToolCalls(onToolCall: PageToolCallHandler | undefined) {
 	const handleFinish = useCallback(
 		(message: UIMessage) => {
 			const handler = handlerRef.current;
-			if (!handler) {
+			if (!handler || requestEpochRef.current !== epochRef.current) {
 				return;
 			}
 			const calls = message.parts
@@ -176,43 +181,54 @@ export function usePageToolCalls(onToolCall: PageToolCallHandler | undefined) {
 	);
 
 	/** Answers every owed call with an error, keeping answers already being written, and stays pending until all are in. */
-	const stop = useCallback((): Promise<boolean> => {
-		if (stoppingRef.current) {
-			return stoppingRef.current;
-		}
-		if (owedRef.current.size === 0) {
-			return Promise.resolve(false);
-		}
-		epochRef.current += 1;
-		const epoch = epochRef.current;
-		const owed = [...owedRef.current];
-		owedRef.current.clear();
-		const stopping = Promise.all(
-			owed.map(
-				([toolCallId, tool]) =>
-					writesRef.current.get(toolCallId) ??
-					write(tool, toolCallId, {
-						state: "output-error",
-						errorText: STOPPED_ERROR_TEXT,
-					}),
-			),
-		).then(() => {
-			stoppingRef.current = null;
-			if (epoch === epochRef.current) {
-				setPending(false);
+	const stop = useCallback(
+		({ keepBusy = false } = {}): Promise<boolean> => {
+			if (stoppingRef.current) {
+				return stoppingRef.current;
 			}
-			return true;
-		});
-		stoppingRef.current = stopping;
-		return stopping;
-	}, [write]);
+			if (owedRef.current.size === 0) {
+				return Promise.resolve(false);
+			}
+			epochRef.current += 1;
+			const epoch = epochRef.current;
+			const owed = [...owedRef.current];
+			owedRef.current.clear();
+			const stopping = Promise.all(
+				owed.map(
+					([toolCallId, tool]) =>
+						writesRef.current.get(toolCallId) ??
+						write(tool, toolCallId, {
+							state: "output-error",
+							errorText: STOPPED_ERROR_TEXT,
+						}),
+				),
+			).then(() => {
+				if (stoppingRef.current === stopping) {
+					stoppingRef.current = null;
+				}
+				if (epoch === epochRef.current && !keepBusy) {
+					setPending(false);
+				}
+				return true;
+			});
+			stoppingRef.current = stopping;
+			return stopping;
+		},
+		[write],
+	);
 
 	/** Forgets every owed call, for when the conversation is replaced. */
 	const drop = useCallback(() => {
 		epochRef.current += 1;
 		owedRef.current.clear();
+		stoppingRef.current = null;
 		setPending(false);
 	}, []);
 
-	return { chatRef, pending, handleFinish, stop, drop };
+	/** Call when the user sends a message, so its answer belongs to the current conversation. */
+	const markRequest = useCallback(() => {
+		requestEpochRef.current = epochRef.current;
+	}, []);
+
+	return { chatRef, pending, handleFinish, stop, drop, markRequest };
 }
