@@ -14,6 +14,7 @@ import {
 } from "../utils.js";
 import type { WidgetTokenCache } from "../widget-token.js";
 import type { FunnelSyncPayload } from "./funnel-sync.js";
+import type { ToolTelemetry } from "./telemetry-capture.js";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -120,12 +121,6 @@ export function buildTrackInput(
 		stripLocationFields?: readonly string[];
 		redactInput?: (input: unknown) => unknown;
 		funnelSync?: FunnelSyncPayload | null;
-		/**
-		 * Input keys `withWaniwani` added to this tool's schema (`intent`,
-		 * `context`). Tracked so the platform can tell a field Waniwani asked for
-		 * from a same-named field the tool declared itself.
-		 */
-		injectedInputFields?: readonly string[];
 	},
 	timing?: {
 		durationMs: number;
@@ -134,7 +129,7 @@ export function buildTrackInput(
 		cause?: ErrorCauseType;
 	},
 	clientInfo?: { name: string; version: string },
-	io?: { input?: unknown; output?: unknown },
+	io?: { input?: unknown; output?: unknown; telemetry?: ToolTelemetry },
 	kbSearch?: KbSearchTrace[],
 ): TrackInput {
 	const toolType = resolveToolType(toolName, options.toolType);
@@ -201,10 +196,7 @@ export function buildTrackInput(
 			type: toolType,
 			...(timing ?? {}),
 			...(input !== undefined && { input }),
-			...(options.injectedInputFields &&
-				options.injectedInputFields.length > 0 && {
-					injectedInputFields: [...options.injectedInputFields],
-				}),
+			...(io?.telemetry && { telemetry: io.telemetry }),
 			...(output !== undefined && { output }),
 			...(kbSearch && kbSearch.length > 0 && { kbSearch }),
 		},

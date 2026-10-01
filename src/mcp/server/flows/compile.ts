@@ -182,7 +182,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			// `intent` is observational: the schema asks for it on start, but nothing
 			// in the engine reads it (it never reaches a node or the store). It is
 			// tracked only because `withWaniwani` records the raw tool input on
-			// `tool.called`, which is also where plain tools' captured intent lands.
+			// `tool.called` and copies it into `properties.telemetry`.
 			// A missing value therefore costs a conversation turn and buys nothing,
 			// so trim it and carry on instead of failing the call.
 			const intent =

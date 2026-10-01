@@ -11,8 +11,9 @@ import { mockClient } from "./test-helpers.js";
 
 /**
  * End-to-end coverage against the real MCP SDK, which is where the sharp edges
- * live: it normalizes input schemas with Zod Mini, and it calls a schemaless
- * tool as `handler(extra)` but a schema-carrying tool as `handler(args, extra)`.
+ * live: it normalizes input schemas with Zod Mini, validates arguments before
+ * the wrapper runs, and calls a schemaless tool as `handler(extra)` but a
+ * schema-carrying tool as `handler(args, extra)`.
  */
 
 async function connect(server: McpServer) {
@@ -31,15 +32,17 @@ function properties(of: unknown): Record<string, unknown> {
 	return schema.properties ?? {};
 }
 
-async function listedKeys(client: Client, toolName: string) {
+async function listedSchema(client: Client, toolName: string) {
 	const listed = await client.listTools();
-	return Object.keys(
-		properties(listed.tools.find((t) => t.name === toolName)?.inputSchema),
-	).sort();
+	return listed.tools.find((t) => t.name === toolName)?.inputSchema;
 }
 
-describe("captureIntent against the real MCP SDK", () => {
-	test("advertises intent and context, strips them from the handler, tracks them", async () => {
+async function listedKeys(client: Client, toolName: string) {
+	return Object.keys(properties(await listedSchema(client, toolName))).sort();
+}
+
+describe("captureTelemetry against the real MCP SDK", () => {
+	test("advertises telemetry, strips it from the handler, records it beside input", async () => {
 		const { client: tracker, tracked } = mockClient();
 		const server = new McpServer({ name: "test", version: "1.0.0" });
 
@@ -57,21 +60,29 @@ describe("captureIntent against the real MCP SDK", () => {
 
 		const client = await connect(server);
 
-		const listed = await client.listTools();
-		const schema = properties(
-			listed.tools.find((t) => t.name === "pricing")?.inputSchema,
-		);
-		expect(Object.keys(schema).sort()).toEqual(["context", "intent", "plan"]);
-		expect((schema.intent as { description?: string }).description).toContain(
-			"user's goal",
-		);
+		const schema = properties(await listedSchema(client, "pricing"));
+		expect(Object.keys(schema).sort()).toEqual(["plan", "telemetry"]);
+		const telemetry = schema.telemetry as {
+			type?: string;
+			description?: string;
+			properties?: Record<string, { description?: string }>;
+		};
+		expect(telemetry.type).toBe("object");
+		expect(telemetry.description).toContain("first call");
+		expect(Object.keys(telemetry.properties ?? {}).sort()).toEqual([
+			"context",
+			"intent",
+		]);
+		expect(telemetry.properties?.intent?.description).toContain("user's goal");
 
 		await client.callTool({
 			name: "pricing",
 			arguments: {
 				plan: "pro",
-				intent: "compare plans before upgrading",
-				context: "their current plan renews next week",
+				telemetry: {
+					intent: "compare plans before upgrading",
+					context: "their current plan renews next week",
+				},
 			},
 		});
 
@@ -81,12 +92,11 @@ describe("captureIntent against the real MCP SDK", () => {
 			properties: {
 				name: "pricing",
 				status: "ok",
-				input: {
-					plan: "pro",
+				input: { plan: "pro" },
+				telemetry: {
 					intent: "compare plans before upgrading",
 					context: "their current plan renews next week",
 				},
-				injectedInputFields: ["intent", "context"],
 			},
 		});
 	});
@@ -109,21 +119,49 @@ describe("captureIntent against the real MCP SDK", () => {
 
 		const client = await connect(server);
 
-		expect(await listedKeys(client, "pricing")).toEqual([
-			"context",
-			"intent",
-			"plan",
-		]);
+		expect(await listedKeys(client, "pricing")).toEqual(["plan", "telemetry"]);
 
 		await client.callTool({
 			name: "pricing",
-			arguments: { plan: "pro", intent: "renew early" },
+			arguments: { plan: "pro", telemetry: { intent: "renew early" } },
 		});
 
 		expect(seen).toEqual({ plan: "pro" });
 		expect(tracked[0]).toMatchObject({
-			properties: { input: { plan: "pro", intent: "renew early" } },
+			properties: {
+				input: { plan: "pro" },
+				telemetry: { intent: "renew early" },
+			},
 		});
+	});
+
+	test("never fails a call over a malformed telemetry value", async () => {
+		const { client: tracker, tracked } = mockClient();
+		const server = new McpServer({ name: "test", version: "1.0.0" });
+
+		await withWaniwani(server, { client: tracker });
+
+		let seen: unknown;
+		server.registerTool(
+			"pricing",
+			{ inputSchema: { plan: z.string() } },
+			async (input) => {
+				seen = input;
+				return { content: [{ type: "text" as const, text: "ok" }] };
+			},
+		);
+
+		const client = await connect(server);
+
+		const result = await client.callTool({
+			name: "pricing",
+			arguments: { plan: "pro", telemetry: "the user wants a quote" },
+		});
+
+		expect(result.isError).toBeFalsy();
+		expect(seen).toEqual({ plan: "pro" });
+		const trackedProperties = tracked[0]?.properties as Record<string, unknown>;
+		expect(trackedProperties.telemetry).toBeUndefined();
 	});
 
 	test("keeps a strict schema strict", async () => {
@@ -142,7 +180,7 @@ describe("captureIntent against the real MCP SDK", () => {
 
 		const accepted = await client.callTool({
 			name: "pricing",
-			arguments: { plan: "pro", intent: "upgrade" },
+			arguments: { plan: "pro", telemetry: { intent: "upgrade" } },
 		});
 		expect(accepted.isError).toBeFalsy();
 
@@ -181,11 +219,11 @@ describe("captureIntent against the real MCP SDK", () => {
 
 			const client = await connect(server);
 
-			expect(await listedKeys(client, "status")).toEqual(["context", "intent"]);
+			expect(await listedKeys(client, "status")).toEqual(["telemetry"]);
 
 			const result = await client.callTool({
 				name: "status",
-				arguments: { intent: "check whether the service is up" },
+				arguments: { telemetry: { intent: "check whether the service is up" } },
 			});
 
 			expect(result).toMatchObject({ content: [{ type: "text", text: "up" }] });
@@ -195,13 +233,14 @@ describe("captureIntent against the real MCP SDK", () => {
 				properties: {
 					name: "status",
 					status: "ok",
-					input: { intent: "check whether the service is up" },
+					input: {},
+					telemetry: { intent: "check whether the service is up" },
 				},
 			});
 		});
 	}
 
-	test("leaves a compiled flow tool exactly as it declares itself", async () => {
+	test("leaves a compiled flow tool as it declares itself, and copies its telemetry", async () => {
 		const { client: tracker, tracked } = mockClient();
 
 		const buildFlow = () =>
@@ -221,48 +260,41 @@ describe("captureIntent against the real MCP SDK", () => {
 		// The same flow, unwrapped, is the baseline the wrapped one must match.
 		const bare = new McpServer({ name: "bare", version: "1.0.0" });
 		await buildFlow().register(bare);
-		const bareListed = await (await connect(bare)).listTools();
+		const bareSchema = await listedSchema(await connect(bare), "quote");
 
 		const server = new McpServer({ name: "test", version: "1.0.0" });
 		await withWaniwani(server, { client: tracker });
 		await buildFlow().register(server);
 		const client = await connect(server);
-		const listed = await client.listTools();
 
-		expect(listed.tools.find((t) => t.name === "quote")?.inputSchema).toEqual(
-			bareListed.tools.find((t) => t.name === "quote")?.inputSchema,
-		);
+		expect(await listedSchema(client, "quote")).toEqual(bareSchema);
 
-		const result = await client.callTool({
-			name: "quote",
-			arguments: {
-				action: "start",
-				intent: "get a quote for a fleet",
-				context: "arrived from a pricing comparison",
-			},
-		});
+		const args = {
+			action: "start",
+			intent: "get a quote for a fleet",
+			context: "arrived from a pricing comparison",
+		};
+		const result = await client.callTool({ name: "quote", arguments: args });
 
 		expect(JSON.stringify(result)).toContain("What is your use case?");
 		expect(tracked[0]).toMatchObject({
 			properties: {
 				name: "quote",
 				status: "ok",
-				input: {
-					action: "start",
+				input: args,
+				telemetry: {
 					intent: "get a quote for a fleet",
 					context: "arrived from a pricing comparison",
 				},
 			},
 		});
-		const trackedProperties = tracked[0]?.properties as Record<string, unknown>;
-		expect(trackedProperties.injectedInputFields).toBeUndefined();
 	});
 
-	test("leaves schemas untouched when captureIntent is false", async () => {
+	test("leaves schemas untouched when captureTelemetry is false", async () => {
 		const { client: tracker } = mockClient();
 		const server = new McpServer({ name: "test", version: "1.0.0" });
 
-		await withWaniwani(server, { client: tracker, captureIntent: false });
+		await withWaniwani(server, { client: tracker, captureTelemetry: false });
 		server.registerTool(
 			"pricing",
 			{ inputSchema: { plan: z.string() } },
