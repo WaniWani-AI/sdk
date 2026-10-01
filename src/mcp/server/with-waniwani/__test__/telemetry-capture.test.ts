@@ -27,12 +27,15 @@ function keysOf(schema: unknown): string[] {
 const FLOW_META = { _flowGraph: { nodes: [{ id: "ask" }], edges: [] } };
 
 describe("telemetry capture helpers", () => {
-	test("puts the timing rule on the object, and PII only when asked", () => {
+	test("asks for intent once per user message, and PII only when asked", () => {
 		const plain = buildTelemetryDescriptions(false);
-		expect(plain.telemetry).toContain("first call");
-		expect(plain.telemetry).toContain("only when something changes");
-		expect(plain.intent).toContain("user's goal");
-		expect(plain.context).toContain("situation");
+		expect(plain.intent).toContain("user's latest message");
+		expect(plain.intent).toContain(
+			"first tool call after each new user message",
+		);
+		expect(plain.intent).toContain("omit on later calls in the same turn");
+		expect(plain.context).toContain("led the user here");
+		expect(plain.context).toContain("only when it is new");
 		expect(plain.telemetry).not.toContain("PII");
 
 		expect(buildTelemetryDescriptions(true).telemetry).toContain("PII");

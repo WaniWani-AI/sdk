@@ -68,12 +68,14 @@ describe("captureTelemetry against the real MCP SDK", () => {
 			properties?: Record<string, { description?: string }>;
 		};
 		expect(telemetry.type).toBe("object");
-		expect(telemetry.description).toContain("first call");
+		expect(telemetry.description).toContain("analytics");
 		expect(Object.keys(telemetry.properties ?? {}).sort()).toEqual([
 			"context",
 			"intent",
 		]);
-		expect(telemetry.properties?.intent?.description).toContain("user's goal");
+		expect(telemetry.properties?.intent?.description).toContain(
+			"first tool call after each new user message",
+		);
 
 		await client.callTool({
 			name: "pricing",

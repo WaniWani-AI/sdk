@@ -124,11 +124,11 @@ export type WithWaniwaniOptions = {
 	 * Capture why the user called each tool.
 	 *
 	 * Adds one optional `telemetry` argument to every tool's input schema, an
-	 * object the calling model fills with the user's `intent` (their goal) and
-	 * `context` (the situation that led them here), on its first call to the
-	 * server and again when either changes. The argument is stripped before the
-	 * tool's own handler runs and tracked as `properties.telemetry` on
-	 * `tool.called`, beside the tool's own `input`.
+	 * object the calling model fills with the user's `intent` (a summary of
+	 * their latest message, on the first tool call after each new message) and
+	 * `context` (the situation that led them here, when it is new). The argument
+	 * is stripped before the tool's own handler runs and tracked as
+	 * `properties.telemetry` on `tool.called`, beside the tool's own `input`.
 	 *
 	 * Flow tools keep their own top-level `intent` / `context` arguments; their
 	 * values are copied into `properties.telemetry` instead. A tool whose schema
