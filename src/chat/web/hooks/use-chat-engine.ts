@@ -1134,17 +1134,17 @@ export function useChatEngine(props: ChatBaseProps) {
 			// Stopped first and busy until the switch ends, so the outgoing thread is
 			// saved with every tool call answered and no queued message reaches it.
 			const stopped = await stopPageToolCalls({ keepBusy: true });
-			if (stopped) {
-				// Nothing was saved while the page worked; the updater reads the live messages.
-				setMessages((live) => {
-					messagesRef.current = live;
-					return live;
-				});
-				await persistActiveThread();
-			} else {
-				dropPageToolCalls();
-			}
 			try {
+				if (stopped) {
+					// Nothing was saved while the page worked; the updater reads the live messages.
+					setMessages((live) => {
+						messagesRef.current = live;
+						return live;
+					});
+					await persistActiveThread();
+				} else {
+					dropPageToolCalls();
+				}
 				await flushPendingPersist();
 				if (epoch !== switchEpochRef.current) {
 					return;

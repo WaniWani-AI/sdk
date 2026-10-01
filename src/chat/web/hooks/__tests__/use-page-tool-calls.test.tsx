@@ -756,3 +756,106 @@ describe("usePageToolCalls Stop under pressure", () => {
 		expect(hook().pending).toBe(false);
 	});
 });
+
+describe("usePageToolCalls Stop with keepBusy", () => {
+	test("keepBusy writes the stopped answers but leaves the chat busy until drop", async () => {
+		const chat = mountWith(() => new Promise(() => {}));
+
+		finish(assistant([pageCall("a"), pageCall("b")]));
+		await flush();
+		let stopped = false;
+		await act(async () => {
+			stopped = await hook().stop({ keepBusy: true });
+		});
+		await flush();
+
+		expect(stopped).toBe(true);
+		expect(lastWrite(chat, "a")).toMatchObject({ errorText: STOPPED_TEXT });
+		expect(lastWrite(chat, "b")).toMatchObject({ errorText: STOPPED_TEXT });
+		expect(hook().pending).toBe(true);
+		expect(chat.followUps).toBe(0);
+
+		act(() => {
+			hook().drop();
+		});
+		expect(hook().pending).toBe(false);
+	});
+
+	test("keepBusy with nothing waiting reports false and leaves the chat idle", async () => {
+		const chat = mountWith(() => "x");
+
+		let stopped = true;
+		await act(async () => {
+			stopped = await hook().stop({ keepBusy: true });
+		});
+
+		expect(stopped).toBe(false);
+		expect(hook().pending).toBe(false);
+		expect(chat.written).toEqual([]);
+	});
+
+	test("a plain Stop during a keepBusy Stop shares its answers and does not end the busy state", async () => {
+		const chat = mountWith(() => new Promise(() => {}));
+
+		finish(assistant([pageCall("a")]));
+		await flush();
+		chat.holdWrites = true;
+		let first: Promise<boolean> = Promise.resolve(false);
+		let second: Promise<boolean> = Promise.resolve(false);
+		act(() => {
+			first = hook().stop({ keepBusy: true });
+			second = hook().stop();
+		});
+		chat.holdWrites = false;
+		await act(async () => {
+			await chat.releaseWrites();
+		});
+		await flush();
+
+		expect(await first).toBe(true);
+		expect(await second).toBe(true);
+		expect(chat.written.filter((w) => w.toolCallId === "a")).toHaveLength(1);
+		expect(hook().pending).toBe(true);
+	});
+
+	test("an answer the page gives after a keepBusy Stop is ignored and nothing carries on", async () => {
+		let answerA: (v: unknown) => void = () => {};
+		const chat = mountWith(
+			() =>
+				new Promise((r) => {
+					answerA = r;
+				}),
+		);
+
+		finish(assistant([pageCall("a")]));
+		await flush();
+		await act(async () => {
+			await hook().stop({ keepBusy: true });
+		});
+		await act(async () => {
+			answerA("too late");
+		});
+		await flush();
+
+		expect(chat.written.filter((w) => w.toolCallId === "a")).toHaveLength(1);
+		expect(lastWrite(chat, "a")).toMatchObject({ errorText: STOPPED_TEXT });
+		expect(chat.followUps).toBe(0);
+	});
+
+	test("a BigInt result is written as the stored-error text, not handed to the chat", async () => {
+		const chat = mountWith(() => 5n);
+
+		finish(assistant([pageCall("c1")]));
+		await flush();
+
+		expect(chat.written.filter((w) => w.toolCallId === "c1")).toEqual([
+			{
+				tool: "get_page_title",
+				toolCallId: "c1",
+				state: "output-error",
+				errorText: "The page's result could not be stored.",
+			},
+		]);
+		expect(chat.followUps).toBe(1);
+	});
+});

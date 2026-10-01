@@ -58,8 +58,29 @@ mock.module("@ai-sdk/react", () => ({ ...realAiSdkReact }));
 // @ts-expect-error -- bun:test `mock.module` exists at runtime but has no TS type
 mock.module("../../lib/lenient-chat-transport", () => ({ ...realTransport }));
 
+// The thread store is real, but a test can hold a load or a delete to see the chat mid-switch.
+const realThreadStorePath = "../../lib/thread-store.ts?real";
+const threadStore: typeof import("../../lib/thread-store") = await import(
+	realThreadStorePath
+);
+const storeHolds: {
+	load?: (threadId: string) => Promise<void>;
+	remove?: (threadId: string) => Promise<void>;
+} = {};
+// @ts-expect-error -- bun:test `mock.module` exists at runtime but has no TS type
+mock.module("../../lib/thread-store", () => ({
+	...threadStore,
+	loadThread: async (threadId: string) => {
+		await storeHolds.load?.(threadId);
+		return threadStore.loadThread(threadId);
+	},
+	deleteThread: async (threadId: string) => {
+		await storeHolds.remove?.(threadId);
+		return threadStore.deleteThread(threadId);
+	},
+}));
+
 const { useChatEngine } = await import("../use-chat-engine");
-const threadStore = await import("../../lib/thread-store");
 const { getOrCreateMemoryUserId } = await import("../../lib/memory-user-id");
 type HookReturn = ReturnType<typeof useChatEngine>;
 type EngineProps = Parameters<typeof useChatEngine>[0];
@@ -324,6 +345,8 @@ function postPart(postIndex: number, toolCallId: string) {
 
 beforeEach(async () => {
 	win.history.replaceState(null, "", "/");
+	storeHolds.load = undefined;
+	storeHolds.remove = undefined;
 	replies = [];
 	chatPosts = [];
 	cancelPosts = [];
@@ -2011,5 +2034,285 @@ describe("a queued message and a thread change while the page works", () => {
 		expect(engine().queuedMessages).toHaveLength(0);
 		expect(engine().messages).toHaveLength(0);
 		expect(engine().isLoading).toBe(false);
+	});
+});
+
+const UNSTORED_TEXT = "The page's result could not be stored.";
+
+function selfReferencing(): Record<string, unknown> {
+	const node: Record<string, unknown> = { name: "loop" };
+	node.self = node;
+	return node;
+}
+
+describe("a result JSON can't carry is sent as an error and later requests still work", () => {
+	for (const [label, make] of [
+		["a BigInt", () => 10n],
+		["an object holding a BigInt", () => ({ total: 10n })],
+		["a self-referencing object", selfReferencing],
+	] as const) {
+		test(`${label}: the follow-up carries the stored-error text, and the next message still sends`, async () => {
+			mount({ onToolCall: () => make() });
+			await settle();
+			replies.push(
+				answerWithCalls([{ id: "c1", name: "read_cart", input: {} }]),
+				textAnswer("sorry"),
+				textAnswer("next answer"),
+			);
+
+			send("cart?");
+			await until("follow-up POST", () => chatPosts.length === 2);
+			await until("chat idle", () => engine().status === "ready");
+			await settle();
+
+			expect(postPart(1, "c1")).toMatchObject({
+				state: "output-error",
+				errorText: UNSTORED_TEXT,
+			});
+
+			send("and now?");
+			await until("third POST", () => chatPosts.length === 3);
+			await until("answered", () => engine().status === "ready");
+
+			expect(postPart(2, "c1").state).toBe("output-error");
+			expect(engine().status).toBe("ready");
+		});
+	}
+
+	test("one unstorable result beside a good one: one follow-up, each call with its own outcome", async () => {
+		mount({
+			onToolCall: (call) => (call.toolCallId === "bad" ? 1n : { ok: true }),
+		});
+		await settle();
+		replies.push(
+			answerWithCalls([
+				{ id: "bad", name: "t", input: {} },
+				{ id: "good", name: "t", input: {} },
+			]),
+			textAnswer("ok"),
+		);
+
+		send("go");
+		await until("follow-up POST", () => chatPosts.length === 2);
+		await until("chat idle", () => engine().status === "ready");
+		await settle();
+
+		expect(chatPosts).toHaveLength(2);
+		expect(postPart(1, "bad")).toMatchObject({
+			state: "output-error",
+			errorText: UNSTORED_TEXT,
+		});
+		expect(postPart(1, "good")).toMatchObject({
+			state: "output-available",
+			output: { ok: true },
+		});
+	});
+});
+
+// Puts the page to work in a fresh saved thread, beside a stored thread to switch to.
+async function pageWorkingInNewThread(): Promise<string> {
+	await clearThreads();
+	await storeThread("t_target", [OLDER_QUESTION]);
+	await storeThread("t_second", [
+		{ id: "u_second", role: "user", parts: [{ type: "text", text: "second" }] },
+	]);
+	mount({ enableThreadHistory: true, onToolCall: () => new Promise(() => {}) });
+	await until("history loaded", () => engine().isThreadHistoryReady);
+	act(() => {
+		engine().startNewThread();
+	});
+	await settle();
+	replies.push(
+		answerWithCalls([{ id: "c1", name: "t", input: {} }]),
+		textAnswer("only if a queued message goes out"),
+	);
+	send("go");
+	await until("page working", () => engine().isLoading);
+	await until("stream ended", () =>
+		engine().messages.some((m) => m.role === "assistant"),
+	);
+	await settle();
+	const outgoing = engine().activeThreadId;
+	if (!outgoing) {
+		throw new Error("no active thread");
+	}
+	return outgoing;
+}
+
+function holdLoad(threadId: string) {
+	const gate = deferred<void>();
+	storeHolds.load = (id) =>
+		id === threadId ? gate.promise : Promise.resolve();
+	return () => gate.resolve();
+}
+
+function stoppedInEngine(id: string) {
+	return () => {
+		const part = engineToolPart(id);
+		return part.state === "output-error" && part.errorText === STOPPED_TEXT;
+	};
+}
+
+describe("a thread switch or delete keeps the chat busy until it ends", () => {
+	test("while the target thread is still loading the chat stays busy and the queued message waits", async () => {
+		await pageWorkingInNewThread();
+		const release = holdLoad("t_target");
+		send("queued meanwhile");
+
+		act(() => {
+			void engine().switchThread("t_target");
+		});
+		await until("stopped answers written", stoppedInEngine("c1"));
+		await tick(100);
+
+		expect(engine().isLoading).toBe(true);
+		expect(engine().status).toBe("streaming");
+		expect(engine().queuedMessages).toHaveLength(1);
+		expect(chatPosts).toHaveLength(1);
+
+		release();
+		await until("switched", () => engine().activeThreadId === "t_target");
+		await tick(100);
+
+		expect(engine().isLoading).toBe(false);
+		expect(engine().queuedMessages).toHaveLength(0);
+		expect(chatPosts).toHaveLength(1);
+	});
+
+	test("the outgoing thread is saved with its stopped calls before the target thread loads", async () => {
+		const outgoing = await pageWorkingInNewThread();
+		const release = holdLoad("t_target");
+
+		act(() => {
+			void engine().switchThread("t_target");
+		});
+		await until("stopped answers written", stoppedInEngine("c1"));
+		await tick(100);
+		const savedMidSwitch = await threadStore.loadThread(outgoing);
+
+		release();
+		await until("switched", () => engine().activeThreadId === "t_target");
+
+		expect(storedPart(savedMidSwitch, "c1")).toMatchObject({
+			state: "output-error",
+			errorText: STOPPED_TEXT,
+		});
+	});
+
+	test("a switch to a thread that no longer exists ends idle on the outgoing thread, its calls answered", async () => {
+		const outgoing = await pageWorkingInNewThread();
+		send("queued meanwhile");
+
+		await act(async () => {
+			await engine().switchThread("t_missing");
+		});
+		await until("queued message sent", () => chatPosts.length === 2);
+		await until("idle", () => engine().status === "ready");
+
+		expect(engine().activeThreadId).toBe(outgoing);
+		expect(engine().isLoading).toBe(false);
+		expect(postPart(1, "c1")).toMatchObject({
+			state: "output-error",
+			errorText: STOPPED_TEXT,
+		});
+	});
+
+	test("a switch superseded part-way by a second switch: no queued message is sent and the chat ends idle on the second thread", async () => {
+		await pageWorkingInNewThread();
+		const release = holdLoad("t_target");
+		send("queued meanwhile");
+
+		act(() => {
+			void engine().switchThread("t_target");
+		});
+		await until("stopped answers written", stoppedInEngine("c1"));
+		act(() => {
+			void engine().switchThread("t_second");
+		});
+		await until("second switch", () => engine().activeThreadId === "t_second");
+		release();
+		await tick(300);
+
+		expect(chatPosts).toHaveLength(1);
+		expect(engine().activeThreadId).toBe("t_second");
+		expect(engine().messages.map((m) => m.id)).toEqual(["u_second"]);
+		expect(engine().queuedMessages).toHaveLength(0);
+		expect(engine().isLoading).toBe(false);
+	});
+
+	test("deleting the active thread keeps the chat busy until the store delete finishes", async () => {
+		const outgoing = await pageWorkingInNewThread();
+		const gate = deferred<void>();
+		storeHolds.remove = (id) =>
+			id === outgoing ? gate.promise : Promise.resolve();
+		send("queued meanwhile");
+
+		act(() => {
+			void engine().deleteThread(outgoing);
+		});
+		await until("stopped answers written", stoppedInEngine("c1"));
+		await tick(100);
+
+		expect(engine().isLoading).toBe(true);
+		expect(engine().queuedMessages).toHaveLength(1);
+		expect(chatPosts).toHaveLength(1);
+
+		gate.resolve();
+		await until("deleted", () => engine().activeThreadId === undefined);
+		await tick(100);
+
+		expect(engine().isLoading).toBe(false);
+		expect(engine().queuedMessages).toHaveLength(0);
+		expect(chatPosts).toHaveLength(1);
+	});
+
+	test("a delete superseded part-way by a switch: no queued message is sent and the chat ends idle on the target", async () => {
+		const outgoing = await pageWorkingInNewThread();
+		const gate = deferred<void>();
+		storeHolds.remove = (id) =>
+			id === outgoing ? gate.promise : Promise.resolve();
+		send("queued meanwhile");
+
+		act(() => {
+			void engine().deleteThread(outgoing);
+		});
+		await until("stopped answers written", stoppedInEngine("c1"));
+		act(() => {
+			void engine().switchThread("t_target");
+		});
+		await until("switched", () => engine().activeThreadId === "t_target");
+		gate.resolve();
+		await tick(300);
+
+		expect(chatPosts).toHaveLength(1);
+		expect(engine().activeThreadId).toBe("t_target");
+		expect(engine().messages.map((m) => m.id)).toEqual(["u_old"]);
+		expect(engine().queuedMessages).toHaveLength(0);
+		expect(engine().isLoading).toBe(false);
+	});
+
+	test("Stop pressed during a held switch does not end the busy state early", async () => {
+		await pageWorkingInNewThread();
+		const release = holdLoad("t_target");
+		send("queued meanwhile");
+
+		act(() => {
+			void engine().switchThread("t_target");
+		});
+		await until("stopped answers written", stoppedInEngine("c1"));
+		await act(async () => {
+			await engine().stop();
+		});
+		await tick(100);
+
+		expect(engine().isLoading).toBe(true);
+		expect(chatPosts).toHaveLength(1);
+		expect(cancelPosts).toHaveLength(0);
+
+		release();
+		await until("switched", () => engine().activeThreadId === "t_target");
+		await tick(100);
+		expect(engine().isLoading).toBe(false);
+		expect(chatPosts).toHaveLength(1);
 	});
 });
