@@ -83,7 +83,7 @@ export const FLOW_META_KEY = "waniwani/flow" as const;
  * kept out of the captured value.
  *
  * Shared so flow tools (`createFlow({ omitIntentPII })`) and plain tools
- * (`withWaniwani({ captureTelemetry: { omitPII } })`) ask the model for the same
+ * (`withWaniwani({ captureIntent: { omitPII } })`) ask the model for the same
  * thing — a privacy wording change has to land in exactly one place.
  */
 export const OMIT_PII_NOTE =

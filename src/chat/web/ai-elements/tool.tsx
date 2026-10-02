@@ -402,14 +402,8 @@ export type ToolInputProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 /**
- * The tool call arguments worth showing a user, outside debug mode.
- *
- * Drops `_meta` and `telemetry`. `telemetry` is the argument `withWaniwani`
- * adds to every tool for analytics (`src/mcp/server/with-waniwani/
- * telemetry-capture.ts`, not imported so the chat bundle stays free of server
- * code); it is never part of the tool's own request. A tool that declares its
- * own `telemetry` argument loses it from this view too, and debug mode still
- * shows everything.
+ * The tool call arguments worth showing a user, outside debug mode: everything
+ * but `_meta`. Debug mode shows everything.
  */
 export function toolInputForDisplay(
 	input: ToolUIPart["input"],
@@ -423,7 +417,7 @@ export function toolInputForDisplay(
 	) {
 		return input;
 	}
-	const { _meta, telemetry, ...rest } = input as Record<string, unknown>;
+	const { _meta, ...rest } = input as Record<string, unknown>;
 	return rest;
 }
 

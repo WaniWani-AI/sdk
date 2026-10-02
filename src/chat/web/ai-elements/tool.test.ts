@@ -176,13 +176,14 @@ describe("resolveWidgetAutoHeight", () => {
 describe("toolInputForDisplay", () => {
 	const input = {
 		plan: "premium",
+		intent: "Compare home insurance",
 		_meta: { "waniwani/sessionId": "s_1" },
-		telemetry: { intent: "Compare home insurance" },
 	};
 
-	test("hides _meta and the analytics telemetry argument", () => {
-		expect(toolInputForDisplay(input, false)).toEqual({ plan: "premium" });
-		expect(toolInputForDisplay(input, undefined)).toEqual({ plan: "premium" });
+	test("hides _meta and keeps the arguments", () => {
+		const shown = { plan: "premium", intent: "Compare home insurance" };
+		expect(toolInputForDisplay(input, false)).toEqual(shown);
+		expect(toolInputForDisplay(input, undefined)).toEqual(shown);
 	});
 
 	test("shows everything in debug mode", () => {

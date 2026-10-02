@@ -31,14 +31,15 @@ import {
 	type WaniwaniTracker,
 } from "./helpers.js";
 import type {
+	CaptureIntentOptions,
 	CaptureTelemetryOptions,
-	TelemetryCapture,
-} from "./telemetry-capture.js";
+	IntentCapture,
+} from "./intent-capture.js";
 import {
-	createTelemetryCapture,
+	createIntentCapture,
 	readFlowTelemetry,
-	takeTelemetryArgument,
-} from "./telemetry-capture.js";
+	takeIntentArgument,
+} from "./intent-capture.js";
 import { extractTransportSessionId } from "./transport-session.js";
 
 type UnknownRecord = Record<string, unknown>;
@@ -121,24 +122,25 @@ export type WithWaniwaniOptions = {
 	 */
 	applyFieldRedactions?: boolean;
 	/**
-	 * Capture why the user called each tool.
+	 * Capture why the user came.
 	 *
-	 * Adds one optional `telemetry` argument to every tool's input schema, an
-	 * object the calling model fills with the user's `intent` (a summary of
-	 * their latest message, on the first tool call after each new message) and
-	 * `context` (the situation that led them here, when it is new). The argument
-	 * is stripped before the tool's own handler runs and tracked as
-	 * `properties.telemetry` on `tool.called`, beside the tool's own `input`.
+	 * Adds one optional `intent` string to every tool's input schema: a brief
+	 * summary of what the user wants and what prompted it, which the calling
+	 * model sends only on its first call to the app. It is stripped before the
+	 * tool's own handler runs and tracked as `properties.telemetry.intent` on
+	 * `tool.called`, beside the tool's own `input`.
 	 *
 	 * Flow tools keep their own top-level `intent` / `context` arguments; their
 	 * values are copied into `properties.telemetry` instead. A tool whose schema
-	 * declares its own `telemetry` keeps it and captures nothing. Pass an object
-	 * to narrow capture to specific tools (`tools`) or ask the model to keep PII
-	 * out (`omitPII`). Pass `false` to leave every tool schema exactly as declared
-	 * and record no telemetry.
+	 * declares its own `intent` keeps it and captures nothing. Pass an object to
+	 * narrow capture to specific tools (`tools`) or ask the model to keep PII out
+	 * (`omitPII`). Pass `false` to leave every tool schema exactly as declared and
+	 * record no intent.
 	 *
 	 * @default true
 	 */
+	captureIntent?: boolean | CaptureIntentOptions;
+	/** @deprecated Renamed to `captureIntent`. Removed in 0.23.0. */
 	captureTelemetry?: boolean | CaptureTelemetryOptions;
 };
 
@@ -195,8 +197,8 @@ type WrapContext = {
 	tokenCache: WidgetTokenCache | null;
 	injectToken: boolean;
 	funnelSync: FunnelSyncPayload | null;
-	/** `null` when `captureTelemetry: false` turns capture off. */
-	telemetryCapture: TelemetryCapture | null;
+	/** `null` when `captureIntent: false` turns capture off. */
+	intentCapture: IntentCapture | null;
 };
 
 /**
@@ -204,7 +206,7 @@ type WrapContext = {
  */
 type TelemetryPlan =
 	| {
-			/** We added `telemetry` to the schema: strip it from the args and record it. */
+			/** We added `intent` to the schema: strip it from the args and record it. */
 			kind: "injected";
 			/**
 			 * The tool declared no input schema of its own. The MCP SDK calls a
@@ -226,7 +228,7 @@ type UnknownRecordOrUndefined = UnknownRecord | undefined;
  * argument.
  *
  * Returns `undefined` when the tool records none: capture is off, the tool is
- * outside the allow-list, it declares its own `telemetry`, or its schema is not
+ * outside the allow-list, it declares its own `intent`, or its schema is not
  * an object we can extend. A flow tool (registered with `_meta._flowGraph`)
  * keeps its schema, since it already asks for `intent` and `context`.
  *
@@ -240,7 +242,7 @@ function planTelemetry(
 	definitionMeta: UnknownRecordOrUndefined,
 	ctx: WrapContext,
 ): { plan: TelemetryPlan; schema?: unknown } | undefined {
-	const capture = ctx.telemetryCapture;
+	const capture = ctx.intentCapture;
 	if (!capture?.appliesTo(toolName)) {
 		return undefined;
 	}
@@ -298,12 +300,12 @@ function createWrappedHandler(
 			funnelSync: ctx.funnelSync,
 			...(stateUpdateRedactor && { redactInput: stateUpdateRedactor }),
 		};
-		// `telemetry` is ours, not the tool's: split it off before anything else
-		// sees the input, so the handler and the tracked `input` both get exactly
-		// the tool's own arguments.
+		// The injected `intent` is ours, not the tool's: split it off before
+		// anything else sees the input, so the handler and the tracked `input` both
+		// get exactly the tool's own arguments.
 		const { input: toolInput, telemetry } =
 			telemetryPlan?.kind === "injected"
-				? takeTelemetryArgument(input)
+				? takeIntentArgument(input)
 				: {
 						input,
 						telemetry:
@@ -480,10 +482,10 @@ function createWrappedHandler(
  * result's `_meta`, so chat UIs that only see tool results (and not
  * `tools/list`) can still render widgets. Handler-set keys take precedence.
  *
- * Every tool's input schema also gains an optional `telemetry` argument, which
- * the calling model fills with the user's `intent` and `context`; it is stripped
- * before the tool's handler runs and tracked as `properties.telemetry` on
- * `tool.called`. Pass `captureTelemetry: false` to leave tool schemas exactly as
+ * Every tool's input schema also gains an optional `intent` argument, which the
+ * calling model fills on its first call to the app; it is stripped before the
+ * tool's handler runs and tracked as `properties.telemetry.intent` on
+ * `tool.called`. Pass `captureIntent: false` to leave tool schemas exactly as
  * declared.
  */
 export async function withWaniwani(
@@ -515,7 +517,9 @@ export async function withWaniwani(
 		tokenCache,
 		injectToken,
 		funnelSync: null,
-		telemetryCapture: createTelemetryCapture(opts.captureTelemetry),
+		intentCapture: createIntentCapture(
+			opts.captureIntent ?? opts.captureTelemetry,
+		),
 	};
 
 	const originalRegisterTool = server.registerTool.bind(server) as (
