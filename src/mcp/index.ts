@@ -75,6 +75,5 @@ export type { WithWaniwaniOptions } from "./server/with-waniwani/index";
 export { withWaniwani } from "./server/with-waniwani/index";
 export type {
 	CaptureIntentOptions,
-	CaptureTelemetryOptions,
 	ToolTelemetry,
 } from "./server/with-waniwani/intent-capture";

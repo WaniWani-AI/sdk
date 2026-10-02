@@ -30,11 +30,7 @@ import {
 	safeTrack,
 	type WaniwaniTracker,
 } from "./helpers.js";
-import type {
-	CaptureIntentOptions,
-	CaptureTelemetryOptions,
-	IntentCapture,
-} from "./intent-capture.js";
+import type { CaptureIntentOptions, IntentCapture } from "./intent-capture.js";
 import {
 	createIntentCapture,
 	readFlowTelemetry,
@@ -140,8 +136,6 @@ export type WithWaniwaniOptions = {
 	 * @default true
 	 */
 	captureIntent?: boolean | CaptureIntentOptions;
-	/** @deprecated Renamed to `captureIntent`. Removed in 0.23.0. */
-	captureTelemetry?: boolean | CaptureTelemetryOptions;
 };
 
 const log = createLogger("mcp");
@@ -517,9 +511,7 @@ export async function withWaniwani(
 		tokenCache,
 		injectToken,
 		funnelSync: null,
-		intentCapture: createIntentCapture(
-			opts.captureIntent ?? opts.captureTelemetry,
-		),
+		intentCapture: createIntentCapture(opts.captureIntent),
 	};
 
 	const originalRegisterTool = server.registerTool.bind(server) as (

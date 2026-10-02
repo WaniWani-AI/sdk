@@ -364,33 +364,4 @@ describe("withWaniwani captureIntent", () => {
 			expect(properties.telemetry).toBeUndefined();
 		}
 	});
-
-	test("still honours the deprecated captureTelemetry option", async () => {
-		const { client } = mockClient();
-		const mock = mockServer();
-
-		await withWaniwani(mock.server, {
-			client,
-			captureTelemetry: { tools: ["pricing"] },
-		});
-
-		mock.registerTool(
-			"pricing",
-			{ inputSchema: { plan: z.string() } },
-			async () => ({}),
-		);
-		mock.registerTool(
-			"health",
-			{ inputSchema: { deep: z.boolean() } },
-			async () => ({}),
-		);
-
-		expect(keysOf(mock.configs.pricing?.inputSchema)).toEqual([
-			"intent",
-			"plan",
-		]);
-		expect(
-			Object.keys(mock.configs.health?.inputSchema as Record<string, unknown>),
-		).toEqual(["deep"]);
-	});
 });

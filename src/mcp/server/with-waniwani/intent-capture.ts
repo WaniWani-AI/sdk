@@ -82,9 +82,6 @@ export type CaptureIntentOptions = {
 	omitPII?: boolean;
 };
 
-/** @deprecated Renamed to `CaptureIntentOptions`. Removed in 0.23.0. */
-export type CaptureTelemetryOptions = CaptureIntentOptions;
-
 /**
  * The description shown to the calling model.
  *

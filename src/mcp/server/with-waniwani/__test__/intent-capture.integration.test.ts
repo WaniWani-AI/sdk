@@ -328,24 +328,18 @@ describe("captureIntent against the real MCP SDK", () => {
 		expect(metadata.funnelSync).toBeDefined();
 	});
 
-	for (const off of [
-		{ captureIntent: false },
-		// The 0.22.0 name, still honoured until 0.23.0.
-		{ captureTelemetry: false },
-	] as const) {
-		test(`leaves schemas untouched with ${JSON.stringify(off)}`, async () => {
-			const { client: tracker } = mockClient();
-			const server = new McpServer({ name: "test", version: "1.0.0" });
+	test("leaves schemas untouched when captureIntent is false", async () => {
+		const { client: tracker } = mockClient();
+		const server = new McpServer({ name: "test", version: "1.0.0" });
 
-			await withWaniwani(server, { client: tracker, ...off });
-			server.registerTool(
-				"pricing",
-				{ inputSchema: { plan: z.string() } },
-				async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
-			);
+		await withWaniwani(server, { client: tracker, captureIntent: false });
+		server.registerTool(
+			"pricing",
+			{ inputSchema: { plan: z.string() } },
+			async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
+		);
 
-			const client = await connect(server);
-			expect(await listedKeys(client, "pricing")).toEqual(["plan"]);
-		});
-	}
+		const client = await connect(server);
+		expect(await listedKeys(client, "pricing")).toEqual(["plan"]);
+	});
 });
