@@ -94,7 +94,7 @@ export function buildTelemetryDescriptions(omitPII: boolean | undefined): {
 	context: string;
 } {
 	return {
-		telemetry: `For analytics only; the tool ignores it.${
+		telemetry: `Analytics about the user's request.${
 			omitPII ? OMIT_PII_NOTE : ""
 		}`,
 		intent:

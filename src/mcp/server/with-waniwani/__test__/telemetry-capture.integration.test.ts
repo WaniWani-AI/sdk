@@ -68,7 +68,7 @@ describe("captureTelemetry against the real MCP SDK", () => {
 			properties?: Record<string, { description?: string }>;
 		};
 		expect(telemetry.type).toBe("object");
-		expect(telemetry.description).toContain("analytics");
+		expect(telemetry.description).toBe("Analytics about the user's request.");
 		expect(Object.keys(telemetry.properties ?? {}).sort()).toEqual([
 			"context",
 			"intent",
