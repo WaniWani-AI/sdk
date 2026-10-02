@@ -14,7 +14,7 @@ import {
 } from "../utils.js";
 import type { WidgetTokenCache } from "../widget-token.js";
 import type { FunnelSyncPayload } from "./funnel-sync.js";
-import type { ToolTelemetry } from "./telemetry-capture.js";
+import type { ToolTelemetry } from "./intent-capture.js";
 
 type UnknownRecord = Record<string, unknown>;
 

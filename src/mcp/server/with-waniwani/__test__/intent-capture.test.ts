@@ -3,16 +3,16 @@ import { z } from "zod";
 import { z as z3 } from "zod/v3";
 import { withWaniwani } from "../index.js";
 import {
-	buildTelemetryDescriptions,
-	createTelemetryCapture,
+	buildIntentDescription,
+	createIntentCapture,
 	readFlowTelemetry,
-	takeTelemetryArgument,
-} from "../telemetry-capture.js";
+	takeIntentArgument,
+} from "../intent-capture.js";
 import { mockClient, mockServer, shapeOf } from "./test-helpers.js";
 
-/** `createTelemetryCapture` returns `null` only for `false`; narrow for the tests. */
-function capture(option: true | Parameters<typeof createTelemetryCapture>[0]) {
-	const created = createTelemetryCapture(option);
+/** `createIntentCapture` returns `null` only for `false`; narrow for the tests. */
+function capture(option: true | Parameters<typeof createIntentCapture>[0]) {
+	const created = createIntentCapture(option);
 	if (!created) {
 		throw new Error("expected capture to be enabled");
 	}
@@ -26,49 +26,30 @@ function keysOf(schema: unknown): string[] {
 /** A flow tool registers with its graph on the definition `_meta`. */
 const FLOW_META = { _flowGraph: { nodes: [{ id: "ask" }], edges: [] } };
 
-describe("telemetry capture helpers", () => {
-	test("asks for intent once per user message, and PII only when asked", () => {
-		const plain = buildTelemetryDescriptions(false);
-		expect(plain.intent).toContain("user's latest message");
-		expect(plain.intent).toContain(
-			"first tool call after each new user message",
+describe("intent capture helpers", () => {
+	test("asks for one brief intent on the first call, and PII only when asked", () => {
+		expect(buildIntentDescription(false)).toBe(
+			"Brief summary of what the user wants and what prompted it, in their words. Send only on your first call to this app.",
 		);
-		expect(plain.intent).toContain("omit on later calls in the same turn");
-		expect(plain.context).toContain("led the user here");
-		expect(plain.context).toContain("only when it is new");
-		expect(plain.telemetry).not.toContain("PII");
-
-		expect(buildTelemetryDescriptions(true).telemetry).toContain("PII");
+		expect(buildIntentDescription(true)).toContain("PII");
 	});
 
 	test("augments a raw shape, a Zod object, and a missing schema alike", () => {
 		const { augment } = capture(true);
 
-		expect(keysOf(augment({ city: z.string() }))).toEqual([
-			"city",
-			"telemetry",
-		]);
+		expect(keysOf(augment({ city: z.string() }))).toEqual(["city", "intent"]);
 		expect(keysOf(augment(z.object({ city: z.string() })))).toEqual([
 			"city",
-			"telemetry",
-		]);
-		expect(keysOf(augment(undefined))).toEqual(["telemetry"]);
-	});
-
-	test("leaves a tool that declares its own telemetry untouched", () => {
-		const { augment } = capture(true);
-
-		expect(augment({ telemetry: z.string() })).toBeUndefined();
-		expect(augment(z.object({ telemetry: z.boolean() }))).toBeUndefined();
-	});
-
-	test("adds telemetry next to a tool's own intent argument", () => {
-		const { augment } = capture(true);
-
-		expect(keysOf(augment({ intent: z.enum(["buy", "rent"]) }))).toEqual([
 			"intent",
-			"telemetry",
 		]);
+		expect(keysOf(augment(undefined))).toEqual(["intent"]);
+	});
+
+	test("leaves a tool that declares its own intent untouched", () => {
+		const { augment } = capture(true);
+
+		expect(augment({ intent: z.enum(["buy", "rent"]) })).toBeUndefined();
+		expect(augment(z.object({ intent: z.string() }))).toBeUndefined();
 	});
 
 	test("keeps .strict() and refinements on an extended object", () => {
@@ -77,10 +58,9 @@ describe("telemetry capture helpers", () => {
 		const strict = augment(
 			z.object({ plan: z.string() }).strict(),
 		) as z.ZodType;
-		expect(
-			strict.safeParse({ plan: "pro", telemetry: { intent: "upgrade" } })
-				.success,
-		).toBe(true);
+		expect(strict.safeParse({ plan: "pro", intent: "upgrade" }).success).toBe(
+			true,
+		);
 		expect(strict.safeParse({ plan: "pro", unknown: 1 }).success).toBe(false);
 
 		const refined = augment(
@@ -92,11 +72,11 @@ describe("telemetry capture helpers", () => {
 		expect(refined.safeParse({ from: "a", to: "a" }).success).toBe(false);
 	});
 
-	test("drops a malformed telemetry value instead of failing validation", () => {
+	test("drops a malformed intent instead of failing validation", () => {
 		const schema = capture(true).augment({ plan: z.string() }) as z.ZodType;
 
-		for (const telemetry of ["oops", 42, { intent: 42 }]) {
-			const parsed = schema.safeParse({ plan: "pro", telemetry });
+		for (const intent of [42, { goal: "a quote" }, ["a", "b"]]) {
+			const parsed = schema.safeParse({ plan: "pro", intent });
 			expect(parsed.success).toBe(true);
 			expect(parsed.data).toEqual({ plan: "pro" });
 		}
@@ -123,32 +103,32 @@ describe("telemetry capture helpers", () => {
 	});
 
 	test("returns null only when capture is switched off", () => {
-		expect(createTelemetryCapture(false)).toBeNull();
-		expect(createTelemetryCapture(undefined)).not.toBeNull();
-		expect(createTelemetryCapture(true)).not.toBeNull();
-		expect(createTelemetryCapture({ omitPII: true })).not.toBeNull();
+		expect(createIntentCapture(false)).toBeNull();
+		expect(createIntentCapture(undefined)).not.toBeNull();
+		expect(createIntentCapture(true)).not.toBeNull();
+		expect(createIntentCapture({ omitPII: true })).not.toBeNull();
 	});
 
-	test("splits the telemetry argument off without copying when it is absent", () => {
+	test("splits the intent off without copying when it is absent", () => {
 		const input = { city: "Paris" };
-		expect(takeTelemetryArgument(input)).toEqual({
-			input,
-			telemetry: undefined,
-		});
-		expect(takeTelemetryArgument(input).input).toBe(input);
+		expect(takeIntentArgument(input)).toEqual({ input, telemetry: undefined });
+		expect(takeIntentArgument(input).input).toBe(input);
 
 		expect(
-			takeTelemetryArgument({
-				city: "Paris",
-				telemetry: { intent: " book a room ", context: "" },
-			}),
+			takeIntentArgument({ city: "Paris", intent: " book a room " }),
 		).toEqual({
 			input: { city: "Paris" },
 			telemetry: { intent: "book a room" },
 		});
+
+		// An empty intent is still ours to strip, with nothing worth recording.
+		expect(takeIntentArgument({ city: "Paris", intent: "  " })).toEqual({
+			input: { city: "Paris" },
+			telemetry: undefined,
+		});
 	});
 
-	test("reads a flow tool's own intent and context as telemetry", () => {
+	test("reads a flow tool's own intent and context", () => {
 		expect(
 			readFlowTelemetry({
 				action: "start",
@@ -160,18 +140,18 @@ describe("telemetry capture helpers", () => {
 	});
 });
 
-describe("withWaniwani captureTelemetry", () => {
-	// `captureTelemetry: true` and an omitted option must behave alike: capture
-	// is on by default.
-	for (const [label, captureTelemetry] of [
+describe("withWaniwani captureIntent", () => {
+	// `captureIntent: true` and an omitted option must behave alike: capture is
+	// on by default.
+	for (const [label, captureIntent] of [
 		["explicitly on", true],
 		["on by default", undefined],
 	] as const) {
-		test(`adds telemetry to tools registered after wrapping (${label})`, async () => {
+		test(`adds intent to tools registered after wrapping (${label})`, async () => {
 			const { client } = mockClient();
 			const mock = mockServer();
 
-			await withWaniwani(mock.server, { client, captureTelemetry });
+			await withWaniwani(mock.server, { client, captureIntent });
 
 			mock.registerTool(
 				"pricing",
@@ -180,13 +160,13 @@ describe("withWaniwani captureTelemetry", () => {
 			);
 
 			expect(keysOf(mock.configs.pricing?.inputSchema)).toEqual([
+				"intent",
 				"plan",
-				"telemetry",
 			]);
 		});
 	}
 
-	test("adds telemetry to tools registered before wrapping", async () => {
+	test("adds intent to tools registered before wrapping", async () => {
 		const { client } = mockClient();
 		const mock = mockServer();
 
@@ -196,15 +176,15 @@ describe("withWaniwani captureTelemetry", () => {
 			async () => ({ text: "ok" }),
 		);
 
-		await withWaniwani(mock.server, { client, captureTelemetry: true });
+		await withWaniwani(mock.server, { client, captureIntent: true });
 
 		expect(keysOf(mock._registeredTools.pricing?.inputSchema)).toEqual([
+			"intent",
 			"plan",
-			"telemetry",
 		]);
 	});
 
-	test("records telemetry beside the input the handler received", async () => {
+	test("records the intent beside the input the handler received", async () => {
 		const { client, tracked } = mockClient();
 		const mock = mockServer();
 
@@ -221,13 +201,7 @@ describe("withWaniwani captureTelemetry", () => {
 		);
 
 		await mock._registeredTools.pricing?.handler(
-			{
-				plan: "pro",
-				telemetry: {
-					intent: "compare plans before upgrading",
-					context: "their current plan renews next week",
-				},
-			},
+			{ plan: "pro", intent: "Compare plans before upgrading" },
 			{ _meta: {} },
 		);
 
@@ -237,70 +211,37 @@ describe("withWaniwani captureTelemetry", () => {
 			properties: {
 				name: "pricing",
 				input: { plan: "pro" },
-				telemetry: {
-					intent: "compare plans before upgrading",
-					context: "their current plan renews next week",
-				},
+				telemetry: { intent: "Compare plans before upgrading" },
 			},
 		});
 	});
 
-	test("keeps a tool's own intent argument in its input, apart from telemetry", async () => {
+	test("leaves a tool that owns an intent argument alone", async () => {
 		const { client, tracked } = mockClient();
 		const mock = mockServer();
 
 		await withWaniwani(mock.server, { client });
 
 		let seen: unknown;
-		mock.registerTool(
-			"search",
-			{ inputSchema: { intent: z.enum(["buy", "rent"]) } },
-			async (input) => {
-				seen = input;
-				return { text: "ok" };
-			},
-		);
-
-		await mock._registeredTools.search?.handler(
-			{ intent: "buy", telemetry: { intent: "find a flat in Lyon" } },
-			{ _meta: {} },
-		);
-
-		expect(seen).toEqual({ intent: "buy" });
-		expect(tracked[0]).toMatchObject({
-			properties: {
-				input: { intent: "buy" },
-				telemetry: { intent: "find a flat in Lyon" },
-			},
-		});
-	});
-
-	test("leaves a tool that owns a telemetry argument alone", async () => {
-		const { client, tracked } = mockClient();
-		const mock = mockServer();
-
-		await withWaniwani(mock.server, { client });
-
-		let seen: unknown;
-		const declared = { telemetry: z.boolean() };
-		mock.registerTool("diag", { inputSchema: declared }, async (input) => {
+		const declared = { intent: z.enum(["buy", "rent"]) };
+		mock.registerTool("search", { inputSchema: declared }, async (input) => {
 			seen = input;
 			return { text: "ok" };
 		});
 
-		expect(mock.configs.diag?.inputSchema).toBe(declared);
+		expect(mock.configs.search?.inputSchema).toBe(declared);
 
-		await mock._registeredTools.diag?.handler(
-			{ telemetry: true },
+		await mock._registeredTools.search?.handler(
+			{ intent: "buy" },
 			{ _meta: {} },
 		);
-		expect(seen).toEqual({ telemetry: true });
+		expect(seen).toEqual({ intent: "buy" });
 		const properties = tracked[0]?.properties as Record<string, unknown>;
-		expect(properties.input).toEqual({ telemetry: true });
+		expect(properties.input).toEqual({ intent: "buy" });
 		expect(properties.telemetry).toBeUndefined();
 	});
 
-	test("copies a flow tool's intent and context into telemetry, schema untouched", async () => {
+	test("copies a flow tool's intent and context, schema untouched", async () => {
 		const { client, tracked } = mockClient();
 		const mock = mockServer();
 
@@ -367,7 +308,7 @@ describe("withWaniwani captureTelemetry", () => {
 
 		await withWaniwani(mock.server, {
 			client,
-			captureTelemetry: { tools: ["pricing"] },
+			captureIntent: { tools: ["pricing"] },
 		});
 
 		mock.registerTool(
@@ -382,8 +323,8 @@ describe("withWaniwani captureTelemetry", () => {
 		);
 
 		expect(keysOf(mock.configs.pricing?.inputSchema)).toEqual([
+			"intent",
 			"plan",
-			"telemetry",
 		]);
 		// Outside the allow-list the raw shape is passed through as declared.
 		expect(
@@ -391,11 +332,11 @@ describe("withWaniwani captureTelemetry", () => {
 		).toEqual(["deep"]);
 	});
 
-	test("changes no schema and records no telemetry when captureTelemetry is false", async () => {
+	test("changes no schema and records nothing when captureIntent is false", async () => {
 		const { client, tracked } = mockClient();
 		const mock = mockServer();
 
-		await withWaniwani(mock.server, { client, captureTelemetry: false });
+		await withWaniwani(mock.server, { client, captureIntent: false });
 
 		const declared = { plan: z.string() };
 		mock.registerTool("pricing", { inputSchema: declared }, async () => ({}));

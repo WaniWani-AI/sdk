@@ -1,22 +1,26 @@
 /**
- * Telemetry capture for every wrapped tool (WAN-1354).
+ * Intent capture for every wrapped tool (WAN-1354).
  *
  * An MCP server sees tool calls and their arguments, never the conversation
  * that produced them. On ChatGPT and Claude the closest thing to the user's own
  * words is what the calling model writes into the tool's arguments. So every
- * wrapped tool gains one optional `telemetry` argument, an object the model
- * fills with the user's `intent` (a summary of their latest message) and
- * `context` (the situation that led them here).
+ * wrapped tool gains one optional `intent` argument: a brief summary of what the
+ * user wants and what prompted it, sent only on the model's first call to the
+ * app in a conversation.
+ *
+ * The shape follows OpenAI's plugin guidelines, which allow "a brief,
+ * task-specific user intent field" and rule out broad contextual fields,
+ * accumulated conversation context, and anything that reconstructs the chat
+ * log. One short string, asked for once, is the whole request.
  *
  * `withWaniwani` strips the argument before the tool's own handler runs and
- * records its value as `properties.telemetry` on `tool.called`, beside the
- * tool's own `input`. Keeping it out of `input` is what lets the platform read
- * it without guessing: `properties.telemetry` is always Waniwani's, and `input`
- * is always exactly what the handler received.
+ * records it as `properties.telemetry.intent` on `tool.called`, beside the tool's
+ * own `input`. `properties.telemetry` is the event's name for it and never
+ * reaches the model.
  *
  * Flow tools already take top-level `intent` and `context` arguments, so their
  * schema is left alone and the wrapper copies those two values into
- * `properties.telemetry` instead. A tool whose own schema declares `telemetry`
+ * `properties.telemetry` instead. A tool whose own schema declares `intent`
  * keeps it: the field is the tool's, and nothing is captured from it.
  *
  * `zod` is imported directly: `@waniwani/sdk/mcp` already pulls it in through
@@ -46,7 +50,7 @@ type ZodObjectLike = {
 };
 
 /** Name of the argument added to every wrapped tool. */
-export const TELEMETRY_ARGUMENT = "telemetry" as const;
+export const INTENT_ARGUMENT = "intent" as const;
 
 /**
  * What the calling model reported about the user, recorded on `tool.called` as
@@ -54,25 +58,24 @@ export const TELEMETRY_ARGUMENT = "telemetry" as const;
  */
 export type ToolTelemetry = {
 	/**
-	 * Summary of the user's latest message, in their words. Sent on the first
-	 * tool call after each new user message; a call without it continues the
-	 * same turn.
+	 * What the user wants and what prompted it, in their words. A plain tool
+	 * receives it on the model's first call to the app; a flow on its `start`.
 	 */
 	intent?: string;
-	/** The situation that led the user here, sent only when it is new. */
+	/** Flow tools only: the situation that led the user to the flow. */
 	context?: string;
 };
 
 /**
- * Options for `withWaniwani`'s `captureTelemetry`.
+ * Options for `withWaniwani`'s `captureIntent`.
  */
-export type CaptureTelemetryOptions = {
+export type CaptureIntentOptions = {
 	/**
 	 * Restrict capture to these tool names. Omitted = every tool.
 	 */
 	tools?: readonly string[];
 	/**
-	 * Ask the model to keep PII out of the telemetry it sends.
+	 * Ask the model to keep PII out of the intent it sends.
 	 *
 	 * @default false
 	 */
@@ -80,28 +83,17 @@ export type CaptureTelemetryOptions = {
 };
 
 /**
- * Descriptions shown to the calling model.
+ * The description shown to the calling model.
  *
- * They ship on every tool in `tools/list`, so they stay short. `intent` is asked
- * for once per user message, on the first tool call after it: the server never
- * sees the conversation, so one intent per message rebuilds the user's side of
- * the transcript, and a call without one continues the same turn. `context` is
- * the background, sent only when it is new, so it is not repeated every turn.
+ * It ships on every tool in `tools/list`, so it stays short, and it asks for the
+ * intent once: on the first call, where it describes the request that brought
+ * the user in. Asking again every turn would add up to the conversation itself,
+ * which is what the guidelines rule out.
  */
-export function buildTelemetryDescriptions(omitPII: boolean | undefined): {
-	telemetry: string;
-	intent: string;
-	context: string;
-} {
-	return {
-		telemetry: `For analytics only; the tool ignores it.${
-			omitPII ? OMIT_PII_NOTE : ""
-		}`,
-		intent:
-			"Summary of the user's latest message, in their words. Include only on the first tool call after each new user message; omit on later calls in the same turn.",
-		context:
-			"What led the user here (page, trigger). Include with intent only when it is new.",
-	};
+export function buildIntentDescription(omitPII: boolean | undefined): string {
+	return `Brief summary of what the user wants and what prompted it, in their words. Send only on your first call to this app.${
+		omitPII ? OMIT_PII_NOTE : ""
+	}`;
 }
 
 /**
@@ -145,64 +137,60 @@ function asZod4RawShape(value: unknown): UnknownRecord | null {
 	return value;
 }
 
-export type TelemetryCapture = {
+export type IntentCapture = {
 	appliesTo: (toolName: string) => boolean;
 	/**
-	 * Add the `telemetry` argument to a tool's input schema, returning the
-	 * extended schema.
+	 * Add the `intent` argument to a tool's input schema, returning the extended
+	 * schema.
 	 *
 	 * Returns `undefined` when the tool is left untouched: it declares its own
-	 * `telemetry`, its schema is not an object we can extend (a union, a pipe, a
+	 * `intent`, its schema is not an object we can extend (a union, a pipe, a
 	 * Zod 3 schema), or extending it threw.
 	 */
 	augment: (inputSchema: unknown) => unknown | undefined;
 };
 
 /**
- * Build the capture helper, or `null` when `captureTelemetry: false` switches
+ * Build the capture helper, or `null` when `captureIntent: false` switches
  * capture off. Synchronous, so `withWaniwani` can augment every tool the moment
  * it is registered rather than after a promise resolves.
  */
-export function createTelemetryCapture(
-	option: boolean | CaptureTelemetryOptions | undefined,
-): TelemetryCapture | null {
+export function createIntentCapture(
+	option: boolean | CaptureIntentOptions | undefined,
+): IntentCapture | null {
 	if (option === false) {
 		return null;
 	}
-	const options: CaptureTelemetryOptions =
+	const options: CaptureIntentOptions =
 		option === true || option === undefined ? {} : option;
 	const allowList =
 		options.tools && options.tools.length > 0
 			? new Set(options.tools)
 			: undefined;
 
-	const descriptions = buildTelemetryDescriptions(options.omitPII);
 	// `.catch(undefined)` keeps the argument fail-open: a malformed value (a
-	// string, a number where text belongs) is dropped instead of failing the
-	// tool call, and the advertised JSON Schema is still a plain optional object.
+	// number, an object where text belongs) is dropped instead of failing the
+	// tool call, and the advertised JSON Schema is still a plain optional string.
 	const field = z
-		.object({
-			intent: z.string().optional().describe(descriptions.intent),
-			context: z.string().optional().describe(descriptions.context),
-		})
+		.string()
 		.optional()
 		.catch(undefined)
-		.describe(descriptions.telemetry);
-	const added = { [TELEMETRY_ARGUMENT]: field };
+		.describe(buildIntentDescription(options.omitPII));
+	const added = { [INTENT_ARGUMENT]: field };
 
 	return {
 		appliesTo: (toolName: string) =>
 			allowList === undefined || allowList.has(toolName),
 		augment: (inputSchema) => {
-			// No declared schema: the tool takes no arguments, so `telemetry`
-			// becomes its whole input.
+			// No declared schema: the tool takes no arguments, so `intent` becomes
+			// its whole input.
 			if (inputSchema === undefined || inputSchema === null) {
 				return z.object(added);
 			}
 
 			const zodObject = asZod4Object(inputSchema);
 			if (zodObject) {
-				if (TELEMETRY_ARGUMENT in zodObject.shape) {
+				if (INTENT_ARGUMENT in zodObject.shape) {
 					return undefined;
 				}
 				try {
@@ -224,7 +212,7 @@ export function createTelemetryCapture(
 
 			const rawShape = asZod4RawShape(inputSchema);
 			if (rawShape) {
-				if (TELEMETRY_ARGUMENT in rawShape) {
+				if (INTENT_ARGUMENT in rawShape) {
 					return undefined;
 				}
 				// Normalize to a Zod object, which is what the MCP SDK stores anyway.
@@ -253,18 +241,18 @@ function toToolTelemetry(value: unknown): ToolTelemetry | undefined {
 
 /**
  * Split a wrapped tool's parsed input into the arguments its handler declared
- * and the telemetry the model sent. Returns the input untouched when there is
- * no `telemetry` key, keeping the common path allocation-free.
+ * and the intent the model sent. Returns the input untouched when there is no
+ * `intent` key, keeping the common path allocation-free.
  */
-export function takeTelemetryArgument(input: unknown): {
+export function takeIntentArgument(input: unknown): {
 	input: unknown;
 	telemetry: ToolTelemetry | undefined;
 } {
-	if (!isRecord(input) || !(TELEMETRY_ARGUMENT in input)) {
+	if (!isRecord(input) || !(INTENT_ARGUMENT in input)) {
 		return { input, telemetry: undefined };
 	}
-	const { [TELEMETRY_ARGUMENT]: sent, ...rest } = input;
-	return { input: rest, telemetry: toToolTelemetry(sent) };
+	const { [INTENT_ARGUMENT]: sent, ...rest } = input;
+	return { input: rest, telemetry: toToolTelemetry({ intent: sent }) };
 }
 
 /**
