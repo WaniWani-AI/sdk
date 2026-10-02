@@ -91,6 +91,11 @@ fallback.
 
 ## Removed surfaces
 
+Removed in 0.23.0: `withWaniwani`'s `captureTelemetry` option and the `CaptureTelemetryOptions` type.
+Use `captureIntent` / `CaptureIntentOptions`. Wrapped tools now advertise one optional `intent`
+string instead of a `telemetry` object. `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.22-to-0.23`
+applies the migration.
+
 Removed in 0.20.0. An import error for any of these means the code is on a pre-0.20 pattern:
 `createTool`, `createResource`, `registerTools`, `toNextJsHandler`, `toExpressJsHandler`,
 `createApiHandler`, `ChatCard`, every MCP-widget React hook except `useWaniwani` (`WidgetProvider`,
@@ -125,7 +130,7 @@ Every version hop also ships a self-contained migration skill you can invoke dir
 `migrate-waniwani-sdk-<from>-to-<to>`. For the latest release:
 
 ```bash
-npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.19-to-0.20
+npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.22-to-0.23
 ```
 
 ## Guided playbooks
