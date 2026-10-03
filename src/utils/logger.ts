@@ -19,11 +19,15 @@ function getGlobalLevel(): LogLevel {
 }
 
 /**
- * Creates a namespaced logger that writes to console when the log level permits.
+ * Creates a namespaced logger that writes to stderr when the log level permits.
  *
  * When `enabled` is omitted the logger checks `WANIWANI_LOG_LEVEL` (or falls
  * back to `WANIWANI_DEBUG` for backward compat). Pass an explicit boolean to
  * override the env-var check (e.g. from a user-facing `debug` option).
+ *
+ * Output goes to **stderr** (`console.error`), not stdout. On a stdio-transport
+ * MCP server stdout is the JSON-RPC channel, so debug logging must stay on
+ * stderr to avoid corrupting the protocol stream.
  *
  * @example
  * const log = createLogger("chat");          // env-var driven
@@ -35,6 +39,6 @@ export function createLogger(
 ): (...args: unknown[]) => void {
 	const active = enabled ?? getGlobalLevel() === "debug";
 	return active
-		? (...args: unknown[]) => console.log(`[waniwani:${namespace}]`, ...args)
+		? (...args: unknown[]) => console.error(`[waniwani:${namespace}]`, ...args)
 		: () => {};
 }
