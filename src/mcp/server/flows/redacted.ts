@@ -63,6 +63,3 @@ export function collectRedactedStateFields(
 	}
 	return out;
 }
-
-export const REDACTED_STATE_UPDATE_FIELDS_META_KEY =
-	"waniwani/redactedStateUpdateFields";

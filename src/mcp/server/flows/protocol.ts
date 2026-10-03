@@ -37,16 +37,17 @@ const CORRECTION =
 	'To change a field the user already answered ("actually my email is X"), call `action: "reset"` with the corrected `stateUpdates`. The flow restarts with every existing answer preserved and filled steps skipped, and may take a different path if the corrected value affects routing. The question on the table is a `continue`, not a `reset`.';
 
 const INTRO =
-	"`intro` opens your next message, ahead of the question, the widget call, and the result. `intro.verbatim` is reproduced word for word — no paraphrase, translation, trimming, expansion, or reformatting. `intro.instructions` is how to write the surrounding prose in your own words. It appears once per conversation and is not repeated from earlier turns.";
+	"`intro` opens your next message, ahead of the question, the widget call, and the result. `intro.verbatim` is reproduced word for word — no paraphrase, translation, trimming, expansion, or reformatting. `intro.instructions` is how to write the surrounding prose in your own words. It appears once per conversation and is not repeated from earlier turns. If you resume the flow before writing to the user, it opens the message you write after that.";
 
 function interruptSteps(): string[] {
 	return [
 		"The flow is paused on the user.",
 		"- One question: ask `question`, and return the answer as `stateUpdates` keyed by `field`.",
 		"- Several questions: ask every entry of `questions` in a single conversational message, then return all the answers keyed by their own `field`.",
+		"- A question the user already answered earlier in the conversation is not asked again: send that answer. When every question is answered this way, resume right away.",
 		'- `fieldSchema`, when present, describes the accepted value: match enum `values` exactly, send a number for `type: "number"`.',
 		"- `context`, when present, shapes your wording and is not shown to the user.",
-		'Resume with `action: "continue"`. Send back what the user actually said, including values they volunteered for other fields — those steps get skipped. Anything they left unanswered stays out and the flow asks again.',
+		'Resume with `action: "continue"`, sending the answers to these questions as the user gave them. Anything they left unanswered stays out and the flow asks again.',
 	];
 }
 

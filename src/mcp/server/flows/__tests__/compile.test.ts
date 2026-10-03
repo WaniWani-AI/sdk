@@ -118,6 +118,7 @@ describe("compileFlow response contract", () => {
 			step: "ask_use_case",
 			state: {},
 			field: "useCase",
+			asked: ["useCase"],
 		});
 	});
 
@@ -1344,7 +1345,7 @@ describe("nested object state", () => {
 		);
 	});
 
-	test("pre-fill nested fields on start with auto-skip", async () => {
+	test("start merges no stateUpdates, so a nested field sent early is still asked", async () => {
 		const store = new TestFlowStateStore();
 		const flow = createFlow({
 			id: "nested_prefill",
@@ -1373,17 +1374,17 @@ describe("nested object state", () => {
 		await flow.register(server);
 		const handler = registered[0]?.[2];
 
-		// Pre-fill name on start
 		const r1 = (await handler?.(
-			startInput({ "driver.name": "Pre-filled" }),
+			startInput({ "driver.name": "Sent early" }),
 			TEST_EXTRA,
 		)) as Record<string, unknown>;
 		const p1 = parsePayload(r1);
 
-		// Should only ask for license
 		expect(p1.status).toBe("interrupt");
-		expect(p1.question).toBe("License?");
-		expect(p1.field).toBe("driver.license");
+		expect(
+			(p1.questions as Array<{ field: string }>).map((q) => q.field),
+		).toEqual(["driver.name", "driver.license"]);
+		expect((await store.get(TEST_SESSION_ID))?.state).toEqual({});
 	});
 
 	test("deep merge preserves sibling nested fields on continue", async () => {

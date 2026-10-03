@@ -26,6 +26,12 @@ import type {
 	RegisteredFlow,
 } from "./@types";
 import { START } from "./@types";
+import { addAskedFields, keepAskedFields } from "./asked-fields";
+import {
+	FLOW_GRAPH_META_KEY,
+	REDACTED_FIELDS_META_KEY,
+	serverOnly,
+} from "./definition-meta";
 import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
 import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
 import { extractFlowGraph } from "./graph-extract";
@@ -38,32 +44,14 @@ import {
 import { deepMerge, expandDotPaths } from "./nested";
 import { flowOutputSchema } from "./output-schema";
 import { buildNextStep } from "./protocol";
-import {
-	collectRedactedStateFields,
-	REDACTED_STATE_UPDATE_FIELDS_META_KEY,
-} from "./redacted";
+import { collectRedactedStateFields } from "./redacted";
 
 // ============================================================================
 // Input schema
 // ============================================================================
 
-function buildInputSchema(config: {
-	omitIntentPII?: boolean;
-	state?: Record<string, z.ZodType>;
-}) {
+function buildInputSchema(config: { omitIntentPII?: boolean }) {
 	const piiNote = config.omitIntentPII ? OMIT_PII_NOTE : "";
-
-	// When the flow declares state fields, expose them as typed (optional) keys
-	// on `stateUpdates` so the LLM sees field names, types, and descriptions in
-	// the tool's JSON Schema. `.passthrough()` preserves unknown keys (e.g.
-	// dot-paths like "driver.name" for nested state, plus forward-compat keys).
-	const hasState = config.state && Object.keys(config.state).length > 0;
-	const stateUpdatesSchema = hasState
-		? z
-				.object(config.state as Record<string, z.ZodType>)
-				.partial()
-				.passthrough()
-		: z.record(z.string(), z.unknown());
 
 	return {
 		action: z
@@ -83,10 +71,14 @@ function buildInputSchema(config: {
 			.describe(
 				`Optional when action is "start". The situation that led the user here — the page they are on, what they were doing, or what triggered the request. Omitted when there is nothing genuinely relevant to report.${piiNote}`,
 			),
-		stateUpdates: stateUpdatesSchema
+		// Untyped on purpose: the listing names no state field. Each response
+		// names the fields it asks for, with their schema, and the engine
+		// accepts only those (see `asked-fields.ts`).
+		stateUpdates: z
+			.record(z.string(), z.unknown())
 			.optional()
 			.describe(
-				'State field values to set before processing the next node: the user\'s answer keyed by the `field` from the response, plus any other values the user stated. Fields already filled here are skipped by the engine. For nested state fields, use dot-paths like "driver.name".',
+				'Answers to the flow\'s questions, keyed by the `field` each response names. For nested fields, use dot-paths like "driver.name".',
 			),
 		sessionId: z
 			.string()
@@ -118,12 +110,30 @@ function resolveDefaultStore(flowId: string): FlowStore {
 // ============================================================================
 
 /**
- * One handled tool call, plus the internal state this session arrived with. The
- * response assembler reads it to decide what to attach, then persists what is
- * left. Branches that fail before the engine runs return no `internal`, which
- * reads as "nothing pending".
+ * One handled tool call, plus the internal state and asked fields this session
+ * arrived with. The response assembler reads it to decide what to attach, then
+ * persists what is left. Branches that fail before the engine runs return no
+ * `internal`, which reads as "nothing pending".
  */
-type HandledCall = ExecutionResult & { internal?: FlowInternalState };
+type HandledCall = ExecutionResult & {
+	internal?: FlowInternalState;
+	asked?: string[];
+};
+
+/**
+ * The `stateUpdates` a `continue` or `reset` merges: only the fields the run
+ * has asked for. A record written before the engine tracked them has no
+ * `asked`, so that one call merges everything, rather than drop the answer to
+ * a question it has no record of.
+ */
+function acceptedUpdates(
+	updates: Record<string, unknown> | undefined,
+	asked: string[] | undefined,
+): Record<string, unknown> {
+	return asked
+		? keepAskedFields(updates, asked)
+		: expandDotPaths(updates ?? {});
+}
 
 export function compileFlow<TState extends Record<string, unknown>>(
 	input: CompileInput<TState>,
@@ -155,16 +165,17 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		waniwani?: ScopedWaniWaniClient,
 	): Promise<HandledCall> {
 		/**
-		 * Run the engine from `node`, carrying this session's internal state
-		 * through to the response assembler. Every branch below resumes the same
-		 * graph with the same per-call context, so the only things that vary are
-		 * where execution starts, the state it starts from, and where the internal
-		 * state was read.
+		 * Run the engine from `node`, carrying this session's internal state and
+		 * asked fields through to the response assembler. Every branch below
+		 * resumes the same graph with the same per-call context, so the only
+		 * things that vary are where execution starts, the state it starts from,
+		 * and where the session's own record was read.
 		 */
 		const run = (
 			node: string,
 			state: TState,
 			internal: FlowInternalState,
+			asked: string[] = [],
 		): Promise<HandledCall> =>
 			executeFrom(
 				node,
@@ -176,7 +187,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				waniwani,
 				input.nodeOptions,
 				config.state,
-			).then((result) => ({ ...result, internal }));
+			).then((result) => ({ ...result, internal, asked }));
 
 		if (args.action === "start") {
 			// `intent` is observational: the schema asks for it on start, but nothing
@@ -214,7 +225,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				sessionIsPreexisting,
 				seed: initialInternal,
 			});
-			const startState = expandDotPaths(args.stateUpdates ?? {}) as TState;
+			// A run starts empty. `stateUpdates` carries answers, and nothing has
+			// been asked yet; values the user already stated are sent back as the
+			// questions come up.
+			const startState = {} as TState;
 			const firstNode = await resolveNextNode(startEdge, startState);
 			return run(firstNode, startState, internal);
 		}
@@ -268,9 +282,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
+			const asked = flowState.asked;
 			const updatedState = deepMerge(
 				state as Record<string, unknown>,
-				expandDotPaths(args.stateUpdates ?? {}),
+				acceptedUpdates(args.stateUpdates, asked),
 			) as TState;
 			const internal = flowState.internal ?? {};
 
@@ -292,13 +307,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					};
 				}
 				const nextNode = await resolveNextNode(edge, updatedState);
-				return run(nextNode, updatedState, internal);
+				return run(nextNode, updatedState, internal, asked);
 			}
 
 			// Interrupt continue: re-execute from current step.
 			// The handler re-runs, filters answered questions, and runs
 			// validators if all questions are filled.
-			return run(step, updatedState, internal);
+			return run(step, updatedState, internal, asked);
 		}
 
 		if (args.action === "reset") {
@@ -358,6 +373,18 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
+			const asked = flowState.asked;
+			const corrections = acceptedUpdates(args.stateUpdates, asked);
+			if (Object.keys(corrections).length === 0) {
+				return {
+					content: {
+						status: "error" as const,
+						error:
+							'Nothing to correct: "reset" takes fields the flow has asked for.',
+					},
+				};
+			}
+
 			const startEdge = edges.get(START);
 			if (!startEdge) {
 				reportSessionError({
@@ -374,12 +401,12 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			const existingState = flowState.state as TState;
 			const mergedState = deepMerge(
 				existingState as Record<string, unknown>,
-				expandDotPaths(args.stateUpdates),
+				corrections,
 			) as TState;
 
 			const internal = flowState.internal ?? {};
 			const firstNode = await resolveNextNode(startEdge, mergedState);
-			return run(firstNode, mergedState, internal);
+			return run(firstNode, mergedState, internal, asked);
 		}
 
 		return {
@@ -402,13 +429,14 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		// The flow graph rides on the definition `_meta` itself, not only on what
 		// `register()` sends, because some servers register this config directly
 		// (the kit does, through skybridge). `withWaniwani` keys both funnel sync
-		// and telemetry capture on `_meta._flowGraph`; without it a flow tool is
-		// treated as a plain tool and gets a second, nested `telemetry` argument.
+		// and telemetry capture on it; without it a flow tool is treated as a
+		// plain tool. Both entries are server-only, so `tools/list` never sends
+		// them (see `definition-meta.ts`).
 		_meta: {
 			...(redactedStateFields.length > 0 && {
-				[REDACTED_STATE_UPDATE_FIELDS_META_KEY]: redactedStateFields,
+				[REDACTED_FIELDS_META_KEY]: serverOnly(redactedStateFields),
 			}),
-			_flowGraph: flowGraph,
+			[FLOW_GRAPH_META_KEY]: serverOnly(flowGraph),
 		},
 	};
 
@@ -499,7 +527,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		// TODO: expose a `deleteOnComplete` compile option for customers who
 		// want the prior behavior (drop the session as soon as END is reached).
 		if (sessionId && result.flowTokenContent) {
-			const tokenContent = withInternalState(result.flowTokenContent, internal);
+			const tokenContent = {
+				...withInternalState(result.flowTokenContent, internal),
+				asked: addAskedFields(result.asked ?? [], contentObj),
+			};
 			try {
 				await store.set(sessionId, tokenContent);
 			} catch (err) {

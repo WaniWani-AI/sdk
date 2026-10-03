@@ -6,7 +6,11 @@ import type { ToolCalledProperties } from "../../../tracking/index.js";
 import { createLogger } from "../../../utils/logger.js";
 import { waniwani } from "../../../waniwani.js";
 import type { FlowGraph } from "../flows/@types.js";
-import { REDACTED_STATE_UPDATE_FIELDS_META_KEY } from "../flows/redacted.js";
+import {
+	hideLegacyFlowGraph,
+	readFlowGraph,
+	readRedactedFields,
+} from "../flows/definition-meta.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import { classifyCause } from "../session-errors/classify.js";
 import type { McpServer } from "../types";
@@ -147,16 +151,7 @@ const REDACTED_VALUE = "REDACTED";
 function buildStateUpdateRedactor(
 	definitionMeta: UnknownRecord | undefined,
 ): ((input: unknown) => unknown) | undefined {
-	if (!definitionMeta) {
-		return undefined;
-	}
-	const fields = definitionMeta[REDACTED_STATE_UPDATE_FIELDS_META_KEY];
-	if (!Array.isArray(fields) || fields.length === 0) {
-		return undefined;
-	}
-	const fieldSet = new Set(
-		fields.filter((f): f is string => typeof f === "string"),
-	);
+	const fieldSet = new Set(readRedactedFields(definitionMeta));
 	if (fieldSet.size === 0) {
 		return undefined;
 	}
@@ -223,7 +218,7 @@ type UnknownRecordOrUndefined = UnknownRecord | undefined;
  *
  * Returns `undefined` when the tool records none: capture is off, the tool is
  * outside the allow-list, it declares its own `intent`, or its schema is not
- * an object we can extend. A flow tool (registered with `_meta._flowGraph`)
+ * an object we can extend. A flow tool (its `_meta` carries a flow graph)
  * keeps its schema, since it already asks for `intent` and `context`.
  *
  * Both registration orders funnel through here: the intercepted `registerTool`
@@ -241,7 +236,7 @@ function planTelemetry(
 		return undefined;
 	}
 
-	if (isRecord(definitionMeta?._flowGraph)) {
+	if (readFlowGraph(definitionMeta)) {
 		return { plan: { kind: "flow" } };
 	}
 
@@ -532,7 +527,7 @@ export async function withWaniwani(
 
 		const definitionMeta =
 			isRecord(config) && isRecord((config as UnknownRecord)._meta)
-				? ((config as UnknownRecord)._meta as UnknownRecord)
+				? hideLegacyFlowGraph((config as UnknownRecord)._meta as UnknownRecord)
 				: undefined;
 
 		const telemetry = isRecord(config)
@@ -552,9 +547,17 @@ export async function withWaniwani(
 			telemetry?.plan,
 		);
 
+		const metaMoved =
+			isRecord(config) && definitionMeta !== (config as UnknownRecord)._meta;
 		const effectiveConfig =
-			telemetry?.schema !== undefined
-				? { ...(config as UnknownRecord), inputSchema: telemetry.schema }
+			metaMoved || telemetry?.schema !== undefined
+				? {
+						...(config as UnknownRecord),
+						...(metaMoved && { _meta: definitionMeta }),
+						...(telemetry?.schema !== undefined && {
+							inputSchema: telemetry.schema,
+						}),
+					}
 				: config;
 
 		return originalRegisterTool(toolNameRaw, effectiveConfig, wrapped);
@@ -586,9 +589,14 @@ export async function withWaniwani(
 				continue;
 			}
 
+			// The MCP SDK serves `tools/list` from `entry._meta`, so swapping it
+			// here keeps a hand-set `_flowGraph` off the wire.
 			const definitionMeta = isRecord(entry._meta)
-				? (entry._meta as UnknownRecord)
+				? hideLegacyFlowGraph(entry._meta as UnknownRecord)
 				: undefined;
+			if (definitionMeta) {
+				entry._meta = definitionMeta;
+			}
 
 			// Only a tool whose handler we wrap gets the argument: the wrapper is what
 			// strips it again and restores a schemaless tool's call shape. A task
@@ -631,14 +639,8 @@ export async function withWaniwani(
 		if (registeredToolsMap && typeof registeredToolsMap === "object") {
 			for (const entry of Object.values(registeredToolsMap)) {
 				if (entry && typeof entry === "object") {
-					const meta = (entry as Record<string, unknown>)._meta;
-					const fg =
-						meta && typeof meta === "object"
-							? ((meta as Record<string, unknown>)._flowGraph as
-									| FlowGraph
-									| undefined)
-							: undefined;
-					if (fg?.nodes?.length) {
+					const fg = readFlowGraph((entry as Record<string, unknown>)._meta);
+					if (fg?.nodes.length) {
 						flowGraphs.push(fg);
 					}
 				}

@@ -40,8 +40,9 @@ await myFlow.register(server);
 ## Opening message (intro)
 
 If the flow should introduce the assistant or state a data/GDPR notice, put it on the config as
-`intro` — never as a first node. Pre-filled state skips opening nodes, so a greeting node is the
-one node most likely never to run.
+`intro` — never as a first node. An opening node is skipped when an earlier action fills its
+fields, and the model answers a question the user already settled without writing to them, so a
+greeting node is the one node most likely never to reach the user.
 
 ```ts
 createFlow({
@@ -103,9 +104,9 @@ Never import `interrupt` or `showWidget` directly.
 ## Common gotchas
 
 - **Forgetting `START` / `END` edges**: every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`.
-- **Missing `.describe()` on state fields**: the model reads these descriptions to know what to ask and what it can pre-fill. Skipping them degrades the flow significantly.
+- **Missing `.describe()` on state fields**: each question carries its field's description as `fieldSchema`, and the model reads it to phrase the question and to recognize an answer the user already gave. Skipping them degrades the flow significantly.
 - **Calling `.compile()` with no store and no API key**: throws immediately with a clear migration message. Pick one.
-- **A greeting or disclaimer node**: use the `intro` config option instead, or pre-filled state will skip it.
+- **A greeting or disclaimer node**: use the `intro` config option instead, or it may never reach the user.
 - **State is always `Partial<TState>`**: at any node, only fields filled by earlier nodes are populated. Guard with `if (!state.x) return {};`.
 
 ## Don't suggest

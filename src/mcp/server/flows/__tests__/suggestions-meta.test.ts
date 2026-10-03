@@ -36,13 +36,7 @@ type RegisterToolArgs = [string, Record<string, unknown>, Handler];
 const TEST_SESSION_ID = "test-session-suggestions";
 const TEST_INTENT = "Qualify the user for this flow.";
 
-function startInput(stateUpdates?: Record<string, unknown>) {
-	return {
-		action: "start" as const,
-		intent: TEST_INTENT,
-		...(stateUpdates ? { stateUpdates } : {}),
-	};
-}
+const START_INPUT = { action: "start" as const, intent: TEST_INTENT };
 
 function mockServer() {
 	const registered: RegisterToolArgs[] = [];
@@ -54,19 +48,25 @@ function mockServer() {
 	return { server: server as unknown as McpServer, registered };
 }
 
-/** Register a compiled flow and run one `start` call, returning the raw result. */
+/**
+ * Register a compiled flow and run one `start` call, then one `continue` per
+ * entry of `answers`, returning the last raw result.
+ */
 async function runStart(
 	flow: RegisteredFlow,
-	stateUpdates?: Record<string, unknown>,
+	...answers: Record<string, unknown>[]
 ): Promise<Record<string, unknown>> {
 	const mock = mockServer();
 	await flow.register(mock.server);
 	const handler = mock.registered[0]?.[2];
 	// A fresh `_meta` object per call — `compile.ts` mutates it in place, and a
 	// shared object here would leak one test's suggestions into the next.
-	return (await handler?.(startInput(stateUpdates), {
-		_meta: { sessionId: TEST_SESSION_ID },
-	})) as Record<string, unknown>;
+	const extra = () => ({ _meta: { sessionId: TEST_SESSION_ID } });
+	let result = await handler?.(START_INPUT, extra());
+	for (const stateUpdates of answers) {
+		result = await handler?.({ action: "continue", stateUpdates }, extra());
+	}
+	return result as Record<string, unknown>;
 }
 
 function metaOf(result: Record<string, unknown>): Record<string, unknown> {
@@ -213,7 +213,7 @@ describe("flow result _meta suggestions", () => {
 			.addEdge("ask_pet", END)
 			.compile({ store: new TestFlowStateStore() });
 
-		// `petName` arrives pre-filled, so only `petType` is still open and the
+		// `petName` is answered first, so only `petType` is still open and the
 		// engine collapses to the single-question shorthand.
 		const result = await runStart(flow, { petName: "Rex" });
 

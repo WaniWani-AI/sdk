@@ -197,7 +197,7 @@ await registerTools(server, [displayTool, myFlow, ...existingTools]);
 2. **Trigger the flow**: In ChatGPT or Claude, say something that matches the flow's description
 3. **Walk through all steps**: Answer each question, verify the flow advances correctly
 4. **Test edge cases**:
-   - Pre-filling: "I want a demo, my email is test@company.com" -- should skip the email question
+   - Answers given up front: "I want a demo, my email is test@company.com" -- the model should answer the email question from that message instead of asking it again
    - Validation: Enter an invalid value and verify the error message + re-ask
    - Branching: If conditional edges exist, test both paths
 5. **Check the dashboard**: Verify events appear at [app.waniwani.ai](https://app.waniwani.ai)
