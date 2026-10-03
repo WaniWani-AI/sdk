@@ -25,15 +25,16 @@ type FlowToolInput =
   | {
       action: "start";
       intent: string;
-      stateUpdates?: Record<string, unknown>;
     }
   | {
-      action: "continue";
+      action: "continue" | "reset";
       stateUpdates?: Record<string, unknown>;
     };
 ```
 
-`intent` is required on `start` and should summarize the user's goal for the flow, including relevant prior context that led to triggering it, if available.
+`intent` is required on `start` and should summarize the user's goal for the flow.
+
+The tool listing names no state field: `stateUpdates` is an untyped record. Each interrupt or widget response names the fields it asks for, with their `fieldSchema`, and `continue` and `reset` merge values only for fields the run has asked for. A field the flow computes for itself (a lookup id, a quote) is never asked, so a call cannot set it. An answer the user gave before its question comes up is sent back when the flow asks it.
 
 ### Tool output
 

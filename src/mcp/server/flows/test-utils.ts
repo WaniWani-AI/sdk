@@ -8,7 +8,10 @@ import type {
 	FlowWidgetContent,
 	RegisteredFlow,
 } from "./@types";
+import { fieldsAskedBy } from "./asked-fields";
+import { isFilled } from "./execute";
 import type { FlowStore } from "./flow-store";
+import { expandDotPaths, getNestedValue } from "./nested";
 
 // ============================================================================
 // Test harness for compiled flows
@@ -53,6 +56,43 @@ export async function createFlowTestHarness(
 
 	const extra = { _meta: { sessionId } };
 
+	async function call(input: Record<string, unknown>): Promise<FlowContent> {
+		const result = (await handler(input, extra)) as Record<string, unknown>;
+		return parsePayload(result);
+	}
+
+	/**
+	 * Answer each question the flow asks from `known`, the way the model
+	 * answers from what the user said earlier, until the flow asks something
+	 * `known` has no value for. A field is sent once: a validator that rejects
+	 * it gets the rejection back, not the same value again.
+	 */
+	async function answerFrom(
+		known: Record<string, unknown>,
+		parsed: FlowContent,
+	): Promise<FlowContent> {
+		const values = expandDotPaths(known);
+		const sent = new Set<string>();
+		let current = parsed;
+		for (;;) {
+			const answerable = fieldsAskedBy(current).filter(
+				(field) => !sent.has(field) && isFilled(getNestedValue(values, field)),
+			);
+			if (answerable.length === 0) {
+				return current;
+			}
+			for (const field of answerable) {
+				sent.add(field);
+			}
+			current = await call({
+				action: "continue",
+				stateUpdates: Object.fromEntries(
+					answerable.map((field) => [field, getNestedValue(values, field)]),
+				),
+			});
+		}
+	}
+
 	async function toResult(parsed: FlowContent): Promise<FlowTestResult> {
 		return {
 			...parsed,
@@ -61,47 +101,39 @@ export async function createFlowTestHarness(
 	}
 
 	return {
+		/**
+		 * Start the flow. `known` stands for what the user already said: every
+		 * question whose field it holds is answered from it, and the result is
+		 * the response the flow stops on.
+		 */
 		async start(
 			intent: string,
-			stateUpdates?: Record<string, unknown>,
+			known?: Record<string, unknown>,
 			context?: string,
 		): Promise<FlowTestResult> {
-			const result = (await handler(
-				{
-					action: "start",
-					intent,
-					...(context ? { context } : {}),
-					...(stateUpdates ? { stateUpdates } : {}),
-				},
-				extra,
-			)) as Record<string, unknown>;
-			return toResult(parsePayload(result));
+			const started = await call({
+				action: "start",
+				intent,
+				...(context ? { context } : {}),
+			});
+			return toResult(known ? await answerFrom(known, started) : started);
 		},
 
 		async continueWith(
 			stateUpdates?: Record<string, unknown>,
 		): Promise<FlowTestResult> {
-			const result = (await handler(
-				{
+			return toResult(
+				await call({
 					action: "continue",
 					...(stateUpdates ? { stateUpdates } : {}),
-				},
-				extra,
-			)) as Record<string, unknown>;
-			return toResult(parsePayload(result));
+				}),
+			);
 		},
 
 		async resetWith(
 			stateUpdates: Record<string, unknown>,
 		): Promise<FlowTestResult> {
-			const result = (await handler(
-				{
-					action: "reset",
-					stateUpdates,
-				},
-				extra,
-			)) as Record<string, unknown>;
-			return toResult(parsePayload(result));
+			return toResult(await call({ action: "reset", stateUpdates }));
 		},
 
 		async lastState(): Promise<FlowTokenContent | null> {

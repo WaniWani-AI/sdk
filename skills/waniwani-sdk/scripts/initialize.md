@@ -179,7 +179,7 @@ export const {flowName} = createFlow({
 2. **Gather in batches** -- Group related fields in a single interrupt node (e.g. ask about the pet's name, breed, and age together).
 3. **Validate early** -- If a field needs validation (API lookup, format check), do it in a processing node right after collection. Return errors via state so the flow can re-ask.
 4. **Show, don't tell** -- Use widgets for any step where visual presentation matters (pricing comparison, confirmation, summaries). A widget step is always more compelling than text.
-5. **Smart defaults** -- Pre-fill state from context when possible. If the user says "I need insurance for my golden retriever Max", extract all three fields from that one message.
+5. **Answers given up front** -- If the user says "I need insurance for my golden retriever Max", the model answers the species, breed and name questions from that one message as the flow asks them. Group fields the user tends to give together into one interrupt node so that costs a single call.
 
 ### If mocking data
 

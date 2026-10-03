@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { END, START } from "../../flows/@types.js";
 import { createFlow } from "../../flows/create-flow.js";
+import { readFlowGraph } from "../../flows/definition-meta.js";
 import { MemoryKvStore } from "../../kv/index.js";
 import { withWaniwani } from "../index.js";
 import { mockClient } from "./test-helpers.js";
@@ -298,7 +299,7 @@ describe("captureIntent against the real MCP SDK", () => {
 			.addEdge("ask", END)
 			.compile({ store: new MemoryKvStore() });
 
-		expect(flow.config._meta?._flowGraph).toEqual(flow.flowGraph);
+		expect(readFlowGraph(flow.config._meta)).toEqual(flow.flowGraph);
 
 		const server = new McpServer({ name: "kit", version: "1.0.0" });
 		server.registerTool(flow.name, flow.config, flow.handler);

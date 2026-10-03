@@ -597,11 +597,12 @@ export type RegisteredFlow = {
 		outputSchema: FlowOutputSchema;
 		annotations?: ToolAnnotations;
 		/**
-		 * Definition metadata. Carries `_flowGraph`, which `withWaniwani` reads to
-		 * recognize the tool as a flow (funnel sync, telemetry capture), so
+		 * Definition metadata. Carries the flow graph, which `withWaniwani` reads
+		 * to recognize the tool as a flow (funnel sync, telemetry capture), so
 		 * registering this config directly behaves exactly like `register()`.
+		 * The entry is server-only: `tools/list` never sends it.
 		 */
-		_meta: { _flowGraph: FlowGraph; [key: string]: unknown };
+		_meta: Record<string, unknown>;
 	};
 	/** Tool callback — pass to `server.registerTool(flow.name, flow.config, flow.handler)`. */
 	handler: FlowToolHandler;
@@ -627,6 +628,10 @@ export type FlowToolInput = {
 	intent?: string;
 	/** Optional when `action` is `"start"`. Describes the situation/environment that led the user to start this flow. */
 	context?: string;
+	/**
+	 * Answers keyed by the `field` a response asked for. The engine keeps only
+	 * fields the run has asked for, so `start` merges none.
+	 */
 	stateUpdates?: Record<string, unknown>;
 	/** Session identifier echoed in the response. Pass it back on "continue" and "reset" calls. */
 	sessionId?: string;
@@ -660,6 +665,12 @@ export type FlowTokenContent = {
 	state: Record<string, unknown>;
 	field?: string;
 	widgetId?: string;
+	/**
+	 * Every field this run has asked for, through an interrupt question or a
+	 * widget's `field`. `continue` and `reset` merge `stateUpdates` only for
+	 * these, so the conversation cannot write a field the flow computes itself.
+	 */
+	asked?: string[];
 	/** The engine's own state for this session. Never flow state. */
 	internal?: FlowInternalState;
 };
