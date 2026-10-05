@@ -34,6 +34,7 @@ import {
 	collectVisitorContext,
 	getOrCreateVisitorId,
 } from "../lib/visitor-context";
+import { usePageToolCalls } from "./use-page-tool-calls";
 
 const SESSION_HEADER_NAME = "x-session-id";
 const THREAD_PERSIST_DEBOUNCE_MS = 250;
@@ -466,6 +467,14 @@ export function useChatEngine(props: ChatBaseProps) {
 					},
 				};
 
+				// Read per send, so it follows a single-page site's in-app navigation.
+				if (
+					!Object.hasOwn(resolvedBody, "pageUrl") &&
+					typeof window !== "undefined"
+				) {
+					resolvedBody.pageUrl = window.location.href;
+				}
+
 				const extra = mcpExtra(resolvedBody.extra);
 				if (extra) {
 					resolvedBody.extra = extra;
@@ -564,18 +573,34 @@ export function useChatEngine(props: ChatBaseProps) {
 		void refreshToolDefinitions();
 	}, [refreshToolDefinitions]);
 
+	// Inert without `onToolCall`: `pending` stays false and `useChat` gets the
+	// same options as it always has.
+	const {
+		chatRef: pageToolChatRef,
+		pending: pageToolCallsPending,
+		handleFinish: handPageToolCalls,
+		stop: stopPageToolCalls,
+		drop: dropPageToolCalls,
+		release: releasePageToolCalls,
+		markRequest: markPageToolRequest,
+	} = usePageToolCalls(props.transport ? undefined : props.onToolCall);
+
 	const {
 		messages,
 		sendMessage,
 		setMessages,
 		status,
 		stop: stopStream,
+		addToolOutput,
 	} = useChat({
 		messages: props.initialMessages,
 		transport: transportRef.current,
 		onFinish({ message, isAbort, isDisconnect, isError }) {
 			turnRef.current?.mark("streamEnd");
 			reportTurn(isAbort || isDisconnect || isError ? "error" : "ok");
+			if (!isAbort && !isDisconnect && !isError) {
+				handPageToolCalls(message);
+			}
 			// `onFinish` also runs for aborted/disconnected/errored requests.
 			// `onResponseReceived` fires for all of them; the widget event is
 			// emitted only for a successful assistant reply.
@@ -604,6 +629,10 @@ export function useChatEngine(props: ChatBaseProps) {
 			}
 		},
 	});
+
+	useEffect(() => {
+		pageToolChatRef.current = { addToolOutput, sendMessage };
+	}, [pageToolChatRef, addToolOutput, sendMessage]);
 
 	const messagesRef = useRef<UIMessage[]>(messages);
 	useEffect(() => {
@@ -640,10 +669,11 @@ export function useChatEngine(props: ChatBaseProps) {
 	}, []);
 
 	const beginTurn = useCallback(() => {
+		markPageToolRequest();
 		turnRef.current = startTurn(
 			messagesRef.current.filter((m) => m.role === "user").length + 1,
 		);
-	}, []);
+	}, [markPageToolRequest]);
 
 	// Dropping the stream leaves the server generating. `/cancel` is what stops
 	// the turn itself; a host that does not serve it answers 404, which is fine
@@ -656,6 +686,10 @@ export function useChatEngine(props: ChatBaseProps) {
 	const [cancelling, setCancelling] = useState(false);
 
 	const stop = useCallback(async () => {
+		// Waiting on the page, the stream has already ended and the server is idle.
+		if (await stopPageToolCalls()) {
+			return;
+		}
 		setCancelling(true);
 		try {
 			await stopStream();
@@ -677,7 +711,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		} finally {
 			setCancelling(false);
 		}
-	}, [api, stopStream]);
+	}, [api, stopStream, stopPageToolCalls]);
 
 	// Hydrate persisted history when it's enabled *after* mount — commonly via
 	// the remote embed config (the dashboard toggle, not a data-attr/prop). The
@@ -784,7 +818,10 @@ export function useChatEngine(props: ChatBaseProps) {
 	const queuedMessagesRef = useRef<QueuedMessage[]>([]);
 	queuedMessagesRef.current = queuedMessages;
 
-	const isLoading = status === "submitted" || status === "streaming";
+	// A page still answering tool calls counts as busy, so a message typed
+	// meanwhile queues rather than landing after an unanswered tool call.
+	const isLoading =
+		status === "submitted" || status === "streaming" || pageToolCallsPending;
 
 	/**
 	 * A queued message the visitor never sends takes its uploads with it. The
@@ -894,7 +931,7 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	// Flush first queued message once the current response finishes
 	useEffect(() => {
-		if (status !== "ready" || cancelling) {
+		if (status !== "ready" || cancelling || pageToolCallsPending) {
 			return;
 		}
 		if (queuedMessages.length === 0) {
@@ -919,6 +956,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	}, [
 		status,
 		cancelling,
+		pageToolCallsPending,
 		sendMessage,
 		onMessageSent,
 		queuedMessages,
@@ -927,6 +965,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	]);
 
 	const reset = useCallback(() => {
+		dropPageToolCalls();
 		transportRef.current.reset?.();
 		setMessages([]);
 		discardAllQueued();
@@ -935,7 +974,13 @@ export function useChatEngine(props: ChatBaseProps) {
 		toolDefinitionsRef.current = {};
 		setToolDefinitionsRevision((r) => r + 1);
 		void refreshToolDefinitions();
-	}, [setMessages, clearSessionId, refreshToolDefinitions, discardAllQueued]);
+	}, [
+		setMessages,
+		clearSessionId,
+		refreshToolDefinitions,
+		discardAllQueued,
+		dropPageToolCalls,
+	]);
 
 	// Build a `StoredThread` from current refs synchronously. Callers that
 	// need to flush before mutating thread state (startNewThread,
@@ -993,7 +1038,11 @@ export function useChatEngine(props: ChatBaseProps) {
 		if (!isThreadHistoryReady) {
 			return;
 		}
-		if (status === "submitted" || status === "streaming") {
+		if (
+			status === "submitted" ||
+			status === "streaming" ||
+			pageToolCallsPending
+		) {
 			return;
 		}
 		if (messages.length === 0) {
@@ -1021,6 +1070,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		isThreadHistoryReady,
 		messages,
 		status,
+		pageToolCallsPending,
 		persistActiveThread,
 	]);
 
@@ -1055,6 +1105,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		// before any await, so subsequent ref mutations below don't taint
 		// the outgoing write.
 		void flushPendingPersist();
+		dropPageToolCalls();
 		// The outgoing thread keeps its runtime session for when it is reopened.
 		transportRef.current.dispose?.();
 		setMessages([]);
@@ -1074,38 +1125,58 @@ export function useChatEngine(props: ChatBaseProps) {
 		refreshThreads,
 		flushPendingPersist,
 		discardAllQueued,
+		dropPageToolCalls,
 	]);
 
 	const switchThread = useCallback(
 		async (threadId: string) => {
 			switchEpochRef.current += 1;
 			const epoch = switchEpochRef.current;
-			await flushPendingPersist();
-			if (epoch !== switchEpochRef.current) {
-				return;
+			// Stopped first and busy until the switch ends, so the outgoing thread is
+			// saved with every tool call answered and no queued message reaches it.
+			const stopped = await stopPageToolCalls({ keepBusy: true });
+			try {
+				if (stopped) {
+					// Nothing was saved while the page worked; the updater reads the live messages.
+					setMessages((live) => {
+						messagesRef.current = live;
+						return live;
+					});
+					await persistActiveThread();
+				} else {
+					dropPageToolCalls();
+				}
+				await flushPendingPersist();
+				if (epoch !== switchEpochRef.current) {
+					return;
+				}
+				const stored = await loadThread(threadId);
+				if (epoch !== switchEpochRef.current) {
+					return;
+				}
+				if (!stored) {
+					return;
+				}
+				transportRef.current.dispose?.();
+				// Restore the session before announcing the switch, so the
+				// `thread.changed` event carries the target thread's session id.
+				if (stored.sessionId) {
+					sessionIdRef.current = stored.sessionId;
+					setSessionIdState(stored.sessionId);
+				} else {
+					clearSessionId();
+				}
+				setActiveThreadId(stored.threadId);
+				threadCreatedAtRef.current = stored.createdAt;
+				threadTitleRef.current = stored.title;
+				setMessages(stored.messages);
+				discardAllQueued();
+				setText("");
+			} finally {
+				if (stopped) {
+					releasePageToolCalls();
+				}
 			}
-			const stored = await loadThread(threadId);
-			if (epoch !== switchEpochRef.current) {
-				return;
-			}
-			if (!stored) {
-				return;
-			}
-			transportRef.current.dispose?.();
-			// Restore the session before announcing the switch, so the
-			// `thread.changed` event carries the target thread's session id.
-			if (stored.sessionId) {
-				sessionIdRef.current = stored.sessionId;
-				setSessionIdState(stored.sessionId);
-			} else {
-				clearSessionId();
-			}
-			setActiveThreadId(stored.threadId);
-			threadCreatedAtRef.current = stored.createdAt;
-			threadTitleRef.current = stored.title;
-			setMessages(stored.messages);
-			discardAllQueued();
-			setText("");
 		},
 		[
 			setMessages,
@@ -1113,6 +1184,10 @@ export function useChatEngine(props: ChatBaseProps) {
 			setActiveThreadId,
 			flushPendingPersist,
 			discardAllQueued,
+			stopPageToolCalls,
+			dropPageToolCalls,
+			releasePageToolCalls,
+			persistActiveThread,
 		],
 	);
 
@@ -1121,34 +1196,55 @@ export function useChatEngine(props: ChatBaseProps) {
 			// Drop pending + await in-flight persist for the thread we're
 			// deleting — otherwise an already-fired `upsertThread` can settle
 			// after `deleteThreadFromStore` and resurrect the row.
+			let stopped = false;
 			if (activeThreadIdRef.current === threadId) {
 				// Invalidate any in-flight `switchThread` targeting this thread.
 				switchEpochRef.current += 1;
+				// Stopped first and busy until the delete ends, so a queued message never
+				// follows an unanswered tool call.
+				stopped = await stopPageToolCalls({ keepBusy: true });
+				if (!stopped) {
+					dropPageToolCalls();
+				}
 				if (persistTimerRef.current) {
 					clearTimeout(persistTimerRef.current);
 					persistTimerRef.current = undefined;
 				}
+			}
+			try {
 				const inflight = persistInflightRef.current;
-				if (inflight) {
+				if (activeThreadIdRef.current === threadId && inflight) {
 					await inflight;
 				}
-			}
-			await deleteThreadFromStore(threadId);
-			transportRef.current.forget?.(threadId);
-			await refreshThreads();
-			if (activeThreadIdRef.current === threadId) {
-				transportRef.current.dispose?.();
-				setMessages([]);
-				discardAllQueued();
-				clearSessionId();
-				setText("");
-				activeThreadIdRef.current = undefined;
-				setActiveThreadIdState(undefined);
-				threadCreatedAtRef.current = undefined;
-				threadTitleRef.current = undefined;
+				await deleteThreadFromStore(threadId);
+				transportRef.current.forget?.(threadId);
+				await refreshThreads();
+				if (activeThreadIdRef.current === threadId) {
+					transportRef.current.dispose?.();
+					setMessages([]);
+					discardAllQueued();
+					clearSessionId();
+					setText("");
+					activeThreadIdRef.current = undefined;
+					setActiveThreadIdState(undefined);
+					threadCreatedAtRef.current = undefined;
+					threadTitleRef.current = undefined;
+				}
+			} finally {
+				if (stopped) {
+					releasePageToolCalls();
+				}
 			}
 		},
-		[setMessages, clearSessionId, refreshThreads, discardAllQueued],
+		[
+			setMessages,
+			clearSessionId,
+			refreshThreads,
+			discardAllQueued,
+			stopPageToolCalls,
+			dropPageToolCalls,
+			releasePageToolCalls,
+		],
 	);
 
 	// Sync controlled `activeThreadId` after mount. The mount effect seeds
@@ -1183,6 +1279,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		[],
 	);
 
+	const displayedStatus = pageToolCallsPending ? "streaming" : status;
 	const lastMessage = messages[messages.length - 1];
 	const hasMessages = messages.length > 0;
 	const showLoaderBubble =
@@ -1196,7 +1293,7 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	return {
 		messages,
-		status,
+		status: displayedStatus,
 		text,
 		setText,
 		handleSubmit,
