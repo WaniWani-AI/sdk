@@ -1,12 +1,12 @@
 "use client";
 
 import { cjk } from "@streamdown/cjk";
-import { code } from "@streamdown/code";
 import type { UIMessage } from "ai";
 import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
 import { memo } from "react";
 import { Streamdown } from "streamdown";
 import { useSmoothStream } from "../hooks/use-smooth-stream";
+import { codeHighlighter } from "../lib/code-highlighter";
 import { cn } from "../lib/utils";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
@@ -61,7 +61,7 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown> & {
 	isStreaming?: boolean;
 };
 
-const streamdownPluginsFull = { cjk, code };
+const streamdownPluginsFull = { cjk, code: codeHighlighter };
 const streamdownPluginsStreaming = { cjk };
 const defaultLinkSafety = { enabled: false } as const;
 
@@ -78,6 +78,7 @@ function MessageResponseImpl({
 
 	return (
 		<Streamdown
+			key={isStreaming ? "streaming" : `complete:${rendered ?? ""}`}
 			className={cn(
 				"ww:size-full ww:[&>*:first-child]:mt-0 ww:[&>*:last-child]:mb-0",
 				className,
