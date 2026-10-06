@@ -210,7 +210,7 @@ undeclared, and graph introspection (funnel analytics, Mermaid diagrams) reads
 | Return value | Behavior |
 |---|---|
 | `interrupt({ field: { question } })` | Pause -> ask user -> resume with answer stored at `field` |
-| `interrupt({ field: { question, context } })` | Same, plus hidden guidance for the assistant |
+| `interrupt({ field: { question } }, { context })` | Same, plus hidden guidance for the assistant |
 | `showWidget({ tool: displayTool, data?, field?, interactive? })` | Pause -> instruct AI to call display tool -> resume on continue |
 | `{ key: value, ... }` | Action node -> merge into state -> auto-advance |
 
