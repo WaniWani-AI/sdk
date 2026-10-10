@@ -41,6 +41,10 @@ import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
+import {
+	DEFAULT_HIDE_AT_BOTTOM_PX,
+	useNearPageBottom,
+} from "./use-near-page-bottom";
 import { usePathname, useVisibilityGate } from "./use-pathname";
 import { useScrollAppearance } from "./use-scroll-appearance";
 import { useSuggestions } from "./use-suggestions";
@@ -124,6 +128,18 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			? appearTriggerForPath(config.visibility, pathname)
 			: null;
 		const scrolledPast = useScrollAppearance(appearAfter);
+
+		// `hideAtBottom` slides the dock away at the end of the page so it
+		// doesn't cover the host's footer. Kept apart from `appeared` so the
+		// entrance timer and the auto-expand don't replay on every return.
+		const hideAtBottom = config.hideAtBottom;
+		const nearBottom = useNearPageBottom(
+			!visible || hideAtBottom === undefined || hideAtBottom === false
+				? null
+				: hideAtBottom === true
+					? DEFAULT_HIDE_AT_BOTTOM_PX
+					: hideAtBottom,
+		);
 
 		const chatRef = useRef<ChatHandle>(null);
 		// One emitter per mount. The session id getter reads through the chat
@@ -430,6 +446,9 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// none, focusing leaves the plain input bar (no empty card, no widen).
 		const showCard = dockTexts.length > 0 && phase !== "input";
 
+		// Never pull the bar out from under a visitor who is mid-sentence.
+		const dockShown = appeared && !(nearBottom && composerText.length === 0);
+
 		const closeButton = (
 			<button
 				type="button"
@@ -462,7 +481,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 								ref={dockRef}
 								data-waniwani-floating="dock"
 								data-state={phase === "open" ? "hidden" : "shown"}
-								data-appeared={appeared ? "true" : "false"}
+								data-appeared={dockShown ? "true" : "false"}
 								className={cn(
 									"ww:fixed ww:bottom-3 ww:sm:bottom-4 ww:left-0 ww:right-0 ww:mx-auto ww:z-[2147483002] ww:flex ww:flex-col",
 									"ww:w-[calc(100vw-2rem)] ww:transition-[max-width] ww:duration-300 ww:ease-out",
