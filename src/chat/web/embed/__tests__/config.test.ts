@@ -243,6 +243,36 @@ describe("parseConfigFromScript — render mode attrs", () => {
 		expect(cfg.launcherText).toBe("Need help?");
 		expect(cfg.appearDelay).toBe(1500);
 	});
+
+	test("data-hide-at-bottom accepts a flag or a pixel distance", async () => {
+		const on = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-at-bottom": "true",
+		});
+		expect(on.hideAtBottom).toBe(true);
+		const bare = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-at-bottom": "",
+		});
+		expect(bare.hideAtBottom).toBe(true);
+		const px = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-at-bottom": " 240 ",
+		});
+		expect(px.hideAtBottom).toBe(240);
+		const off = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-at-bottom": "false",
+		});
+		expect(off.hideAtBottom).toBe(false);
+		const junk = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-at-bottom": "footer",
+		});
+		expect(junk.hideAtBottom).toBeUndefined();
+		const unset = await parseWithAttrs({ "data-token": "tok" });
+		expect(unset.hideAtBottom).toBeUndefined();
+	});
 });
 
 describe("parseConfigFromScript — data-visitor-id", () => {

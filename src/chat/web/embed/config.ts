@@ -334,6 +334,16 @@ export interface EmbedConfig {
 	 */
 	appearDelay?: number;
 	/**
+	 * Slide the floating dock away once the visitor scrolls to the bottom of
+	 * the page, so it doesn't cover the host's footer. It comes back as soon
+	 * as they scroll up. `true` hides it within 120px of the end of the page;
+	 * a number sets that distance in px (use the footer's height to clear the
+	 * whole footer). Never hides the open chat panel, or the dock while the
+	 * visitor has text typed in it. Only applies when `mode` is `"floating"`.
+	 * Surfaced as `data-hide-at-bottom` (`"true"` or a pixel distance).
+	 */
+	hideAtBottom?: boolean | number;
+	/**
 	 * Opt out of the top-of-funnel `page.viewed` event the widget fires once
 	 * on mount. Leave unset (or `false`) to keep the default landing-funnel
 	 * tracking; set `true` on surfaces where a page view is meaningless and
@@ -602,6 +612,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		}
 	}
 
+	const hideAtBottom = parseHideAtBottom(str("data-hide-at-bottom"));
+	if (hideAtBottom !== undefined) {
+		config.hideAtBottom = hideAtBottom;
+	}
+
 	const disclaimerRaw = str("data-disclaimer");
 	if (disclaimerRaw !== undefined) {
 		const trimmed = disclaimerRaw.trim();
@@ -614,6 +629,27 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	}
 
 	return config;
+}
+
+/**
+ * `data-hide-at-bottom`: `"true"` / `"false"`, or a non-negative pixel
+ * distance (`"200"`). Anything else is ignored.
+ */
+function parseHideAtBottom(
+	raw: string | undefined,
+): boolean | number | undefined {
+	if (raw === undefined) {
+		return undefined;
+	}
+	const value = raw.trim().toLowerCase();
+	if (value === "" || value === "true") {
+		return true;
+	}
+	if (value === "false") {
+		return false;
+	}
+	const px = Number(value);
+	return Number.isFinite(px) && px >= 0 ? px : undefined;
 }
 
 // ---------------------------------------------------------------------------
