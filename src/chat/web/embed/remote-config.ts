@@ -122,6 +122,12 @@ interface RemoteConfigResponse {
 	 */
 	visibility?: VisibilityRules | null;
 	/**
+	 * Hide the floating dock near the bottom of the page (WAN-1431): `true`,
+	 * or a distance in px from the end of the page. Absent on servers that
+	 * predate the field.
+	 */
+	hideAtBottom?: boolean | number | null;
+	/**
 	 * Documents module state for the project behind this token. Absent on
 	 * servers that predate the field, which the widget reads as off. Every member
 	 * is `unknown` because this one decides whether the uploader exists and what
@@ -294,6 +300,14 @@ function remoteToConfigPartial(
 	}
 	if (data.visibility) {
 		out.visibility = data.visibility;
+	}
+	if (
+		typeof data.hideAtBottom === "boolean" ||
+		(typeof data.hideAtBottom === "number" &&
+			Number.isFinite(data.hideAtBottom) &&
+			data.hideAtBottom >= 0)
+	) {
+		out.hideAtBottom = data.hideAtBottom;
 	}
 	const documentUpload = parseDocumentUpload(data.documentUpload);
 	if (documentUpload) {
