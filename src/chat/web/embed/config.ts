@@ -334,13 +334,16 @@ export interface EmbedConfig {
 	 */
 	appearDelay?: number;
 	/**
-	 * Slide the floating dock away once the visitor scrolls to the bottom of
-	 * the page, so it doesn't cover the host's footer. It comes back as soon
-	 * as they scroll up. `true` hides it within 120px of the end of the page;
-	 * a number sets that distance in px (use the footer's height to clear the
-	 * whole footer). Never hides the open chat panel, or the dock while the
-	 * visitor has text typed in it. Only applies when `mode` is `"floating"`.
-	 * Surfaced as `data-hide-at-bottom` (`"true"` or a pixel distance).
+	 * Whether the floating dock slides away at the bottom of the page so it
+	 * doesn't cover the host's footer. On by default: the dock hides once the
+	 * page's `<footer>` (or `[role="contentinfo"]`) scrolls into view, or
+	 * within 120px of the end of the page when there's no footer, and comes
+	 * back as soon as the visitor scrolls up. `false` keeps the dock pinned
+	 * the whole way down. A number hides it within that many px of the end of
+	 * the page instead of tracking the footer. Never hides the open chat
+	 * panel, or the dock while the visitor has text typed in it. Only applies
+	 * when `mode` is `"floating"`. Surfaced as `data-hide-at-bottom`
+	 * (`"false"` or a pixel distance).
 	 */
 	hideAtBottom?: boolean | number;
 	/**

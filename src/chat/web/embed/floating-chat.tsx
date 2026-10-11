@@ -41,10 +41,7 @@ import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
-import {
-	DEFAULT_HIDE_AT_BOTTOM_PX,
-	useNearPageBottom,
-} from "./use-near-page-bottom";
+import { useNearPageBottom } from "./use-near-page-bottom";
 import { usePathname, useVisibilityGate } from "./use-pathname";
 import { useScrollAppearance } from "./use-scroll-appearance";
 import { useSuggestions } from "./use-suggestions";
@@ -129,16 +126,18 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			: null;
 		const scrolledPast = useScrollAppearance(appearAfter);
 
-		// `hideAtBottom` slides the dock away at the end of the page so it
-		// doesn't cover the host's footer. Kept apart from `appeared` so the
-		// entrance timer and the auto-expand don't replay on every return.
+		// The dock slides away once the page's footer scrolls into view, so it
+		// doesn't cover it. On by default; `hideAtBottom: false` opts out and a
+		// number swaps footer detection for a fixed distance from the end of the
+		// page. Kept apart from `appeared` so the entrance timer and the
+		// auto-expand don't replay on every return.
 		const hideAtBottom = config.hideAtBottom;
 		const nearBottom = useNearPageBottom(
-			!visible || hideAtBottom === undefined || hideAtBottom === false
+			!visible || hideAtBottom === false
 				? null
-				: hideAtBottom === true
-					? DEFAULT_HIDE_AT_BOTTOM_PX
-					: hideAtBottom,
+				: typeof hideAtBottom === "number"
+					? hideAtBottom
+					: "footer",
 		);
 
 		const chatRef = useRef<ChatHandle>(null);
