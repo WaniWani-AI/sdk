@@ -93,6 +93,7 @@ const flow = createFlow({ /* …same… */ }).compile(); // hosted flow state, a
 - Typecheck: `bun run typecheck`
 - Lint: `bun run lint`
 - Test: `bun test`
+- Flow eval (live models through the AI Gateway, costs tokens): `bun run eval:flows`. Run it, with `--sdk local,<last release>`, before any release that touches `src/mcp/server/flows/`. See `evals/flows/README.md`.
 - Pre-commit: always run `bun biome check . --fix`
 
 ## Releasing (version bumps)
