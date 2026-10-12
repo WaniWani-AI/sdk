@@ -161,9 +161,8 @@ npx skills add Waniwani-AI/sdk -s audit-tracking        # read-only audit of an 
 - **Forgetting `START` / `END` edges**: every flow needs `addEdge(START, firstNode)` and
   `addEdge(lastNode, END)`.
 - **Adding a first node just to greet the user or state a GDPR notice**: an opening node is
-  skipped when an earlier action fills its fields, and the model answers questions the user
-  already settled without writing to them, so that message may never land. Use `intro` on the
-  flow config instead
+  skipped once its fields are filled, by an earlier action or by an answer the user gave up
+  front, so that message may never land. Use `intro` on the flow config instead
   ([/sdk/flows/intro](https://docs.waniwani.ai/sdk/flows/intro)).
 - **Writing instructions into `createFlow({ description })`**: the description is the whole consent
   card a ChatGPT user approves. Numbered protocols, `Do NOT`, `You MUST call X first` and other

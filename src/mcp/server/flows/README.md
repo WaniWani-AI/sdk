@@ -34,7 +34,7 @@ type FlowToolInput =
 
 `intent` is required on `start` and should summarize the user's goal for the flow.
 
-The tool listing names no state field: `stateUpdates` is an untyped record. Each interrupt or widget response names the fields it asks for, with their `fieldSchema`, and `continue` and `reset` merge values only for fields the run has asked for. A field the flow computes for itself (a lookup id, a quote) is never asked, so a call cannot set it. An answer the user gave before its question comes up is sent back when the flow asks it.
+The tool listing names no state field: `stateUpdates` is an untyped record. Each interrupt or widget response names the fields it asks for, with their `fieldSchema`, and `continue` and `reset` merge values only for fields the run has asked for. A field the flow computes for itself (a lookup id, a quote) is never asked, so a call cannot set it. An answer the user gave before its question comes up (including everything sent on `start`) is held on the session record instead of dropped, and when an interrupt question asks for that field the engine fills it from the hold and runs its validator, with no extra call. A held value that does not fit the field's schema is dropped and the question is asked. Widget fields are never filled from the hold. A field marked `neverPrefilled(schema)`, the way to declare a consent or attestation asked as an interrupt, is never held at all, as a field or as a group member, so only a value sent while the flow asks for it counts. A field no question asks is never applied. Held values are stored on the session record next to `state`, in the flow's store, until their question comes up or the flow completes, when the hold is discarded.
 
 ### Tool output
 
