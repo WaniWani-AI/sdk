@@ -218,6 +218,20 @@ describe("prototype keys", () => {
 		expect(({} as Record<string, unknown>).polluted).toBeUndefined();
 	});
 
+	test("expandDotPaths drops them at any depth inside a value", () => {
+		const updates = JSON.parse(
+			'{"driver": {"name": "Ana", "__proto__": {"polluted": "yes"}, "cars": [{"__proto__": {"polluted": "yes"}}]}}',
+		) as Record<string, unknown>;
+		const driver = expandDotPaths(updates).driver as Record<string, unknown>;
+
+		expect(Object.keys(driver)).toEqual(["name", "cars"]);
+		expect(Object.getPrototypeOf(driver)).toBe(Object.prototype);
+		expect(Object.keys((driver.cars as object[])[0] as object)).toEqual([]);
+		expect(
+			(Object.assign({}, driver) as Record<string, unknown>).polluted,
+		).toBeUndefined();
+	});
+
 	test("deepMerge skips them", () => {
 		const source = JSON.parse(
 			'{"__proto__": {"polluted": "yes"}, "driver": {"__proto__": {"polluted": "yes"}}}',

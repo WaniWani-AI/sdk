@@ -43,6 +43,28 @@ function isPrototypeKey(key: string): boolean {
 	return PROTOTYPE_KEYS.has(key);
 }
 
+/**
+ * A copy of `value` with every prototype key removed at any depth. A nested
+ * object from `stateUpdates` can carry an own `__proto__` key (`JSON.parse`
+ * makes one), and stored as is it would set the prototype of whatever object
+ * a node later copies it into.
+ */
+function withoutPrototypeKeys(value: unknown): unknown {
+	if (Array.isArray(value)) {
+		return value.map(withoutPrototypeKeys);
+	}
+	if (value === null || typeof value !== "object") {
+		return value;
+	}
+	const copy: Record<string, unknown> = {};
+	for (const [key, member] of Object.entries(value)) {
+		if (!isPrototypeKey(key)) {
+			copy[key] = withoutPrototypeKeys(member);
+		}
+	}
+	return copy;
+}
+
 /** Resolve a dot-path like `"driver.name"` to its value in a nested object. */
 export function getNestedValue(
 	obj: Record<string, unknown>,
@@ -132,10 +154,11 @@ export function expandDotPaths(
 	flat: Record<string, unknown>,
 ): Record<string, unknown> {
 	let result: Record<string, unknown> = {};
-	for (const [key, value] of Object.entries(flat)) {
+	for (const [key, raw] of Object.entries(flat)) {
 		if (isPrototypeKey(key)) {
 			continue;
 		}
+		const value = withoutPrototypeKeys(raw);
 		if (key.includes(".")) {
 			setNestedValue(result, key, value);
 		} else if (
