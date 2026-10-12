@@ -247,6 +247,38 @@ describe("stateUpdates", () => {
 	});
 });
 
+describe("a path through the prototype", () => {
+	test("writes nothing, in this session or in the next one", async () => {
+		const { flow, store } = carQuote();
+		const handler = await handlerFor(flow);
+		const other = { _meta: { sessionId: "another-session" } };
+
+		await handler({ action: "start", intent: "quote my car" }, EXTRA);
+		await handler(
+			{
+				action: "continue",
+				stateUpdates: {
+					plate: "1234ABC",
+					"__proto__.postcode": "28001",
+					"constructor.prototype.vehicleId": "v-forged",
+				},
+			},
+			EXTRA,
+		);
+		const next = parsePayload(
+			await handler({ action: "start", intent: "quote my car" }, other),
+		);
+
+		expect(({} as Record<string, unknown>).postcode).toBeUndefined();
+		expect(({} as Record<string, unknown>).vehicleId).toBeUndefined();
+		expect(next.field).toBe("plate");
+		expect((await store.get(SESSION_ID))?.state).toEqual({
+			plate: "1234ABC",
+			vehicleId: "v-1234ABC",
+		});
+	});
+});
+
 describe("keepAskedFields", () => {
 	test("a question on one member accepts that member alone, in either spelling", () => {
 		expect(

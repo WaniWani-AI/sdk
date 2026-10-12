@@ -30,6 +30,19 @@ export function getObjectShape(
 // Dot-path value access
 // ============================================================================
 
+/**
+ * Keys that reach an object's prototype rather than the object itself. Paths
+ * come from `stateUpdates`, so a path through one of these would write to
+ * every object in the process (`"__proto__.postcode"` sets
+ * `Object.prototype.postcode`, and every session then reads that field as
+ * filled). The helpers below never read, write or merge through them.
+ */
+const PROTOTYPE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function isPrototypeKey(key: string): boolean {
+	return PROTOTYPE_KEYS.has(key);
+}
+
 /** Resolve a dot-path like `"driver.name"` to its value in a nested object. */
 export function getNestedValue(
 	obj: Record<string, unknown>,
@@ -39,6 +52,10 @@ export function getNestedValue(
 	let current: unknown = obj;
 	for (const part of parts) {
 		if (current == null || typeof current !== "object") {
+			return undefined;
+		}
+		// Own keys only: an inherited value is never a field the flow holds.
+		if (isPrototypeKey(part) || !Object.hasOwn(current, part)) {
 			return undefined;
 		}
 		current = (current as Record<string, unknown>)[part];
@@ -53,6 +70,9 @@ export function setNestedValue(
 	value: unknown,
 ): void {
 	const parts = path.split(".");
+	if (parts.some(isPrototypeKey)) {
+		return;
+	}
 	const lastKey = parts.pop();
 	if (!lastKey) {
 		return;
@@ -77,6 +97,9 @@ export function deleteNestedValue(
 	path: string,
 ): void {
 	const parts = path.split(".");
+	if (parts.some(isPrototypeKey)) {
+		return;
+	}
 	const lastKey = parts.pop();
 	if (!lastKey) {
 		return;
@@ -110,6 +133,9 @@ export function expandDotPaths(
 ): Record<string, unknown> {
 	let result: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(flat)) {
+		if (isPrototypeKey(key)) {
+			continue;
+		}
 		if (key.includes(".")) {
 			setNestedValue(result, key, value);
 		} else if (
@@ -135,6 +161,9 @@ export function deepMerge(
 ): Record<string, unknown> {
 	const result = { ...target };
 	for (const [key, value] of Object.entries(source)) {
+		if (isPrototypeKey(key)) {
+			continue;
+		}
 		if (
 			value !== null &&
 			typeof value === "object" &&
