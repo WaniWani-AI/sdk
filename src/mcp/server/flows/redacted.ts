@@ -37,7 +37,7 @@ export function isFieldRedacted(schema: z.ZodType): boolean {
 	return isRecord(waniwani) && waniwani.redacted === true;
 }
 
-function readMeta(schema: z.ZodType): UnknownRecord {
+export function readMeta(schema: z.ZodType): UnknownRecord {
 	const metaFn = (schema as unknown as { meta?: () => unknown }).meta;
 	if (typeof metaFn !== "function") {
 		return {};

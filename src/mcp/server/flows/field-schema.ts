@@ -106,27 +106,28 @@ export function resolveFieldSchema(
 	state: Record<string, z.ZodType> | undefined,
 	fieldPath: string,
 ): FieldSchemaInfo | undefined {
+	const schema = resolveFieldZodType(state, fieldPath);
+	return schema ? introspectField(schema) : undefined;
+}
+
+/**
+ * Resolve a field path (flat key or `parent.child` dot-path) to the Zod schema
+ * the flow declared for it, or `undefined` when the path is not declared.
+ */
+export function resolveFieldZodType(
+	state: Record<string, z.ZodType> | undefined,
+	fieldPath: string,
+): z.ZodType | undefined {
 	if (!state || !fieldPath) {
 		return undefined;
 	}
 	if (fieldPath.includes(".")) {
 		const dot = fieldPath.indexOf(".");
-		const parent = fieldPath.slice(0, dot);
-		const child = fieldPath.slice(dot + 1);
-		const parentSchema = state[parent];
+		const parentSchema = state[fieldPath.slice(0, dot)];
 		if (!parentSchema) {
 			return undefined;
 		}
-		const shape = getObjectShape(parentSchema);
-		const childSchema = shape?.[child];
-		if (!childSchema) {
-			return undefined;
-		}
-		return introspectField(childSchema);
+		return getObjectShape(parentSchema)?.[fieldPath.slice(dot + 1)];
 	}
-	const schema = state[fieldPath];
-	if (!schema) {
-		return undefined;
-	}
-	return introspectField(schema);
+	return state[fieldPath];
 }

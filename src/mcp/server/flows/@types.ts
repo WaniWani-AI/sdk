@@ -629,8 +629,9 @@ export type FlowToolInput = {
 	/** Optional when `action` is `"start"`. Describes the situation/environment that led the user to start this flow. */
 	context?: string;
 	/**
-	 * Answers keyed by the `field` a response asked for. The engine keeps only
-	 * fields the run has asked for, so `start` merges none.
+	 * Answers keyed by the `field` a response asked for. The engine merges only
+	 * fields the run has asked for; values for fields not asked yet (all of
+	 * them on `start`) are held and fill their question when it comes up.
 	 */
 	stateUpdates?: Record<string, unknown>;
 	/** Session identifier echoed in the response. Pass it back on "continue" and "reset" calls. */
@@ -671,6 +672,12 @@ export type FlowTokenContent = {
 	 * these, so the conversation cannot write a field the flow computes itself.
 	 */
 	asked?: string[];
+	/**
+	 * Values the user gave for fields not asked yet, held until an interrupt
+	 * question asks for one and filled in then (see `held-answers.ts`). Never
+	 * merged into `state` on its own, and dropped when the flow completes.
+	 */
+	held?: Record<string, unknown>;
 	/** The engine's own state for this session. Never flow state. */
 	internal?: FlowInternalState;
 };

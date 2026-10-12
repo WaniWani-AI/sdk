@@ -11,15 +11,28 @@ export function isObjectSchema(schema: z.ZodType): boolean {
 	return def?.type === "object";
 }
 
-/** Extract the shape of a `z.object(...)` schema, or null if not an object. */
+type ObjectDef = {
+	type?: string;
+	shape?: Record<string, z.ZodType>;
+	innerType?: z.ZodType;
+};
+
+/** Wrappers that leave a group's shape as it is. */
+const SHAPE_WRAPPERS = new Set(["optional", "nullable", "default"]);
+
+/**
+ * Extract the shape of a `z.object(...)` schema, or null if not an object. A
+ * group declared `.optional()`, `.nullable()` or `.default()` still has its
+ * members, so those wrappers are looked through.
+ */
 export function getObjectShape(
 	schema: z.ZodType,
 ): Record<string, z.ZodType> | null {
-	const def = (
-		schema as unknown as {
-			_zod?: { def?: { type?: string; shape?: Record<string, z.ZodType> } };
-		}
-	)._zod?.def;
+	let def = (schema as unknown as { _zod?: { def?: ObjectDef } })._zod?.def;
+	for (let i = 0; i < 8 && def?.type && SHAPE_WRAPPERS.has(def.type); i++) {
+		def = (def.innerType as unknown as { _zod?: { def?: ObjectDef } })?._zod
+			?.def;
+	}
 	if (def?.type === "object" && def.shape) {
 		return def.shape;
 	}

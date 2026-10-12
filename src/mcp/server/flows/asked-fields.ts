@@ -39,31 +39,37 @@ export function addAskedFields(
 }
 
 /**
- * Keep only the values for fields in `asked`. Dot-paths are expanded first, so
- * `{ "driver.name": … }` and `{ driver: { name: … } }` are judged alike. A
- * question on a whole group (`driver`) accepts every key inside it; a question
- * on one member (`driver.name`) accepts that member alone.
+ * Split `updates` into the values for fields in `asked` and everything else.
+ * Dot-paths are expanded first, so `{ "driver.name": … }` and
+ * `{ driver: { name: … } }` are judged alike. A question on a whole group
+ * (`driver`) accepts every key inside it; a question on one member
+ * (`driver.name`) accepts that member alone.
  */
-export function keepAskedFields(
+export function splitAskedFields(
 	updates: Record<string, unknown> | undefined,
 	asked: readonly string[],
-): Record<string, unknown> {
+): { accepted: Record<string, unknown>; unasked: Record<string, unknown> } {
 	const askedSet = new Set(asked);
-	const kept: Record<string, unknown> = {};
+	const accepted: Record<string, unknown> = {};
+	const unasked: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(expandDotPaths(updates ?? {}))) {
 		if (askedSet.has(key)) {
-			kept[key] = value;
+			accepted[key] = value;
 			continue;
 		}
 		if (!isRecord(value)) {
+			unasked[key] = value;
 			continue;
 		}
-		const members = Object.entries(value).filter(([member]) =>
-			askedSet.has(`${key}.${member}`),
-		);
-		if (members.length > 0) {
-			kept[key] = Object.fromEntries(members);
+		const members = Object.entries(value);
+		const inAsked = members.filter(([m]) => askedSet.has(`${key}.${m}`));
+		const notAsked = members.filter(([m]) => !askedSet.has(`${key}.${m}`));
+		if (inAsked.length > 0) {
+			accepted[key] = Object.fromEntries(inAsked);
+		}
+		if (notAsked.length > 0) {
+			unasked[key] = Object.fromEntries(notAsked);
 		}
 	}
-	return kept;
+	return { accepted, unasked };
 }

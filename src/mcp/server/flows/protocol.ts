@@ -47,7 +47,7 @@ function interruptSteps(): string[] {
 		"- A question the user already answered earlier in the conversation is not asked again: send that answer. When every question is answered this way, resume right away.",
 		'- `fieldSchema`, when present, describes the accepted value: match enum `values` exactly, send a number for `type: "number"`.',
 		"- `context`, when present, shapes your wording and is not shown to the user.",
-		'Resume with `action: "continue"`, sending the answers to these questions as the user gave them. Anything they left unanswered stays out and the flow asks again.',
+		'Resume with `action: "continue"`, sending the answers to these questions as the user gave them, plus anything they already stated for a field this flow has named but not asked yet: the flow holds it and fills that question in when it gets there. Anything they left unanswered stays out and the flow asks again.',
 	];
 }
 

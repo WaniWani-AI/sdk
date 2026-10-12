@@ -1345,7 +1345,7 @@ describe("nested object state", () => {
 		);
 	});
 
-	test("start merges no stateUpdates, so a nested field sent early is still asked", async () => {
+	test("start holds stateUpdates, so a nested field sent early fills its question", async () => {
 		const store = new TestFlowStateStore();
 		const flow = createFlow({
 			id: "nested_prefill",
@@ -1381,10 +1381,11 @@ describe("nested object state", () => {
 		const p1 = parsePayload(r1);
 
 		expect(p1.status).toBe("interrupt");
-		expect(
-			(p1.questions as Array<{ field: string }>).map((q) => q.field),
-		).toEqual(["driver.name", "driver.license"]);
-		expect((await store.get(TEST_SESSION_ID))?.state).toEqual({});
+		expect(p1.field).toBe("driver.license");
+		const record = await store.get(TEST_SESSION_ID);
+		expect(record?.state).toEqual({ driver: { name: "Sent early" } });
+		expect(record?.asked).toContain("driver.name");
+		expect(record?.held).toBeUndefined();
 	});
 
 	test("deep merge preserves sibling nested fields on continue", async () => {
