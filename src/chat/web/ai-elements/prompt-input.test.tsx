@@ -148,13 +148,6 @@ async function settle(ms = 20) {
 	});
 }
 
-async function settleUntil(done: () => boolean, timeoutMs = 2000) {
-	const deadline = Date.now() + timeoutMs;
-	while (!done() && Date.now() < deadline) {
-		await settle();
-	}
-}
-
 beforeEach(() => {
 	ctx = null;
 	submissions = [];
@@ -663,6 +656,31 @@ describe("PromptInput — upload lifecycle", () => {
 });
 
 describe("PromptInput — without an uploader the inline path is unchanged", () => {
+	// The fake object URLs resolve nowhere and happy-dom's FileReader rejects a
+	// native Blob, so both are stood in for to keep the blob-to-data-URL path
+	// the same on every runner.
+	const realFetch = globalThis.fetch;
+	const realFileReader = globalThis.FileReader;
+	beforeEach(() => {
+		globalThis.fetch = (async () =>
+			new Response(new Blob(["pdf"], { type: "application/pdf" }))) as never;
+		globalThis.FileReader = class {
+			result: string | null = null;
+			onloadend: (() => void) | null = null;
+			onerror: (() => void) | null = null;
+			readAsDataURL(blob: Blob) {
+				blob.arrayBuffer().then((bytes) => {
+					this.result = `data:${blob.type};base64,${Buffer.from(bytes).toString("base64")}`;
+					this.onloadend?.();
+				});
+			}
+		} as never;
+	});
+	afterEach(() => {
+		globalThis.fetch = realFetch;
+		globalThis.FileReader = realFileReader;
+	});
+
 	test("attachments travel as files, and documents stays empty", async () => {
 		mount({});
 
@@ -675,11 +693,14 @@ describe("PromptInput — without an uploader the inline path is unchanged", () 
 		expect(attachments().files[0]?.documentId).toBeUndefined();
 
 		submit();
-		await settleUntil(() => submissions.length > 0);
+		await settle();
 
 		expect(submissions[0]?.documents).toEqual([]);
 		expect(submissions[0]?.files).toHaveLength(1);
 		expect(submissions[0]?.files[0]?.filename).toBe("policy.pdf");
+		expect(submissions[0]?.files[0]?.url).toStartWith(
+			"data:application/pdf;base64,",
+		);
 	});
 });
 
