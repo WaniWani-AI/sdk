@@ -9,9 +9,8 @@ import type {
 	RegisteredFlow,
 } from "./@types";
 import { fieldsAskedBy } from "./asked-fields";
-import { isFilled } from "./execute";
 import type { FlowStore } from "./flow-store";
-import { expandDotPaths, getNestedValue } from "./nested";
+import { expandDotPaths, getNestedValue, isFilled } from "./nested";
 
 // ============================================================================
 // Test harness for compiled flows

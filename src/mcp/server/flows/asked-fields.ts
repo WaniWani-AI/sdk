@@ -6,15 +6,13 @@
  * `field` (with a `fieldSchema`) in the response that asks it, and the same
  * rule decides what a call may write: a value is accepted only for a
  * field this run has asked for. Fields the flow computes for itself (a lookup
- * id, a quote) are never asked, so the conversation cannot set them.
+ * id, a quote) are never asked, so the conversation cannot set them. Values
+ * for fields not asked yet are held until their question comes up (see
+ * `held-answers.ts`).
  */
 
 import type { FlowContent } from "./@types";
-import { expandDotPaths } from "./nested";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
-}
+import { expandDotPaths, isRecord } from "./nested";
 
 /** The fields one response asks the user, or a widget, to fill. */
 export function fieldsAskedBy(content: FlowContent): string[] {
@@ -62,13 +60,15 @@ export function splitAskedFields(
 			continue;
 		}
 		const members = Object.entries(value);
-		const inAsked = members.filter(([m]) => askedSet.has(`${key}.${m}`));
-		const notAsked = members.filter(([m]) => !askedSet.has(`${key}.${m}`));
-		if (inAsked.length > 0) {
-			accepted[key] = Object.fromEntries(inAsked);
+		const isAsked = ([member]: [string, unknown]) =>
+			askedSet.has(`${key}.${member}`);
+		const askedMembers = members.filter(isAsked);
+		const otherMembers = members.filter((entry) => !isAsked(entry));
+		if (askedMembers.length > 0) {
+			accepted[key] = Object.fromEntries(askedMembers);
 		}
-		if (notAsked.length > 0) {
-			unasked[key] = Object.fromEntries(notAsked);
+		if (otherMembers.length > 0) {
+			unasked[key] = Object.fromEntries(otherMembers);
 		}
 	}
 	return { accepted, unasked };

@@ -35,7 +35,7 @@ import {
 import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
 import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
 import { extractFlowGraph } from "./graph-extract";
-import { type HeldAnswers, holdAnswers } from "./held-answers";
+import { type HeldAnswers, holdAnswers, holdableAnswers } from "./held-answers";
 import {
 	initInternalState,
 	loadInternalState,
@@ -182,7 +182,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			state: TState,
 			internal: FlowInternalState,
 			asked: string[] = [],
-			held: HeldAnswers = { values: {}, applied: [] },
+			held: HeldAnswers = holdAnswers({}),
 		): Promise<HandledCall> =>
 			executeFrom(
 				node,
@@ -241,17 +241,14 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			// A run starts empty: nothing has been asked yet, so every value in
 			// `stateUpdates` is held and fills its question when the flow gets there.
 			const startState = {} as TState;
-			const held = holdAnswers(
-				undefined,
-				expandDotPaths(args.stateUpdates ?? {}),
-				{},
-				config.state,
-			);
-			const firstNode = await resolveNextNode(startEdge, startState);
-			return run(firstNode, startState, internal, [], {
-				values: held,
-				applied: [],
+			const held = holdAnswers({
+				holdable: holdableAnswers(
+					expandDotPaths(args.stateUpdates ?? {}),
+					config.state,
+				),
 			});
+			const firstNode = await resolveNextNode(startEdge, startState);
+			return run(firstNode, startState, internal, [], held);
 		}
 
 		if (args.action === "continue") {
@@ -310,10 +307,11 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				accepted,
 			) as TState;
 			const internal = flowState.internal ?? {};
-			const held: HeldAnswers = {
-				values: holdAnswers(flowState.held, unasked, accepted, config.state),
-				applied: [],
-			};
+			const held = holdAnswers({
+				previous: flowState.held,
+				holdable: holdableAnswers(unasked, config.state),
+				answered: accepted,
+			});
 
 			// Widget continue: advance past the widget step (don't re-show it)
 			if (flowState.widgetId) {
@@ -404,19 +402,22 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				args.stateUpdates,
 				asked,
 			);
-			const held: HeldAnswers = {
-				values: holdAnswers(flowState.held, unasked, corrections, config.state),
-				applied: [],
-			};
+			const holdable = holdableAnswers(unasked, config.state);
+			const held = holdAnswers({
+				previous: flowState.held,
+				holdable,
+				answered: corrections,
+			});
 			const existingState = flowState.state as TState;
 			const internal = flowState.internal ?? {};
 
 			// A correction to an answer the flow is still holding ("actually it's
 			// 22222", before the postcode question came up) changes the hold, not
 			// state, so nothing restarts: the current step runs again with it.
-			const holdChanged =
-				JSON.stringify(held.values) !== JSON.stringify(flowState.held ?? {});
-			if (Object.keys(corrections).length === 0 && holdChanged) {
+			if (
+				Object.keys(corrections).length === 0 &&
+				Object.keys(holdable).length > 0
+			) {
 				return run(flowState.step, existingState, internal, asked, held);
 			}
 

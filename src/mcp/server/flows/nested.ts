@@ -1,24 +1,67 @@
 import type { z } from "zod";
 
 // ============================================================================
-// Zod object schema detection
+// Values
 // ============================================================================
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Check whether a state value counts as "filled" (not empty/missing). */
+export function isFilled(v: unknown): boolean {
+	return v !== undefined && v !== null && v !== "";
+}
+
+// ============================================================================
+// Zod schema introspection
+// ============================================================================
+
+type ZodDef = {
+	type?: string;
+	entries?: Record<string, string>;
+	innerType?: z.ZodType;
+	shape?: Record<string, z.ZodType>;
+};
+
+export function readZodDef(schema: z.ZodType): ZodDef | undefined {
+	return (schema as unknown as { _zod?: { def?: ZodDef } })._zod?.def;
+}
+
+/**
+ * Unwrap optional/nullable/default wrappers to reach the underlying schema.
+ * Returns whether at least one wrapper marked the field as optional from the
+ * caller's perspective (optional/nullable/default all mean the LLM may omit it).
+ */
+export function unwrapOptional(schema: z.ZodType): {
+	inner: z.ZodType;
+	optional: boolean;
+} {
+	let current = schema;
+	let optional = false;
+	for (let i = 0; i < 8; i++) {
+		const def = readZodDef(current);
+		if (!def?.innerType) {
+			break;
+		}
+		if (
+			def.type === "optional" ||
+			def.type === "nullable" ||
+			def.type === "default"
+		) {
+			optional = true;
+			current = def.innerType;
+			continue;
+		}
+		break;
+	}
+	return { inner: current, optional };
+}
 
 /** Check whether a Zod schema is a `z.object(...)`. */
 export function isObjectSchema(schema: z.ZodType): boolean {
-	const def = (schema as unknown as { _zod?: { def?: { type?: string } } })._zod
-		?.def;
-	return def?.type === "object";
+	return readZodDef(schema)?.type === "object";
 }
-
-type ObjectDef = {
-	type?: string;
-	shape?: Record<string, z.ZodType>;
-	innerType?: z.ZodType;
-};
-
-/** Wrappers that leave a group's shape as it is. */
-const SHAPE_WRAPPERS = new Set(["optional", "nullable", "default"]);
 
 /**
  * Extract the shape of a `z.object(...)` schema, or null if not an object. A
@@ -28,11 +71,7 @@ const SHAPE_WRAPPERS = new Set(["optional", "nullable", "default"]);
 export function getObjectShape(
 	schema: z.ZodType,
 ): Record<string, z.ZodType> | null {
-	let def = (schema as unknown as { _zod?: { def?: ObjectDef } })._zod?.def;
-	for (let i = 0; i < 8 && def?.type && SHAPE_WRAPPERS.has(def.type); i++) {
-		def = (def.innerType as unknown as { _zod?: { def?: ObjectDef } })?._zod
-			?.def;
-	}
+	const def = readZodDef(unwrapOptional(schema).inner);
 	if (def?.type === "object" && def.shape) {
 		return def.shape;
 	}

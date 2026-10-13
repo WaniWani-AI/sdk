@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { getObjectShape } from "./nested";
+import { getObjectShape, readZodDef, unwrapOptional } from "./nested";
 
 /**
  * Compact, JSON-serializable schema fragment for a single state field.
@@ -24,56 +24,10 @@ export type FieldSchemaInfo = {
 	optional?: boolean;
 };
 
-type ZodDef = {
-	type?: string;
-	entries?: Record<string, string>;
-	innerType?: z.ZodType;
-};
-
-type ZodInternals = {
-	_zod?: {
-		def?: ZodDef;
-	};
-};
-
-function readDef(schema: z.ZodType): ZodDef | undefined {
-	return (schema as unknown as ZodInternals)._zod?.def;
-}
-
-/**
- * Unwrap optional/nullable/default wrappers to reach the underlying schema.
- * Returns whether at least one wrapper marked the field as optional from the
- * caller's perspective (optional/nullable/default all mean the LLM may omit it).
- */
-function unwrapOptional(schema: z.ZodType): {
-	inner: z.ZodType;
-	optional: boolean;
-} {
-	let current = schema;
-	let optional = false;
-	for (let i = 0; i < 8; i++) {
-		const def = readDef(current);
-		if (!def?.innerType) {
-			break;
-		}
-		if (
-			def.type === "optional" ||
-			def.type === "nullable" ||
-			def.type === "default"
-		) {
-			optional = true;
-			current = def.innerType;
-			continue;
-		}
-		break;
-	}
-	return { inner: current, optional };
-}
-
 export function introspectField(schema: z.ZodType): FieldSchemaInfo {
 	const { inner, optional } = unwrapOptional(schema);
 	const description = inner.description ?? schema.description ?? undefined;
-	const def = readDef(inner);
+	const def = readZodDef(inner);
 	const t = def?.type;
 
 	const base: FieldSchemaInfo = {

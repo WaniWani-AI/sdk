@@ -10,7 +10,7 @@ The SDK ships two public tiers plus a private one. The legacy tier was removed i
 
 Truly open source. Works standalone with any state backend.
 
-- `createFlow`, `StateGraph`, `START`, `END`, `redacted`, `createFlowTestHarness` from `@waniwani/sdk/mcp`
+- `createFlow`, `StateGraph`, `START`, `END`, `redacted`, `neverPrefilled`, `createFlowTestHarness` from `@waniwani/sdk/mcp`
 - `KvStore` interface, `MemoryKvStore` from `@waniwani/sdk/mcp`
 
 `createFlow().compile()` requires either an explicit `{ store }` OR `WANIWANI_API_KEY`. With neither, it throws at compile time with a clear migration message.

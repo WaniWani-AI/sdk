@@ -14,12 +14,12 @@ import type {
 } from "./@types";
 import { END, interrupt, isInterrupt, isWidget, showWidget } from "./@types";
 import { resolveFieldSchema } from "./field-schema";
-import { type HeldAnswers, takeHeldAnswer } from "./held-answers";
+import { fillFromHold, type HeldAnswers } from "./held-answers";
 import {
 	deepMerge,
 	deleteNestedValue,
-	expandDotPaths,
 	getNestedValue,
+	isFilled,
 } from "./nested";
 
 export type StateSchema = Record<string, z.ZodType>;
@@ -27,11 +27,6 @@ export type StateSchema = Record<string, z.ZodType>;
 // ============================================================================
 // Helpers
 // ============================================================================
-
-/** Check whether a state value counts as "filled" (not empty/missing). */
-export function isFilled(v: unknown): boolean {
-	return v !== undefined && v !== null && v !== "";
-}
 
 export type ValidateFn = (
 	value: unknown,
@@ -200,25 +195,15 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 					}
 				}
 
-				// Fill each open question the user already answered before it was
-				// asked. Its validator runs below like any other answer's.
+				// An answer the user gave before this question came up fills it,
+				// and its validator runs below like any other answer's.
 				if (held) {
-					for (const q of result.questions) {
-						const current = getNestedValue(
-							state as Record<string, unknown>,
-							q.field,
-						);
-						if (isFilled(current)) {
-							continue;
-						}
-						const value = await takeHeldAnswer(held, q.field, stateSchema);
-						if (value !== undefined) {
-							state = deepMerge(
-								state as Record<string, unknown>,
-								expandDotPaths({ [q.field]: value }),
-							) as TState;
-						}
-					}
+					state = await fillFromHold({
+						questions: result.questions,
+						state,
+						held,
+						stateSchema,
+					});
 				}
 
 				const interruptResult = buildInterruptResult(
