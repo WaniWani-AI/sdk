@@ -91,6 +91,13 @@ fallback.
 
 ## Removed surfaces
 
+Changed in 0.24.0: a flow's tool listing no longer names state fields under `stateUpdates`, and
+`flow.config._meta` no longer types or sends `_flowGraph` (read `flow.flowGraph`). `start` merges no
+`stateUpdates`, and `continue` and `reset` merge only fields the run has asked through an interrupt
+question or a widget's `field`. A field the model or a widget writes without a question asking for it
+is never set. `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.23-to-0.24` applies the
+migration.
+
 Removed in 0.23.0: `withWaniwani`'s `captureTelemetry` option and the `CaptureTelemetryOptions` type.
 Use `captureIntent` / `CaptureIntentOptions`. Wrapped tools now advertise one optional `intent`
 string instead of a `telemetry` object. `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.22-to-0.23`
@@ -130,7 +137,7 @@ Every version hop also ships a self-contained migration skill you can invoke dir
 `migrate-waniwani-sdk-<from>-to-<to>`. For the latest release:
 
 ```bash
-npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.22-to-0.23
+npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.23-to-0.24
 ```
 
 ## Guided playbooks
