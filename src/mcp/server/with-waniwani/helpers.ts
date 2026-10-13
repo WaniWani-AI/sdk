@@ -9,6 +9,7 @@ import type { WaniWaniClient } from "../../../types.js";
 import {
 	extractSessionId,
 	extractSource,
+	extractSourceFromClientName,
 	FLOW_META_KEY,
 	WIDGET_CONFIG_META_KEY,
 } from "../utils.js";
@@ -201,7 +202,9 @@ export function buildTrackInput(
 			...(kbSearch && kbSearch.length > 0 && { kbSearch }),
 		},
 		meta: mergedMeta,
-		source: extractSource(mergedMeta ?? meta, clientInfo),
+		source:
+			extractSource(mergedMeta ?? meta, clientInfo) ??
+			extractSourceFromClientName(clientInfo),
 		metadata: {
 			...(options.metadata ?? {}),
 			...(clientInfo && { clientInfo }),

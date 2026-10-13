@@ -396,3 +396,12 @@ export function extractSourceFromHeaders(
 	}
 	return undefined;
 }
+
+const MAX_CLIENT_NAME_SOURCE_LENGTH = 100;
+
+export function extractSourceFromClientName(
+	clientInfo: ExtractSourceClientInfo | undefined,
+): string | undefined {
+	const name = clientInfo?.name?.trim();
+	return name ? name.slice(0, MAX_CLIENT_NAME_SOURCE_LENGTH) : undefined;
+}

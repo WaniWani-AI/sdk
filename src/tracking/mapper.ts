@@ -10,8 +10,6 @@ import {
 import type { EventType, LegacyTrackEvent, TrackInput } from "./@types.js";
 import type { V2CorrelationIds, V2EventEnvelope } from "./v2-types.js";
 
-const DEFAULT_SOURCE = "@waniwani/sdk";
-
 export interface MapTrackEventOptions {
 	now?: () => Date;
 	generateId?: () => string;
@@ -33,8 +31,7 @@ export function mapTrackEventToV2(
 	const source =
 		takeNonEmptyString(input.source) ??
 		extractSource(meta) ??
-		options.source ??
-		DEFAULT_SOURCE;
+		takeNonEmptyString(options.source);
 	const rawLegacy = isLegacyTrackEvent(input) ? { ...input } : undefined;
 
 	const mappedMetadata: Record<string, unknown> = {
@@ -51,7 +48,7 @@ export function mapTrackEventToV2(
 		id: eventId,
 		type: "mcp.event",
 		name: eventName,
-		source,
+		...(source && { source }),
 		timestamp,
 		correlation,
 		properties: mapProperties(input, eventName),

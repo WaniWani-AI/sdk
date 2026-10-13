@@ -126,4 +126,17 @@ describe("mapTrackEventToV2", () => {
 		expect(mapped.timestamp).toBe("2026-02-26T03:04:05.000Z");
 		expect(mapped.source).toBe("test-source");
 	});
+
+	// WAN-981: no channel can claim the package name, so ingest rejects any event
+	// that carries it as its source.
+	test("omits source when nothing identifies the caller", () => {
+		const mapped = mapTrackEventToV2({
+			event: "prices_compared",
+			properties: { options: [] },
+			meta: { "waniwani/sessionId": "ses-1" },
+		});
+
+		expect(mapped.source).toBeUndefined();
+		expect(JSON.parse(JSON.stringify(mapped))).not.toHaveProperty("source");
+	});
 });
