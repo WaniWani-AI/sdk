@@ -58,11 +58,6 @@ export function unwrapOptional(schema: z.ZodType): {
 	return { inner: current, optional };
 }
 
-/** Check whether a Zod schema is a `z.object(...)`. */
-export function isObjectSchema(schema: z.ZodType): boolean {
-	return readZodDef(schema)?.type === "object";
-}
-
 /**
  * Extract the shape of a `z.object(...)` schema, or null if not an object. A
  * group declared `.optional()`, `.nullable()` or `.default()` still has its
@@ -76,6 +71,11 @@ export function getObjectShape(
 		return def.shape;
 	}
 	return null;
+}
+
+/** Check whether a Zod schema is a `z.object(...)`, wrapped or not. */
+export function isObjectSchema(schema: z.ZodType): boolean {
+	return getObjectShape(schema) !== null;
 }
 
 // ============================================================================
@@ -95,17 +95,26 @@ function isPrototypeKey(key: string): boolean {
 	return PROTOTYPE_KEYS.has(key);
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	if (!isRecord(value)) {
+		return false;
+	}
+	const proto = Object.getPrototypeOf(value);
+	return proto === Object.prototype || proto === null;
+}
+
 /**
  * A copy of `value` with every prototype key removed at any depth. A nested
  * object from `stateUpdates` can carry an own `__proto__` key (`JSON.parse`
  * makes one), and stored as is it would set the prototype of whatever object
- * a node later copies it into.
+ * a node later copies it into. Only plain objects and arrays are copied, so a
+ * `Date` or a class instance comes through as it is.
  */
 function withoutPrototypeKeys(value: unknown): unknown {
 	if (Array.isArray(value)) {
 		return value.map(withoutPrototypeKeys);
 	}
-	if (value === null || typeof value !== "object") {
+	if (!isPlainObject(value)) {
 		return value;
 	}
 	const copy: Record<string, unknown> = {};

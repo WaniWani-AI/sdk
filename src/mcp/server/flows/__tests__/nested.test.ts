@@ -19,6 +19,12 @@ describe("isObjectSchema", () => {
 		expect(isObjectSchema(z.string())).toBe(false);
 	});
 
+	test("returns true for a z.object wrapped in optional", () => {
+		expect(isObjectSchema(z.object({ name: z.string() }).optional())).toBe(
+			true,
+		);
+	});
+
 	test("returns false for z.record", () => {
 		expect(isObjectSchema(z.record(z.string(), z.unknown()))).toBe(false);
 	});
@@ -230,6 +236,19 @@ describe("prototype keys", () => {
 		expect(
 			(Object.assign({}, driver) as Record<string, unknown>).polluted,
 		).toBeUndefined();
+	});
+
+	test("expandDotPaths keeps a Date or class instance as it is", () => {
+		const date = new Date("2026-10-20");
+		class Plate {
+			constructor(readonly value: string) {}
+		}
+		const plate = new Plate("1234ABC");
+
+		const expanded = expandDotPaths({ "booking.date": date, plate });
+
+		expect((expanded.booking as Record<string, unknown>).date).toBe(date);
+		expect(expanded.plate).toBe(plate);
 	});
 
 	test("deepMerge skips them", () => {

@@ -154,10 +154,15 @@ export async function fillFromHold<TState extends Record<string, unknown>>({
 	let filled: Record<string, unknown> = state;
 	for (const { field } of questions) {
 		const value = getNestedValue(held.values, field);
-		if (isFilled(getNestedValue(filled, field)) || !isFilled(value)) {
+		if (!isFilled(value)) {
 			continue;
 		}
+		// Taken either way: a field already filled keeps its value, and a held
+		// one left behind would refill it if a node later cleared it to ask again.
 		release(held.values, field);
+		if (isFilled(getNestedValue(filled, field))) {
+			continue;
+		}
 		const schema = resolveFieldZodType(stateSchema, field);
 		if (!schema || !(await schema.safeParseAsync(value)).success) {
 			continue;

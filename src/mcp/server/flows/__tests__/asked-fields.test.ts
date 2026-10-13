@@ -570,6 +570,52 @@ describe("held answers", () => {
 		});
 	});
 
+	test("a held value for a field already filled is let go, not kept to refill it later", async () => {
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const flow = createFlow({
+			id: "refill",
+			title: "Refill",
+			description: "A year the flow fills, clears and asks again.",
+			state: {
+				year: z.number().describe("Model year"),
+				confirmed: z.boolean().describe("Year looks right"),
+			},
+		})
+			.addNode("lookup", () => ({ year: 2021 }))
+			.addNode("ask_year", ({ interrupt }) =>
+				interrupt({ year: { question: "Model year?" } }),
+			)
+			.addNode("ask_confirm", ({ interrupt }) =>
+				interrupt({ confirmed: { question: "Is that year right?" } }),
+			)
+			.addNode("clear_year", ({ state }) =>
+				state.confirmed ? {} : { year: undefined },
+			)
+			.addNode("ask_year_again", ({ interrupt }) =>
+				interrupt({ year: { question: "Which year is it, then?" } }),
+			)
+			.addEdge(START, "lookup")
+			.addEdge("lookup", "ask_year")
+			.addEdge("ask_year", "ask_confirm")
+			.addEdge("ask_confirm", "clear_year")
+			.addEdge("clear_year", "ask_year_again")
+			.addEdge("ask_year_again", END)
+			.compile({ store });
+
+		const { handler, payload } = await startWith(flow, { year: 2019 });
+		expect(payload.field).toBe("confirmed");
+
+		const next = parsePayload(
+			await handler(
+				{ action: "continue", stateUpdates: { confirmed: false } },
+				EXTRA,
+			),
+		);
+
+		expect(next.field).toBe("year");
+		expect((await store.get(SESSION_ID))?.held).toBeUndefined();
+	});
+
 	test("a held answer in a batch is validated once the batch is complete", async () => {
 		const seen: unknown[] = [];
 		const store = new MemoryKvStore<FlowTokenContent>();
