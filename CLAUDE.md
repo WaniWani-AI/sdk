@@ -93,7 +93,7 @@ const flow = createFlow({ /* …same… */ }).compile(); // hosted flow state, a
 - Typecheck: `bun run typecheck`
 - Lint: `bun run lint`
 - Test: `bun test`
-- Flow eval (live models through the AI Gateway, costs tokens): `bun run eval:flows`. The release workflow runs it with `--sdk local,<last release> --fail-on-regression` when a release touches `src/mcp/server/flows/`, and does not publish on a regression. See `evals/flows/README.md`.
+- Flow eval (live models through the AI Gateway, costs tokens): `bun run eval:flows`. The release workflow runs it with `--sdk local,<last release> --fail-on-regression` on every release, and does not publish on a regression. See `evals/flows/README.md`.
 - Pre-commit: always run `bun biome check . --fix`
 
 ## Releasing (version bumps)

@@ -67,12 +67,8 @@ jobs:
             fi
             PREV=$(git describe --tags --abbrev=0 --match 'v*' HEAD^)
           fi
-          if git diff --quiet "$PREV" HEAD -- src/mcp/server/flows/; then
-            echo "::notice::No changes in src/mcp/server/flows/ since $PREV, skipping the flow eval"
-            exit 0
-          fi
           if [[ -z "$AI_GATEWAY_API_KEY" ]]; then
-            echo "::error::src/mcp/server/flows/ changed since $PREV, and the flow eval needs the AI_GATEWAY_API_KEY repo secret."
+            echo "::error::The flow eval needs the AI_GATEWAY_API_KEY secret."
             exit 1
           fi
           set +e
