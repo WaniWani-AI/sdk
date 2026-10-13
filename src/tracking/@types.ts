@@ -274,7 +274,8 @@ export interface RevenueOptionSelectedInput
 /**
  * Input for `track.leadQualified()` — identity only (`externalId`, `email`,
  * `name`) plus the shared tracking context. There is no acquisition-source
- * property; the envelope `source` (the origin channel) is set automatically.
+ * property; the envelope `source` comes from `meta` or the frontend client's
+ * `source` option, and is left out when neither identifies the caller.
  */
 export interface RevenueLeadQualifiedInput
 	extends TrackingContext,

@@ -326,11 +326,10 @@ function createWrappedHandler(
 			}
 		}
 
-		// Resolve and stamp the caller source into _meta once, so downstream
-		// consumers (flow nodes, nested tool handlers, tracking) can branch on
-		// `waniwani/source` without each re-deriving it from clientInfo/headers.
-		// Hosts like Claude carry no source in _meta and no transport session id;
-		// clientInfo (MCP initialize) and the request headers are the only signals.
+		// Stamp the recognised caller source into _meta once, so flow nodes, nested
+		// tool handlers and tracking read one `waniwani/source`. Hosts like Claude
+		// carry none in _meta; clientInfo (MCP initialize) and the request headers
+		// are the signals. Only tracking falls back to an unrecognised client name.
 		if (!extractSource(meta) && isRecord(extra)) {
 			const headers = (extra as { requestInfo?: { headers?: unknown } })
 				.requestInfo?.headers as Record<string, unknown> | undefined;
