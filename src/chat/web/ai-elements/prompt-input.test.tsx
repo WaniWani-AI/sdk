@@ -148,6 +148,13 @@ async function settle(ms = 20) {
 	});
 }
 
+async function settleUntil(done: () => boolean, timeoutMs = 2000) {
+	const deadline = Date.now() + timeoutMs;
+	while (!done() && Date.now() < deadline) {
+		await settle();
+	}
+}
+
 beforeEach(() => {
 	ctx = null;
 	submissions = [];
@@ -668,7 +675,7 @@ describe("PromptInput — without an uploader the inline path is unchanged", () 
 		expect(attachments().files[0]?.documentId).toBeUndefined();
 
 		submit();
-		await settle();
+		await settleUntil(() => submissions.length > 0);
 
 		expect(submissions[0]?.documents).toEqual([]);
 		expect(submissions[0]?.files).toHaveLength(1);
