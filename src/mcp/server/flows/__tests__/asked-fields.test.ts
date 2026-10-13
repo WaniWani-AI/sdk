@@ -362,6 +362,35 @@ describe("held answers", () => {
 		expect((await store.get(SESSION_ID))?.held).toBeUndefined();
 	});
 
+	test("a node that asks only while its field is empty runs its rest with a held answer", async () => {
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const flow = createFlow({
+			id: "greet",
+			title: "Greet",
+			description: "Greet the user.",
+			state: {
+				name: z.string().describe("Name"),
+				greeting: z.string().describe("Greeting the flow builds"),
+			},
+		})
+			.addNode("ask_name", ({ state, interrupt }) =>
+				state.name
+					? { greeting: `Hi ${state.name}` }
+					: interrupt({ name: { question: "What's your name?" } }),
+			)
+			.addEdge(START, "ask_name")
+			.addEdge("ask_name", END)
+			.compile({ store });
+
+		const { payload } = await startWith(flow, { name: "Ana" });
+
+		expect(payload.status).toBe("complete");
+		expect((await store.get(SESSION_ID))?.state).toEqual({
+			name: "Ana",
+			greeting: "Hi Ana",
+		});
+	});
+
 	test("a fresh answer wins over a held one", async () => {
 		const { flow, store } = carQuote();
 

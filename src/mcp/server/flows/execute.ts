@@ -135,6 +135,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 	let currentNode = startNodeName;
 	let state = { ...startState };
 	const nodesVisited: NodeVisit[] = [];
+	let rerun = false;
 
 	// Safety limit to prevent infinite loops
 	const MAX_ITERATIONS = 50;
@@ -167,9 +168,10 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 			};
 		}
 
-		if (!nodeOptions?.get(currentNode)?.hideFromFunnel) {
+		if (!rerun && !nodeOptions?.get(currentNode)?.hideFromFunnel) {
 			nodesVisited.push({ id: currentNode, at: new Date().toISOString() });
 		}
+		rerun = false;
 
 		try {
 			// Build context object for the handler
@@ -196,14 +198,19 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				}
 
 				// An answer the user gave before this question came up fills it,
-				// and its validator runs below like any other answer's.
+				// and the node runs again with it, as it would for a fresh answer.
 				if (held) {
+					const appliedBefore = held.applied.length;
 					state = await fillFromHold({
 						questions: result.questions,
 						state,
 						held,
 						stateSchema,
 					});
+					if (held.applied.length > appliedBefore) {
+						rerun = true;
+						continue;
+					}
 				}
 
 				const interruptResult = buildInterruptResult(
