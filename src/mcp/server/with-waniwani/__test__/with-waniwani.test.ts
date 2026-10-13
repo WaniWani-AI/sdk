@@ -294,15 +294,12 @@ describe("withWaniwani", () => {
 		}));
 
 		const handler = mock.registered[0]?.[2];
-		const extra = { _meta: {} } as Record<string, unknown>;
-		const result = (await handler?.({}, extra)) as {
-			_meta?: Record<string, Record<string, unknown> | undefined>;
-		};
+		const extra: { _meta: Record<string, unknown> } = { _meta: {} };
+		const result = await handler?.({}, extra);
 
-		expect(
-			(extra._meta as Record<string, unknown>)["waniwani/source"],
-		).toBeUndefined();
-		expect(result._meta?.["waniwani/widget"]?.source).toBeUndefined();
+		expect(extra._meta["waniwani/source"]).toBeUndefined();
+		expect(result).toHaveProperty(["_meta", "waniwani/widget", "endpoint"]);
+		expect(result).not.toHaveProperty(["_meta", "waniwani/widget", "source"]);
 	});
 
 	test("a recognised header wins over an unrecognised client name", async () => {
@@ -337,12 +334,10 @@ describe("withWaniwani", () => {
 		}));
 
 		const handler = mock.registered[0]?.[2];
-		const extra = { _meta: {} } as Record<string, unknown>;
+		const extra: { _meta: Record<string, unknown> } = { _meta: {} };
 		await handler?.({}, extra);
 
-		expect(
-			(extra._meta as Record<string, unknown>)["waniwani/source"],
-		).toBeUndefined();
+		expect(extra._meta["waniwani/source"]).toBeUndefined();
 		expect(tracked[0]?.source).toBeUndefined();
 	});
 
