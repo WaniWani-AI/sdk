@@ -209,6 +209,7 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 					});
 					if (held.applied.length > appliedBefore) {
 						rerun = true;
+						iterations--;
 						continue;
 					}
 				}

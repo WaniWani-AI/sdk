@@ -391,6 +391,36 @@ describe("held answers", () => {
 		});
 	});
 
+	test("a long flow answered up front does not run out of steps", async () => {
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const fields = Array.from({ length: 30 }, (_, i) => `q${i}`);
+		let builder = createFlow({
+			id: "long",
+			title: "Long",
+			description: "Many questions.",
+			state: Object.fromEntries(
+				fields.map((f) => [f, z.string().describe(f)]),
+			) as Record<string, z.ZodString>,
+		});
+		for (const f of fields) {
+			builder = builder.addNode(f, ({ interrupt }) =>
+				interrupt({ [f]: { question: f } }),
+			);
+		}
+		builder = builder.addEdge(START, fields[0] as never);
+		fields.forEach((f, i) => {
+			builder = builder.addEdge(f as never, (fields[i + 1] ?? END) as never);
+		});
+		const flow = builder.compile({ store });
+
+		const { payload } = await startWith(
+			flow,
+			Object.fromEntries(fields.map((f) => [f, "x"])),
+		);
+
+		expect(payload.status).toBe("complete");
+	});
+
 	test("a fresh answer wins over a held one", async () => {
 		const { flow, store } = carQuote();
 
