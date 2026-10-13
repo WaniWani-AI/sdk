@@ -134,12 +134,14 @@ function Harness({
 	resultRef,
 	body,
 	api = "/api/waniwani",
+	enableThreadHistory,
 }: {
 	resultRef: { current: HookReturn | null };
 	body?: Record<string, unknown>;
 	api?: string;
+	enableThreadHistory?: boolean;
 }) {
-	const engine = useChatEngine({ api, body });
+	const engine = useChatEngine({ api, body, enableThreadHistory });
 	resultRef.current = engine;
 	return null;
 }
@@ -285,6 +287,17 @@ async function flushAsync() {
 }
 
 describe("useChatEngine – thread history", () => {
+	beforeEach(() => {
+		act(() => {
+			root.render(
+				createElement(Harness, {
+					resultRef: hookRef,
+					enableThreadHistory: true,
+				}),
+			);
+		});
+	});
+
 	test("resolvedBody.threadId is set after the first send", async () => {
 		const engine = hookRef.current;
 		if (!engine) {
@@ -292,9 +305,6 @@ describe("useChatEngine – thread history", () => {
 		}
 		// Wait for visitor context + thread history load to settle
 		await flushAsync();
-		act(() => {
-			root.render(createElement(Harness, { resultRef: hookRef }));
-		});
 
 		expect(capturedTransportBody).toBeDefined();
 		const body = capturedTransportBody?.();

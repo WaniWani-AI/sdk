@@ -347,7 +347,7 @@ describe("PromptInput — a refused file is reported, never silently dropped", (
 		expect(attachments().files).toEqual([]);
 		expect(errors[0]?.code).toBe("max_file_size");
 		expect(errors[0]?.message).toContain("huge.pdf");
-		expect(errors[0]?.message).toContain("1 KB");
+		expect(errors[0]?.message).toContain("1 kB");
 	});
 
 	test("the admitted prefix is kept when the batch exceeds maxFiles", async () => {
@@ -1103,13 +1103,13 @@ describe("PromptInputAddAttachments — the picker cannot filter by size, so the
 		expect(three).not.toContain("20 MB");
 
 		mountPaperclip({ maxFileSize: 512 * 1024 });
-		expect(paperclipLabel()).toContain("512 KB");
+		expect(paperclipLabel()).toContain("512 kB");
 	});
 
 	test("the cap the label states is the cap add() enforces", () => {
 		mountPaperclip({ maxFileSize: 1024 });
 
-		expect(paperclipLabel()).toContain("1 KB");
+		expect(paperclipLabel()).toContain("1 kB");
 		act(() => {
 			attachments().add([file("huge.pdf", "application/pdf", 2048)]);
 		});

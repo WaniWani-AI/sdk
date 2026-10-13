@@ -2,7 +2,7 @@
 
 Runs real models against real flows over MCP and counts what a user would notice: questions about things they already said, turns that end in silence, and values that land in the wrong field.
 
-It calls models through the AI Gateway, so every run costs tokens. It stays out of `bun test` for that reason. Run it before any release that touches `src/mcp/server/flows/`.
+It calls models through the AI Gateway, so every run costs tokens. It stays out of `bun test` for that reason. The release workflow runs it on its own when a release touches `src/mcp/server/flows/`: it compares the tagged commit with the previous release and stops the publish on a regression. The workflow reads the key from the `AI_GATEWAY_API_KEY` repo secret.
 
 ## Setup
 
@@ -31,6 +31,7 @@ bun run eval:flows --steps 10                        # a looser step limit than 
 | `--scenario` | all | Substring filter on scenario ids. |
 | `--concurrency` | `4` | Conversations in flight at once. |
 | `--verbose` | off | Prints the transcript of every run that fails. |
+| `--fail-on-regression` | off | Needs `--sdk <candidate>,<baseline>`. Exits 1 when a scenario passes at least two runs fewer on the candidate than on the baseline. A drop of one run is model noise. |
 
 Each run writes every transcript to `evals/flows/results/<timestamp>.json` (gitignored).
 
