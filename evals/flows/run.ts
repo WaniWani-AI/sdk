@@ -241,8 +241,14 @@ async function main() {
 
 	const [candidate, baseline] = sdks;
 	if (flags["fail-on-regression"] && candidate && baseline) {
+		const errored = results.filter((r) => r.error);
 		const found = regressions(results, candidate, baseline);
-		if (found.length) {
+		if (errored.length) {
+			console.error(
+				`\n${errored.length} runs errored, so the versions cannot be compared:\n${errored.map((r) => `${r.sdk} ${r.model} ${r.scenario} #${r.run + 1}: ${r.error}`).join("\n")}`,
+			);
+			process.exitCode = 1;
+		} else if (found.length) {
 			console.error(`\nRegressions against ${baseline}:\n${found.join("\n")}`);
 			process.exitCode = 1;
 		} else {

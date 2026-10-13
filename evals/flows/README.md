@@ -31,7 +31,7 @@ bun run eval:flows --steps 10                        # a looser step limit than 
 | `--scenario` | all | Substring filter on scenario ids. |
 | `--concurrency` | `4` | Conversations in flight at once. |
 | `--verbose` | off | Prints the transcript of every run that fails. |
-| `--fail-on-regression` | off | Needs `--sdk <candidate>,<baseline>`. Exits 1 when a scenario passes at least two runs fewer on the candidate than on the baseline. A drop of one run is model noise. |
+| `--fail-on-regression` | off | Needs `--sdk <candidate>,<baseline>`. Exits 1 when a run errors, or when a scenario passes at least two runs fewer on the candidate than on the baseline. A drop of one run is model noise. |
 
 Each run writes every transcript to `evals/flows/results/<timestamp>.json` (gitignored).
 
