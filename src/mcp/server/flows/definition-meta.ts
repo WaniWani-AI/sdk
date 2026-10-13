@@ -1,4 +1,5 @@
 import type { FlowGraph } from "./@types";
+import { isRecord } from "./nested";
 
 /**
  * What a flow's tool definition carries for the server alone.
@@ -51,10 +52,6 @@ function unwrap(entry: unknown): unknown {
 		return (entry as { value: unknown }).value;
 	}
 	return entry;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function isFlowGraph(value: unknown): value is FlowGraph {

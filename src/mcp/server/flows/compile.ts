@@ -26,7 +26,7 @@ import type {
 	RegisteredFlow,
 } from "./@types";
 import { START } from "./@types";
-import { addAskedFields, keepAskedFields } from "./asked-fields";
+import { addAskedFields, splitAskedFields } from "./asked-fields";
 import {
 	FLOW_GRAPH_META_KEY,
 	REDACTED_FIELDS_META_KEY,
@@ -35,6 +35,7 @@ import {
 import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
 import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
 import { extractFlowGraph } from "./graph-extract";
+import { type HeldAnswers, holdAnswers, holdableAnswers } from "./held-answers";
 import {
 	initInternalState,
 	loadInternalState,
@@ -118,21 +119,24 @@ function resolveDefaultStore(flowId: string): FlowStore {
 type HandledCall = ExecutionResult & {
 	internal?: FlowInternalState;
 	asked?: string[];
+	/** Answers still waiting for their question (see `held-answers.ts`). */
+	held?: Record<string, unknown>;
 };
 
 /**
- * The `stateUpdates` a `continue` or `reset` merges: only the fields the run
- * has asked for. A record written before the engine tracked them has no
- * `asked`, so that one call merges everything, rather than drop the answer to
- * a question it has no record of.
+ * Split the `stateUpdates` of a `continue` or `reset` into what merges now,
+ * only the fields the run has asked for, and what is held for later. A record
+ * written before the engine tracked them has no `asked`, so that one call
+ * merges everything, rather than drop the answer to a question it has no
+ * record of.
  */
-function acceptedUpdates(
+function splitUpdates(
 	updates: Record<string, unknown> | undefined,
 	asked: string[] | undefined,
-): Record<string, unknown> {
+): { accepted: Record<string, unknown>; unasked: Record<string, unknown> } {
 	return asked
-		? keepAskedFields(updates, asked)
-		: expandDotPaths(updates ?? {});
+		? splitAskedFields(updates, asked)
+		: { accepted: expandDotPaths(updates ?? {}), unasked: {} };
 }
 
 export function compileFlow<TState extends Record<string, unknown>>(
@@ -165,17 +169,20 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		waniwani?: ScopedWaniWaniClient,
 	): Promise<HandledCall> {
 		/**
-		 * Run the engine from `node`, carrying this session's internal state and
-		 * asked fields through to the response assembler. Every branch below
-		 * resumes the same graph with the same per-call context, so the only
-		 * things that vary are where execution starts, the state it starts from,
-		 * and where the session's own record was read.
+		 * Run the engine from `node`, carrying this session's internal state,
+		 * asked fields and held answers through to the response assembler. A
+		 * question filled from the hold counts as asked, so `reset` can correct
+		 * it like any other answer. Every branch below resumes the same graph
+		 * with the same per-call context, so the only things that vary are where
+		 * execution starts, the state it starts from, and where the session's own
+		 * record was read.
 		 */
 		const run = (
 			node: string,
 			state: TState,
 			internal: FlowInternalState,
 			asked: string[] = [],
+			held: HeldAnswers = holdAnswers({}),
 		): Promise<HandledCall> =>
 			executeFrom(
 				node,
@@ -187,7 +194,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				waniwani,
 				input.nodeOptions,
 				config.state,
-			).then((result) => ({ ...result, internal, asked }));
+				held,
+			).then((result) => ({
+				...result,
+				internal,
+				asked: [...asked, ...held.applied],
+				held: held.values,
+			}));
 
 		if (args.action === "start") {
 			// `intent` is observational: the schema asks for it on start, but nothing
@@ -225,12 +238,17 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				sessionIsPreexisting,
 				seed: initialInternal,
 			});
-			// A run starts empty. `stateUpdates` carries answers, and nothing has
-			// been asked yet; values the user already stated are sent back as the
-			// questions come up.
+			// A run starts empty: nothing has been asked yet, so every value in
+			// `stateUpdates` is held and fills its question when the flow gets there.
 			const startState = {} as TState;
+			const held = holdAnswers({
+				holdable: holdableAnswers(
+					expandDotPaths(args.stateUpdates ?? {}),
+					config.state,
+				),
+			});
 			const firstNode = await resolveNextNode(startEdge, startState);
-			return run(firstNode, startState, internal);
+			return run(firstNode, startState, internal, [], held);
 		}
 
 		if (args.action === "continue") {
@@ -283,11 +301,17 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			}
 
 			const asked = flowState.asked;
+			const { accepted, unasked } = splitUpdates(args.stateUpdates, asked);
 			const updatedState = deepMerge(
 				state as Record<string, unknown>,
-				acceptedUpdates(args.stateUpdates, asked),
+				accepted,
 			) as TState;
 			const internal = flowState.internal ?? {};
+			const held = holdAnswers({
+				previous: flowState.held,
+				holdable: holdableAnswers(unasked, config.state),
+				answered: accepted,
+			});
 
 			// Widget continue: advance past the widget step (don't re-show it)
 			if (flowState.widgetId) {
@@ -307,13 +331,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					};
 				}
 				const nextNode = await resolveNextNode(edge, updatedState);
-				return run(nextNode, updatedState, internal, asked);
+				return run(nextNode, updatedState, internal, asked, held);
 			}
 
 			// Interrupt continue: re-execute from current step.
 			// The handler re-runs, filters answered questions, and runs
 			// validators if all questions are filled.
-			return run(step, updatedState, internal, asked);
+			return run(step, updatedState, internal, asked, held);
 		}
 
 		if (args.action === "reset") {
@@ -374,7 +398,29 @@ export function compileFlow<TState extends Record<string, unknown>>(
 			}
 
 			const asked = flowState.asked;
-			const corrections = acceptedUpdates(args.stateUpdates, asked);
+			const { accepted: corrections, unasked } = splitUpdates(
+				args.stateUpdates,
+				asked,
+			);
+			const holdable = holdableAnswers(unasked, config.state);
+			const held = holdAnswers({
+				previous: flowState.held,
+				holdable,
+				answered: corrections,
+			});
+			const existingState = flowState.state as TState;
+			const internal = flowState.internal ?? {};
+
+			// A correction to an answer the flow is still holding ("actually it's
+			// 22222", before the postcode question came up) changes the hold, not
+			// state, so nothing restarts: the current step runs again with it.
+			if (
+				Object.keys(corrections).length === 0 &&
+				Object.keys(holdable).length > 0
+			) {
+				return run(flowState.step, existingState, internal, asked, held);
+			}
+
 			if (Object.keys(corrections).length === 0) {
 				return {
 					content: {
@@ -398,15 +444,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
-			const existingState = flowState.state as TState;
 			const mergedState = deepMerge(
 				existingState as Record<string, unknown>,
 				corrections,
 			) as TState;
 
-			const internal = flowState.internal ?? {};
 			const firstNode = await resolveNextNode(startEdge, mergedState);
-			return run(firstNode, mergedState, internal, asked);
+			return run(firstNode, mergedState, internal, asked, held);
 		}
 
 		return {
@@ -527,9 +571,16 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		// TODO: expose a `deleteOnComplete` compile option for customers who
 		// want the prior behavior (drop the session as soon as END is reached).
 		if (sessionId && result.flowTokenContent) {
+			// The hold goes with the run: a finished flow drops whatever no
+			// question ever asked for.
+			const held =
+				result.flowTokenContent.step && Object.keys(result.held ?? {}).length
+					? result.held
+					: undefined;
 			const tokenContent = {
 				...withInternalState(result.flowTokenContent, internal),
 				asked: addAskedFields(result.asked ?? [], contentObj),
+				...(held ? { held } : {}),
 			};
 			try {
 				await store.set(sessionId, tokenContent);

@@ -6,9 +6,10 @@ import { z } from "zod";
 import { MemoryKvStore } from "../../kv/memory-kv-store";
 import type { FlowTokenContent, McpServer, RegisteredTool } from "../@types";
 import { END, START } from "../@types";
-import { keepAskedFields } from "../asked-fields";
+import { splitAskedFields } from "../asked-fields";
 import { createFlow } from "../create-flow";
 import { readFlowGraph } from "../definition-meta";
+import { neverPrefilled } from "../held-answers";
 import { redacted } from "../redacted";
 import { createFlowTestHarness, type FlowTestResult } from "../test-utils";
 
@@ -146,18 +147,21 @@ describe("stateUpdates", () => {
 		});
 	});
 
-	test("drops a value for a later question until the flow asks it", async () => {
+	test("holds a value for a later question and fills it when the flow asks it", async () => {
 		const { flow, store } = carQuote();
 		const harness = await createFlowTestHarness(flow, { stateStore: store });
 
 		await harness.start("quote my car");
-		const next = await harness.continueWith({
+		const done = await harness.continueWith({
 			plate: "1234ABC",
 			postcode: "28001",
 		});
 
-		expect(asInterrupt(next).field).toBe("postcode");
-		expect(next.decodedState?.state.postcode).toBeUndefined();
+		expect(done.status).toBe("complete");
+		expect(done.decodedState?.state).toMatchObject({
+			postcode: "28001",
+			price: 300,
+		});
 	});
 
 	test("the record lists every field the run has asked", async () => {
@@ -182,16 +186,32 @@ describe("stateUpdates", () => {
 		expect(corrected.decodedState?.state.plate).toBe("9999ZZZ");
 	});
 
-	test("reset with only a computed field is refused", async () => {
+	test("reset with only a computed field never reaches state", async () => {
 		const { flow, store } = carQuote();
 		const harness = await createFlowTestHarness(flow, { stateStore: store });
 
 		await harness.start("quote my car");
 		await harness.continueWith({ plate: "1234ABC" });
-		const refused = await harness.resetWith({ vehicleId: "v-forged" });
+		const same = await harness.resetWith({ vehicleId: "v-forged" });
+		const done = await harness.continueWith({ postcode: "28001" });
+
+		expect(asInterrupt(same).field).toBe("postcode");
+		expect(done.status).toBe("complete");
+		expect(done.decodedState?.state).toMatchObject({
+			vehicleId: "v-1234ABC",
+			price: 300,
+		});
+	});
+
+	test("reset with only fields the flow does not declare is refused", async () => {
+		const { flow, store } = carQuote();
+		const harness = await createFlowTestHarness(flow, { stateStore: store });
+
+		await harness.start("quote my car");
+		await harness.continueWith({ plate: "1234ABC" });
+		const refused = await harness.resetWith({ discount: 100 });
 
 		expect(refused.status).toBe("error");
-		expect(refused.decodedState?.state.vehicleId).toBe("v-1234ABC");
 	});
 
 	test("a record written without `asked` merges everything for that call", async () => {
@@ -247,21 +267,573 @@ describe("stateUpdates", () => {
 	});
 });
 
-describe("keepAskedFields", () => {
+describe("a path through the prototype", () => {
+	test("writes nothing, in this session or in the next one", async () => {
+		const { flow, store } = carQuote();
+		const handler = await handlerFor(flow);
+		const other = { _meta: { sessionId: "another-session" } };
+
+		await handler({ action: "start", intent: "quote my car" }, EXTRA);
+		await handler(
+			{
+				action: "continue",
+				stateUpdates: {
+					plate: "1234ABC",
+					"__proto__.postcode": "28001",
+					"constructor.prototype.vehicleId": "v-forged",
+				},
+			},
+			EXTRA,
+		);
+		const next = parsePayload(
+			await handler({ action: "start", intent: "quote my car" }, other),
+		);
+
+		expect(({} as Record<string, unknown>).postcode).toBeUndefined();
+		expect(({} as Record<string, unknown>).vehicleId).toBeUndefined();
+		expect(next.field).toBe("plate");
+		expect((await store.get(SESSION_ID))?.state).toEqual({
+			plate: "1234ABC",
+			vehicleId: "v-1234ABC",
+		});
+	});
+});
+
+describe("held answers", () => {
+	async function startWith(
+		flow: { register: (server: McpServer) => Promise<void> },
+		stateUpdates: Record<string, unknown>,
+	) {
+		const handler = await handlerFor(flow);
+		const payload = parsePayload(
+			await handler(
+				{ action: "start", intent: "quote my car", stateUpdates },
+				EXTRA,
+			),
+		);
+		return { handler, payload };
+	}
+
+	test("everything stated on start runs the flow to the end", async () => {
+		const { flow, store } = carQuote();
+
+		const { payload } = await startWith(flow, {
+			plate: "1234ABC",
+			postcode: "28001",
+		});
+
+		expect(payload.status).toBe("complete");
+		expect((await store.get(SESSION_ID))?.state.price).toBe(300);
+	});
+
+	test("a computed field sent on start is never applied, and is gone once the flow ends", async () => {
+		const { flow, store } = carQuote();
+
+		const { payload } = await startWith(flow, {
+			plate: "1234ABC",
+			vehicleId: "v-forged",
+			postcode: "28001",
+		});
+
+		expect(payload.status).toBe("complete");
+		const record = await store.get(SESSION_ID);
+		expect(record?.state).toMatchObject({ vehicleId: "v-1234ABC", price: 300 });
+		expect(record?.held).toBeUndefined();
+	});
+
+	test("a held value the validator rejects comes back as the rejection", async () => {
+		const { flow } = carQuote();
+
+		const { payload } = await startWith(flow, { plate: "bad" });
+
+		expect(payload.field).toBe("plate");
+		expect(payload.context).toContain("Not a plate");
+	});
+
+	test("a held value that does not fit the field's schema is dropped and the question asked", async () => {
+		const { flow, store } = carQuote();
+
+		const { payload } = await startWith(flow, {
+			plate: "1234ABC",
+			postcode: 28001,
+		});
+
+		expect(payload.field).toBe("postcode");
+		expect((await store.get(SESSION_ID))?.held).toBeUndefined();
+	});
+
+	test("a node that asks only while its field is empty runs its rest with a held answer", async () => {
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const flow = createFlow({
+			id: "greet",
+			title: "Greet",
+			description: "Greet the user.",
+			state: {
+				name: z.string().describe("Name"),
+				greeting: z.string().describe("Greeting the flow builds"),
+			},
+		})
+			.addNode("ask_name", ({ state, interrupt }) =>
+				state.name
+					? { greeting: `Hi ${state.name}` }
+					: interrupt({ name: { question: "What's your name?" } }),
+			)
+			.addEdge(START, "ask_name")
+			.addEdge("ask_name", END)
+			.compile({ store });
+
+		const { payload } = await startWith(flow, { name: "Ana" });
+
+		expect(payload.status).toBe("complete");
+		expect((await store.get(SESSION_ID))?.state).toEqual({
+			name: "Ana",
+			greeting: "Hi Ana",
+		});
+	});
+
+	test("a long flow answered up front does not run out of steps", async () => {
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const fields = Array.from({ length: 30 }, (_, i) => `q${i}`);
+		let builder = createFlow({
+			id: "long",
+			title: "Long",
+			description: "Many questions.",
+			state: Object.fromEntries(
+				fields.map((f) => [f, z.string().describe(f)]),
+			) as Record<string, z.ZodString>,
+		});
+		for (const f of fields) {
+			builder = builder.addNode(f, ({ interrupt }) =>
+				interrupt({ [f]: { question: f } }),
+			);
+		}
+		builder = builder.addEdge(START, fields[0] as never);
+		fields.forEach((f, i) => {
+			builder = builder.addEdge(f as never, (fields[i + 1] ?? END) as never);
+		});
+		const flow = builder.compile({ store });
+
+		const { payload } = await startWith(
+			flow,
+			Object.fromEntries(fields.map((f) => [f, "x"])),
+		);
+
+		expect(payload.status).toBe("complete");
+	});
+
+	test("a fresh answer wins over a held one", async () => {
+		const { flow, store } = carQuote();
+
+		const { handler } = await startWith(flow, { postcode: "11111" });
+		await handler(
+			{
+				action: "continue",
+				stateUpdates: { plate: "1234ABC", postcode: "28001" },
+			},
+			EXTRA,
+		);
+
+		expect((await store.get(SESSION_ID))?.state.postcode).toBe("28001");
+	});
+
+	test("reset corrects a field that was filled from the hold", async () => {
+		const { flow, store } = carQuote();
+
+		const { handler } = await startWith(flow, { plate: "1234ABC" });
+		const corrected = parsePayload(
+			await handler(
+				{ action: "reset", stateUpdates: { plate: "9999ZZZ" } },
+				EXTRA,
+			),
+		);
+
+		expect(corrected.field).toBe("postcode");
+		expect((await store.get(SESSION_ID))?.state.plate).toBe("9999ZZZ");
+	});
+
+	test("never fills a widget's field", async () => {
+		const consentCard: RegisteredTool = {
+			id: "consent_card",
+			title: "Consent card",
+			description: "Agree to the notice",
+			register: async () => {},
+		};
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const flow = createFlow({
+			id: "consent",
+			title: "Consent",
+			description: "Agree, then answer.",
+			state: {
+				agreed: z.boolean().describe("Agreed to the notice"),
+				name: z.string().describe("Name"),
+			},
+		})
+			.addNode("agree", ({ showWidget }) =>
+				showWidget({ tool: consentCard, field: "agreed" }),
+			)
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addEdge(START, "agree")
+			.addEdge("agree", "ask_name")
+			.addEdge("ask_name", END)
+			.compile({ store });
+
+		const { handler, payload } = await startWith(flow, {
+			agreed: true,
+			name: "Ana",
+		});
+		expect(payload.status).toBe("widget");
+
+		const done = parsePayload(
+			await handler(
+				{ action: "continue", stateUpdates: { agreed: true } },
+				EXTRA,
+			),
+		);
+		expect(done.status).toBe("complete");
+		expect((await store.get(SESSION_ID))?.state).toEqual({
+			agreed: true,
+			name: "Ana",
+		});
+	});
+
+	test("a correction to an answer still held replaces it, with no restart", async () => {
+		const { flow, store } = carQuote();
+
+		const { handler } = await startWith(flow, { postcode: "11111" });
+		const same = parsePayload(
+			await handler(
+				{ action: "reset", stateUpdates: { postcode: "22222" } },
+				EXTRA,
+			),
+		);
+		await handler(
+			{ action: "continue", stateUpdates: { plate: "1234ABC" } },
+			EXTRA,
+		);
+
+		expect(same.status).toBe("interrupt");
+		expect(same.field).toBe("plate");
+		expect((await store.get(SESSION_ID))?.state.postcode).toBe("22222");
+	});
+
+	test("a field marked neverPrefilled is asked even when answered up front", async () => {
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const flow = createFlow({
+			id: "share",
+			title: "Share",
+			description: "Answer, then agree to sharing.",
+			state: {
+				name: z.string().describe("Name"),
+				agreed: neverPrefilled(
+					z.boolean().describe("Agreed to share data with partners"),
+				),
+			},
+		})
+			.addNode("ask_name", ({ interrupt }) =>
+				interrupt({ name: { question: "Name?" } }),
+			)
+			.addNode("ask_agreement", ({ interrupt }) =>
+				interrupt({
+					agreed: {
+						question: "Do you agree that we share your data with partners?",
+					},
+				}),
+			)
+			.addEdge(START, "ask_name")
+			.addEdge("ask_name", "ask_agreement")
+			.addEdge("ask_agreement", END)
+			.compile({ store });
+
+		const { payload } = await startWith(flow, { name: "Ana", agreed: true });
+
+		expect(payload.field).toBe("agreed");
+		const record = await store.get(SESSION_ID);
+		expect(record?.state).toEqual({ name: "Ana" });
+		expect(record?.held).toBeUndefined();
+	});
+
+	test("a group question never fills a member marked neverPrefilled", async () => {
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const flow = createFlow({
+			id: "group_consent",
+			title: "Group consent",
+			description: "Driver details, then the driver's consent.",
+			state: {
+				driver: z
+					.object({
+						name: z.string().describe("Full name"),
+						consent: neverPrefilled(
+							z.boolean().optional().describe("Agrees to a records check"),
+						),
+					})
+					.describe("Driver details"),
+			},
+		})
+			.addNode("ask_driver", ({ interrupt }) =>
+				interrupt({ driver: { question: "Who is driving?" } }),
+			)
+			.addNode("ask_consent", ({ interrupt }) =>
+				interrupt({
+					"driver.consent": { question: "May we check your records?" },
+				}),
+			)
+			.addEdge(START, "ask_driver")
+			.addEdge("ask_driver", "ask_consent")
+			.addEdge("ask_consent", END)
+			.compile({ store });
+
+		const { payload } = await startWith(flow, {
+			driver: { name: "Ana", consent: true },
+		});
+
+		expect(payload.field).toBe("driver.consent");
+		expect((await store.get(SESSION_ID))?.state).toEqual({
+			driver: { name: "Ana" },
+		});
+	});
+
+	test("fills a member of a group declared optional", async () => {
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const flow = createFlow({
+			id: "optional_group",
+			title: "Optional group",
+			description: "Optional driver details.",
+			state: {
+				driver: z
+					.object({
+						name: z.string().describe("Full name"),
+						license: z.string().describe("License number"),
+					})
+					.optional()
+					.describe("Driver details"),
+			},
+		})
+			.addNode("ask_driver", ({ interrupt }) =>
+				interrupt({
+					"driver.name": { question: "Name?" },
+					"driver.license": { question: "License?" },
+				}),
+			)
+			.addEdge(START, "ask_driver")
+			.addEdge("ask_driver", END)
+			.compile({ store });
+
+		const { payload } = await startWith(flow, { "driver.name": "Ana" });
+
+		expect(payload.field).toBe("driver.license");
+		expect(payload.fieldSchema).toMatchObject({ type: "string" });
+		expect((await store.get(SESSION_ID))?.state).toEqual({
+			driver: { name: "Ana" },
+		});
+	});
+
+	test("a held value for a field already filled is let go, not kept to refill it later", async () => {
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const flow = createFlow({
+			id: "refill",
+			title: "Refill",
+			description: "A year the flow fills, clears and asks again.",
+			state: {
+				year: z.number().describe("Model year"),
+				confirmed: z.boolean().describe("Year looks right"),
+			},
+		})
+			.addNode("lookup", () => ({ year: 2021 }))
+			.addNode("ask_year", ({ interrupt }) =>
+				interrupt({ year: { question: "Model year?" } }),
+			)
+			.addNode("ask_confirm", ({ interrupt }) =>
+				interrupt({ confirmed: { question: "Is that year right?" } }),
+			)
+			.addNode("clear_year", ({ state }) =>
+				state.confirmed ? {} : { year: undefined },
+			)
+			.addNode("ask_year_again", ({ interrupt }) =>
+				interrupt({ year: { question: "Which year is it, then?" } }),
+			)
+			.addEdge(START, "lookup")
+			.addEdge("lookup", "ask_year")
+			.addEdge("ask_year", "ask_confirm")
+			.addEdge("ask_confirm", "clear_year")
+			.addEdge("clear_year", "ask_year_again")
+			.addEdge("ask_year_again", END)
+			.compile({ store });
+
+		const { handler, payload } = await startWith(flow, { year: 2019 });
+		expect(payload.field).toBe("confirmed");
+
+		const next = parsePayload(
+			await handler(
+				{ action: "continue", stateUpdates: { confirmed: false } },
+				EXTRA,
+			),
+		);
+
+		expect(next.field).toBe("year");
+		expect((await store.get(SESSION_ID))?.held).toBeUndefined();
+	});
+
+	test("a held answer in a batch is validated once the batch is complete", async () => {
+		const seen: unknown[] = [];
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const flow = createFlow({
+			id: "batch",
+			title: "Batch",
+			description: "Two questions in one node.",
+			state: {
+				email: z.string().describe("Email"),
+				phone: z.string().describe("Phone"),
+			},
+		})
+			.addNode("ask_contact", ({ interrupt }) =>
+				interrupt({
+					email: {
+						question: "Email?",
+						validate: (email) => {
+							seen.push(email);
+						},
+					},
+					phone: { question: "Phone?" },
+				}),
+			)
+			.addEdge(START, "ask_contact")
+			.addEdge("ask_contact", END)
+			.compile({ store });
+
+		const { handler, payload } = await startWith(flow, { email: "a@b.co" });
+		expect(payload.field).toBe("phone");
+		expect(seen).toEqual([]);
+
+		const done = parsePayload(
+			await handler(
+				{ action: "continue", stateUpdates: { phone: "555" } },
+				EXTRA,
+			),
+		);
+		expect(done.status).toBe("complete");
+		expect(seen).toEqual(["a@b.co"]);
+	});
+
+	test("a nested member of the wrong type is dropped and asked", async () => {
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const flow = createFlow({
+			id: "driver",
+			title: "Driver",
+			description: "Driver details.",
+			state: {
+				driver: z
+					.object({
+						name: z.string().describe("Full name"),
+						license: z.string().describe("License number"),
+					})
+					.describe("Driver details"),
+			},
+		})
+			.addNode("ask_driver", ({ interrupt }) =>
+				interrupt({
+					"driver.name": { question: "Name?" },
+					"driver.license": { question: "License?" },
+				}),
+			)
+			.addEdge(START, "ask_driver")
+			.addEdge("ask_driver", END)
+			.compile({ store });
+
+		const { payload } = await startWith(flow, {
+			"driver.name": "Ana",
+			"driver.license": 123,
+		});
+
+		expect(payload.field).toBe("driver.license");
+		expect((await store.get(SESSION_ID))?.state).toEqual({
+			driver: { name: "Ana" },
+		});
+	});
+
+	test("never stores a key the state schema does not declare", async () => {
+		const { flow, store } = carQuote();
+
+		await startWith(flow, {
+			discount: 100,
+			toString: "x",
+			constructor: "y",
+			postcode: "28001",
+		});
+
+		expect((await store.get(SESSION_ID))?.held).toEqual({ postcode: "28001" });
+	});
+
+	test("a record written without `asked` holds nothing", async () => {
+		const { flow, store } = carQuote();
+		const handler = await handlerFor(flow);
+		await store.set(SESSION_ID, {
+			step: "ask_plate",
+			state: {},
+			field: "plate",
+		});
+
+		await handler(
+			{
+				action: "continue",
+				stateUpdates: { plate: "1234ABC", postcode: "28001" },
+			},
+			EXTRA,
+		);
+
+		const record = await store.get(SESSION_ID);
+		expect(record?.state.price).toBe(300);
+		expect(record?.held).toBeUndefined();
+	});
+
+	test("checks a held value against a schema with an async refinement", async () => {
+		const store = new MemoryKvStore<FlowTokenContent>();
+		const flow = createFlow({
+			id: "async_refine",
+			title: "Async refine",
+			description: "A code checked asynchronously.",
+			state: {
+				code: z
+					.string()
+					.refine(async (code) => code.startsWith("OK"))
+					.describe("Promo code"),
+			},
+		})
+			.addNode("ask_code", ({ interrupt }) =>
+				interrupt({ code: { question: "Code?" } }),
+			)
+			.addEdge(START, "ask_code")
+			.addEdge("ask_code", END)
+			.compile({ store });
+
+		const { payload } = await startWith(flow, { code: "OK-42" });
+
+		expect(payload.status).toBe("complete");
+	});
+});
+
+describe("splitAskedFields", () => {
 	test("a question on one member accepts that member alone, in either spelling", () => {
 		expect(
-			keepAskedFields({ "driver.name": "Ana", driver: { license: "L-1" } }, [
+			splitAskedFields({ "driver.name": "Ana", driver: { license: "L-1" } }, [
 				"driver.name",
 			]),
-		).toEqual({ driver: { name: "Ana" } });
+		).toEqual({
+			accepted: { driver: { name: "Ana" } },
+			unasked: { driver: { license: "L-1" } },
+		});
 	});
 
 	test("a question on a group accepts every key inside it", () => {
 		expect(
-			keepAskedFields({ "driver.name": "Ana", "driver.license": "L-1" }, [
+			splitAskedFields({ "driver.name": "Ana", "driver.license": "L-1" }, [
 				"driver",
 			]),
-		).toEqual({ driver: { name: "Ana", license: "L-1" } });
+		).toEqual({
+			accepted: { driver: { name: "Ana", license: "L-1" } },
+			unasked: {},
+		});
 	});
 });
 

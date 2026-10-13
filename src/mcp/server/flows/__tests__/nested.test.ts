@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { z } from "zod";
 import {
 	deepMerge,
@@ -17,6 +17,12 @@ describe("isObjectSchema", () => {
 
 	test("returns false for z.string", () => {
 		expect(isObjectSchema(z.string())).toBe(false);
+	});
+
+	test("returns true for a z.object wrapped in optional", () => {
+		expect(isObjectSchema(z.object({ name: z.string() }).optional())).toBe(
+			true,
+		);
 	});
 
 	test("returns false for z.record", () => {
@@ -181,5 +187,93 @@ describe("deepMerge", () => {
 		expect(deepMerge({}, { driver: { name: "John" } })).toEqual({
 			driver: { name: "John" },
 		});
+	});
+});
+
+describe("prototype keys", () => {
+	const PATHS = [
+		"__proto__.polluted",
+		"constructor.prototype.polluted",
+		"driver.__proto__.polluted",
+	];
+
+	afterEach(() => {
+		delete (Object.prototype as Record<string, unknown>).polluted;
+	});
+
+	test("setNestedValue writes nothing through them", () => {
+		for (const path of PATHS) {
+			const obj: Record<string, unknown> = { driver: {} };
+			setNestedValue(obj, path, "yes");
+			expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+		}
+	});
+
+	test("expandDotPaths drops them, as dot-paths and as own keys", () => {
+		const parsed = JSON.parse(
+			'{"__proto__": {"polluted": "yes"}, "name": "Ana"}',
+		) as Record<string, unknown>;
+		const expanded = expandDotPaths({
+			...parsed,
+			"__proto__.polluted": "yes",
+			"constructor.prototype.polluted": "yes",
+		});
+
+		expect(expanded).toEqual({ name: "Ana" });
+		expect(Object.getPrototypeOf(expanded)).toBe(Object.prototype);
+		expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+	});
+
+	test("expandDotPaths drops them at any depth inside a value", () => {
+		const updates = JSON.parse(
+			'{"driver": {"name": "Ana", "__proto__": {"polluted": "yes"}, "cars": [{"__proto__": {"polluted": "yes"}}]}}',
+		) as Record<string, unknown>;
+		const driver = expandDotPaths(updates).driver as Record<string, unknown>;
+
+		expect(Object.keys(driver)).toEqual(["name", "cars"]);
+		expect(Object.getPrototypeOf(driver)).toBe(Object.prototype);
+		expect(Object.keys((driver.cars as object[])[0] as object)).toEqual([]);
+		expect(
+			(Object.assign({}, driver) as Record<string, unknown>).polluted,
+		).toBeUndefined();
+	});
+
+	test("expandDotPaths keeps a Date or class instance as it is", () => {
+		const date = new Date("2026-10-20");
+		class Plate {
+			constructor(readonly value: string) {}
+		}
+		const plate = new Plate("1234ABC");
+
+		const expanded = expandDotPaths({ "booking.date": date, plate });
+
+		expect((expanded.booking as Record<string, unknown>).date).toBe(date);
+		expect(expanded.plate).toBe(plate);
+	});
+
+	test("deepMerge skips them", () => {
+		const source = JSON.parse(
+			'{"__proto__": {"polluted": "yes"}, "driver": {"__proto__": {"polluted": "yes"}}}',
+		) as Record<string, unknown>;
+		const merged = deepMerge({ driver: { name: "Ana" } }, source);
+
+		expect(merged).toEqual({ driver: { name: "Ana" } });
+		expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+	});
+
+	test("getNestedValue reads own keys only", () => {
+		(Object.prototype as Record<string, unknown>).polluted = "inherited";
+
+		expect(getNestedValue({}, "polluted")).toBeUndefined();
+		expect(getNestedValue({ driver: {} }, "driver.polluted")).toBeUndefined();
+		expect(getNestedValue({}, "__proto__")).toBeUndefined();
+	});
+
+	test("deleteNestedValue deletes nothing through them", () => {
+		(Object.prototype as Record<string, unknown>).polluted = "inherited";
+
+		deleteNestedValue({}, "__proto__.polluted");
+
+		expect(({} as Record<string, unknown>).polluted).toBe("inherited");
 	});
 });

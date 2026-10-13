@@ -48,7 +48,7 @@ The user is scripted. Their first message comes from the scenario. After that th
 | `done` | The flow reached `complete`. |
 | `user turns (ideal)` | Average user messages it took. The ideal is the opener plus one reply per question group the user hadn't already answered. |
 | `waiting on known` | Fields the flow was still waiting on at the end of a turn although the user had already given them. The assistant either asked again or has to send them on a later call. |
-| `unasked keys` | `stateUpdates` keys the model sent for fields the flow wasn't waiting on. On a version that only accepts asked fields, these are dropped. |
+| `unasked keys` | `stateUpdates` keys the model sent for fields the flow wasn't waiting on. An engine without held answers drops these. With held answers they are kept and fill their question when it comes up, so they only cost a run when they land in a wrong or computed field. |
 | `step limit` | Turns cut off by the step limit while the model was still calling tools. The user sees no reply. |
 | `wrong` | Final-state fields that don't match what the user said. |
 | `computed` | Fields the flow computes itself (member id, vehicle id, price) that ended up with another value. |

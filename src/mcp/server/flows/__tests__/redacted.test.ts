@@ -5,6 +5,8 @@ import type { McpServer } from "../@types";
 import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
 import { readRedactedFields } from "../definition-meta";
+import { hasFieldMark } from "../field-marks";
+import { neverPrefilled } from "../held-answers";
 import {
 	collectRedactedStateFields,
 	isFieldRedacted,
@@ -42,6 +44,14 @@ describe("redacted()", () => {
 			company: z.string().default("all"),
 		});
 		expect(fields.sort()).toEqual(["ages", "zipcode"]);
+	});
+
+	test("combines with neverPrefilled, in either order", () => {
+		expect(isFieldRedacted(neverPrefilled(redacted(z.string())))).toBe(true);
+		expect(isFieldRedacted(redacted(neverPrefilled(z.string())))).toBe(true);
+		expect(
+			hasFieldMark(redacted(neverPrefilled(z.string())), "neverPrefilled"),
+		).toBe(true);
 	});
 
 	test("empty state returns empty list", () => {

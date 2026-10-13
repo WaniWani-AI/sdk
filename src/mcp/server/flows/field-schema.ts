@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { getObjectShape } from "./nested";
+import { getObjectShape, readZodDef, unwrapOptional } from "./nested";
 
 /**
  * Compact, JSON-serializable schema fragment for a single state field.
@@ -24,56 +24,10 @@ export type FieldSchemaInfo = {
 	optional?: boolean;
 };
 
-type ZodDef = {
-	type?: string;
-	entries?: Record<string, string>;
-	innerType?: z.ZodType;
-};
-
-type ZodInternals = {
-	_zod?: {
-		def?: ZodDef;
-	};
-};
-
-function readDef(schema: z.ZodType): ZodDef | undefined {
-	return (schema as unknown as ZodInternals)._zod?.def;
-}
-
-/**
- * Unwrap optional/nullable/default wrappers to reach the underlying schema.
- * Returns whether at least one wrapper marked the field as optional from the
- * caller's perspective (optional/nullable/default all mean the LLM may omit it).
- */
-function unwrapOptional(schema: z.ZodType): {
-	inner: z.ZodType;
-	optional: boolean;
-} {
-	let current = schema;
-	let optional = false;
-	for (let i = 0; i < 8; i++) {
-		const def = readDef(current);
-		if (!def?.innerType) {
-			break;
-		}
-		if (
-			def.type === "optional" ||
-			def.type === "nullable" ||
-			def.type === "default"
-		) {
-			optional = true;
-			current = def.innerType;
-			continue;
-		}
-		break;
-	}
-	return { inner: current, optional };
-}
-
 export function introspectField(schema: z.ZodType): FieldSchemaInfo {
 	const { inner, optional } = unwrapOptional(schema);
 	const description = inner.description ?? schema.description ?? undefined;
-	const def = readDef(inner);
+	const def = readZodDef(inner);
 	const t = def?.type;
 
 	const base: FieldSchemaInfo = {
@@ -106,27 +60,28 @@ export function resolveFieldSchema(
 	state: Record<string, z.ZodType> | undefined,
 	fieldPath: string,
 ): FieldSchemaInfo | undefined {
+	const schema = resolveFieldZodType(state, fieldPath);
+	return schema ? introspectField(schema) : undefined;
+}
+
+/**
+ * Resolve a field path (flat key or `parent.child` dot-path) to the Zod schema
+ * the flow declared for it, or `undefined` when the path is not declared.
+ */
+export function resolveFieldZodType(
+	state: Record<string, z.ZodType> | undefined,
+	fieldPath: string,
+): z.ZodType | undefined {
 	if (!state || !fieldPath) {
 		return undefined;
 	}
 	if (fieldPath.includes(".")) {
 		const dot = fieldPath.indexOf(".");
-		const parent = fieldPath.slice(0, dot);
-		const child = fieldPath.slice(dot + 1);
-		const parentSchema = state[parent];
+		const parentSchema = state[fieldPath.slice(0, dot)];
 		if (!parentSchema) {
 			return undefined;
 		}
-		const shape = getObjectShape(parentSchema);
-		const childSchema = shape?.[child];
-		if (!childSchema) {
-			return undefined;
-		}
-		return introspectField(childSchema);
+		return getObjectShape(parentSchema)?.[fieldPath.slice(dot + 1)];
 	}
-	const schema = state[fieldPath];
-	if (!schema) {
-		return undefined;
-	}
-	return introspectField(schema);
+	return state[fieldPath];
 }

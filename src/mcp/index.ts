@@ -55,6 +55,7 @@ export {
 	createFlow,
 	createFlowTestHarness,
 	END,
+	neverPrefilled,
 	redacted,
 	START,
 	StateGraph,

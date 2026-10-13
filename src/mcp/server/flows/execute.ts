@@ -5,6 +5,7 @@ import { reportSessionError } from "../session-errors/report";
 import type {
 	Edge,
 	ExecutionResult,
+	InterruptQuestion,
 	InterruptQuestionData,
 	MaybePromise,
 	NodeHandler,
@@ -13,18 +14,19 @@ import type {
 } from "./@types";
 import { END, interrupt, isInterrupt, isWidget, showWidget } from "./@types";
 import { resolveFieldSchema } from "./field-schema";
-import { deepMerge, deleteNestedValue, getNestedValue } from "./nested";
+import { fillFromHold, type HeldAnswers } from "./held-answers";
+import {
+	deepMerge,
+	deleteNestedValue,
+	getNestedValue,
+	isFilled,
+} from "./nested";
 
 export type StateSchema = Record<string, z.ZodType>;
 
 // ============================================================================
 // Helpers
 // ============================================================================
-
-/** Check whether a state value counts as "filled" (not empty/missing). */
-export function isFilled(v: unknown): boolean {
-	return v !== undefined && v !== null && v !== "";
-}
 
 export type ValidateFn = (
 	value: unknown,
@@ -57,7 +59,7 @@ export async function resolveNextNode<TState extends Record<string, unknown>>(
  * Returns `null` when all questions are already filled (caller should advance).
  */
 export function buildInterruptResult<TState extends Record<string, unknown>>(
-	questions: InterruptQuestionData[],
+	questions: InterruptQuestion[],
 	context: string | undefined,
 	currentNode: string,
 	state: TState,
@@ -80,7 +82,7 @@ export function buildInterruptResult<TState extends Record<string, unknown>>(
 			(q) =>
 				!isFilled(getNestedValue(state as Record<string, unknown>, q.field)),
 		)
-		.map((q) => {
+		.map(({ validate: _validate, ...q }): InterruptQuestionData => {
 			const fieldSchema = resolveFieldSchema(stateSchema, q.field);
 			return fieldSchema ? { ...q, fieldSchema } : q;
 		});
@@ -128,10 +130,12 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 	waniwani?: ScopedWaniWaniClient,
 	nodeOptions?: Map<string, NodeOptions>,
 	stateSchema?: StateSchema,
+	held?: HeldAnswers,
 ): Promise<ExecutionResult> {
 	let currentNode = startNodeName;
 	let state = { ...startState };
 	const nodesVisited: NodeVisit[] = [];
+	let rerun = false;
 
 	// Safety limit to prevent infinite loops
 	const MAX_ITERATIONS = 50;
@@ -164,9 +168,10 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 			};
 		}
 
-		if (!nodeOptions?.get(currentNode)?.hideFromFunnel) {
+		if (!rerun && !nodeOptions?.get(currentNode)?.hideFromFunnel) {
 			nodesVisited.push({ id: currentNode, at: new Date().toISOString() });
 		}
+		rerun = false;
 
 		try {
 			// Build context object for the handler
@@ -189,6 +194,23 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				for (const q of result.questions) {
 					if (q.validate) {
 						validators.set(`${currentNode}:${q.field}`, q.validate);
+					}
+				}
+
+				// An answer the user gave before this question came up fills it,
+				// and the node runs again with it, as it would for a fresh answer.
+				if (held) {
+					const appliedBefore = held.applied.length;
+					state = await fillFromHold({
+						questions: result.questions,
+						state,
+						held,
+						stateSchema,
+					});
+					if (held.applied.length > appliedBefore) {
+						rerun = true;
+						iterations--;
+						continue;
 					}
 				}
 

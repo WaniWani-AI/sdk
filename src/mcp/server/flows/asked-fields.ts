@@ -6,15 +6,13 @@
  * `field` (with a `fieldSchema`) in the response that asks it, and the same
  * rule decides what a call may write: a value is accepted only for a
  * field this run has asked for. Fields the flow computes for itself (a lookup
- * id, a quote) are never asked, so the conversation cannot set them.
+ * id, a quote) are never asked, so the conversation cannot set them. Values
+ * for fields not asked yet are held until their question comes up (see
+ * `held-answers.ts`).
  */
 
 import type { FlowContent } from "./@types";
-import { expandDotPaths } from "./nested";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
-}
+import { expandDotPaths, isRecord } from "./nested";
 
 /** The fields one response asks the user, or a widget, to fill. */
 export function fieldsAskedBy(content: FlowContent): string[] {
@@ -39,31 +37,39 @@ export function addAskedFields(
 }
 
 /**
- * Keep only the values for fields in `asked`. Dot-paths are expanded first, so
- * `{ "driver.name": … }` and `{ driver: { name: … } }` are judged alike. A
- * question on a whole group (`driver`) accepts every key inside it; a question
- * on one member (`driver.name`) accepts that member alone.
+ * Split `updates` into the values for fields in `asked` and everything else.
+ * Dot-paths are expanded first, so `{ "driver.name": … }` and
+ * `{ driver: { name: … } }` are judged alike. A question on a whole group
+ * (`driver`) accepts every key inside it; a question on one member
+ * (`driver.name`) accepts that member alone.
  */
-export function keepAskedFields(
+export function splitAskedFields(
 	updates: Record<string, unknown> | undefined,
 	asked: readonly string[],
-): Record<string, unknown> {
+): { accepted: Record<string, unknown>; unasked: Record<string, unknown> } {
 	const askedSet = new Set(asked);
-	const kept: Record<string, unknown> = {};
+	const accepted: Record<string, unknown> = {};
+	const unasked: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(expandDotPaths(updates ?? {}))) {
 		if (askedSet.has(key)) {
-			kept[key] = value;
+			accepted[key] = value;
 			continue;
 		}
 		if (!isRecord(value)) {
+			unasked[key] = value;
 			continue;
 		}
-		const members = Object.entries(value).filter(([member]) =>
-			askedSet.has(`${key}.${member}`),
-		);
-		if (members.length > 0) {
-			kept[key] = Object.fromEntries(members);
+		const members = Object.entries(value);
+		const isAsked = ([member]: [string, unknown]) =>
+			askedSet.has(`${key}.${member}`);
+		const askedMembers = members.filter(isAsked);
+		const otherMembers = members.filter((entry) => !isAsked(entry));
+		if (askedMembers.length > 0) {
+			accepted[key] = Object.fromEntries(askedMembers);
+		}
+		if (otherMembers.length > 0) {
+			unasked[key] = Object.fromEntries(otherMembers);
 		}
 	}
-	return kept;
+	return { accepted, unasked };
 }
