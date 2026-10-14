@@ -122,9 +122,9 @@ interface RemoteConfigResponse {
 	 */
 	visibility?: VisibilityRules | null;
 	/**
-	 * Hide the floating dock near the bottom of the page (WAN-1431): `true`,
-	 * or a distance in px from the end of the page. Absent on servers that
-	 * predate the field.
+	 * Hide the floating dock at the bottom of the page (WAN-1431). On by
+	 * default; `false` opts out, a number is a distance in px from the end of
+	 * the page. Absent on servers that predate the field.
 	 */
 	hideAtBottom?: boolean | number | null;
 	/**
