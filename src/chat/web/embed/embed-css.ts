@@ -27,13 +27,37 @@ function isPlaceholder(value: string): boolean {
 }
 
 /**
- * Append the compiled stylesheet to a shadow root.
+ * Text properties the host page must not hand down to the widget.
  *
- * A no-op when the bundle was not post-processed, which is every path other
- * than the IIFE: the React entry points ship `styles.css` for the host page to
- * import, so there is nothing to inline and nothing to inject.
+ * A shadow root stops the host's selectors, not inheritance: inherited
+ * properties still flow from the page into the host element and on down.
+ * saudeprime.pt runs the Divi theme, whose `body { font-weight: 500 }` turned
+ * every line of the chat medium-weight — the "bold answers" of WAN-1441, with
+ * no `**` anywhere in the messages. Any theme that styles `body` text does the
+ * same.
+ *
+ * Only properties whose initial value is what the widget is designed for are
+ * reset. Size, line height, colour and font family still inherit: changing
+ * them would resize or recolour the widget on every site that embeds it today.
+ * `:host` rules lose to the page's own rules on the host element, so a site
+ * that targets the host directly still wins; a `body` rule no longer reaches.
+ */
+export const HOST_TEXT_RESET =
+	":host{font-weight:400;font-style:normal;letter-spacing:normal;word-spacing:normal;text-transform:none;text-indent:0}";
+
+/**
+ * Append the compiled stylesheet to a shadow root, after the text reset.
+ *
+ * The stylesheet is skipped when the bundle was not post-processed, which is
+ * every path other than the IIFE: the React entry points ship `styles.css` for
+ * the host page to import, so there is nothing to inline. The reset is always
+ * appended — it is what isolates the root, whatever else loads into it.
  */
 export function injectEmbedCss(shadowRoot: ShadowRoot): void {
+	const reset = document.createElement("style");
+	reset.textContent = HOST_TEXT_RESET;
+	shadowRoot.appendChild(reset);
+
 	if (!EMBED_CSS || isPlaceholder(EMBED_CSS)) {
 		return;
 	}
