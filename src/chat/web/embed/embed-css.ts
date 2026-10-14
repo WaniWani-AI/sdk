@@ -27,13 +27,42 @@ function isPlaceholder(value: string): boolean {
 }
 
 /**
- * Append the compiled stylesheet to a shadow root.
+ * Text properties the host page must not hand down to the widget.
  *
- * A no-op when the bundle was not post-processed, which is every path other
- * than the IIFE: the React entry points ship `styles.css` for the host page to
- * import, so there is nothing to inline and nothing to inject.
+ * A shadow root stops the host's selectors, not inheritance: inherited
+ * properties still flow from the page into the host element and on down. On a
+ * Divi WordPress site, `body { font-weight: 500 }` turned every line of the
+ * chat medium-weight — the "bold answers" of WAN-1441, with no `**` anywhere
+ * in the messages. Any theme that styles `body` text does the same, and a
+ * centred page column centres every message.
+ *
+ * Only properties that nothing else in the widget sets, and whose initial
+ * value is what it is designed for, are pinned here. Font family, colour,
+ * size and line height are left alone: the stylesheet's preflight and theme
+ * variables already set them where the widget needs them. Smoothing and word
+ * wrapping are left alone too — themes usually set them for the better.
+ * `direction` must never be reset: `text-align: start` follows it.
+ *
+ * `:host` rules lose to the page's own rules on the host element, and to a
+ * `data-css` stylesheet appended later, so a site can still override these on
+ * purpose; a rule on `body` or an ancestor no longer reaches.
+ */
+export const HOST_TEXT_RESET =
+	":host{font-weight:400;font-style:normal;font-variant:normal;letter-spacing:normal;word-spacing:normal;text-transform:none;text-indent:0;text-align:start;text-shadow:none}";
+
+/**
+ * Append the compiled stylesheet to a shadow root, after the text reset.
+ *
+ * The stylesheet is skipped when the bundle was not post-processed, which is
+ * every path other than the IIFE: the React entry points ship `styles.css` for
+ * the host page to import, so there is nothing to inline. The reset is always
+ * appended — it is what isolates the root, whatever else loads into it.
  */
 export function injectEmbedCss(shadowRoot: ShadowRoot): void {
+	const reset = document.createElement("style");
+	reset.textContent = HOST_TEXT_RESET;
+	shadowRoot.appendChild(reset);
+
 	if (!EMBED_CSS || isPlaceholder(EMBED_CSS)) {
 		return;
 	}
