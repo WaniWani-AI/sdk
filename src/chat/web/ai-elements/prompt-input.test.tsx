@@ -347,7 +347,7 @@ describe("PromptInput — a refused file is reported, never silently dropped", (
 		expect(attachments().files).toEqual([]);
 		expect(errors[0]?.code).toBe("max_file_size");
 		expect(errors[0]?.message).toContain("huge.pdf");
-		expect(errors[0]?.message).toContain("1 KB");
+		expect(errors[0]?.message).toContain("1 kB");
 	});
 
 	test("the admitted prefix is kept when the batch exceeds maxFiles", async () => {
@@ -656,6 +656,31 @@ describe("PromptInput — upload lifecycle", () => {
 });
 
 describe("PromptInput — without an uploader the inline path is unchanged", () => {
+	// The fake object URLs resolve nowhere and happy-dom's FileReader rejects a
+	// native Blob, so both are stood in for to keep the blob-to-data-URL path
+	// the same on every runner.
+	const realFetch = globalThis.fetch;
+	const realFileReader = globalThis.FileReader;
+	beforeEach(() => {
+		globalThis.fetch = (async () =>
+			new Response(new Blob(["pdf"], { type: "application/pdf" }))) as never;
+		globalThis.FileReader = class {
+			result: string | null = null;
+			onloadend: (() => void) | null = null;
+			onerror: (() => void) | null = null;
+			readAsDataURL(blob: Blob) {
+				blob.arrayBuffer().then((bytes) => {
+					this.result = `data:${blob.type};base64,${Buffer.from(bytes).toString("base64")}`;
+					this.onloadend?.();
+				});
+			}
+		} as never;
+	});
+	afterEach(() => {
+		globalThis.fetch = realFetch;
+		globalThis.FileReader = realFileReader;
+	});
+
 	test("attachments travel as files, and documents stays empty", async () => {
 		mount({});
 
@@ -673,6 +698,9 @@ describe("PromptInput — without an uploader the inline path is unchanged", () 
 		expect(submissions[0]?.documents).toEqual([]);
 		expect(submissions[0]?.files).toHaveLength(1);
 		expect(submissions[0]?.files[0]?.filename).toBe("policy.pdf");
+		expect(submissions[0]?.files[0]?.url).toStartWith(
+			"data:application/pdf;base64,",
+		);
 	});
 });
 
@@ -1103,13 +1131,13 @@ describe("PromptInputAddAttachments — the picker cannot filter by size, so the
 		expect(three).not.toContain("20 MB");
 
 		mountPaperclip({ maxFileSize: 512 * 1024 });
-		expect(paperclipLabel()).toContain("512 KB");
+		expect(paperclipLabel()).toContain("512 kB");
 	});
 
 	test("the cap the label states is the cap add() enforces", () => {
 		mountPaperclip({ maxFileSize: 1024 });
 
-		expect(paperclipLabel()).toContain("1 KB");
+		expect(paperclipLabel()).toContain("1 kB");
 		act(() => {
 			attachments().add([file("huge.pdf", "application/pdf", 2048)]);
 		});

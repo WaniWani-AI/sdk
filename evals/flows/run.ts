@@ -25,6 +25,7 @@ const { values: flags } = parseArgs({
 		scenario: { type: "string" },
 		concurrency: { type: "string", default: "4" },
 		verbose: { type: "boolean", default: false },
+		"fail-on-regression": { type: "boolean", default: false },
 	},
 });
 
@@ -143,6 +144,34 @@ function summarize(results: RunResult[]): string {
 	return table(rows);
 }
 
+// One run of slack: a model that passes 3/3 on one version and 2/3 on the
+// other is within its own noise, so only a drop of two or more runs fails.
+function regressions(
+	results: RunResult[],
+	candidate: string,
+	baseline: string,
+): string[] {
+	const passes = new Map<string, number>();
+	for (const result of results) {
+		const key = [result.sdk, result.model, result.scenario].join("\u0000");
+		passes.set(key, (passes.get(key) ?? 0) + (result.pass ? 1 : 0));
+	}
+	const found: string[] = [];
+	for (const result of results) {
+		if (result.sdk !== baseline || result.run !== 0) {
+			continue;
+		}
+		const at = (sdk: string) =>
+			passes.get([sdk, result.model, result.scenario].join("\u0000")) ?? 0;
+		if (at(baseline) - at(candidate) > 1) {
+			found.push(
+				`${result.model} ${result.scenario}: ${candidate} passed ${at(candidate)}, ${baseline} passed ${at(baseline)}`,
+			);
+		}
+	}
+	return found;
+}
+
 async function main() {
 	if (!process.env.AI_GATEWAY_API_KEY) {
 		console.error(
@@ -152,6 +181,12 @@ async function main() {
 	}
 
 	const sdks = list(flags.sdk);
+	if (flags["fail-on-regression"] && sdks.length !== 2) {
+		console.error(
+			"--fail-on-regression compares two versions: --sdk <candidate>,<baseline>",
+		);
+		process.exit(1);
+	}
 	const models = list(flags.models);
 	const runs = Number(flags.runs);
 	const maxSteps = Number(flags.steps);
@@ -203,6 +238,23 @@ async function main() {
 		JSON.stringify({ sdks, models, runs, maxSteps, results }, null, 2),
 	);
 	console.log(`Transcripts: ${file}`);
+
+	const [candidate, baseline] = sdks;
+	if (flags["fail-on-regression"] && candidate && baseline) {
+		const errored = results.filter((r) => r.error);
+		const found = regressions(results, candidate, baseline);
+		if (errored.length) {
+			console.error(
+				`\n${errored.length} runs errored, so the versions cannot be compared:\n${errored.map((r) => `${r.sdk} ${r.model} ${r.scenario} #${r.run + 1}: ${r.error}`).join("\n")}`,
+			);
+			process.exitCode = 1;
+		} else if (found.length) {
+			console.error(`\nRegressions against ${baseline}:\n${found.join("\n")}`);
+			process.exitCode = 1;
+		} else {
+			console.log(`\nNo regressions against ${baseline}.`);
+		}
+	}
 }
 
 await main();
