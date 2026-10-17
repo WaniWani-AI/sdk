@@ -24,7 +24,7 @@ Parse the source code to identify:
 
 **Nodes** — Each `.addNode("name", ...)` call. Classify by what the handler returns:
 - **Widget node** — handler returns `showWidget({ tool, data })` (or the legacy positional form `showWidget(tool, { data })`). Look for `{ tool: ... }` (object form) or the second positional arg (legacy form).
-- **Interrupt node** — handler returns `interrupt({ question, field })`.
+- **Interrupt node** — handler returns `interrupt({ field: { question } })`, one key per field asked (e.g. `interrupt({ email: { question: "What is your work email?" } })`).
 - **Action node** — handler returns a plain object like `{}` or `{ key: value }`. These run silently and auto-advance.
 
 **Direct edges** — Each `.addEdge(from, to)` call. `START` and `END` are sentinel constants (`"__start__"` and `"__end__"`).
