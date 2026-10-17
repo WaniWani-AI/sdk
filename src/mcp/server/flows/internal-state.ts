@@ -11,6 +11,7 @@
 import type { FlowConfig, FlowInternalState, FlowTokenContent } from "./@types";
 import type { FlowStore } from "./flow-store";
 import { normalizeIntro } from "./intro";
+import { listStateFields } from "./state-updates";
 
 /**
  * How each internal field starts life. One entry per field: it reads the flow
@@ -26,6 +27,7 @@ const SEEDS: {
 	) => FlowInternalState[K];
 } = {
 	intro: (config) => normalizeIntro(config.intro, config.id),
+	fields: (config) => listStateFields(config.state),
 };
 
 /**

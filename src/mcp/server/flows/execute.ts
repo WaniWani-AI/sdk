@@ -2,6 +2,7 @@ import type { z } from "zod";
 import type { ScopedWaniWaniClient } from "../scoped-client";
 import { classifyCause } from "../session-errors/classify";
 import { reportSessionError } from "../session-errors/report";
+import { extractSessionId } from "../utils";
 import type {
 	Edge,
 	ExecutionResult,
@@ -14,7 +15,6 @@ import type {
 } from "./@types";
 import { END, interrupt, isInterrupt, isWidget, showWidget } from "./@types";
 import { resolveFieldSchema } from "./field-schema";
-import { fillFromHold, type HeldAnswers } from "./held-answers";
 import {
 	deepMerge,
 	deleteNestedValue,
@@ -130,12 +130,10 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 	waniwani?: ScopedWaniWaniClient,
 	nodeOptions?: Map<string, NodeOptions>,
 	stateSchema?: StateSchema,
-	held?: HeldAnswers,
 ): Promise<ExecutionResult> {
 	let currentNode = startNodeName;
 	let state = { ...startState };
 	const nodesVisited: NodeVisit[] = [];
-	let rerun = false;
 
 	// Safety limit to prevent infinite loops
 	const MAX_ITERATIONS = 50;
@@ -168,16 +166,18 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 			};
 		}
 
-		if (!rerun && !nodeOptions?.get(currentNode)?.hideFromFunnel) {
+		if (!nodeOptions?.get(currentNode)?.hideFromFunnel) {
 			nodesVisited.push({ id: currentNode, at: new Date().toISOString() });
 		}
-		rerun = false;
 
 		try {
 			// Build context object for the handler
 			const ctx = {
 				state,
 				meta,
+				// The tool handler bridges the session id it resolved into `meta`,
+				// so this is the id the flow's own record is stored under.
+				sessionId: extractSessionId(meta),
 				interrupt: interrupt as NodeHandler<TState> extends never
 					? never
 					: typeof interrupt,
@@ -194,23 +194,6 @@ export async function executeFrom<TState extends Record<string, unknown>>(
 				for (const q of result.questions) {
 					if (q.validate) {
 						validators.set(`${currentNode}:${q.field}`, q.validate);
-					}
-				}
-
-				// An answer the user gave before this question came up fills it,
-				// and the node runs again with it, as it would for a fresh answer.
-				if (held) {
-					const appliedBefore = held.applied.length;
-					state = await fillFromHold({
-						questions: result.questions,
-						state,
-						held,
-						stateSchema,
-					});
-					if (held.applied.length > appliedBefore) {
-						rerun = true;
-						iterations--;
-						continue;
 					}
 				}
 

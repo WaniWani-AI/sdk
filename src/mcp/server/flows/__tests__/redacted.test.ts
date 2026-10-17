@@ -6,12 +6,12 @@ import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
 import { readRedactedFields } from "../definition-meta";
 import { hasFieldMark } from "../field-marks";
-import { neverPrefilled } from "../held-answers";
 import {
 	collectRedactedStateFields,
 	isFieldRedacted,
 	redacted,
 } from "../redacted";
+import { neverPrefilled } from "../state-updates";
 
 type Handler = (input: unknown, extra: unknown) => Promise<unknown>;
 type RegisterToolArgs = [string, Record<string, unknown>, Handler];
