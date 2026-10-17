@@ -49,7 +49,7 @@ The user is scripted. Their first message comes from the scenario. After that th
 | `done` | The flow reached `complete`. |
 | `user turns (ideal)` | Average user messages it took. The ideal is the opener plus one reply per question group the user hadn't already answered. |
 | `waiting on known` | Fields the flow was still waiting on at the end of a turn although the user had already given them. The assistant either asked again or has to send them on a later call. |
-| `unasked keys` | `stateUpdates` keys the model sent for fields the flow wasn't waiting on. An engine without held answers drops these. With held answers they are kept and fill their question when it comes up, so they only cost a run when they land in a wrong or computed field. |
+| `unasked keys` | `stateUpdates` keys the model sent for fields the flow wasn't waiting on. Up to 0.24.2 the engine drops these. From the release that lists `fields`, a declared field whose value fits its schema is written, so these only cost a run when they land in a wrong or computed field. |
 | `step limit` | Turns cut off by the step limit while the model was still calling tools. The user sees no reply. |
 | `wrong` | Final-state fields that don't match what the user said. |
 | `computed` | Fields the flow computes itself (member id, vehicle id, price) that ended up with another value. |
@@ -59,9 +59,11 @@ The user is scripted. Their first message comes from the scenario. After that th
 `fixtures.ts` holds two flows and the scenarios that drive them:
 
 - `signup`: six questions, one per node, then an action node that computes a member id.
-- `car`: an open first question whose `context` tells the model to extract other fields (the Everquote/Luva pattern), grouped questions after it, a vehicle lookup, and a computed price.
+- `car`: an open first question whose `context` tells the model to extract other fields (the Everquote/Luva pattern), grouped questions after it, a vehicle lookup, a computed price, and `currentInsurer`, which no question asks. The model can only learn that field from the `fields` listing on the first response.
 
-To add a scenario, give it an opener, the fields that opener reveals, and optionally `volunteer` (fields the user adds when asked a given question). The ideal turn count follows from those.
+`signup/opener-scattered` gives the first name and the email before the flow starts, with the last name between them in the flow. It passes when the model sends both on its first `continue` and the flow goes straight to the last name.
+
+To add a scenario, give it an opener, the fields that opener reveals, and optionally `volunteer` (fields the user adds when asked a given question). The ideal turn count follows from those. A persona field that no group asks is checked only in scenarios where the user says it.
 
 ## What it doesn't cover
 

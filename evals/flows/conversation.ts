@@ -17,7 +17,7 @@ import {
 	type ToolSet,
 } from "ai";
 import type { Engine } from "./engine";
-import { idealUserTurns, type Scenario } from "./fixtures";
+import { checkedFields, idealUserTurns, type Scenario } from "./fixtures";
 
 /** `DEFAULT_SYSTEM_PROMPT + GUARDRAIL_PROMPT_SUFFIX` from `app/src/app/api/mcp/chat/constants.ts`. */
 const SANDBOX_INSTRUCTIONS = `You are a helpful assistant on a chat playground.
@@ -304,9 +304,9 @@ export async function runConversation(input: {
 		? ((await store.get(sessionId))?.state ?? {})
 		: undefined;
 	const wrongValues = finalState
-		? Object.entries(persona).flatMap(([field, { value }]) => {
+		? checkedFields(scenario).flatMap((field) => {
 				const got = normalize(finalState[field]);
-				const want = normalize(value);
+				const want = normalize(persona[field]?.value);
 				return got && (got.includes(want) || want.includes(got))
 					? []
 					: [`${field}: got ${JSON.stringify(finalState[field])}`];

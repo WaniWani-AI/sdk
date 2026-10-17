@@ -38,19 +38,30 @@ const INTRO = { verbatim: "Acme is the data controller." };
 const SEEDED: FlowInternalState = { intro: INTRO };
 const PREEXISTING = { sessionId: "s1", sessionIsPreexisting: true };
 
-function flowConfig(intro?: FlowConfig["intro"]): FlowConfig {
+function flowConfig(
+	intro?: FlowConfig["intro"],
+	state: FlowConfig["state"] = {},
+): FlowConfig {
 	return {
 		id: "home_quote",
 		title: "Home insurance quote",
 		description: "Quote a home insurance policy.",
 		...(intro !== undefined ? { intro } : {}),
-		state: { city: z.string().describe("City") },
+		state,
 	};
 }
 
 describe("initInternalState", () => {
 	test("seeds the intro a flow declares", () => {
 		expect(initInternalState(flowConfig(INTRO.verbatim))).toEqual(SEEDED);
+	});
+
+	test("seeds the fields a flow declares", () => {
+		expect(
+			initInternalState(
+				flowConfig(undefined, { city: z.string().describe("City") }),
+			),
+		).toEqual({ fields: { city: { type: "string", description: "City" } } });
 	});
 
 	test("a flow using none of the features seeds nothing", () => {

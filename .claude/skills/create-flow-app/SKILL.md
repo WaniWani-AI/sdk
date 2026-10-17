@@ -41,8 +41,8 @@ await myFlow.register(server);
 
 If the flow should introduce the assistant or state a data/GDPR notice, put it on the config as
 `intro` — never as a first node. An opening node is skipped once its fields are filled, by an
-earlier action or by an answer the user gave up front (held, then filled in when the question comes
-up), so a greeting node is the one node most likely never to reach the user.
+earlier action or by an answer the user gave up front, so a greeting node is the one node most
+likely never to reach the user.
 
 ```ts
 createFlow({
@@ -105,7 +105,8 @@ Never import `interrupt` or `showWidget` directly.
 
 - **Forgetting `START` / `END` edges**: every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`.
 - **Missing `.describe()` on state fields**: each question carries its field's description as `fieldSchema`, and the model reads it to phrase the question and to recognize an answer the user already gave. Skipping them degrades the flow significantly.
-- **Expecting an up-front answer to fill a widget or a computed field**: `stateUpdates` values for fields not asked yet (everything on `start`) are held on the session record and fill **interrupt questions** only, when the flow reaches them, through the question's validator. A widget's `field` is always the user's own action on screen, and a field no question asks is never written from the conversation. Mark a consent or attestation asked as an interrupt with `neverPrefilled(schema)`: it is never held, so only a value sent while the flow asks for it counts. The model only knows a field's name once a response names it, so an opener that should collect several answers lists their field names in its `context`.
+- **Putting a server-only value in `state`**: the session's first question or widget lists every state field in `fields`, and any call may write a declared field whose value fits its schema. A lookup id or a price the user must not choose stays out of `state`: compute it in the node that needs it, or store it server-side keyed by `ctx.sessionId`. A node guarded with `if (state.vehicleId) return {};` keeps whatever value the model sent.
+- **Leaving a consent prefillable**: wrap a consent, an attestation, or a widget pick that must happen on screen in `neverPrefilled(schema)`. It stays out of `fields` and takes a value only once the flow asks for it.
 - **Calling `.compile()` with no store and no API key**: throws immediately with a clear migration message. Pick one.
 - **A greeting or disclaimer node**: use the `intro` config option instead, or it may never reach the user.
 - **State is always `Partial<TState>`**: at any node, only fields filled by earlier nodes are populated. Guard with `if (!state.x) return {};`.

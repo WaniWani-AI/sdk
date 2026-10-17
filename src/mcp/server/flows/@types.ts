@@ -370,6 +370,12 @@ export type NodeContext<TState> = {
 	state: Partial<TState>;
 	/** Request metadata from the MCP call */
 	meta?: Record<string, unknown>;
+	/**
+	 * The session the flow's state is stored under. Key server-side data by it,
+	 * such as a lookup id the conversation must never see or set: everything in
+	 * `state` is listed to the model and writable from the conversation.
+	 */
+	sessionId?: string;
 	/** Create an interrupt signal — pause and ask the user questions */
 	interrupt: TypedInterrupt<TState>;
 	/** Create a widget signal — pause and show a UI widget */
@@ -519,8 +525,12 @@ export type FlowConfig = {
 	 *
 	 * The state definition serves two purposes:
 	 * 1. Type inference — `TState` is automatically derived, no explicit generic needed
-	 * 2. AI protocol — field names, types, and descriptions are included in the tool
-	 *    description so the AI can pre-fill answers via `_meta.flow.state`
+	 * 2. AI protocol — field names, types, and descriptions go out in `fields` on
+	 *    the session's first question or widget, so the AI can send any value the
+	 *    user already gave. Mark a field with `neverPrefilled()` to keep it out.
+	 *
+	 * Every field here is exposed to the conversation. Keep a value the model
+	 * must never see or set out of `state`, keyed by `ctx.sessionId` instead.
 	 *
 	 * @example
 	 * ```ts
@@ -629,9 +639,9 @@ export type FlowToolInput = {
 	/** Optional when `action` is `"start"`. Describes the situation/environment that led the user to start this flow. */
 	context?: string;
 	/**
-	 * Answers keyed by the `field` a response asked for. The engine merges only
-	 * fields the run has asked for; values for fields not asked yet (all of
-	 * them on `start`) are held and fill their question when it comes up.
+	 * Values keyed by the field names the flow's responses give. The engine
+	 * merges the answers to fields the run has asked, and any other declared
+	 * field whose value fits its schema (see `state-updates.ts`).
 	 */
 	stateUpdates?: Record<string, unknown>;
 	/** Session identifier echoed in the response. Pass it back on "continue" and "reset" calls. */
@@ -659,6 +669,11 @@ export type FlowInternalState = {
 	 * once delivered, so later responses in the same conversation leave it out.
 	 */
 	intro?: FlowIntroPayload;
+	/**
+	 * Every field the conversation may fill, waiting to ride on the session's
+	 * first question or widget. Gone once delivered.
+	 */
+	fields?: Record<string, FieldSchemaInfo>;
 };
 
 export type FlowTokenContent = {
@@ -668,16 +683,10 @@ export type FlowTokenContent = {
 	widgetId?: string;
 	/**
 	 * Every field this run has asked for, through an interrupt question or a
-	 * widget's `field`. `continue` and `reset` merge `stateUpdates` only for
-	 * these, so the conversation cannot write a field the flow computes itself.
+	 * widget's `field`. An answer to one of these merges as sent, and a field
+	 * marked `neverPrefilled()` merges only once it is here.
 	 */
 	asked?: string[];
-	/**
-	 * Values the user gave for fields not asked yet, held until an interrupt
-	 * question asks for one and filled in then (see `held-answers.ts`). Never
-	 * merged into `state` on its own, and dropped when the flow completes.
-	 */
-	held?: Record<string, unknown>;
 	/** The engine's own state for this session. Never flow state. */
 	internal?: FlowInternalState;
 };
@@ -708,6 +717,8 @@ export type FlowInterruptContent = {
 	/** Multi-question */
 	questions?: InterruptQuestionData[];
 	context?: string;
+	/** Every field the conversation may fill. On the session's first question or widget only. */
+	fields?: Record<string, FieldSchemaInfo>;
 };
 
 export type FlowWidgetContent = {
@@ -730,6 +741,8 @@ export type FlowWidgetContent = {
 	field?: string;
 	/** JIT schema fragment for the field the widget fills. */
 	fieldSchema?: FieldSchemaInfo;
+	/** Every field the conversation may fill. On the session's first question or widget only. */
+	fields?: Record<string, FieldSchemaInfo>;
 };
 
 export type FlowCompleteContent = {

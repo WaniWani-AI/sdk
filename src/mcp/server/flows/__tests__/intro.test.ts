@@ -218,7 +218,10 @@ describe("flow intro", () => {
 
 		expect(parsed.status).toBe("complete");
 		expect(parsed.intro).toEqual({ verbatim: VERBATIM });
-		expect((await store.get(SESSION_ID))?.internal).toBeUndefined();
+		// `fields` waits for a question: a completed run fills nothing.
+		expect(Object.keys((await store.get(SESSION_ID))?.internal ?? {})).toEqual([
+			"fields",
+		]);
 	});
 
 	test("rides along when the first step is a widget", async () => {

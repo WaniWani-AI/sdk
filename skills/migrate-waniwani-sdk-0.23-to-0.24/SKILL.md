@@ -1,6 +1,6 @@
 ---
 name: migrate-waniwani-sdk-0.23-to-0.24
-description: "Migrate a project from @waniwani/sdk 0.23.x to 0.24.x and auto-apply its breaking change to flows: the tool listing no longer names state fields under stateUpdates, `start` merges no stateUpdates, and `continue` and `reset` merge only fields the run has asked through an interrupt question or a widget's `field`. A field the conversation writes without any question asking for it (sent by the model on start, extracted from an opener, sent back by a widget, or a second field filled from one question) is never set. The flow graph moved off the wire, so `flow.config._meta._flowGraph` is gone from the type and from tools/list. Covers computing such fields in a node or asking them with an interrupt, widget group fields, the createFlowTestHarness `start(intent, known)` change, and `neverPrefilled()` for releases that hold early answers. Trigger when the user is on @waniwani/sdk 0.23.x and wants to move to 0.24, asks to migrate to 0.24, or after bumping sees any of: a flow asks again for something the user already said, a field the model used to send on start (a locale, a flag inferred from the user's intent) or a value computed on start is never set, a widget's answer is ignored, `reset` returns `Nothing to correct`, a type error on `_meta._flowGraph`, or tests that assert the `stateUpdates` schema or `_meta._flowGraph` in tools/list fail."
+description: "Migrate a project from @waniwani/sdk 0.23.x to 0.24.x and auto-apply its breaking change to flows: the tool listing no longer names state fields under stateUpdates, `start` merges no stateUpdates, and `continue` and `reset` merge only fields the run has asked through an interrupt question or a widget's `field`. A field the conversation writes without any question asking for it (sent by the model on start, extracted from an opener, sent back by a widget, or a second field filled from one question) is never set. The flow graph moved off the wire, so `flow.config._meta._flowGraph` is gone from the type and from tools/list. Covers computing such fields in a node or asking them with an interrupt, widget group fields, and the createFlowTestHarness `start(intent, known)` change. Trigger when the user is on @waniwani/sdk 0.23.x and wants to move to 0.24, asks to migrate to 0.24, or after bumping sees any of: a flow asks again for something the user already said, a field the model used to send on start (a locale, a flag inferred from the user's intent) or a value computed on start is never set, a widget's answer is ignored, `reset` returns `Nothing to correct`, a type error on `_meta._flowGraph`, or tests that assert the `stateUpdates` schema or `_meta._flowGraph` in tools/list fail."
 metadata:
   author: Waniwani
 ---
@@ -19,16 +19,9 @@ In 0.23 a flow tool listed its whole Zod state schema under `stateUpdates` in `t
 
 In 0.24 the listing names no field. Each interrupt or widget response names the fields it asks for, with their `fieldSchema`. The engine records the fields a run has asked (`asked` on the session record) and merges `stateUpdates` only for those. A question on a `z.object` group accepts every key inside it.
 
-Two behaviors ship under 0.24.x, and the rewrites below work on both:
+A value sent for a field the run has not asked yet is dropped. When the flow later asks that question, the model answers it from earlier messages with one silent `continue`, and the user is not asked again.
 
-- **0.24.0 to 0.24.2** drop every value sent for a field the run has not asked yet. When the flow later asks that question, the model answers it from earlier messages with one silent `continue`, and the user is not asked again.
-- **The first 0.24.x release after 0.24.2 that includes held answers** (WAN-1464, no version number decided yet) keeps those values on the session record (`held`). When an interrupt question asks for one, the engine fills it in the same call and runs the question's validator. A widget's field is never filled from the hold, and neither is a field no question asks.
-
-Tell which one the project has after the bump:
-
-```bash
-grep -q neverPrefilled node_modules/@waniwani/sdk/dist/mcp/index.d.ts && echo held || echo dropped
-```
+This skill covers 0.24.0 to 0.24.2. The release after 0.24.2 sends every state field to the model once per conversation, in `fields`, and writes any declared field again. Its changelog entry and its own migration skill cover that hop.
 
 Breaking, and visible to `tsc`:
 
@@ -38,15 +31,15 @@ Breaking, and visible to `tsc`:
 
 Breaking, and not visible to `tsc`:
 
-| Call | 0.23 | 0.24.0 to 0.24.2 | Held-answers release |
-| --- | --- | --- | --- |
-| `start` with `stateUpdates` | Merged into state, filled nodes skipped | Ignored | Held until an interrupt question asks each field |
-| `continue` with a field not asked yet | Merged | Dropped | Held the same way |
-| `continue` or `reset` with a field no question or widget ever asks | Merged | Dropped | Held and never applied |
-| A widget's `continue` carrying keys other than its `field` | Merged | Dropped | Held. Only an interrupt question can use them |
-| `reset` with no asked field | Merged, flow restarts | Error: `Nothing to correct: "reset" takes fields the flow has asked for.` | A state field updates the hold and the current step runs again. A key outside the state schema still errors |
+| Call | 0.23 | 0.24 |
+| --- | --- | --- |
+| `start` with `stateUpdates` | Merged into state, filled nodes skipped | Ignored |
+| `continue` with a field not asked yet | Merged | Dropped |
+| `continue` or `reset` with a field no question or widget ever asks | Merged | Dropped |
+| A widget's `continue` carrying keys other than its `field` | Merged | Dropped |
+| `reset` with no asked field | Merged, flow restarts | Error: `Nothing to correct: "reset" takes fields the flow has asked for.` |
 
-A key that is not a state field is dropped on every 0.24.x release, and a held value that fails its field's Zod schema is dropped when its question comes up.
+A key that is not a state field is dropped.
 
 Other behavior changes:
 
@@ -64,8 +57,7 @@ Other behavior changes:
    ```bash
    bun add @waniwani/sdk@^0.24.0
    ```
-2. **Note which behavior you got** with the `grep` above. Rewrite 6 applies only to `held`.
-3. **Collect the call sites.**
+2. **Collect the call sites.**
    ```bash
    bun run typecheck
    rg -n "_flowGraph" --glob '!node_modules'
@@ -74,19 +66,19 @@ Other behavior changes:
    rg -n -i "on start|in stateUpdates|always (include|send)|pre-?fill" --glob '!node_modules'
    rg -n "\.start\(|resetWith\(|listTools\(" --glob '*.test.*'
    ```
-4. **Build a field table for every flow.** For each key in `createFlow({ state })`, record which of these write it:
+3. **Build a field table for every flow.** For each key in `createFlow({ state })`, record which of these write it:
    - an interrupt question (the key appears as `key: { question: ... }` inside an `interrupt({ ... })` call),
    - a widget (`showWidget({ field: "key" })`, or a `z.object` group the widget's `field` names),
    - a node return value (`return { key: ... }` from a node),
    - the conversation (the flow `description` or the field's `.describe()` tells the model to send it, a question's `context` tells the model to put a value in it, a widget sends it back, or a test sends it in `stateUpdates`).
 
    A field the conversation writes and that has no interrupt question and no widget field is a target. So is a field that only a node return writes but that a test seeds through `stateUpdates`.
-5. **Apply rewrites 1 to 5** below to every target, then rewrite 6 if the project is on the held-answers release.
-6. **Verify, which is the completion check.**
+4. **Apply rewrites 1 to 5** below to every target.
+5. **Verify, which is the completion check.**
    ```bash
    bun run typecheck && bun test
    ```
-7. **Report** each flow's targets, the rewrite applied to each, which behavior the project runs (`held` or `dropped`), and whether the app is listed in a reviewed directory (see "Ship it").
+6. **Report** each flow's targets, the rewrite applied to each, and whether the app is listed in a reviewed directory (see "Ship it").
 
 ## Rewrite 1: a field the conversation writes and no question asks
 
@@ -100,7 +92,7 @@ Pick the branch by these checks, in order:
 
 **1b. Ask it.** Add the field as a question in an `interrupt`, in a node placed before the first node that reads it. When the model can answer it from the conversation, say so in the question's `context`.
 
-In both branches, delete the sentence in `description` or `.describe()` that tells the model to send the field. On 0.24.0 to 0.24.2 a 1b question costs one silent model call when the user already gave the answer. On the held-answers release a value the model sent on `start` fills a 1b question in the same call.
+In both branches, delete the sentence in `description` or `.describe()` that tells the model to send the field. A 1b question costs one silent model call when the user already gave the answer.
 
 ```ts
 // Before
@@ -181,7 +173,7 @@ const flow = createFlow({
   .compile({ store: new MemoryKvStore() });
 ```
 
-`locale` and `transferAllowed` take branch 1b. `ageBand` takes branch 1a, and a call that sends it is now ignored on every 0.24.x.
+`locale` and `transferAllowed` take branch 1b. `ageBand` takes branch 1a, and a call that sends it is now ignored.
 
 ## Rewrite 2: one question that fills several fields
 
@@ -259,7 +251,7 @@ const result = await harness.start("compare my rates", {
 expect(result.status).toBe("widget");
 ```
 
-**A raw handler call that sends `stateUpdates` on `start` and expects nodes to be skipped.** Replace it with `harness.start(intent, known)`, or send one `continue` per question. A test that asserts the skip itself must branch on the behavior (`held` fills the interrupt question, `dropped` asks it).
+**A raw handler call that sends `stateUpdates` on `start` and expects nodes to be skipped.** Replace it with `harness.start(intent, known)`, or send one `continue` per question.
 
 **`tools/list` assertions.** Read the graph from `flow.flowGraph`. Over `InMemoryTransport` the client receives the server-only wrappers as objects, so round-trip through JSON before asserting what a client would see.
 
@@ -275,7 +267,7 @@ expect(JSON.stringify(listed._meta ?? {})).not.toContain("flowGraph");
 expect(flow.flowGraph.nodes).toHaveLength(4);
 ```
 
-**`reset` before the field was asked.** On 0.24.0 to 0.24.2 it returns `status: "error"`. Answer the question first, then call `resetWith`.
+**`reset` before the field was asked.** It returns `status: "error"`. Answer the question first, then call `resetWith`.
 
 **Snapshots of `nextStep` or of the listing.** Regenerate them with `bun test --update-snapshots` and check the diff only touches those strings.
 
@@ -295,31 +287,9 @@ server.registerTool(flow.name, flow.config, flow.handler);
 
 When you pass your own `_meta`, spread `flow.config._meta` into it. A hand-set `_flowGraph` keeps working until 0.25.0.
 
-## Rewrite 6: `neverPrefilled()` for consent (held-answers release only)
-
-Skip this on 0.24.0 to 0.24.2: `neverPrefilled` does not exist there and the import fails to compile.
-
-On the held-answers release, an answer the user gave early fills its interrupt question without the question going out. For a consent or an attestation asked through `interrupt`, wrap the field's schema in `neverPrefilled()` so only an answer sent while that question is on the table counts. Apply it at the end of the schema chain. It combines with `redacted()`. A consent asked through a widget needs nothing, since a widget's field is never filled from the hold.
-
-```ts
-// Before
-import { createFlow } from "@waniwani/sdk/mcp";
-
-state: {
-  shareConsent: z.boolean().describe("Agrees to share data with partners"),
-},
-
-// After
-import { createFlow, neverPrefilled } from "@waniwani/sdk/mcp";
-
-state: {
-  shareConsent: neverPrefilled(z.boolean().describe("Agrees to share data with partners")),
-},
-```
-
 ## No rewrite: openers that extract everything
 
-A first node that asks one open question and tells the model to fill other fields from the answer keeps working when later nodes ask those fields. On 0.24.0 to 0.24.2 each later node costs one silent `continue`. On the held-answers release the values the model sends are held and fill those questions. Fields in that opener that no later node asks are targets of rewrite 1.
+A first node that asks one open question and tells the model to fill other fields from the answer keeps working when later nodes ask those fields. Each later node costs one silent `continue`. Fields in that opener that no later node asks are targets of rewrite 1.
 
 ## Ship it
 
@@ -329,7 +299,7 @@ The flow tool's listing shrinks: `stateUpdates` names no field, description or e
 
 - **Asking a computed field with an interrupt.** A lookup id or a price must stay unasked, or the conversation can set it again. Use rewrite 1a.
 - **Leaving "send X on start" in the flow description.** The description is the consent card a ChatGPT user approves, and steering text there gets flagged. The question from rewrite 1b carries that instruction now.
-- **Expecting a widget's field to fill from an early answer.** No 0.24.x release does that. The widget shows and the user picks.
+- **Expecting a widget's field to fill from an early answer.** 0.24 does not do that. The widget shows and the user picks.
 - **Asserting `tools/list` `_meta` over `InMemoryTransport` without a JSON round trip.** The wrappers are still there as objects. A real transport drops them.
-- **Importing `neverPrefilled` on 0.24.0 to 0.24.2.** It only exists from the held-answers release.
+- **Importing `neverPrefilled`.** It does not exist in 0.24.0 to 0.24.2.
 - **Skipping the verify step.** A clean `bun run typecheck` plus green `bun test` is the definition of done. A flow that compiles can still lose answers, so the tests need to drive each rewritten flow to the node that reads the moved field.

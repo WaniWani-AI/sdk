@@ -34,7 +34,13 @@ type FlowToolInput =
 
 `intent` is required on `start` and should summarize the user's goal for the flow.
 
-The tool listing names no state field: `stateUpdates` is an untyped record. Each interrupt or widget response names the fields it asks for, with their `fieldSchema`, and `continue` and `reset` merge values only for fields the run has asked for. A field the flow computes for itself (a lookup id, a quote) is never asked, so a call cannot set it. An answer the user gave before its question comes up (including everything sent on `start`) is held on the session record instead of dropped, and when an interrupt question asks for that field the engine fills it from the hold and runs its validator, with no extra call. A held value that does not fit the field's schema is dropped and the question is asked. Widget fields are never filled from the hold. A field marked `neverPrefilled(schema)`, the way to declare a consent or attestation asked as an interrupt, is never held at all, as a field or as a group member, so only a value sent while the flow asks for it counts. A field no question asks is never applied. Held values are stored on the session record next to `state`, in the flow's store, until their question comes up or the flow completes, when the hold is discarded.
+The tool listing names no state field: `stateUpdates` is an untyped record. The session's first interrupt or widget response carries `fields`, every state field with its type, enum values and description (members of a `z.object` group as dot-paths), once per conversation. Each question also names its own field with a `fieldSchema`.
+
+Any call (`start`, `continue`, `reset`) writes the answer to a field the run has asked as sent, plus any other declared field whose value fits its Zod schema. The flow skips the questions those values fill, and their validators run when the flow reaches them. A field no question asks (a classification the opener implies, a locale) is set the same way. A value that does not fit its schema, or a key the state does not declare, is dropped.
+
+A field marked `neverPrefilled(schema)` is left out of `fields` and takes a value only once the run has asked it, as a field or as a group member. Mark a consent or attestation this way, and a widget pick that must happen on screen.
+
+Everything in `state` is exposed to the conversation: listed in `fields` and writable. A value the model must never see or set, such as a lookup id that decides what gets priced, stays out of `state`. Compute it in the node that needs it, or keep it in a server-side store keyed by `ctx.sessionId`, the session the flow's own record is stored under.
 
 ### Tool output
 

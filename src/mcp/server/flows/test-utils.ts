@@ -8,9 +8,9 @@ import type {
 	FlowWidgetContent,
 	RegisteredFlow,
 } from "./@types";
-import { fieldsAskedBy } from "./asked-fields";
 import type { FlowStore } from "./flow-store";
 import { expandDotPaths, getNestedValue, isFilled } from "./nested";
+import { fieldsAskedBy } from "./state-updates";
 
 // ============================================================================
 // Test harness for compiled flows
@@ -63,8 +63,10 @@ export async function createFlowTestHarness(
 	/**
 	 * Answer each question the flow asks from `known`, the way the model
 	 * answers from what the user said earlier, until the flow asks something
-	 * `known` has no value for. A field is sent once: a validator that rejects
-	 * it gets the rejection back, not the same value again.
+	 * `known` has no value for. This covers the values `start` did not take: a
+	 * field marked `neverPrefilled()`, or one that did not fit its schema. A
+	 * field is sent once: a validator that rejects it gets the rejection back,
+	 * not the same value again.
 	 */
 	async function answerFrom(
 		known: Record<string, unknown>,
@@ -101,9 +103,9 @@ export async function createFlowTestHarness(
 
 	return {
 		/**
-		 * Start the flow. `known` stands for what the user already said: every
-		 * question whose field it holds is answered from it, and the result is
-		 * the response the flow stops on.
+		 * Start the flow. `known` stands for what the user already said: it goes
+		 * out as `stateUpdates` on `start`, every question whose field it holds
+		 * is answered from it, and the result is the response the flow stops on.
 		 */
 		async start(
 			intent: string,
@@ -114,6 +116,7 @@ export async function createFlowTestHarness(
 				action: "start",
 				intent,
 				...(context ? { context } : {}),
+				...(known ? { stateUpdates: known } : {}),
 			});
 			return toResult(known ? await answerFrom(known, started) : started);
 		},

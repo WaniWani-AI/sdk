@@ -108,6 +108,12 @@ export const flowOutputSchema = {
 		.describe(
 			"Whether the widget requires user interaction before continuing.",
 		),
+	fields: z
+		.record(z.string(), flowFieldSchema)
+		.optional()
+		.describe(
+			"Every field the flow fills from the conversation, keyed the way stateUpdates takes them. Present once per conversation, on the first question or widget.",
+		),
 	sessionId: z
 		.string()
 		.optional()

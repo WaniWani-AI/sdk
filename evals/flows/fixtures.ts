@@ -27,7 +27,11 @@ export type FlowFixture = {
 	id: string;
 	/** Question groups in the order the flow asks them, one per interrupt node. */
 	groups: string[][];
-	/** What the user answers for each asked field, and how they say it. */
+	/**
+	 * What the user says for each field, and how they say it. A field no group
+	 * asks is set only from what the user volunteers, so it is checked only in
+	 * scenarios where they say it.
+	 */
 	persona: Record<string, { value: string; phrase: string }>;
 	build: (engine: Engine) => { flow: BuiltFlow; store: FlowStoreLike };
 	/** Problems with the fields the flow computes for itself, given the final state. */
@@ -188,6 +192,10 @@ const carQuote: FlowFixture = {
 		},
 		fullName: { value: "Max Antoine", phrase: "my name is Max Antoine" },
 		birthDate: { value: "1990-04-12", phrase: "I was born on 1990-04-12" },
+		currentInsurer: {
+			value: "Geico",
+			phrase: "I'm with Geico at the moment",
+		},
 	},
 	build: ({ createFlow, START, END, MemoryKvStore, z }) => {
 		const store = new MemoryKvStore<FlowTokenContent>();
@@ -209,6 +217,11 @@ const carQuote: FlowFixture = {
 					.describe("Address where the car is parked overnight"),
 				fullName: z.string().describe("Driver's full name"),
 				birthDate: z.string().describe("Driver's date of birth, YYYY-MM-DD"),
+				// No question asks it: it is set only when the user mentions it.
+				currentInsurer: z
+					.string()
+					.optional()
+					.describe("The user's current car insurer, if they mention one"),
 				monthlyPrice: z.number().describe("Quoted monthly price in dollars"),
 			},
 		})
@@ -331,6 +344,14 @@ export const SCENARIOS: Scenario[] = [
 		},
 	},
 	{
+		id: "signup/opener-scattered",
+		flow: signup,
+		opener: {
+			text: "Hi, I'm Max and I'd like to open an account. My email is max.antoine@example.com.",
+			reveals: ["firstName", "email"],
+		},
+	},
+	{
 		id: "signup/volunteer-midflow",
 		flow: signup,
 		opener: { text: "Hi, I'd like to open an account.", reveals: [] },
@@ -352,7 +373,30 @@ export const SCENARIOS: Scenario[] = [
 			],
 		},
 	},
+	{
+		id: "car/opener-insurer",
+		flow: carQuote,
+		opener: {
+			text: "Hi, I'm with Geico at the moment and I'd like to see if I can get a better car insurance quote. It's for my 2019 Honda Civic.",
+			reveals: ["currentInsurer", "vehicle"],
+		},
+	},
 ];
+
+/**
+ * The persona fields a scenario's final state is checked on: every field a
+ * question asks, plus any other field the user says along the way.
+ */
+export function checkedFields(scenario: Scenario): string[] {
+	const fields = new Set([
+		...scenario.flow.groups.flat(),
+		...scenario.opener.reveals,
+		...Object.values(scenario.volunteer ?? {}).flat(),
+	]);
+	return Object.keys(scenario.flow.persona).filter((field) =>
+		fields.has(field),
+	);
+}
 
 /**
  * The fewest user messages that can finish the scenario: the opener, plus one

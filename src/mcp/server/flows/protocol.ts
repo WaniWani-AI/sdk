@@ -29,6 +29,8 @@ export interface NextStepInput {
 	interactive?: boolean;
 	/** Whether this response carries the once-per-conversation `intro`. */
 	hasIntro?: boolean;
+	/** Whether this response carries the once-per-conversation `fields`. */
+	hasFields?: boolean;
 	/** Whether the response echoes a `sessionId` the caller must pass back. */
 	echoSessionId?: boolean;
 }
@@ -39,6 +41,9 @@ const CORRECTION =
 const INTRO =
 	"`intro` opens your next message, ahead of the question, the widget call, and the result. `intro.verbatim` is reproduced word for word — no paraphrase, translation, trimming, expansion, or reformatting. `intro.instructions` is how to write the surrounding prose in your own words. It appears once per conversation and is not repeated from earlier turns. If you resume the flow before writing to the user, it opens the message you write after that.";
 
+const FIELDS =
+	"`fields` lists every field this flow fills from the conversation, keyed the way `stateUpdates` takes them. It appears once per conversation. Whenever the user states a value for a listed field, in any message, send it once in `stateUpdates` on your next call to this flow, matching its `type` and enum `values`. The flow fills those fields and skips the questions that would ask them.";
+
 function interruptSteps(): string[] {
 	return [
 		"The flow is paused on the user.",
@@ -47,7 +52,7 @@ function interruptSteps(): string[] {
 		"- A question the user already answered earlier in the conversation is not asked again: send that answer. When every question is answered this way, resume right away.",
 		'- `fieldSchema`, when present, describes the accepted value: match enum `values` exactly, send a number for `type: "number"`.',
 		"- `context`, when present, shapes your wording and is not shown to the user.",
-		'Resume with `action: "continue"`, sending the answers to these questions as the user gave them, plus anything they already stated for a field this flow has named but not asked yet: the flow holds it and fills that question in when it gets there. Anything they left unanswered stays out and the flow asks again.',
+		'Resume with `action: "continue"`, sending the answers to these questions as the user gave them, plus any other field listed in `fields` that the user has stated and you have not sent yet. Anything they left unanswered stays out and the flow asks again.',
 	];
 }
 
@@ -91,6 +96,10 @@ export function buildNextStep(input: NextStepInput): string | undefined {
 		parts.push(
 			"`sessionId` comes back on every `continue` and `reset` call for this flow.",
 		);
+	}
+
+	if (input.hasFields) {
+		parts.unshift(FIELDS);
 	}
 
 	if (input.hasIntro) {
