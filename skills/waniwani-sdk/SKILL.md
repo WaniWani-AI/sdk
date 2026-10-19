@@ -96,11 +96,13 @@ Changed in 0.24.0: a flow's tool listing no longer names state fields under `sta
 0.24.2, `start` merges no `stateUpdates`, and `continue` and `reset` merge only fields the run has
 asked. `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.23-to-0.24` applies the migration.
 
-From the next release, the session's first question or widget lists every state field in `fields`,
+Changed in 0.25.0: the session's first question or widget lists every state field in `fields`,
 and any call writes a declared field whose value fits its schema, including one no question asks.
 Everything in `state` is exposed that way, so a lookup id or price the user must not choose stays out of
 `state` (key it by `ctx.sessionId` in your own store). Wrap a consent or a must-see widget pick in
 `neverPrefilled(schema)` so only an answer to its own question counts.
+`npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.24-to-0.25` applies the migration, from 0.24.x
+or straight from 0.23.x.
 
 Removed in 0.23.0: `withWaniwani`'s `captureTelemetry` option and the `CaptureTelemetryOptions` type.
 Use `captureIntent` / `CaptureIntentOptions`. Wrapped tools now advertise one optional `intent`
@@ -141,7 +143,7 @@ Every version hop also ships a self-contained migration skill you can invoke dir
 `migrate-waniwani-sdk-<from>-to-<to>`. For the latest release:
 
 ```bash
-npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.23-to-0.24
+npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.24-to-0.25
 ```
 
 ## Guided playbooks
