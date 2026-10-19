@@ -104,6 +104,7 @@ Assistant messages render as plain text by default. Set `assistantBubble: true` 
 
 - **React** — pass `classNames` (`ChatClassNames`) to target individual slots: `root`, `header`, `message`, `userBubble`, `assistantBubble`, `input`.
 - **`<script>` embed** — the widget renders in a Shadow DOM, so host-page selectors can't reach internals. Set `--ww-*` variables (they inherit through the boundary), or inject a stylesheet with `data-css="https://.../sheet.css"` and target the stable semantic classes: `.ww-header`, `.ww-input`, `.ww-message-user .ww-bubble`, `.ww-message-assistant .ww-bubble`.
+  Inherited text properties cross the boundary too. The embed pins the ones nothing else in the widget sets: weight (400), style, variant, letter and word spacing, case, indent, alignment (`start`) and text shadow. Font, colour, size and line height come from the `--ww-*` theme variables. A `data-css` stylesheet can still override any of them with a `:host { … }` rule.
 
 See [docs.waniwani.ai/sdk/chat/embed](https://docs.waniwani.ai/sdk/chat/embed) and [docs.waniwani.ai/sdk/chat/react](https://docs.waniwani.ai/sdk/chat/react) for the full customization guide and script-tag options.
 
