@@ -1,6 +1,6 @@
 ---
 name: migrate-waniwani-sdk-0.23-to-0.24
-description: "Migrate a project from @waniwani/sdk 0.23.x to 0.24.x and auto-apply its breaking change to flows: the tool listing no longer names state fields under stateUpdates, `start` merges no stateUpdates, and `continue` and `reset` merge only fields the run has asked through an interrupt question or a widget's `field`. A field the conversation writes without any question asking for it (sent by the model on start, extracted from an opener, sent back by a widget, or a second field filled from one question) is never set. The flow graph moved off the wire, so `flow.config._meta._flowGraph` is gone from the type and from tools/list. Covers computing such fields in a node or asking them with an interrupt, widget group fields, and the createFlowTestHarness `start(intent, known)` change. Trigger when the user is on @waniwani/sdk 0.23.x and wants to move to 0.24, asks to migrate to 0.24, or after bumping sees any of: a flow asks again for something the user already said, a field the model used to send on start (a locale, a flag inferred from the user's intent) or a value computed on start is never set, a widget's answer is ignored, `reset` returns `Nothing to correct`, a type error on `_meta._flowGraph`, or tests that assert the `stateUpdates` schema or `_meta._flowGraph` in tools/list fail."
+description: "Migrate a project from @waniwani/sdk 0.23.x to 0.24.x and auto-apply its breaking change to flows: the tool listing no longer names state fields under stateUpdates, `start` merges no stateUpdates, and `continue` and `reset` merge only fields the run has asked through an interrupt question or a widget's `field`. A field the conversation writes without any question asking for it (sent by the model on start, extracted from an opener, sent back by a widget, or a second field filled from one question) is never set. The flow graph moved off the wire, so `flow.config._meta._flowGraph` is gone from the type and from tools/list. Covers computing such fields in a node or asking them with an interrupt, widget group fields, and the createFlowTestHarness `start(intent, known)` change. Trigger when the user is on @waniwani/sdk 0.23.x and wants to move to 0.24 (for 0.25 or later, use migrate-waniwani-sdk-0.24-to-0.25 instead), asks to migrate to 0.24, or after bumping sees any of: a flow asks again for something the user already said, a field the model used to send on start (a locale, a flag inferred from the user's intent) or a value computed on start is never set, a widget's answer is ignored, `reset` returns `Nothing to correct`, a type error on `_meta._flowGraph`, or tests that assert the `stateUpdates` schema or `_meta._flowGraph` in tools/list fail."
 metadata:
   author: Waniwani
 ---
@@ -21,7 +21,7 @@ In 0.24 the listing names no field. Each interrupt or widget response names the 
 
 A value sent for a field the run has not asked yet is dropped. When the flow later asks that question, the model answers it from earlier messages with one silent `continue`, and the user is not asked again.
 
-This skill covers 0.24.0 to 0.24.2. The release after 0.24.2 sends every state field to the model once per conversation, in `fields`, and writes any declared field again. Its changelog entry and its own migration skill cover that hop.
+This skill covers 0.24.0 to 0.24.2. 0.25.0 sends every state field to the model once per conversation, in `fields`, and writes any declared field again. A project going from 0.23 straight to 0.25 skips this skill and runs `migrate-waniwani-sdk-0.24-to-0.25`, which covers that jump and does not need rewrites 1 to 3 below.
 
 Breaking, and visible to `tsc`:
 
@@ -44,7 +44,7 @@ A key that is not a state field is dropped.
 Other behavior changes:
 
 - **`tools/list`.** A flow's `stateUpdates` is an untyped record, the same for every flow. The definition `_meta` still carries the flow graph and the redacted-fields list for `withWaniwani`, wrapped in an object whose `toJSON` returns `undefined`, so a serializing transport never sends them. Snapshot tests of the listing change.
-- **Hand-set `_meta._flowGraph`.** `withWaniwani` still reads it and moves it off the wire. It is deprecated and stops being read in 0.25.0.
+- **Hand-set `_meta._flowGraph`.** `withWaniwani` still reads it and moves it off the wire. It is deprecated. 0.25.0 still reads it.
 - **`createFlowTestHarness`.** `start(intent, known)` no longer sends `known` as `stateUpdates`. It starts empty, then answers each question whose field `known` holds with a `continue`, until the flow asks something `known` has no value for. A value in `known` for a field no question asks is ignored.
 - **`nextStep` text on interrupts.** It now tells the model to answer questions the user already settled. Snapshot tests of it change.
 - **Sessions in flight.** A record written by 0.23 has no `asked`, so its next call merges everything once. No action.
@@ -285,7 +285,7 @@ const nodes = flow.flowGraph.nodes;
 server.registerTool(flow.name, flow.config, flow.handler);
 ```
 
-When you pass your own `_meta`, spread `flow.config._meta` into it. A hand-set `_flowGraph` keeps working until 0.25.0.
+When you pass your own `_meta`, spread `flow.config._meta` into it. A hand-set `_flowGraph` still works in 0.25.0, but it is deprecated.
 
 ## No rewrite: openers that extract everything
 
