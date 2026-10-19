@@ -8,6 +8,9 @@ on:
       - "skills/**"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 # Every run compares main with the last release, so a newer run covers
 # everything an older one would have caught.
 concurrency:
