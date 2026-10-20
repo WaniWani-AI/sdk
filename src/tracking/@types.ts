@@ -78,6 +78,14 @@ export interface PageViewedProperties {
 	language?: string;
 	/** IANA timezone of the visitor. */
 	timezone?: string;
+	/** `screen.width` in CSS pixels. */
+	screenWidth?: number;
+	/** `screen.height` in CSS pixels. */
+	screenHeight?: number;
+	/** `window.innerWidth` in CSS pixels, scrollbar included. */
+	viewportWidth?: number;
+	/** `window.innerHeight` in CSS pixels. */
+	viewportHeight?: number;
 }
 
 export interface ToolCalledProperties {
