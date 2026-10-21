@@ -7,7 +7,11 @@ const LEVELS: Record<LogLevel, number> = {
 	none: 3,
 };
 
-function getGlobalLevel(): LogLevel {
+/**
+ * The effective log level: `WANIWANI_LOG_LEVEL` when it names a known level,
+ * else `debug` when `WANIWANI_DEBUG` is set, else `none`.
+ */
+export function getGlobalLevel(): LogLevel {
 	const explicit = process.env.WANIWANI_LOG_LEVEL as LogLevel | undefined;
 	if (explicit && explicit in LEVELS) {
 		return explicit;

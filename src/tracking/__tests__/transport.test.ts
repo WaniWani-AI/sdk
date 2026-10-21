@@ -194,4 +194,51 @@ describe("V2 transport", () => {
 			globalThis.fetch = originalFetch;
 		}
 	});
+	test("debug logger sees the request, its status and duration, and the delivery", async () => {
+		const debug: string[] = [];
+
+		const transport = createV2BatchTransport({
+			apiUrl: "https://example.com",
+			apiKey: "test-key",
+			flushIntervalMs: 10_000,
+			fetchFn: async () => jsonResponse({ accepted: 1 }),
+			logger: {
+				debug: (message) => debug.push(message),
+				warn: () => {},
+				error: () => {},
+			},
+		});
+
+		transport.enqueue(makeEvent("evt_debug"));
+		await transport.flush();
+		await transport.shutdown();
+
+		expect(debug).toContain("flushing batch of 1 event(s), 0 still buffered");
+		expect(debug).toContain(
+			"POST https://example.com/api/mcp/events/v2/batch (1 event(s))",
+		);
+		expect(
+			debug.some((line) =>
+				/^POST https:\/\/example\.com\/api\/mcp\/events\/v2\/batch -> 200 in \d+ms$/.test(
+					line,
+				),
+			),
+		).toBe(true);
+		expect(debug).toContain("batch of 1 event(s) delivered");
+		expect(debug.join("\n")).not.toContain("test-key");
+	});
+
+	test("a logger without debug still works", async () => {
+		const transport = createV2BatchTransport({
+			apiUrl: "https://example.com",
+			apiKey: "test-key",
+			flushIntervalMs: 10_000,
+			fetchFn: async () => jsonResponse({ accepted: 1 }),
+			logger: { warn: () => {}, error: () => {} },
+		});
+
+		transport.enqueue(makeEvent("evt_no_debug"));
+		await transport.flush();
+		await transport.shutdown();
+	});
 });
