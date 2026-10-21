@@ -154,3 +154,4 @@ Found a vulnerability? Please report it privately — see [SECURITY.md](./SECURI
 [MIT](./LICENSE) © Waniwani
 
 "Waniwani" is a trademark of Waniwani Inc. The license covers the code, not the name.
+
