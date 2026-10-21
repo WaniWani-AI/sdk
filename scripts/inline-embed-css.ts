@@ -1,8 +1,12 @@
 /**
  * Post-build: Inline CSS into the embed IIFE bundle.
  *
- * The embed entry point (src/chat/web/embed/embed.ts) contains a placeholder:
+ * src/chat/web/embed/embed-css.ts contains a placeholder:
  *   const EMBED_CSS = "__WANIWANI_EMBED_CSS__";
+ *
+ * It lives in one module, imported by every root that needs it (the chat's and
+ * the WebMCP overlay's), so the string below appears exactly once in the
+ * bundle — which matters, because `String.replace` swaps only the first.
  *
  * This script reads dist/chat/styles.css, escapes it for JS string embedding,
  * and replaces the placeholder in dist/chat/embed.js.
@@ -36,7 +40,7 @@ if (!embedJs.includes(placeholder)) {
 		`ERROR: Placeholder "${placeholder}" not found in ${embedPath}`,
 	);
 	console.error(
-		'Make sure src/chat/web/embed/embed.ts contains: const EMBED_CSS = "__WANIWANI_EMBED_CSS__";',
+		'Make sure src/chat/web/embed/embed-css.ts contains: const EMBED_CSS = "__WANIWANI_EMBED_CSS__";',
 	);
 	process.exit(1);
 }

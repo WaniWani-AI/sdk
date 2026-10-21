@@ -17,7 +17,7 @@
 // ============================================================================
 
 import type { UIMessage } from "ai";
-import { ArrowUp, Minus, XIcon } from "lucide-react";
+import { ArrowUp, XIcon } from "lucide-react";
 import {
 	forwardRef,
 	useCallback,
@@ -30,15 +30,18 @@ import {
 import type { ChatHandle } from "../@types";
 import BorderGlow from "../components/border-glow";
 import { Suggestions } from "../components/suggestions";
+import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
+import { useBootTiming } from "../lib/timing-context";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { EmbedConfig } from "./config";
 import { useRemoteEmbedConfig } from "./remote-config";
+import { useNearPageBottom } from "./use-near-page-bottom";
 import { usePathname, useVisibilityGate } from "./use-pathname";
 import { useScrollAppearance } from "./use-scroll-appearance";
 import { useSuggestions } from "./use-suggestions";
@@ -122,6 +125,20 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			? appearTriggerForPath(config.visibility, pathname)
 			: null;
 		const scrolledPast = useScrollAppearance(appearAfter);
+
+		// The dock slides away once the page's footer scrolls into view, so it
+		// doesn't cover it. On by default; `hideAtBottom: false` opts out and a
+		// number swaps footer detection for a fixed distance from the end of the
+		// page. Kept apart from `appeared` so the entrance timer and the
+		// auto-expand don't replay on every return.
+		const hideAtBottom = config.hideAtBottom;
+		const nearBottom = useNearPageBottom(
+			!visible || hideAtBottom === false
+				? null
+				: typeof hideAtBottom === "number"
+					? hideAtBottom
+					: "footer",
+		);
 
 		const chatRef = useRef<ChatHandle>(null);
 		// One emitter per mount. The session id getter reads through the chat
@@ -296,6 +313,15 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 			}
 		}, [ready, widgetEvents]);
 
+		useBootTiming({
+			api: config.api,
+			token: config.token,
+			channelId: config.channelId,
+			mode: "floating",
+			paintMark: "launcherPainted",
+			painted: ready && visible,
+		});
+
 		// Open/close transitions. Watching `phase` covers every path that opens
 		// or closes the panel: dock focus, suggestion click, the imperative API,
 		// the header collapse button. The docked and expanded-dock states both
@@ -406,6 +432,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.
 		const body: Record<string, unknown> = { mode: "floating" };
+		const transport = useDirectTransport(config.sessionApi);
 		if (config.mcpServerUrl) {
 			body.mcpServerUrl = config.mcpServerUrl;
 		}
@@ -418,6 +445,9 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 		// none, focusing leaves the plain input bar (no empty card, no widen).
 		const showCard = dockTexts.length > 0 && phase !== "input";
 
+		// Never pull the bar out from under a visitor who is mid-sentence.
+		const dockShown = appeared && !(nearBottom && composerText.length === 0);
+
 		const closeButton = (
 			<button
 				type="button"
@@ -425,7 +455,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 				aria-label={t.launcher.close}
 				className="ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer"
 			>
-				<Minus className="ww:size-4" />
+				<XIcon className="ww:size-4" />
 			</button>
 		);
 
@@ -450,7 +480,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 								ref={dockRef}
 								data-waniwani-floating="dock"
 								data-state={phase === "open" ? "hidden" : "shown"}
-								data-appeared={appeared ? "true" : "false"}
+								data-appeared={dockShown ? "true" : "false"}
 								className={cn(
 									"ww:fixed ww:bottom-3 ww:sm:bottom-4 ww:left-0 ww:right-0 ww:mx-auto ww:z-[2147483002] ww:flex ww:flex-col",
 									"ww:w-[calc(100vw-2rem)] ww:transition-[max-width] ww:duration-300 ww:ease-out",
@@ -600,6 +630,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 								)}
 							>
 								<ChatEmbed
+									transport={transport}
 									ref={chatRef}
 									api={config.api ?? ""}
 									headers={{ Authorization: `Bearer ${config.token}` }}
@@ -608,7 +639,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									appearance={config.appearance}
 									title={config.title}
 									headerActions={closeButton}
-									// Force the header on in floating mode: the minimize control
+									// Force the header on in floating mode: the close control
 									// lives in `headerActions`, so honoring `hideHeader` here would
 									// leave an opened (full-screen on mobile) panel with no in-UI
 									// way back to the dock. The panel is its own chrome anyway.
@@ -622,6 +653,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, FloatingChatProps>(
 									placeholder={config.placeholder}
 									suggestions={suggestions}
 									enableThreadHistory={config.enableThreadHistory}
+									documentUpload={config.documentUpload}
 									showToolCalls={config.showToolCalls}
 									locale={config.locale}
 									initializing={!ready}

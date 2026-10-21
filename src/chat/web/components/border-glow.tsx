@@ -15,7 +15,8 @@ interface BorderGlowProps {
 	style?: React.CSSProperties;
 	edgeSensitivity?: number;
 	backgroundColor?: string;
-	borderRadius?: number;
+	/** A number is treated as px; a string is used verbatim (a CSS var works). */
+	borderRadius?: number | string;
 	coneSpread?: number;
 	animated?: boolean;
 	colors?: string[];
@@ -141,7 +142,8 @@ const BorderGlow: React.FC<BorderGlowProps> = ({
 			className={`ww:relative ww:grid ww:isolate ww:border ${className}`}
 			style={{
 				background: backgroundColor,
-				borderRadius: `${borderRadius}px`,
+				borderRadius:
+					typeof borderRadius === "number" ? `${borderRadius}px` : borderRadius,
 				transform: "translate3d(0, 0, 0.01px)",
 				...style,
 			}}

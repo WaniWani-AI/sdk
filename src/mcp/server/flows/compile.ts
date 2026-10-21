@@ -12,6 +12,7 @@ import { reportSessionError } from "../session-errors/report";
 import {
 	extractSessionId,
 	FLOW_META_KEY,
+	OMIT_PII_NOTE,
 	SUGGESTIONS_META_KEY,
 	type SuggestionsMeta,
 } from "../utils";
@@ -25,6 +26,11 @@ import type {
 	RegisteredFlow,
 } from "./@types";
 import { START } from "./@types";
+import {
+	FLOW_GRAPH_META_KEY,
+	REDACTED_FIELDS_META_KEY,
+	serverOnly,
+} from "./definition-meta";
 import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
 import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
 import { extractFlowGraph } from "./graph-extract";
@@ -34,37 +40,18 @@ import {
 	takeInternalField,
 	withInternalState,
 } from "./internal-state";
-import { deepMerge, expandDotPaths } from "./nested";
+import { deepMerge } from "./nested";
 import { flowOutputSchema } from "./output-schema";
-import { buildFlowProtocol } from "./protocol";
-import {
-	collectRedactedStateFields,
-	REDACTED_STATE_UPDATE_FIELDS_META_KEY,
-} from "./redacted";
+import { buildNextStep } from "./protocol";
+import { collectRedactedStateFields } from "./redacted";
+import { acceptStateUpdates, addAskedFields } from "./state-updates";
 
 // ============================================================================
 // Input schema
 // ============================================================================
 
-function buildInputSchema(config: {
-	omitIntentPII?: boolean;
-	state?: Record<string, z.ZodType>;
-}) {
-	const piiNote = config.omitIntentPII
-		? " Do not include PII (names, emails, phones, addresses, IDs, ages, birthdates) — summarize abstractly."
-		: "";
-
-	// When the flow declares state fields, expose them as typed (optional) keys
-	// on `stateUpdates` so the LLM sees field names, types, and descriptions in
-	// the tool's JSON Schema. `.passthrough()` preserves unknown keys (e.g.
-	// dot-paths like "driver.name" for nested state, plus forward-compat keys).
-	const hasState = config.state && Object.keys(config.state).length > 0;
-	const stateUpdatesSchema = hasState
-		? z
-				.object(config.state as Record<string, z.ZodType>)
-				.partial()
-				.passthrough()
-		: z.record(z.string(), z.unknown());
+function buildInputSchema(config: { omitIntentPII?: boolean }) {
+	const piiNote = config.omitIntentPII ? OMIT_PII_NOTE : "";
 
 	return {
 		action: z
@@ -76,18 +63,22 @@ function buildInputSchema(config: {
 			.string()
 			.optional()
 			.describe(
-				`Required when action is "start". Provide a brief summary of the user's goal for this flow. Do not invent missing intent.${piiNote}`,
+				`Required when action is "start". A brief summary of the user's goal for this flow, taken from what the user said rather than inferred.${piiNote}`,
 			),
 		context: z
 			.string()
 			.optional()
 			.describe(
-				`Optional when action is "start". Describe the situation or environment that led the user to start this flow — e.g. what page they are on, what they were doing, or what triggered the request. Do not invent missing context.${piiNote}`,
+				`Optional when action is "start". The situation that led the user here — the page they are on, what they were doing, or what triggered the request. Omitted when there is nothing genuinely relevant to report.${piiNote}`,
 			),
-		stateUpdates: stateUpdatesSchema
+		// Untyped on purpose: the listing names no state field. The session's
+		// first question or widget lists them in `fields`, and each question
+		// names its own (see `state-updates.ts`).
+		stateUpdates: z
+			.record(z.string(), z.unknown())
 			.optional()
 			.describe(
-				'State field values to set before processing the next node. Pass the user\'s answer (keyed by the field name from the response) and any other values the user mentioned. For nested state fields, use dot-paths like "driver.name".',
+				'Values for the flow\'s fields, keyed by the field names its responses give. For nested fields, use dot-paths like "driver.name".',
 			),
 		sessionId: z
 			.string()
@@ -119,12 +110,15 @@ function resolveDefaultStore(flowId: string): FlowStore {
 // ============================================================================
 
 /**
- * One handled tool call, plus the internal state this session arrived with. The
- * response assembler reads it to decide what to attach, then persists what is
- * left. Branches that fail before the engine runs return no `internal`, which
- * reads as "nothing pending".
+ * One handled tool call, plus the internal state and asked fields this session
+ * arrived with. The response assembler reads it to decide what to attach, then
+ * persists what is left. Branches that fail before the engine runs return no
+ * `internal`, which reads as "nothing pending".
  */
-type HandledCall = ExecutionResult & { internal?: FlowInternalState };
+type HandledCall = ExecutionResult & {
+	internal?: FlowInternalState;
+	asked?: string[];
+};
 
 export function compileFlow<TState extends Record<string, unknown>>(
 	input: CompileInput<TState>,
@@ -132,8 +126,11 @@ export function compileFlow<TState extends Record<string, unknown>>(
 	const { config, nodes, edges } = input;
 	const inputSchema = buildInputSchema(config);
 	const flowGraph = extractFlowGraph(config, nodes, edges, input.nodeOptions);
-	const protocol = buildFlowProtocol(config);
-	const fullDescription = `${config.description}\n${protocol}`;
+	// The description says what the tool is and nothing about what the
+	// assistant should do next. Operating instructions in a tool description
+	// trip prompt-injection classifiers (see `protocol.ts`); they ride the
+	// response instead, as `nextStep`.
+	const fullDescription = `${config.description}\n\nThis tool runs a multi-step flow. Each call returns the flow's current status, the data for that step, and a \`nextStep\` field describing what the following call contains.`;
 
 	const store: FlowStore = input.store ?? resolveDefaultStore(config.id);
 
@@ -153,16 +150,17 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		waniwani?: ScopedWaniWaniClient,
 	): Promise<HandledCall> {
 		/**
-		 * Run the engine from `node`, carrying this session's internal state
-		 * through to the response assembler. Every branch below resumes the same
-		 * graph with the same per-call context, so the only things that vary are
-		 * where execution starts, the state it starts from, and where the internal
-		 * state was read.
+		 * Run the engine from `node`, carrying this session's internal state and
+		 * asked fields through to the response assembler. Every branch below
+		 * resumes the same graph with the same per-call context, so the only
+		 * things that vary are where execution starts, the state it starts from,
+		 * and where the session's own record was read.
 		 */
 		const run = (
 			node: string,
 			state: TState,
 			internal: FlowInternalState,
+			asked: string[] = [],
 		): Promise<HandledCall> =>
 			executeFrom(
 				node,
@@ -174,13 +172,23 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				waniwani,
 				input.nodeOptions,
 				config.state,
-			).then((result) => ({ ...result, internal }));
+			).then((result) => ({ ...result, internal, asked }));
+
+		/** The part of this call's `stateUpdates` that writes to state. */
+		const accept = (asked: string[] | undefined) =>
+			acceptStateUpdates({
+				updates: args.stateUpdates,
+				asked,
+				stateSchema: config.state,
+			});
 
 		if (args.action === "start") {
 			// `intent` is observational: the schema asks for it on start, but nothing
-			// in the engine reads it (it never reaches a node, the store, or an
-			// event). A missing value therefore costs a conversation turn and buys
-			// nothing, so trim it and carry on instead of failing the call.
+			// in the engine reads it (it never reaches a node or the store). It is
+			// tracked only because `withWaniwani` records the raw tool input on
+			// `tool.called` and copies it into `properties.telemetry`.
+			// A missing value therefore costs a conversation turn and buys nothing,
+			// so trim it and carry on instead of failing the call.
 			const intent =
 				typeof args.intent === "string" ? args.intent.trim() : undefined;
 			args.intent = intent || undefined;
@@ -210,7 +218,9 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				sessionIsPreexisting,
 				seed: initialInternal,
 			});
-			const startState = expandDotPaths(args.stateUpdates ?? {}) as TState;
+			// Nothing has been asked yet, so a value merges only for a declared
+			// field it fits, and the flow skips the questions it fills.
+			const startState = (await accept([])) as TState;
 			const firstNode = await resolveNextNode(startEdge, startState);
 			return run(firstNode, startState, internal);
 		}
@@ -264,9 +274,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
+			const asked = flowState.asked;
 			const updatedState = deepMerge(
 				state as Record<string, unknown>,
-				expandDotPaths(args.stateUpdates ?? {}),
+				await accept(asked),
 			) as TState;
 			const internal = flowState.internal ?? {};
 
@@ -288,13 +299,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 					};
 				}
 				const nextNode = await resolveNextNode(edge, updatedState);
-				return run(nextNode, updatedState, internal);
+				return run(nextNode, updatedState, internal, asked);
 			}
 
 			// Interrupt continue: re-execute from current step.
 			// The handler re-runs, filters answered questions, and runs
 			// validators if all questions are filled.
-			return run(step, updatedState, internal);
+			return run(step, updatedState, internal, asked);
 		}
 
 		if (args.action === "reset") {
@@ -354,6 +365,21 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
+			const asked = flowState.asked;
+			const corrections = await accept(asked);
+			const existingState = flowState.state as TState;
+			const internal = flowState.internal ?? {};
+
+			if (Object.keys(corrections).length === 0) {
+				return {
+					content: {
+						status: "error" as const,
+						error:
+							'Nothing to correct: "reset" takes fields the flow listed in `fields` or has asked for.',
+					},
+				};
+			}
+
 			const startEdge = edges.get(START);
 			if (!startEdge) {
 				reportSessionError({
@@ -367,15 +393,13 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				};
 			}
 
-			const existingState = flowState.state as TState;
 			const mergedState = deepMerge(
 				existingState as Record<string, unknown>,
-				expandDotPaths(args.stateUpdates),
+				corrections,
 			) as TState;
 
-			const internal = flowState.internal ?? {};
 			const firstNode = await resolveNextNode(startEdge, mergedState);
-			return run(firstNode, mergedState, internal);
+			return run(firstNode, mergedState, internal, asked);
 		}
 
 		return {
@@ -395,11 +419,18 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		inputSchema,
 		outputSchema: flowOutputSchema,
 		annotations: config.annotations,
-		...(redactedStateFields.length > 0 && {
-			_meta: {
-				[REDACTED_STATE_UPDATE_FIELDS_META_KEY]: redactedStateFields,
-			},
-		}),
+		// The flow graph rides on the definition `_meta` itself, not only on what
+		// `register()` sends, because some servers register this config directly
+		// (the kit does, through skybridge). `withWaniwani` keys both funnel sync
+		// and telemetry capture on it; without it a flow tool is treated as a
+		// plain tool. Both entries are server-only, so `tools/list` never sends
+		// them (see `definition-meta.ts`).
+		_meta: {
+			...(redactedStateFields.length > 0 && {
+				[REDACTED_FIELDS_META_KEY]: serverOnly(redactedStateFields),
+			}),
+			[FLOW_GRAPH_META_KEY]: serverOnly(flowGraph),
+		},
 	};
 
 	const toolHandler = (async (args: FlowToolInput, extra: unknown) => {
@@ -449,14 +480,37 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		// conversation. Error responses keep it pending: the assistant may never
 		// surface one to the user, so delivering it there would spend it on a
 		// message nobody reads.
-		const { value: intro, internal } =
+		const { value: intro, internal: afterIntro } =
 			contentObj.status === "error"
 				? { value: undefined, internal: result.internal ?? {} }
 				: takeInternalField(result.internal, "intro");
+		// `fields` goes out with the session's first question or widget, the
+		// first response the model fills anything from. A flow that completes
+		// or fails on its first call keeps it for the next run.
+		const { value: fields, internal } =
+			contentObj.status === "interrupt" || contentObj.status === "widget"
+				? takeInternalField(afterIntro, "fields")
+				: { value: undefined, internal: afterIntro };
 
 		// `intro` first so it reads as the opening instruction rather than a
-		// trailing detail after the question and its schema.
-		const payload = intro ? { intro, ...contentObj } : contentObj;
+		// trailing detail after the question and its schema. `fields` after the
+		// step's own data. `nextStep` last: it is the protocol for this one
+		// status, and it reads after the data it applies to.
+		const nextStep = buildNextStep({
+			status: contentObj.status,
+			tool: "tool" in contentObj ? contentObj.tool : undefined,
+			interactive:
+				"interactive" in contentObj ? contentObj.interactive : undefined,
+			hasIntro: Boolean(intro),
+			hasFields: Boolean(fields),
+			echoSessionId: !metaSessionId && Boolean(sessionId),
+		});
+		const payload = {
+			...(intro ? { intro } : {}),
+			...contentObj,
+			...(fields ? { fields } : {}),
+			...(nextStep ? { nextStep } : {}),
+		};
 
 		// Authoritative for the turn: an empty array clears pills an earlier flow
 		// call in the same turn set. Only the single-open-question shorthand
@@ -475,7 +529,10 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		// TODO: expose a `deleteOnComplete` compile option for customers who
 		// want the prior behavior (drop the session as soon as END is reached).
 		if (sessionId && result.flowTokenContent) {
-			const tokenContent = withInternalState(result.flowTokenContent, internal);
+			const tokenContent = {
+				...withInternalState(result.flowTokenContent, internal),
+				asked: addAskedFields(result.asked ?? [], contentObj),
+			};
 			try {
 				await store.set(sessionId, tokenContent);
 			} catch (err) {
@@ -537,15 +594,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		handler: toolHandler as unknown as FlowToolHandler,
 
 		async register(server: McpServer): Promise<void> {
-			const configWithGraph = {
-				...toolConfig,
-				_meta: { ...toolConfig._meta, _flowGraph: flowGraph },
-			};
-			server.registerTool(
-				config.id,
-				configWithGraph as typeof toolConfig,
-				toolHandler,
-			);
+			server.registerTool(config.id, toolConfig, toolHandler);
 		},
 		graph: input.graph,
 		flowGraph,

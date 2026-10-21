@@ -65,7 +65,7 @@ const files = await Promise.all(
 const client = waniwani();
 
 console.log("Ingesting files into knowledge base...");
-console.log("⚠️  This will replace all existing KB chunks for this environment.");
+console.log("Files land in the agent's draft. Publish it in the WaniWani app to make them live.");
 
 const result = await client.kb.ingest(files);
 console.log(`Done: ${result.chunksIngested} chunks from ${result.filesProcessed} files`);
@@ -177,4 +177,4 @@ Tell the user:
 - Run `bun run kb:ingest` after adding or updating .md files
 - `WANIWANI_API_KEY` must be set in the environment
 - Markdown files should use `# Title` (H1) and `## Section` (H2) structure
-- Ingestion is destructive — it replaces all existing chunks for the environment
+- A push replaces only the sources it names and lands in the agent's draft. Publish in the app to make it live.

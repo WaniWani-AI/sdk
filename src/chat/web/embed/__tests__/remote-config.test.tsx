@@ -42,11 +42,15 @@ const { createRoot } = await import("react-dom/client");
 type Root = ReturnType<typeof createRoot>;
 
 const { __resetPageViewGuard } = await import("../../lib/page-view");
+const { __resetBootTiming, sendTiming } = await import("../../lib/timing");
 const { resolveConfig } = await import("../config");
 type EmbedConfigType = import("../config").EmbedConfig;
-const { fetchRemoteConfig, useRemoteEmbedConfig } = await import(
-	"../remote-config"
-);
+const {
+	fetchRemoteConfig,
+	loadCachedConfig,
+	saveCachedConfig,
+	useRemoteEmbedConfig,
+} = await import("../remote-config");
 
 // ---------------------------------------------------------------------------
 // Fetch stub — serves `GET {api}/config` and captures the V2 batch ingest POST
@@ -126,6 +130,7 @@ function mountHook(programmatic: Partial<EmbedConfigType>): {
 
 beforeEach(() => {
 	__resetPageViewGuard();
+	__resetBootTiming();
 	win.sessionStorage.clear();
 	win.localStorage.clear();
 });
@@ -287,6 +292,342 @@ describe("useRemoteEmbedConfig — page.viewed channel attribution", () => {
 				await new Promise((resolve) => setTimeout(resolve, 25));
 			});
 			expect(batches).toHaveLength(0);
+		} finally {
+			restore();
+		}
+	});
+});
+
+const DOCUMENT_UPLOAD = {
+	enabled: true,
+	maxBytes: 20 * 1024 * 1024,
+	maxPdfPages: 30,
+	maxFiles: 10,
+	accept: ["application/pdf", "image/png"],
+};
+
+async function partialFor(documentUpload: unknown) {
+	const { restore } = stubFetch({
+		success: true,
+		data: { welcomeMessage: null, documentUpload },
+	});
+	try {
+		return await fetchRemoteConfig(API, "wwp_test");
+	} finally {
+		restore();
+	}
+}
+
+describe("fetchRemoteConfig — documentUpload", () => {
+	test("maps a well-formed module payload through unchanged", async () => {
+		const partial = await partialFor(DOCUMENT_UPLOAD);
+
+		expect(partial.documentUpload).toEqual(DOCUMENT_UPLOAD);
+	});
+
+	test("a project with the module switched off still speaks, and says off", async () => {
+		const partial = await partialFor({ ...DOCUMENT_UPLOAD, enabled: false });
+
+		expect("documentUpload" in partial).toBe(true);
+		expect(partial.documentUpload).toEqual({
+			enabled: false,
+			maxBytes: 0,
+			maxPdfPages: 0,
+			maxFiles: 0,
+			accept: ["application/pdf", "image/png"],
+		});
+	});
+
+	test("a switched-off module carrying no caps at all still survives", async () => {
+		const partial = await partialFor({ enabled: false });
+
+		expect("documentUpload" in partial).toBe(true);
+		expect(partial.documentUpload).toEqual({
+			enabled: false,
+			maxBytes: 0,
+			maxPdfPages: 0,
+			maxFiles: 0,
+			accept: [],
+		});
+	});
+
+	test("keeps only the string entries of accept", async () => {
+		const partial = await partialFor({
+			...DOCUMENT_UPLOAD,
+			accept: ["application/pdf", 42, null, "image/png"],
+		});
+
+		expect(partial.documentUpload?.accept).toEqual([
+			"application/pdf",
+			"image/png",
+		]);
+	});
+
+	test("ignores fields the widget does not know about", async () => {
+		const partial = await partialFor({
+			...DOCUMENT_UPLOAD,
+			maxPagesPerMinute: 4,
+		});
+
+		expect(partial.documentUpload).toEqual(DOCUMENT_UPLOAD);
+	});
+
+	test("a server that predates the field leaves the key off entirely", async () => {
+		const { restore } = stubFetch({
+			success: true,
+			data: { welcomeMessage: "Hi" },
+		});
+		try {
+			const partial = await fetchRemoteConfig(API, "wwp_test");
+			expect("documentUpload" in partial).toBe(false);
+		} finally {
+			restore();
+		}
+	});
+
+	test("a malformed payload is dropped whole, never half-applied", async () => {
+		const malformed: unknown[] = [
+			null,
+			"enabled",
+			42,
+			true,
+			[],
+			{},
+			{
+				enabled: "true",
+				maxBytes: 1,
+				maxPdfPages: 1,
+				maxFiles: 1,
+				accept: ["a"],
+			},
+			{ maxBytes: 1, maxPdfPages: 1, maxFiles: 1, accept: ["a"] },
+			{ enabled: true, maxPdfPages: 1, maxFiles: 1, accept: ["a"] },
+			{
+				enabled: true,
+				maxBytes: "20mb",
+				maxPdfPages: 1,
+				maxFiles: 1,
+				accept: ["a"],
+			},
+			{ enabled: true, maxBytes: 1, maxFiles: 1, accept: ["a"] },
+			{
+				enabled: true,
+				maxBytes: 1,
+				maxPdfPages: "30",
+				maxFiles: 1,
+				accept: ["a"],
+			},
+			{ enabled: true, maxBytes: 1, maxPdfPages: 1, maxFiles: 1 },
+			{ enabled: true, maxBytes: 1, maxPdfPages: 1, maxFiles: 1, accept: [] },
+			{
+				enabled: true,
+				maxBytes: 1,
+				maxPdfPages: 1,
+				maxFiles: 1,
+				accept: [42, null],
+			},
+			{
+				enabled: true,
+				maxBytes: 1,
+				maxPdfPages: 1,
+				maxFiles: 1,
+				accept: "application/pdf",
+			},
+		];
+
+		for (const payload of malformed) {
+			const partial = await partialFor(payload);
+			expect({
+				payload,
+				hasKey: "documentUpload" in partial,
+			}).toEqual({ payload, hasKey: false });
+		}
+	});
+
+	test("an enabled module with no usable maxFiles is dropped, never uncapped", async () => {
+		const unusable = [undefined, null, 0, -1, "10", true, [10]];
+
+		for (const maxFiles of unusable) {
+			const partial = await partialFor({ ...DOCUMENT_UPLOAD, maxFiles });
+			expect({
+				maxFiles,
+				hasKey: "documentUpload" in partial,
+			}).toEqual({ maxFiles, hasKey: false });
+		}
+	});
+
+	test("a cap of one is a real cap, not a missing one", async () => {
+		const partial = await partialFor({ ...DOCUMENT_UPLOAD, maxFiles: 1 });
+
+		expect(partial.documentUpload?.maxFiles).toBe(1);
+	});
+});
+
+describe("chatTimingLogs metadata", () => {
+	const timingTarget = { api: API, token: "wwp_test" };
+	const ON = { chatTimingLogs: "true" };
+
+	function stubTiming(config: Promise<Record<string, unknown>>): {
+		timing: string[];
+		restore: () => void;
+	} {
+		const timing: string[] = [];
+		const real = globalThis.fetch;
+		// biome-ignore lint/suspicious/noExplicitAny: test stub
+		(globalThis as any).fetch = async (url: any) => {
+			const href = String(url);
+			if (href.includes("/config")) {
+				return Response.json({ success: true, data: await config });
+			}
+			if (href.includes("/timing")) {
+				timing.push(href);
+			}
+			return new Response(null, { status: 202 });
+		};
+		return {
+			timing,
+			restore: () => {
+				globalThis.fetch = real;
+			},
+		};
+	}
+
+	async function beaconsAfter(data: Record<string, unknown>) {
+		const { timing, restore } = stubTiming(Promise.resolve(data));
+		try {
+			const partial = await fetchRemoteConfig(API, "wwp_test");
+			sendTiming("boot", timingTarget, {}, {});
+			return { partial, timing };
+		} finally {
+			restore();
+		}
+	}
+
+	test('chatTimingLogs: "true" sends', async () => {
+		const { partial, timing } = await beaconsAfter({ metadata: ON });
+		expect(partial.metadata).toEqual(ON);
+		expect(timing).toHaveLength(1);
+	});
+
+	test('chatTimingLogs: "false" sends nothing', async () => {
+		const { timing } = await beaconsAfter({
+			metadata: { chatTimingLogs: "false" },
+		});
+		expect(timing).toHaveLength(0);
+	});
+
+	test("metadata without the key sends nothing", async () => {
+		const { timing } = await beaconsAfter({ metadata: { plan: "gold" } });
+		expect(timing).toHaveLength(0);
+	});
+
+	test("null metadata sends nothing", async () => {
+		const { partial, timing } = await beaconsAfter({ metadata: null });
+		expect(partial.metadata).toBeUndefined();
+		expect(timing).toHaveLength(0);
+	});
+
+	test("a /config without the field sends nothing", async () => {
+		const { timing } = await beaconsAfter({ title: "Hi" });
+		expect(timing).toHaveLength(0);
+	});
+
+	test("a cached config without the field reads as off", async () => {
+		saveCachedConfig(API, "wwp_test", undefined, { title: "Cached" });
+		const { timing, restore } = stubTiming(new Promise(() => {}));
+		try {
+			const { latest } = mountHook({ token: "wwp_test" });
+			await waitFor(() => latest().title === "Cached");
+			sendTiming("boot", timingTarget, {}, {});
+			expect(timing).toHaveLength(0);
+		} finally {
+			restore();
+		}
+	});
+
+	test("a fresh fetch overrides the cached verdict and updates the cache", async () => {
+		saveCachedConfig(API, "wwp_test", undefined, { title: "Cached" });
+		const { timing, restore } = stubTiming(
+			Promise.resolve({ title: "Fresh", metadata: ON }),
+		);
+		try {
+			const { latest } = mountHook({ token: "wwp_test" });
+			await waitFor(() => latest().title === "Fresh");
+			sendTiming("boot", timingTarget, {}, {});
+			expect(timing).toHaveLength(1);
+			expect(loadCachedConfig(API, "wwp_test")?.metadata).toEqual(ON);
+		} finally {
+			restore();
+		}
+	});
+});
+
+async function sessionApiFor(sessionApi: unknown) {
+	const { restore } = stubFetch({
+		success: true,
+		data: { welcomeMessage: null, sessionApi },
+	});
+	try {
+		return await fetchRemoteConfig(API, "wwp_test");
+	} finally {
+		restore();
+	}
+}
+
+describe("fetchRemoteConfig — sessionApi", () => {
+	test("a non-empty string reaches the config partial", async () => {
+		const partial = await sessionApiFor(
+			"https://app.waniwani.ai/api/mcp/agent/session",
+		);
+
+		expect(partial.sessionApi).toBe(
+			"https://app.waniwani.ai/api/mcp/agent/session",
+		);
+	});
+
+	const ignored: [string, unknown][] = [
+		["an empty string", ""],
+		["null", null],
+		["a number", 42],
+		["a boolean", true],
+		["an object", { url: "https://app.waniwani.ai/session" }],
+		["an array", ["https://app.waniwani.ai/session"]],
+	];
+	for (const [label, value] of ignored) {
+		test(`${label} is ignored`, async () => {
+			const partial = await sessionApiFor(value);
+
+			expect(partial).not.toHaveProperty("sessionApi");
+		});
+	}
+
+	test("a server that predates the field leaves the key off entirely", async () => {
+		const { restore } = stubFetch({
+			success: true,
+			data: { welcomeMessage: "Hi" },
+		});
+		try {
+			const partial = await fetchRemoteConfig(API, "wwp_test");
+			expect(partial).not.toHaveProperty("sessionApi");
+		} finally {
+			restore();
+		}
+	});
+
+	test("the mounted embed config picks up the remote sessionApi", async () => {
+		const { restore } = stubFetch({
+			success: true,
+			data: {
+				welcomeMessage: "Hi",
+				sessionApi: "https://app.waniwani.ai/api/mcp/agent/session",
+			},
+		});
+		try {
+			const { latest } = mountHook({ api: API, token: "wwp_test" });
+			await waitFor(() => latest().welcomeMessage === "Hi");
+			expect(latest().sessionApi).toBe(
+				"https://app.waniwani.ai/api/mcp/agent/session",
+			);
 		} finally {
 			restore();
 		}

@@ -6,9 +6,11 @@
 // ============================================================================
 
 import { useEffect, useState } from "react";
+import type { DocumentUploadConfig } from "../@types";
 import { buildApiUrl } from "../lib/api-url";
 import { debugLog } from "../lib/debug";
 import { firePageView } from "../lib/page-view";
+import { markBoot, markConfigSource, setTimingMetadata } from "../lib/timing";
 import type { EmbedConfig } from "./config";
 import { resolveConfig } from "./config";
 import { parsePageSuggestions } from "./use-suggestions";
@@ -91,6 +93,8 @@ interface RemoteConfigResponse {
 	 */
 	pageSuggestions?: unknown;
 	enableThreadHistory?: boolean | null;
+	/** Present when the org's chats talk to the agent runtime directly. */
+	sessionApi?: string | null;
 	/**
 	 * Channel-specific event source (e.g. the integration/source this channel
 	 * is attributed to). Stamped onto widget-originated events like
@@ -117,6 +121,76 @@ interface RemoteConfigResponse {
 	 * (or absent) means show everywhere.
 	 */
 	visibility?: VisibilityRules | null;
+	/**
+	 * Hide the floating dock at the bottom of the page (WAN-1431). On by
+	 * default; `false` opts out, a number is a distance in px from the end of
+	 * the page. Absent on servers that predate the field.
+	 */
+	hideAtBottom?: boolean | number | null;
+	/**
+	 * Documents module state for the project behind this token. Absent on
+	 * servers that predate the field, which the widget reads as off. Every member
+	 * is `unknown` because this one decides whether the uploader exists and what
+	 * caps it enforces, so a half-filled payload must not become a half-configured
+	 * uploader.
+	 */
+	documentUpload?: RemoteDocumentUpload | null;
+	/**
+	 * The channel's WebMCP switch. Absent on servers that predate the field,
+	 * which reads as on: the surface needs no configuration to work, so the only
+	 * thing worth sending is a channel that has declined it.
+	 */
+	webmcp?: { enabled?: boolean | null } | null;
+	/** The channel's custom key:value pairs. Absent on servers that predate the field. */
+	metadata?: Record<string, string> | null;
+}
+
+interface RemoteDocumentUpload {
+	enabled?: unknown;
+	maxBytes?: unknown;
+	maxPdfPages?: unknown;
+	maxFiles?: unknown;
+	accept?: unknown;
+}
+
+function parseDocumentUpload(
+	raw: RemoteDocumentUpload | null | undefined,
+): DocumentUploadConfig | null {
+	if (typeof raw !== "object" || raw === null) {
+		return null;
+	}
+	if (typeof raw.enabled !== "boolean") {
+		return null;
+	}
+	const accept = Array.isArray(raw.accept)
+		? raw.accept.filter((entry): entry is string => typeof entry === "string")
+		: [];
+	const positive = (value: unknown): value is number =>
+		typeof value === "number" && Number.isFinite(value) && value > 0;
+
+	// A disabled module is the answer even when it carries no caps, and it has to
+	// survive: dropping it here would fall back to the `allowAttachments` prop and
+	// show the paperclip on a project the platform said no to.
+	if (!raw.enabled) {
+		return { enabled: false, maxBytes: 0, maxPdfPages: 0, maxFiles: 0, accept };
+	}
+	if (
+		!(
+			positive(raw.maxBytes) &&
+			positive(raw.maxPdfPages) &&
+			positive(raw.maxFiles) &&
+			accept.length > 0
+		)
+	) {
+		return null;
+	}
+	return {
+		enabled: true,
+		maxBytes: raw.maxBytes,
+		maxPdfPages: raw.maxPdfPages,
+		maxFiles: raw.maxFiles,
+		accept,
+	};
 }
 
 /**
@@ -132,6 +206,21 @@ export async function fetchRemoteConfig(
 	token: string,
 	signal?: AbortSignal,
 	channelId?: string,
+): Promise<Partial<EmbedConfig>> {
+	markBoot("configStart");
+	const remote = await requestRemoteConfig(api, token, signal, channelId);
+	markBoot("configEnd");
+	if (!signal?.aborted) {
+		setTimingMetadata(remote.metadata);
+	}
+	return remote;
+}
+
+async function requestRemoteConfig(
+	api: string,
+	token: string,
+	signal: AbortSignal | undefined,
+	channelId: string | undefined,
 ): Promise<Partial<EmbedConfig>> {
 	try {
 		const url = buildApiUrl(
@@ -194,6 +283,14 @@ function remoteToConfigPartial(
 	if (typeof data.enableThreadHistory === "boolean") {
 		out.enableThreadHistory = data.enableThreadHistory;
 	}
+	if (typeof data.sessionApi === "string" && data.sessionApi) {
+		out.sessionApi = data.sessionApi;
+	}
+	// WebMCP is on by default and derives its endpoints from the token, so the
+	// only thing a channel can say about it is that it declines.
+	if (typeof data.webmcp?.enabled === "boolean") {
+		out.webmcp = { enabled: data.webmcp.enabled };
+	}
 	if (data.toolCallDisplay === "full") {
 		out.showToolCalls = true;
 	} else if (data.toolCallDisplay === "titles-only") {
@@ -203,6 +300,21 @@ function remoteToConfigPartial(
 	}
 	if (data.visibility) {
 		out.visibility = data.visibility;
+	}
+	if (
+		typeof data.hideAtBottom === "boolean" ||
+		(typeof data.hideAtBottom === "number" &&
+			Number.isFinite(data.hideAtBottom) &&
+			data.hideAtBottom >= 0)
+	) {
+		out.hideAtBottom = data.hideAtBottom;
+	}
+	const documentUpload = parseDocumentUpload(data.documentUpload);
+	if (documentUpload) {
+		out.documentUpload = documentUpload;
+	}
+	if (data.metadata && typeof data.metadata === "object") {
+		out.metadata = data.metadata;
 	}
 	return out;
 }
@@ -263,7 +375,10 @@ export function useRemoteEmbedConfig(
 				api,
 				token,
 				channelId: channelId ?? remote.channelId,
-				mode: initialConfig.mode,
+				// `WidgetMode` names the surfaces that can be on screen, and
+				// `mode: "off"` mounts none — this hook only runs inside a mounted
+				// chat, so the branch is unreachable and reports no surface.
+				mode: initialConfig.mode === "off" ? undefined : initialConfig.mode,
 				source: remote.source,
 			});
 		};
@@ -272,6 +387,8 @@ export function useRemoteEmbedConfig(
 			try {
 				const resolved = resolveConfig(programmatic, cached, scriptConfig);
 				setConfig(resolved);
+				markConfigSource("cache");
+				setTimingMetadata(cached.metadata);
 				setReady(true);
 				debugLog("config resolved (sessionStorage cache)", {
 					config: resolved,
@@ -283,7 +400,10 @@ export function useRemoteEmbedConfig(
 			}
 		}
 		const controller = new AbortController();
-		const safety = setTimeout(() => setReady(true), READINESS_TIMEOUT_MS);
+		const safety = setTimeout(() => {
+			markConfigSource("timeout");
+			setReady(true);
+		}, READINESS_TIMEOUT_MS);
 		void fetchRemoteConfig(api, token, controller.signal, channelId)
 			.then((remote) => {
 				if (controller.signal.aborted) {
@@ -306,6 +426,7 @@ export function useRemoteEmbedConfig(
 						console.error("[Waniwani] Failed to apply remote config:", err);
 					}
 				}
+				markConfigSource("remote");
 				setReady(true);
 				pageView(remote);
 			})

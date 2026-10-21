@@ -1,8 +1,10 @@
 import { WaniWaniError } from "../error.js";
+import { refusalMessage } from "../shared/refusal.js";
 import type { InternalConfig } from "../types.js";
 import type {
 	DocumentExtractInput,
 	DocumentExtractResult,
+	DocumentExtractStoredInput,
 	DocumentSchema,
 	DocumentsClient,
 } from "./types.js";
@@ -22,37 +24,20 @@ interface ExtractWireResponse {
 	documentId: string;
 }
 
-/**
- * The platform puts the machine-readable code on `message` and the human reason
- * on `detail`, so a refusal reads as "UNSUPPORTED_DOCUMENT_TYPE: photo.heic is
- * not one of ...". The raw body is the fallback.
- */
-function refusalMessage(body: string, status: number): string {
-	try {
-		const parsed: unknown = JSON.parse(body);
-		if (parsed !== null && typeof parsed === "object") {
-			const code =
-				"message" in parsed && typeof parsed.message === "string"
-					? parsed.message
-					: "";
-			const detail =
-				"detail" in parsed && typeof parsed.detail === "string"
-					? parsed.detail
-					: "";
-			if (code && detail) {
-				return `${code}: ${detail}`;
-			}
-			if (code) {
-				return code;
-			}
-			if (detail) {
-				return detail;
-			}
-		}
-	} catch {
-		// A non-JSON body is surfaced as-is below.
+function isStoredInput<T>(
+	input: DocumentExtractInput<T>,
+): input is DocumentExtractStoredInput<T> {
+	return "documentId" in input && typeof input.documentId === "string";
+}
+
+/** The platform's body is a union, so each branch's fields must travel alone. */
+function sourceFields<T>(
+	input: DocumentExtractInput<T>,
+): Record<string, string> {
+	if (isStoredInput(input)) {
+		return { documentId: input.documentId };
 	}
-	return body || `Documents API error: HTTP ${status}`;
+	return { url: input.url, filename: input.filename };
 }
 
 export function createDocumentsClient(
@@ -83,8 +68,7 @@ export function createDocumentsClient(
 						"X-WaniWani-SDK": SDK_NAME,
 					},
 					body: JSON.stringify({
-						url: input.url,
-						filename: input.filename,
+						...sourceFields(input),
 						schema: toJSONSchema(input.schema),
 						pages: input.pages,
 						sessionId: input.sessionId,
@@ -96,7 +80,7 @@ export function createDocumentsClient(
 			if (!response.ok) {
 				const text = await response.text().catch(() => "");
 				throw new WaniWaniError(
-					refusalMessage(text, response.status),
+					refusalMessage(text, response.status, "Documents API"),
 					response.status,
 				);
 			}

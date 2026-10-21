@@ -434,3 +434,87 @@ describe("core path stays free of the optional zod peer", () => {
 		expect(offenders).toEqual([]);
 	});
 });
+
+describe("documents.extract — the stored-document branch", () => {
+	test("sends the id alone: no url, no filename, not even as undefined", async () => {
+		const calls = stubFetch(() => envelope(wireData));
+
+		await client().extract({
+			documentId: "doc_upload_1",
+			schema: invoiceSchema,
+		});
+
+		expect(calls[0]?.body.documentId).toBe("doc_upload_1");
+		expect(calls[0]?.body).not.toHaveProperty("url");
+		expect(calls[0]?.body).not.toHaveProperty("filename");
+	});
+
+	test("the url branch still travels without a documentId", async () => {
+		const calls = stubFetch(() => envelope(wireData));
+
+		await client().extract({
+			url: "https://cdn.test/invoice.pdf",
+			filename: "invoice.pdf",
+			schema: invoiceSchema,
+		});
+
+		expect(calls[0]?.body).not.toHaveProperty("documentId");
+		expect(calls[0]?.body.url).toBe("https://cdn.test/invoice.pdf");
+	});
+
+	test("an attached document spread whole leaks neither its filename nor its media type", async () => {
+		const calls = stubFetch(() => envelope(wireData));
+		const attached = {
+			documentId: "doc_upload_1",
+			filename: "passport-scan.png",
+			mediaType: "image/png",
+		};
+
+		await client().extract({ ...attached, schema: invoiceSchema });
+
+		expect(calls[0]?.body.documentId).toBe("doc_upload_1");
+		expect(calls[0]?.body).not.toHaveProperty("filename");
+		expect(calls[0]?.body).not.toHaveProperty("mediaType");
+	});
+
+	test("page selection, session and correlation ids ride along on a stored call", async () => {
+		const calls = stubFetch(() => envelope(wireData));
+
+		await client().extract({
+			documentId: "doc_upload_1",
+			schema: invoiceSchema,
+			pages: [0, 1],
+			sessionId: "sess_1",
+			correlationId: "corr_1",
+		});
+
+		expect(calls[0]?.body.pages).toEqual([0, 1]);
+		expect(calls[0]?.body.sessionId).toBe("sess_1");
+		expect(calls[0]?.body.correlationId).toBe("corr_1");
+	});
+
+	test("the platform's refusal for a stored id surfaces its code and detail", async () => {
+		stubFetch(
+			() =>
+				new Response(
+					JSON.stringify({
+						message: "DOCUMENT_NOT_FOUND",
+						detail: "doc_upload_1 has passed its retention window",
+					}),
+					{ status: 404, headers: { "content-type": "application/json" } },
+				),
+		);
+
+		await client()
+			.extract({ documentId: "doc_upload_1", schema: invoiceSchema })
+			.catch((error: unknown) => {
+				expect(error).toBeInstanceOf(WaniWaniError);
+				if (error instanceof WaniWaniError) {
+					expect(error.status).toBe(404);
+					expect(error.message).toBe(
+						"DOCUMENT_NOT_FOUND: doc_upload_1 has passed its retention window",
+					);
+				}
+			});
+	});
+});

@@ -29,6 +29,7 @@ import { useSuggestions } from "../embed/use-suggestions";
 import type { WidgetEvent } from "../embed/widget-events";
 import { createWidgetEventEmitter } from "../embed/widget-events";
 import { WidgetEventsProvider } from "../embed/widget-events-context";
+import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import type { Locale, MessageOverrides } from "../i18n";
 import {
@@ -36,6 +37,8 @@ import {
 	createNoopChatTrackClient,
 } from "../lib/chat-track";
 import { firePageView } from "../lib/page-view";
+import { markConfigSource, setTimingMetadata } from "../lib/timing";
+import { useBootTiming } from "../lib/timing-context";
 import { ChatEmbed } from "./chat-embed";
 
 /**
@@ -93,6 +96,12 @@ export interface WaniwaniChatOverrides {
 	api?: string;
 	/** Override the MCP server URL (rarely needed). */
 	mcpServerUrl?: string;
+	/**
+	 * The app's agent-runtime session route (`/api/mcp/agent/session`). Set,
+	 * turns go straight to the agent runtime for a chat the route admits, and
+	 * through `api` for one it does not.
+	 */
+	sessionApi?: string;
 	/**
 	 * AI transparency notice rendered under the input (EU AI Act compliance).
 	 * String overrides the default wording; `false` hides it.
@@ -318,11 +327,16 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			const cached = loadCachedConfig(resolvedApi, token, channelId);
 			if (cached) {
 				setRemote(cached);
+				markConfigSource("cache");
+				setTimingMetadata(cached.metadata);
 				setReady(true);
 				pageView(cached);
 			}
 			const controller = new AbortController();
-			const safety = setTimeout(() => setReady(true), READINESS_TIMEOUT_MS);
+			const safety = setTimeout(() => {
+				markConfigSource("timeout");
+				setReady(true);
+			}, READINESS_TIMEOUT_MS);
 			void fetchRemoteConfig(resolvedApi, token, controller.signal, channelId)
 				.then((r) => {
 					if (controller.signal.aborted) {
@@ -332,6 +346,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 						saveCachedConfig(resolvedApi, token, channelId, r);
 						setRemote(r);
 					}
+					markConfigSource("remote");
 					setReady(true);
 					pageView(r);
 				})
@@ -452,6 +467,15 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 		// re-evaluates on SPA route changes.
 		const visible = useVisibilityGate(config.visibility, ready);
 
+		useBootTiming({
+			api: config.api ?? resolvedApi,
+			token: config.token ?? token,
+			channelId: config.channelId ?? channelId,
+			mode: "inline",
+			paintMark: "chatVisible",
+			painted: ready && visible,
+		});
+
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.
 		// `WaniwaniChat` is always an in-page mount, so it reports "inline".
@@ -463,6 +487,10 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			body.channelId = config.channelId;
 		}
 
+		const transport = useDirectTransport(
+			overrides?.sessionApi ?? config.sessionApi,
+		);
+
 		if (!visible) {
 			return null;
 		}
@@ -472,6 +500,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				<ChatEmbed
 					ref={innerRef}
 					api={config.api ?? DEFAULT_API}
+					transport={transport}
 					headers={{ Authorization: `Bearer ${config.token}` }}
 					visitorId={visitorId}
 					skipRemoteConfig
@@ -487,6 +516,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}
 					disclaimer={config.disclaimer}
+					documentUpload={config.documentUpload}
 					allowAttachments={overrides?.allowAttachments}
 					locale={config.locale}
 					messages={overrides?.messages}

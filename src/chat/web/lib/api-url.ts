@@ -1,21 +1,4 @@
-/**
- * Build a sibling endpoint URL from the chat `api` base.
- *
- * The `api` base is a full path to the chat endpoint (e.g.
- * `https://app.waniwani.ai/api/mcp/chat`) and every sibling endpoint
- * (`/config`, `/tools`, `/resource`) lives one segment deeper. Callers used to
- * build these by string concatenation (`` `${api}/config` ``), which breaks
- * when `api` carries a query string: internal surfaces append markers like
- * `?test=1` to the base, and naive concatenation produces
- * `.../chat?test=1/config` — the browser then reads `test=1/config` as the
- * query and hits the wrong route (a GET to the chat endpoint → 405).
- *
- * This inserts `path` before any existing query string, preserves the base's
- * own query params (so a marker like `test=1` propagates to siblings), and
- * merges in `params`. `api` may be absolute or root-relative (the default
- * `/api/waniwani`); the base and query are split textually so both forms work
- * without a document origin.
- */
+/** Preserves the base's query string, so `.../chat?test=1` yields `.../chat/config?test=1` and not `.../chat?test=1/config`, which routes to the chat endpoint. `api` may be absolute or root-relative. */
 export function buildApiUrl(
 	api: string,
 	path: string,
@@ -31,4 +14,23 @@ export function buildApiUrl(
 	}
 	const query = search.toString();
 	return `${base}${path}${query ? `?${query}` : ""}`;
+}
+
+const PLATFORM_MOUNT = "/api/mcp/";
+
+/** Resolves a Waniwani route that lives outside the chat mount (document module, event ingest) against the origin `api` points at. `null` off the platform mount: a customer-hosted runtime serves the chat siblings and nothing else, so `<its origin>/api/mcp/…` is a 404 the caller can neither fix nor explain. */
+export function platformEndpoint(api: string, path: string): string | null {
+	const [rawBase = ""] = api.split("?");
+	let origin = "";
+	let pathname = rawBase;
+	try {
+		const url = new URL(rawBase);
+		origin = url.origin;
+		pathname = url.pathname;
+	} catch {
+		if (!rawBase.startsWith("/")) {
+			return null;
+		}
+	}
+	return pathname.startsWith(PLATFORM_MOUNT) ? `${origin}${path}` : null;
 }

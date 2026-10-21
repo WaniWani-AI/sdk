@@ -14,22 +14,33 @@ import type { ChatEmbedProps, ChatHandle } from "../@types";
 import {
 	PromptInput,
 	PromptInputAddAttachments,
+	PromptInputAttachments,
+	PromptInputDropOverlay,
 	PromptInputSubmit,
 	PromptInputTextarea,
 } from "../ai-elements/prompt-input";
 import { AiDisclaimer } from "../components/ai-disclaimer";
 import { ChatQueue } from "../components/chat-queue";
 import { MessageList } from "../components/message-list";
+import { NewThreadButton } from "../components/new-thread-button";
 import { PoweredBy } from "../components/powered-by";
 import { Suggestions } from "../components/suggestions";
 import { ThreadMenu } from "../components/thread-menu";
 import { useWidgetEvents } from "../embed/widget-events-context";
 import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
+import { useDocumentUpload } from "../hooks/use-document-upload";
 import { useSuggestionRow } from "../hooks/use-suggestion-row";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
+import {
+	bearerToken,
+	sendTiming,
+	type TimingTarget,
+	type WidgetTimingSink,
+} from "../lib/timing";
+import { WidgetTimingProvider } from "../lib/timing-context";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import { Button } from "../ui/button";
@@ -69,6 +80,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			className,
 			classNames,
 			allowAttachments = false,
+			documentUpload,
 			welcomeMessage,
 			welcome,
 			placeholder = t.promptInput.placeholder,
@@ -140,7 +152,37 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		const resourceEndpoint =
 			mcp?.resourceEndpoint ?? buildResourceEndpoint(api, props.headers);
 
+		// Read through a ref so the sink identity stays stable as the session id
+		// lands, which would otherwise re-render every mounted widget frame.
+		const timingTargetRef = useRef<TimingTarget>({});
+		timingTargetRef.current = {
+			api,
+			token: bearerToken(props.headers),
+			channelId:
+				typeof props.body?.channelId === "string"
+					? props.body.channelId
+					: undefined,
+			sessionId: engine.sessionId,
+		};
+		const widgetTiming = useCallback<WidgetTimingSink>((report) => {
+			sendTiming(
+				"widget",
+				timingTargetRef.current,
+				{ widget: report.widget, outcome: report.outcome },
+				report.metrics,
+			);
+		}, []);
+
 		const animatedPlaceholder = useTypingPlaceholder(placeholder, !engine.text);
+
+		const uploads = useDocumentUpload({
+			api,
+			headers: props.headers,
+			uploadHeaders: props.uploadHeaders,
+			sessionId: engine.sessionId,
+			documentUpload,
+			allowAttachments,
+		});
 
 		const [fullscreenToolCallId, setFullscreenToolCallId] = useState<
 			string | null
@@ -455,7 +497,10 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		}, [triggerEvent, engine.handleSubmit, focusInput]);
 
 		const showHeader =
-			!hideHeader && Boolean(title || enableThreadHistory || headerActions);
+			!hideHeader &&
+			Boolean(
+				title || enableThreadHistory || engine.keepsSession || headerActions,
+			);
 
 		// Hold opacity 0 until both the remote-config (caller-driven
 		// `initializing`) and the i18n auto-detect effect have settled.
@@ -508,6 +553,9 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							</div>
 						)}
 						{!title && <div className="ww:flex-1" />}
+						{!enableThreadHistory && engine.keepsSession && (
+							<NewThreadButton onClick={engine.reset} />
+						)}
 						{enableThreadHistory && (
 							<ThreadMenu
 								threads={engine.threads}
@@ -522,7 +570,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							/>
 						)}
 						{/* Rendered last so embed-host actions (e.g. the floating
-						    minimize button) sit at the far right of the header. */}
+						    close button) sit at the far right of the header. */}
 						{headerActions}
 					</div>
 				)}
@@ -541,40 +589,42 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							fullscreenToolCallId && "ww:!py-0",
 						)}
 					>
-						<MessageList
-							messages={engine.messages}
-							status={engine.status}
-							welcomeMessage={welcomeMessage}
-							welcome={welcome}
-							onSuggestionSelect={handleSuggestionSelect}
-							resourceEndpoint={resourceEndpoint}
-							chatSessionId={engine.sessionId}
-							isDark={isDark}
-							onFollowUp={handleWidgetMessage}
-							onCallTool={handleCallTool}
-							fullscreenToolCallId={fullscreenToolCallId}
-							debug={debug}
-							showToolCalls={showToolCalls}
-							toolDefinitions={engine.toolDefinitions}
-							messageClassNames={{
-								message: classNames?.message,
-								userBubble: classNames?.userBubble,
-								assistantBubble: classNames?.assistantBubble,
-							}}
-							onWidgetDisplayModeChange={(mode, widget) => {
-								if (mode === "fullscreen") {
-									// Read the height while the embed is still laid out inline
-									// (before this state change collapses an unbounded parent).
-									const h =
-										rootRef.current?.getBoundingClientRect().height ?? 0;
-									setFrozenHeight(h > 0 ? h : null);
-									setFullscreenToolCallId(widget.toolCallId);
-								} else {
-									setFrozenHeight(null);
-									setFullscreenToolCallId(null);
-								}
-							}}
-						/>
+						<WidgetTimingProvider value={widgetTiming}>
+							<MessageList
+								messages={engine.messages}
+								status={engine.status}
+								welcomeMessage={welcomeMessage}
+								welcome={welcome}
+								onSuggestionSelect={handleSuggestionSelect}
+								resourceEndpoint={resourceEndpoint}
+								chatSessionId={engine.sessionId}
+								isDark={isDark}
+								onFollowUp={handleWidgetMessage}
+								onCallTool={handleCallTool}
+								fullscreenToolCallId={fullscreenToolCallId}
+								debug={debug}
+								showToolCalls={showToolCalls}
+								toolDefinitions={engine.toolDefinitions}
+								messageClassNames={{
+									message: classNames?.message,
+									userBubble: classNames?.userBubble,
+									assistantBubble: classNames?.assistantBubble,
+								}}
+								onWidgetDisplayModeChange={(mode, widget) => {
+									if (mode === "fullscreen") {
+										// Read the height while the embed is still laid out inline
+										// (before this state change collapses an unbounded parent).
+										const h =
+											rootRef.current?.getBoundingClientRect().height ?? 0;
+										setFrozenHeight(h > 0 ? h : null);
+										setFullscreenToolCallId(widget.toolCallId);
+									} else {
+										setFrozenHeight(null);
+										setFullscreenToolCallId(null);
+									}
+								}}
+							/>
+						</WidgetTimingProvider>
 						<div ref={bottomRef} aria-hidden style={{ height: 1 }} />
 					</div>
 					{!atBottom && !fullscreenToolCallId && (
@@ -611,15 +661,27 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							<div className="ww:mx-auto ww:w-full ww:max-w-3xl">
 								<PromptInput
 									onSubmit={engine.handleSubmit}
-									globalDrop={allowAttachments}
-									multiple={allowAttachments}
+									attachmentsEnabled={uploads.enabled}
+									globalDrop={uploads.enabled}
+									multiple={uploads.enabled}
+									accept={uploads.accept}
+									maxFileSize={uploads.maxFileSize}
+									maxPdfPages={uploads.maxPdfPages}
+									maxFiles={uploads.maxFiles}
+									upload={uploads.upload}
+									onDiscard={uploads.onDiscard}
+									onError={uploads.reportError}
 									className={cn(
 										"ww-input ww:rounded-2xl ww:border-border ww:bg-input",
 										classNames?.input,
 									)}
 								>
+									<PromptInputDropOverlay enabled={uploads.enabled} />
+									{uploads.enabled && (
+										<PromptInputAttachments className="ww:px-4 ww:pt-3" />
+									)}
 									<div className="ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-2.5">
-										{allowAttachments && <PromptInputAddAttachments />}
+										{uploads.enabled && <PromptInputAddAttachments />}
 										<PromptInputTextarea
 											onChange={engine.handleTextChange}
 											value={engine.text}
@@ -629,9 +691,15 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 										<PromptInputSubmit
 											status={engine.status}
 											disabled={engine.queueFull}
+											onStop={engine.stop}
 										/>
 									</div>
 								</PromptInput>
+								{uploads.error && (
+									<output className="ww:block ww:pt-1.5 ww:text-center ww:text-destructive ww:text-xs">
+										{uploads.error.message}
+									</output>
+								)}
 								<div className="ww:pt-2 ww:pb-1 ww:flex ww:flex-nowrap ww:justify-center ww:items-center ww:gap-1.5">
 									<PoweredBy />
 									<AiDisclaimer text={disclaimer} />

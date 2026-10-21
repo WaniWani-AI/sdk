@@ -129,11 +129,29 @@ export interface ChatClassNames {
 // Shared Base Props
 // ============================================================================
 
+/** What the platform reports about the documents module for this project. */
+export interface DocumentUploadConfig {
+	enabled: boolean;
+	/** Refused before the upload starts. */
+	maxBytes: number;
+	/** Stated to the visitor; the OCR vendor is what enforces it. */
+	maxPdfPages: number;
+	/** The chat request refuses more than this, so the composer must not take more. */
+	maxFiles: number;
+	/** MIME types the platform accepts. */
+	accept: string[];
+}
+
 export interface ChatBaseProps {
 	/** Waniwani project API key */
 	apiKey?: string;
 	/** Chat API endpoint URL. Defaults to Waniwani hosted endpoint */
 	api?: string;
+	/**
+	 * Builds the transport turns are sent through. Defaults to the chat's own
+	 * HTTP transport to `api`, which it also hands the factory as `fallback`.
+	 */
+	transport?: ChatTransportFactory;
 	/** Pre-loaded messages to display when the chat mounts. */
 	initialMessages?: import("ai").UIMessage[];
 
@@ -170,10 +188,24 @@ export interface ChatBaseProps {
 	visitorId?: VisitorIdInput;
 	/** Additional headers to send with chat API requests */
 	headers?: Record<string, string>;
+	/**
+	 * Extra headers for the document upload and discard requests, merged over
+	 * `headers` for those calls only. Set it where those endpoints take a
+	 * different credential than the chat; everything else in `headers` still
+	 * goes out. Matching names replace, case-insensitively. Browser-visible, so
+	 * public credentials only.
+	 */
+	uploadHeaders?: Record<string, string>;
 	/** Additional body fields to send with each chat request */
 	body?: Record<string, unknown>;
 	/** Enable file attachments in the input. Defaults to false. */
 	allowAttachments?: boolean;
+	/**
+	 * Document upload, as the platform reports it on `GET /api/mcp/chat/config`.
+	 * The composer offers a paperclip, a drop target and paste only while
+	 * `enabled` is true, and the upload endpoint enforces the same flag.
+	 */
+	documentUpload?: DocumentUploadConfig;
 	/** Placeholder text shown in the input field. Defaults to "Ask me anything...". Animates with a typing effect. */
 	placeholder?: string;
 	/**
@@ -186,6 +218,12 @@ export interface ChatBaseProps {
 	onMessageSent?: (message: string) => void;
 	/** Callback fired when a response is received */
 	onResponseReceived?: () => void;
+	/** @experimental Answers tool calls the server left without a result: the return value goes back to the AI as the result, a throw as an error result, and the chat then carries on. Ignored with a custom `transport`. */
+	onToolCall?: (call: {
+		toolCallId: string;
+		toolName: string;
+		input: unknown;
+	}) => unknown;
 	/**
 	 * Suggestion pills. The row obeys a fixed hierarchy — flow > followup >
 	 * page > channel — and every origin is always active.
@@ -415,3 +453,43 @@ export interface ChatHandle {
 		traits?: Record<string, unknown>,
 	) => Promise<{ eventId: string }>;
 }
+
+/** What the chat hands a transport factory. */
+export interface ChatTransportContext {
+	/** The chat's HTTP transport to `api`. */
+	fallback: import("ai").ChatTransport<import("ai").UIMessage>;
+	headers: () => Record<string, string> | undefined;
+	/** The channel, visitor and MCP `extra` a turn is attributed to. */
+	body: () => Record<string, unknown>;
+	/** Whether the chat keeps saved threads, whose messages the chat restores itself. */
+	threadHistory: () => boolean;
+	/** The active saved thread, started if there is none. Undefined without saved threads. */
+	threadId: () => string | undefined;
+	/** Whether the chat already shows messages the transport did not restore. */
+	hasMessages: () => boolean;
+	/** The documents attached to the message being sent, handed over once. */
+	takeTurnInput: () => {
+		documents?: import("../../documents/types").AttachedDocument[];
+	};
+	onSession: (sessionId: string) => void;
+}
+
+/** Optional hooks the chat calls on a transport. */
+export interface ChatTransportLifecycle {
+	/** The visitor started typing their first message. */
+	prepare?(): void;
+	/** On mount: the conversation this browser already holds, as messages to show. */
+	restore?(): Promise<import("ai").UIMessage[]>;
+	/** The visitor started a new conversation. */
+	reset?(): void;
+	/** A saved thread was deleted. */
+	forget?(threadId: string): void;
+	/** Whether a page load brings the session back, which the New chat button needs. */
+	keepsSession?(): boolean;
+	dispose?(): void;
+}
+
+export type ChatTransportFactory = (
+	context: ChatTransportContext,
+) => import("ai").ChatTransport<import("ai").UIMessage> &
+	ChatTransportLifecycle;

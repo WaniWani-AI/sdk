@@ -108,11 +108,23 @@ export const flowOutputSchema = {
 		.describe(
 			"Whether the widget requires user interaction before continuing.",
 		),
+	fields: z
+		.record(z.string(), flowFieldSchema)
+		.optional()
+		.describe(
+			"Every field the flow fills from the conversation, keyed the way stateUpdates takes them. Present once per conversation, on the first question or widget.",
+		),
 	sessionId: z
 		.string()
 		.optional()
 		.describe("Session identifier to pass on future continue and reset calls."),
 	error: z.string().optional().describe("Error message when status is error."),
+	nextStep: z
+		.string()
+		.optional()
+		.describe(
+			"How to handle this response and what the next call to this tool contains. Scoped to the status returned above.",
+		),
 };
 
 export type FlowOutputSchema = typeof flowOutputSchema;

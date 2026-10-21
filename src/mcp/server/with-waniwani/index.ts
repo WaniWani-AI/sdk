@@ -6,7 +6,11 @@ import type { ToolCalledProperties } from "../../../tracking/index.js";
 import { createLogger } from "../../../utils/logger.js";
 import { waniwani } from "../../../waniwani.js";
 import type { FlowGraph } from "../flows/@types.js";
-import { REDACTED_STATE_UPDATE_FIELDS_META_KEY } from "../flows/redacted.js";
+import {
+	hideLegacyFlowGraph,
+	readFlowGraph,
+	readRedactedFields,
+} from "../flows/definition-meta.js";
 import { createScopedClient, SCOPED_CLIENT_KEY } from "../scoped-client.js";
 import { classifyCause } from "../session-errors/classify.js";
 import type { McpServer } from "../types";
@@ -30,6 +34,12 @@ import {
 	safeTrack,
 	type WaniwaniTracker,
 } from "./helpers.js";
+import type { CaptureIntentOptions, IntentCapture } from "./intent-capture.js";
+import {
+	createIntentCapture,
+	readFlowTelemetry,
+	takeIntentArgument,
+} from "./intent-capture.js";
 import { extractTransportSessionId } from "./transport-session.js";
 
 type UnknownRecord = Record<string, unknown>;
@@ -111,6 +121,25 @@ export type WithWaniwaniOptions = {
 	 * @default false
 	 */
 	applyFieldRedactions?: boolean;
+	/**
+	 * Capture why the user came.
+	 *
+	 * Adds one optional `intent` string to every tool's input schema: a brief
+	 * summary of what the user wants and what prompted it, which the calling
+	 * model sends only on its first call to the app. It is stripped before the
+	 * tool's own handler runs and tracked as `properties.telemetry.intent` on
+	 * `tool.called`, beside the tool's own `input`.
+	 *
+	 * Flow tools keep their own top-level `intent` / `context` arguments; their
+	 * values are copied into `properties.telemetry` instead. A tool whose schema
+	 * declares its own `intent` keeps it and captures nothing. Pass an object to
+	 * narrow capture to specific tools (`tools`) or ask the model to keep PII out
+	 * (`omitPII`). Pass `false` to leave every tool schema exactly as declared and
+	 * record no intent.
+	 *
+	 * @default true
+	 */
+	captureIntent?: boolean | CaptureIntentOptions;
 };
 
 const log = createLogger("mcp");
@@ -122,16 +151,7 @@ const REDACTED_VALUE = "REDACTED";
 function buildStateUpdateRedactor(
 	definitionMeta: UnknownRecord | undefined,
 ): ((input: unknown) => unknown) | undefined {
-	if (!definitionMeta) {
-		return undefined;
-	}
-	const fields = definitionMeta[REDACTED_STATE_UPDATE_FIELDS_META_KEY];
-	if (!Array.isArray(fields) || fields.length === 0) {
-		return undefined;
-	}
-	const fieldSet = new Set(
-		fields.filter((f): f is string => typeof f === "string"),
-	);
+	const fieldSet = new Set(readRedactedFields(definitionMeta));
 	if (fieldSet.size === 0) {
 		return undefined;
 	}
@@ -166,15 +186,80 @@ type WrapContext = {
 	tokenCache: WidgetTokenCache | null;
 	injectToken: boolean;
 	funnelSync: FunnelSyncPayload | null;
+	/** `null` when `captureIntent: false` turns capture off. */
+	intentCapture: IntentCapture | null;
 };
 
+/**
+ * How a wrapped tool yields telemetry, resolved once at registration.
+ */
+type TelemetryPlan =
+	| {
+			/** We added `intent` to the schema: strip it from the args and record it. */
+			kind: "injected";
+			/**
+			 * The tool declared no input schema of its own. The MCP SDK calls a
+			 * schemaless tool as `handler(extra)` and a schema-carrying one as
+			 * `handler(args, extra)`, so the injected schema shifts the call shape
+			 * and the tool's own handler still expects the single-argument form.
+			 */
+			schemaWasAbsent: boolean;
+	  }
+	| {
+			/** A flow tool: copy its own top-level `intent` / `context` into telemetry. */
+			kind: "flow";
+	  };
+
 type UnknownRecordOrUndefined = UnknownRecord | undefined;
+
+/**
+ * Decide how one tool yields telemetry, and extend its schema when we add the
+ * argument.
+ *
+ * Returns `undefined` when the tool records none: capture is off, the tool is
+ * outside the allow-list, it declares its own `intent`, or its schema is not
+ * an object we can extend. A flow tool (its `_meta` carries a flow graph)
+ * keeps its schema, since it already asks for `intent` and `context`.
+ *
+ * Both registration orders funnel through here: the intercepted `registerTool`
+ * (which puts the schema on the config) and the `_registeredTools` walk (which
+ * assigns `entry.inputSchema`).
+ */
+function planTelemetry(
+	toolName: string,
+	inputSchema: unknown,
+	definitionMeta: UnknownRecordOrUndefined,
+	ctx: WrapContext,
+): { plan: TelemetryPlan; schema?: unknown } | undefined {
+	const capture = ctx.intentCapture;
+	if (!capture?.appliesTo(toolName)) {
+		return undefined;
+	}
+
+	if (readFlowGraph(definitionMeta)) {
+		return { plan: { kind: "flow" } };
+	}
+
+	const schema = capture.augment(inputSchema);
+	if (schema === undefined) {
+		return undefined;
+	}
+
+	return {
+		plan: {
+			kind: "injected",
+			schemaWasAbsent: inputSchema === undefined || inputSchema === null,
+		},
+		schema,
+	};
+}
 
 function createWrappedHandler(
 	toolName: string,
 	originalHandler: RawHandler,
 	ctx: WrapContext,
 	definitionMeta: UnknownRecordOrUndefined,
+	telemetryPlan: TelemetryPlan | undefined,
 ): MaybeWrappedHandler {
 	const { server, tracker, opts, tokenCache, injectToken } = ctx;
 
@@ -182,17 +267,41 @@ function createWrappedHandler(
 		opts.applyFieldRedactions === true
 			? buildStateUpdateRedactor(definitionMeta)
 			: undefined;
+
+	// A tool that declared no input schema takes `extra` alone. The injected
+	// schema makes the MCP SDK call this wrapper as `(args, extra)`, so restore
+	// the single-argument call its handler was written for; a caller that still
+	// uses the single-argument shape passes the extra as `input` and nothing else.
+	const invokeOriginal: RawHandler =
+		telemetryPlan?.kind === "injected" && telemetryPlan.schemaWasAbsent
+			? (input, extra) =>
+					(originalHandler as unknown as (extra: unknown) => unknown)(
+						extra === undefined ? input : extra,
+					)
+			: originalHandler;
+
 	const wrappedHandler: MaybeWrappedHandler = async (
 		input: unknown,
 		extra: unknown,
 	) => {
-		const effectiveOpts = stateUpdateRedactor
-			? {
-					...opts,
-					redactInput: stateUpdateRedactor,
-					funnelSync: ctx.funnelSync,
-				}
-			: { ...opts, funnelSync: ctx.funnelSync };
+		const effectiveOpts = {
+			...opts,
+			funnelSync: ctx.funnelSync,
+			...(stateUpdateRedactor && { redactInput: stateUpdateRedactor }),
+		};
+		// The injected `intent` is ours, not the tool's: split it off before
+		// anything else sees the input, so the handler and the tracked `input` both
+		// get exactly the tool's own arguments.
+		const { input: toolInput, telemetry } =
+			telemetryPlan?.kind === "injected"
+				? takeIntentArgument(input)
+				: {
+						input,
+						telemetry:
+							telemetryPlan?.kind === "flow"
+								? readFlowTelemetry(input)
+								: undefined,
+					};
 		// Inject scoped client into extra so createTool/flows can surface it
 		const meta = extractMeta(extra) ?? {};
 
@@ -217,11 +326,10 @@ function createWrappedHandler(
 			}
 		}
 
-		// Resolve and stamp the caller source into _meta once, so downstream
-		// consumers (flow nodes, nested tool handlers, tracking) can branch on
-		// `waniwani/source` without each re-deriving it from clientInfo/headers.
-		// Hosts like Claude carry no source in _meta and no transport session id;
-		// clientInfo (MCP initialize) and the request headers are the only signals.
+		// Stamp the recognised caller source into _meta once, so flow nodes, nested
+		// tool handlers and tracking read one `waniwani/source`. Hosts like Claude
+		// carry none in _meta; clientInfo (MCP initialize) and the request headers
+		// are the signals. Only tracking falls back to an unrecognised client name.
 		if (!extractSource(meta) && isRecord(extra)) {
 			const headers = (extra as { requestInfo?: { headers?: unknown } })
 				.requestInfo?.headers as Record<string, unknown> | undefined;
@@ -245,7 +353,7 @@ function createWrappedHandler(
 		const startTime = performance.now();
 		try {
 			const result = await retrievalCollectorStore.run(retrievalCollector, () =>
-				originalHandler(input, extra),
+				invokeOriginal(toolInput, extra),
 			);
 			const durationMs = Math.round(performance.now() - startTime);
 
@@ -277,7 +385,7 @@ function createWrappedHandler(
 						}),
 					},
 					clientInfo,
-					{ input, output: result },
+					{ input: toolInput, output: result, telemetry },
 					retrievalCollector.searches,
 				),
 				opts.onError,
@@ -324,7 +432,7 @@ function createWrappedHandler(
 						cause: classifyCause({ error }),
 					},
 					clientInfo,
-					{ input },
+					{ input: toolInput, telemetry },
 					retrievalCollector.searches,
 				),
 				opts.onError,
@@ -361,6 +469,12 @@ function createWrappedHandler(
  * OpenAI's `_meta["openai/outputTemplate"]`) is also forwarded into each tool
  * result's `_meta`, so chat UIs that only see tool results (and not
  * `tools/list`) can still render widgets. Handler-set keys take precedence.
+ *
+ * Every tool's input schema also gains an optional `intent` argument, which the
+ * calling model fills on its first call to the app; it is stripped before the
+ * tool's handler runs and tracked as `properties.telemetry.intent` on
+ * `tool.called`. Pass `captureIntent: false` to leave tool schemas exactly as
+ * declared.
  */
 export async function withWaniwani(
 	server: McpServer,
@@ -391,6 +505,7 @@ export async function withWaniwani(
 		tokenCache,
 		injectToken,
 		funnelSync: null,
+		intentCapture: createIntentCapture(opts.captureIntent),
 	};
 
 	const originalRegisterTool = server.registerTool.bind(server) as (
@@ -411,16 +526,40 @@ export async function withWaniwani(
 
 		const definitionMeta =
 			isRecord(config) && isRecord((config as UnknownRecord)._meta)
-				? ((config as UnknownRecord)._meta as UnknownRecord)
+				? hideLegacyFlowGraph((config as UnknownRecord)._meta as UnknownRecord)
 				: undefined;
+
+		const telemetry = isRecord(config)
+			? planTelemetry(
+					toolName,
+					(config as UnknownRecord).inputSchema,
+					definitionMeta,
+					ctx,
+				)
+			: undefined;
 
 		const wrapped = createWrappedHandler(
 			toolName,
 			handlerRaw as RawHandler,
 			ctx,
 			definitionMeta,
+			telemetry?.plan,
 		);
-		return originalRegisterTool(toolNameRaw, config, wrapped);
+
+		const metaMoved =
+			isRecord(config) && definitionMeta !== (config as UnknownRecord)._meta;
+		const effectiveConfig =
+			metaMoved || telemetry?.schema !== undefined
+				? {
+						...(config as UnknownRecord),
+						...(metaMoved && { _meta: definitionMeta }),
+						...(telemetry?.schema !== undefined && {
+							inputSchema: telemetry.schema,
+						}),
+					}
+				: config;
+
+		return originalRegisterTool(toolNameRaw, effectiveConfig, wrapped);
 	}) as McpServer["registerTool"];
 
 	// Wrap any tools that were already registered before withWaniwani() ran.
@@ -449,15 +588,41 @@ export async function withWaniwani(
 				continue;
 			}
 
+			// The MCP SDK serves `tools/list` from `entry._meta`, so swapping it
+			// here keeps a hand-set `_flowGraph` off the wire.
 			const definitionMeta = isRecord(entry._meta)
-				? (entry._meta as UnknownRecord)
+				? hideLegacyFlowGraph(entry._meta as UnknownRecord)
 				: undefined;
+			if (definitionMeta) {
+				entry._meta = definitionMeta;
+			}
+
+			// Only a tool whose handler we wrap gets the argument: the wrapper is what
+			// strips it again and restores a schemaless tool's call shape. A task
+			// handler (an object, skipped above) keeps its schema as declared.
+			//
+			// The MCP SDK reads `entry.inputSchema` when it serves `tools/list` and
+			// when it validates a call, so reassigning it upgrades the tool in place.
+			// This is the schema half of the SDK's own
+			// `registeredTool.update({ paramsSchema })`; it skips the
+			// `tools/list_changed` notification that method also sends, because
+			// `withWaniwani` runs before `connect()` in every supported call order.
+			const telemetry = planTelemetry(
+				toolName,
+				(entry as UnknownRecord).inputSchema,
+				definitionMeta,
+				ctx,
+			);
+			if (telemetry?.schema !== undefined) {
+				(entry as UnknownRecord).inputSchema = telemetry.schema;
+			}
 
 			entry.handler = createWrappedHandler(
 				toolName,
 				existing,
 				ctx,
 				definitionMeta,
+				telemetry?.plan,
 			);
 		}
 	}
@@ -473,14 +638,8 @@ export async function withWaniwani(
 		if (registeredToolsMap && typeof registeredToolsMap === "object") {
 			for (const entry of Object.values(registeredToolsMap)) {
 				if (entry && typeof entry === "object") {
-					const meta = (entry as Record<string, unknown>)._meta;
-					const fg =
-						meta && typeof meta === "object"
-							? ((meta as Record<string, unknown>)._flowGraph as
-									| FlowGraph
-									| undefined)
-							: undefined;
-					if (fg?.nodes?.length) {
+					const fg = readFlowGraph((entry as Record<string, unknown>)._meta);
+					if (fg?.nodes.length) {
 						flowGraphs.push(fg);
 					}
 				}

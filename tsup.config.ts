@@ -1,4 +1,35 @@
+import { createRequire } from "node:module";
 import { defineConfig } from "tsup";
+import type { Plugin } from "esbuild";
+
+// `decode-named-character-reference` picks `index.dom.js` under the browser
+// condition, and that file runs `document.createElement` at module load, so any
+// SSR import of the chat entry throws. Node's resolver never applies `browser`,
+// so this hands back the isomorphic `index.js`.
+const nodeRequire = createRequire(import.meta.url);
+
+const isomorphicEntityDecoder = nodeRequire.resolve(
+	"decode-named-character-reference",
+);
+
+// The chat surfaces report their own version in timing telemetry, so it is read
+// from package.json rather than restated in a source constant that would drift.
+const sdkVersion: Record<string, string> = {
+	__WANIWANI_SDK_VERSION__: JSON.stringify(
+		(nodeRequire("./package.json") as { version: string }).version,
+	),
+};
+
+// eve's client pre-bundles its own copy of zod, which no bundler can tree-shake
+// or share, so it resolves to the zod this build already carries.
+const eveSharesZod: Plugin = {
+	name: "eve-shares-zod",
+	setup(build) {
+		build.onResolve({ filter: /^#compiled\/zod\/index\.js$/ }, (args) =>
+			build.resolve("zod", { kind: args.kind, resolveDir: args.resolveDir }),
+		);
+	},
+};
 
 export default defineConfig([
 	// Core tracking SDK
@@ -37,6 +68,7 @@ export default defineConfig([
 		entry: { "mcp/react": "src/mcp/react/index.ts" },
 		format: ["esm"],
 		target: "es2022",
+		platform: "browser",
 		dts: true,
 		clean: false,
 		shims: false,
@@ -59,6 +91,7 @@ export default defineConfig([
 		entry: { "mcp/react/skybridge": "src/mcp/react/skybridge.ts" },
 		format: ["esm"],
 		target: "es2022",
+		platform: "browser",
 		dts: true,
 		clean: false,
 		shims: false,
@@ -76,11 +109,12 @@ export default defineConfig([
 			js: '"use client";',
 		},
 	},
-	// Chat widget (React component)
+	// Chat widget. platform "browser" keeps nanoid and streamdown → unified → vfile off their Node entries, which leak bare crypto/path/process/url imports.
 	{
 		entry: { "chat/index": "src/chat/web/index.ts" },
 		format: ["esm"],
 		target: "es2022",
+		platform: "browser",
 		dts: true,
 		clean: false,
 		shims: false,
@@ -97,6 +131,14 @@ export default defineConfig([
 		banner: {
 			js: '"use client";',
 		},
+		define: sdkVersion,
+		esbuildOptions(options) {
+			options.alias = {
+				...options.alias,
+				"decode-named-character-reference": isomorphicEntityDecoder,
+			};
+		},
+		esbuildPlugins: [eveSharesZod],
 	},
 	// Internal SDK surface (mounted at @waniwani/sdk/internal — not public).
 	// Used by the Waniwani platform (app.waniwani.ai). Not for third parties.
@@ -159,8 +201,10 @@ export default defineConfig([
 			return { js: ".js" };
 		},
 		platform: "browser",
+		esbuildPlugins: [eveSharesZod],
 		define: {
 			"process.env.NODE_ENV": '"production"',
+			...sdkVersion,
 		},
 		esbuildOptions(options) {
 			// Lighter alternatives for the embed IIFE bundle.

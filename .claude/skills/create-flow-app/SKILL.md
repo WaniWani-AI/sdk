@@ -40,8 +40,9 @@ await myFlow.register(server);
 ## Opening message (intro)
 
 If the flow should introduce the assistant or state a data/GDPR notice, put it on the config as
-`intro` — never as a first node. Pre-filled state skips opening nodes, so a greeting node is the
-one node most likely never to run.
+`intro` — never as a first node. An opening node is skipped once its fields are filled, by an
+earlier action or by an answer the user gave up front, so a greeting node is the one node most
+likely never to reach the user.
 
 ```ts
 createFlow({
@@ -103,9 +104,11 @@ Never import `interrupt` or `showWidget` directly.
 ## Common gotchas
 
 - **Forgetting `START` / `END` edges**: every flow needs `addEdge(START, firstNode)` and `addEdge(lastNode, END)`.
-- **Missing `.describe()` on state fields**: the model reads these descriptions to know what to ask and what it can pre-fill. Skipping them degrades the flow significantly.
+- **Missing `.describe()` on state fields**: each question carries its field's description as `fieldSchema`, and the model reads it to phrase the question and to recognize an answer the user already gave. Skipping them degrades the flow significantly.
+- **Putting a server-only value in `state`**: the session's first question or widget lists every state field in `fields`, and any call may write a declared field whose value fits its schema. A lookup id or a price the user must not choose stays out of `state`: compute it in the node that needs it, or store it server-side keyed by `ctx.sessionId`. A node guarded with `if (state.vehicleId) return {};` keeps whatever value the model sent.
+- **Leaving a consent prefillable**: wrap a consent, an attestation, or a widget pick that must happen on screen in `neverPrefilled(schema)`. It stays out of `fields` and takes a value only once the flow asks for it.
 - **Calling `.compile()` with no store and no API key**: throws immediately with a clear migration message. Pick one.
-- **A greeting or disclaimer node**: use the `intro` config option instead, or pre-filled state will skip it.
+- **A greeting or disclaimer node**: use the `intro` config option instead, or it may never reach the user.
 - **State is always `Partial<TState>`**: at any node, only fields filled by earlier nodes are populated. Guard with `if (!state.x) return {};`.
 
 ## Don't suggest

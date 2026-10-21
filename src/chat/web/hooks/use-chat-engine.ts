@@ -1,15 +1,17 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import type { FileUIPart, UIMessage } from "ai";
+import type { ChatTransport, FileUIPart, UIMessage } from "ai";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { AttachedDocument } from "../../../documents/types";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import { hasModelContext } from "../../../shared/model-context";
-import type { ChatBaseProps } from "../@types";
+import type { ChatBaseProps, ChatTransportLifecycle } from "../@types";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
 import { useWidgetEvents } from "../embed/widget-events-context";
 import { buildApiUrl } from "../lib/api-url";
+import { discardDocument } from "../lib/document-upload";
 import { LenientChatTransport } from "../lib/lenient-chat-transport";
 import {
 	deleteThread as deleteThreadFromStore,
@@ -20,12 +22,19 @@ import {
 	type StoredThread,
 	upsertThread,
 } from "../lib/thread-store";
+import {
+	bearerToken,
+	startTurn,
+	type TimingTarget,
+	type TurnTimer,
+} from "../lib/timing";
 import type { VisitorContext } from "../lib/visitor-context";
 import {
 	applyVisitorId,
 	collectVisitorContext,
 	getOrCreateVisitorId,
 } from "../lib/visitor-context";
+import { usePageToolCalls } from "./use-page-tool-calls";
 
 const SESSION_HEADER_NAME = "x-session-id";
 const THREAD_PERSIST_DEBOUNCE_MS = 250;
@@ -57,6 +66,7 @@ export interface QueuedMessage {
 	id: string;
 	text: string;
 	files: FileUIPart[];
+	documents: AttachedDocument[];
 	modelContext?: ModelContextUpdate;
 }
 
@@ -122,6 +132,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	const {
 		api = "/api/waniwani",
 		headers: userHeaders,
+		uploadHeaders,
 		body,
 		onMessageSent,
 		onResponseReceived,
@@ -145,6 +156,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	const widgetEvents = useWidgetEvents();
 
 	const headersRef = useRef(userHeaders);
+	const uploadHeadersRef = useRef(uploadHeaders);
 	const bodyRef = useRef(body);
 	const enableThreadHistoryRef = useRef(enableThreadHistory);
 	useEffect(() => {
@@ -153,6 +165,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	const pendingModelContextRef = useRef<ModelContextUpdate | undefined>(
 		undefined,
 	);
+	const pendingDocumentsRef = useRef<AttachedDocument[] | undefined>(undefined);
 	const visitorContextRef = useRef<VisitorContext | null>(null);
 	const [sessionId, setSessionIdState] = useState<string | undefined>(
 		undefined,
@@ -252,7 +265,8 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	useEffect(() => {
 		headersRef.current = userHeaders;
-	}, [userHeaders]);
+		uploadHeadersRef.current = uploadHeaders;
+	}, [userHeaders, uploadHeaders]);
 
 	useEffect(() => {
 		bodyRef.current = body;
@@ -320,7 +334,67 @@ export function useChatEngine(props: ChatBaseProps) {
 		};
 	}, []);
 
-	const transportRef = useRef(
+	const turnRef = useRef<TurnTimer | null>(null);
+	const bodyString = useCallback((key: string): string | undefined => {
+		const value = bodyRef.current?.[key];
+		return typeof value === "string" ? value : undefined;
+	}, []);
+	const timingTarget = useCallback(
+		(): TimingTarget => ({
+			api,
+			token: bearerToken(headersRef.current),
+			channelId: bodyString("channelId"),
+			sessionId: sessionIdRef.current,
+		}),
+		[api, bodyString],
+	);
+	const reportTurn = useCallback(
+		(outcome: "ok" | "error") => {
+			const turn = turnRef.current;
+			turnRef.current = null;
+			turn?.report(timingTarget(), { mode: bodyString("mode"), outcome });
+		},
+		[timingTarget, bodyString],
+	);
+
+	// Auto-inject SDK-managed identifiers into `extra` so they reach MCP
+	// `_meta["waniwani/extra"]`. Caller-supplied `body.extra` keys win on collision.
+	const mcpExtra = useCallback(
+		(callerValue: unknown): Record<string, unknown> | undefined => {
+			const callerExtra =
+				typeof callerValue === "object" &&
+				callerValue !== null &&
+				!Array.isArray(callerValue)
+					? (callerValue as Record<string, unknown>)
+					: undefined;
+			const memoryUserId = visitorContextRef.current?.memoryUserId;
+			const locale = visitorContextRef.current?.language;
+			const autoExtra: Record<string, unknown> = {};
+			if (memoryUserId) {
+				autoExtra.memoryUserId = memoryUserId;
+			}
+			if (locale) {
+				autoExtra.locale = locale;
+			}
+			return Object.keys(autoExtra).length > 0 || callerExtra
+				? { ...autoExtra, ...(callerExtra ?? {}) }
+				: undefined;
+		},
+		[],
+	);
+
+	const ensureThreadId = useCallback((): string => {
+		let tid = activeThreadIdRef.current;
+		if (!tid) {
+			tid = generateThreadId();
+			threadCreatedAtRef.current = nowIso();
+			threadTitleRef.current = undefined;
+			setActiveThreadId(tid);
+		}
+		return tid;
+	}, [setActiveThreadId]);
+
+	const appTransport = useRef(
 		new LenientChatTransport({
 			api,
 			headers: () => ({
@@ -348,6 +422,10 @@ export function useChatEngine(props: ChatBaseProps) {
 
 				if (hasModelContext(pendingModelContextRef.current)) {
 					resolvedBody.modelContext = pendingModelContextRef.current;
+				}
+
+				if (pendingDocumentsRef.current?.length) {
+					resolvedBody.documents = pendingDocumentsRef.current;
 				}
 
 				// Resolve the visitor id synchronously so it is present on the very
@@ -389,42 +467,23 @@ export function useChatEngine(props: ChatBaseProps) {
 					},
 				};
 
-				// Auto-inject SDK-managed identifiers into `extra` so the upstream
-				// API forwards them to MCP `_meta["waniwani/extra"]`.
-				// Caller-supplied `body.extra` keys win on collision.
-				const callerExtra =
-					typeof resolvedBody.extra === "object" &&
-					resolvedBody.extra !== null &&
-					!Array.isArray(resolvedBody.extra)
-						? (resolvedBody.extra as Record<string, unknown>)
-						: undefined;
-				const memoryUserId = visitorContextRef.current?.memoryUserId;
-				const locale = visitorContextRef.current?.language;
-				const autoExtra: Record<string, unknown> = {};
-				if (memoryUserId) {
-					autoExtra.memoryUserId = memoryUserId;
+				// Read per send, so it follows a single-page site's in-app navigation.
+				if (
+					!Object.hasOwn(resolvedBody, "pageUrl") &&
+					typeof window !== "undefined"
+				) {
+					resolvedBody.pageUrl = window.location.href;
 				}
-				if (locale) {
-					autoExtra.locale = locale;
-				}
-				if (Object.keys(autoExtra).length > 0 || callerExtra) {
-					resolvedBody.extra = {
-						...autoExtra,
-						...(callerExtra ?? {}),
-					};
+
+				const extra = mcpExtra(resolvedBody.extra);
+				if (extra) {
+					resolvedBody.extra = extra;
 				}
 
 				if (enableThreadHistoryRef.current) {
 					const hasExplicitThreadId = Object.hasOwn(resolvedBody, "threadId");
 					if (!hasExplicitThreadId) {
-						let tid = activeThreadIdRef.current;
-						if (!tid) {
-							tid = generateThreadId();
-							threadCreatedAtRef.current = nowIso();
-							threadTitleRef.current = undefined;
-							setActiveThreadId(tid);
-						}
-						resolvedBody.threadId = tid;
+						resolvedBody.threadId = ensureThreadId();
 					} else if (typeof resolvedBody.threadId === "string") {
 						activeThreadIdRef.current = resolvedBody.threadId;
 					}
@@ -433,12 +492,49 @@ export function useChatEngine(props: ChatBaseProps) {
 				return resolvedBody;
 			},
 			fetch: (async (input, init) => {
-				const response = await fetch(input, init);
-				pendingModelContextRef.current = undefined;
-				setSessionId(response.headers.get(SESSION_HEADER_NAME));
-				return response;
+				const turn = turnRef.current;
+				turn?.mark("requestStart");
+				try {
+					const response = await fetch(input, init);
+					pendingModelContextRef.current = undefined;
+					setSessionId(response.headers.get(SESSION_HEADER_NAME));
+					return turn ? turn.instrument(response) : response;
+				} finally {
+					// A request that never landed still consumed its documents; the
+					// next turn must not re-attach them.
+					pendingDocumentsRef.current = undefined;
+				}
 			}) as typeof fetch,
 		}),
+	);
+
+	const transportRef = useRef<
+		ChatTransport<UIMessage> & ChatTransportLifecycle
+	>(
+		props.transport?.({
+			fallback: appTransport.current,
+			headers: () => headersRef.current,
+			body: () => {
+				const extra = mcpExtra(bodyRef.current?.extra);
+				return {
+					channelId: bodyString("channelId"),
+					visitor: { id: getOrCreateVisitorId() },
+					...(extra ? { extra } : {}),
+				};
+			},
+			threadHistory: () => enableThreadHistoryRef.current,
+			threadId: () =>
+				enableThreadHistoryRef.current ? ensureThreadId() : undefined,
+			hasMessages: (): boolean => messagesRef.current.length > 0,
+			// The runtime has nowhere to put model context; the chat route drops it too.
+			takeTurnInput: () => {
+				const documents = pendingDocumentsRef.current;
+				pendingDocumentsRef.current = undefined;
+				pendingModelContextRef.current = undefined;
+				return documents?.length ? { documents } : {};
+			},
+			onSession: setSessionId,
+		}) ?? appTransport.current,
 	);
 
 	const pendingWaitRef = useRef<{
@@ -477,10 +573,34 @@ export function useChatEngine(props: ChatBaseProps) {
 		void refreshToolDefinitions();
 	}, [refreshToolDefinitions]);
 
-	const { messages, sendMessage, setMessages, status } = useChat({
+	// Inert without `onToolCall`: `pending` stays false and `useChat` gets the
+	// same options as it always has.
+	const {
+		chatRef: pageToolChatRef,
+		pending: pageToolCallsPending,
+		handleFinish: handPageToolCalls,
+		stop: stopPageToolCalls,
+		drop: dropPageToolCalls,
+		release: releasePageToolCalls,
+		markRequest: markPageToolRequest,
+	} = usePageToolCalls(props.transport ? undefined : props.onToolCall);
+
+	const {
+		messages,
+		sendMessage,
+		setMessages,
+		status,
+		stop: stopStream,
+		addToolOutput,
+	} = useChat({
 		messages: props.initialMessages,
 		transport: transportRef.current,
 		onFinish({ message, isAbort, isDisconnect, isError }) {
+			turnRef.current?.mark("streamEnd");
+			reportTurn(isAbort || isDisconnect || isError ? "error" : "ok");
+			if (!isAbort && !isDisconnect && !isError) {
+				handPageToolCalls(message);
+			}
 			// `onFinish` also runs for aborted/disconnected/errored requests.
 			// `onResponseReceived` fires for all of them; the widget event is
 			// emitted only for a successful assistant reply.
@@ -495,6 +615,7 @@ export function useChatEngine(props: ChatBaseProps) {
 			}
 		},
 		onError(error) {
+			reportTurn("error");
 			console.warn("[Waniwani] Chat error:", error.message);
 			widgetEvents.emit({
 				name: "chat.error",
@@ -509,10 +630,88 @@ export function useChatEngine(props: ChatBaseProps) {
 		},
 	});
 
+	useEffect(() => {
+		pageToolChatRef.current = { addToolOutput, sendMessage };
+	}, [pageToolChatRef, addToolOutput, sendMessage]);
+
 	const messagesRef = useRef<UIMessage[]>(messages);
 	useEffect(() => {
 		messagesRef.current = messages;
 	}, [messages]);
+
+	const keepsSession = transportRef.current.keepsSession?.() ?? false;
+	const restoredRef = useRef(false);
+
+	// An embed's transport keeps a session only once its remote config answers, after mount.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: restore when the transport starts keeping a session
+	useEffect(() => {
+		if (
+			!keepsSession ||
+			restoredRef.current ||
+			messagesRef.current.length > 0
+		) {
+			return;
+		}
+		restoredRef.current = true;
+		void transportRef.current
+			.restore?.()
+			.then((restored) => {
+				if (restored.length > 0 && messagesRef.current.length === 0) {
+					setMessages(restored);
+				}
+			})
+			.catch(() => {});
+	}, [keepsSession]);
+
+	useEffect(() => {
+		const transport = transportRef.current;
+		return () => transport.dispose?.();
+	}, []);
+
+	const beginTurn = useCallback(() => {
+		markPageToolRequest();
+		turnRef.current = startTurn(
+			messagesRef.current.filter((m) => m.role === "user").length + 1,
+		);
+	}, [markPageToolRequest]);
+
+	// Dropping the stream leaves the server generating. `/cancel` is what stops
+	// the turn itself; a host that does not serve it answers 404, which is fine
+	// because the abort above already happened.
+	// Aborting the stream flips `status` to "ready" straight away, which is the
+	// condition the queue drain waits on, while /cancel is still in flight and
+	// names only the session. Draining then hands the server a fresh turn for the
+	// cancellation to land on. Holding the queue until this settles is what keeps
+	// Stop pointed at the turn the visitor stopped.
+	const [cancelling, setCancelling] = useState(false);
+
+	const stop = useCallback(async () => {
+		// Waiting on the page, the stream has already ended and the server is idle.
+		if (await stopPageToolCalls()) {
+			return;
+		}
+		setCancelling(true);
+		try {
+			await stopStream();
+			const sessionId = sessionIdRef.current;
+			if (!sessionId) {
+				return;
+			}
+			await fetch(buildApiUrl(api, "/cancel"), {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					...headersRef.current,
+				},
+				body: JSON.stringify({ sessionId }),
+			});
+		} catch {
+			// Same reasoning as a 404: the visitor already got their stop. Nothing
+			// here may reject, because the caller is an onClick that drops the promise.
+		} finally {
+			setCancelling(false);
+		}
+	}, [api, stopStream, stopPageToolCalls]);
 
 	// Hydrate persisted history when it's enabled *after* mount — commonly via
 	// the remote embed config (the dashboard toggle, not a data-attr/prop). The
@@ -607,20 +806,67 @@ export function useChatEngine(props: ChatBaseProps) {
 	}, [status]);
 
 	const [text, setText] = useState("");
+	// A host resolving its own visitor id asynchronously gets its session on the first send instead.
+	const prewarm = typeof propVisitorId !== "function";
+	const typing = text.length > 0;
+	useEffect(() => {
+		if (prewarm && typing) {
+			transportRef.current.prepare?.();
+		}
+	}, [prewarm, typing]);
 	const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
+	const queuedMessagesRef = useRef<QueuedMessage[]>([]);
+	queuedMessagesRef.current = queuedMessages;
 
-	const isLoading = status === "submitted" || status === "streaming";
+	// A page still answering tool calls counts as busy, so a message typed
+	// meanwhile queues rather than landing after an unanswered tool call.
+	const isLoading =
+		status === "submitted" || status === "streaming" || pageToolCallsPending;
 
-	const removeQueuedMessage = useCallback((id: string) => {
-		setQueuedMessages((prev) => prev.filter((m) => m.id !== id));
-	}, []);
+	/**
+	 * A queued message the visitor never sends takes its uploads with it. The
+	 * send path must not call this: dequeuing to send is not taking it back.
+	 */
+	const dropQueued = useCallback(
+		(dropped: QueuedMessage[]) => {
+			for (const message of dropped) {
+				for (const document of message.documents ?? []) {
+					void discardDocument({
+						documentId: document.documentId,
+						api,
+						headers: headersRef.current,
+						uploadHeaders: uploadHeadersRef.current,
+					});
+				}
+			}
+		},
+		[api],
+	);
+
+	const discardAllQueued = useCallback(() => {
+		dropQueued(queuedMessagesRef.current);
+		setQueuedMessages([]);
+	}, [dropQueued]);
+
+	const removeQueuedMessage = useCallback(
+		(id: string) => {
+			const found = queuedMessagesRef.current.find((m) => m.id === id);
+			if (found) {
+				dropQueued([found]);
+			}
+			setQueuedMessages((prev) => prev.filter((m) => m.id !== id));
+		},
+		[dropQueued],
+	);
 
 	const queueFull = isLoading && queuedMessages.length > 0;
 
 	const handleSubmit = useCallback(
 		(message: ChatEngineMessage) => {
 			const hasText = Boolean(message.text?.trim());
-			const hasFiles = Boolean(message.files?.length);
+			const hasFiles = Boolean(
+				message.files?.length || message.documents?.length,
+			);
 			if (!(hasText || hasFiles)) {
 				return;
 			}
@@ -637,6 +883,7 @@ export function useChatEngine(props: ChatBaseProps) {
 						id: nanoid(),
 						text: message.text || "",
 						files: message.files ?? [],
+						documents: message.documents ?? [],
 						modelContext: message.modelContext,
 					},
 				]);
@@ -644,10 +891,15 @@ export function useChatEngine(props: ChatBaseProps) {
 				return;
 			}
 
+			beginTurn();
 			pendingModelContextRef.current = message.modelContext;
+			pendingDocumentsRef.current = message.documents;
 			sendMessage({
 				text: message.text || "",
 				files: message.files,
+				...(message.documents?.length && {
+					metadata: { documents: message.documents },
+				}),
 			});
 
 			onMessageSent?.(message.text || "");
@@ -660,6 +912,7 @@ export function useChatEngine(props: ChatBaseProps) {
 			isLoading,
 			queuedMessages.length,
 			widgetEvents,
+			beginTurn,
 		],
 	);
 
@@ -667,17 +920,18 @@ export function useChatEngine(props: ChatBaseProps) {
 		(text: string): Promise<unknown> => {
 			return new Promise((resolve, reject) => {
 				pendingWaitRef.current = { resolve, reject };
+				beginTurn();
 				sendMessage({ text });
 				onMessageSent?.(text);
 				widgetEvents.emit({ name: "message.sent" });
 			});
 		},
-		[sendMessage, onMessageSent, widgetEvents],
+		[sendMessage, onMessageSent, widgetEvents, beginTurn],
 	);
 
 	// Flush first queued message once the current response finishes
 	useEffect(() => {
-		if (status !== "ready") {
+		if (status !== "ready" || cancelling || pageToolCallsPending) {
 			return;
 		}
 		if (queuedMessages.length === 0) {
@@ -687,24 +941,46 @@ export function useChatEngine(props: ChatBaseProps) {
 		const [first, ...rest] = queuedMessages;
 		setQueuedMessages(rest);
 
+		beginTurn();
 		pendingModelContextRef.current = first.modelContext;
+		pendingDocumentsRef.current = first.documents;
 		sendMessage({
 			text: first.text,
 			files: first.files.length > 0 ? first.files : undefined,
+			...(first.documents.length > 0 && {
+				metadata: { documents: first.documents },
+			}),
 		});
 		onMessageSent?.(first.text);
 		widgetEvents.emit({ name: "message.sent" });
-	}, [status, sendMessage, onMessageSent, queuedMessages, widgetEvents]);
+	}, [
+		status,
+		cancelling,
+		pageToolCallsPending,
+		sendMessage,
+		onMessageSent,
+		queuedMessages,
+		widgetEvents,
+		beginTurn,
+	]);
 
 	const reset = useCallback(() => {
+		dropPageToolCalls();
+		transportRef.current.reset?.();
 		setMessages([]);
-		setQueuedMessages([]);
+		discardAllQueued();
 		clearSessionId();
 		setText("");
 		toolDefinitionsRef.current = {};
 		setToolDefinitionsRevision((r) => r + 1);
 		void refreshToolDefinitions();
-	}, [setMessages, clearSessionId, refreshToolDefinitions]);
+	}, [
+		setMessages,
+		clearSessionId,
+		refreshToolDefinitions,
+		discardAllQueued,
+		dropPageToolCalls,
+	]);
 
 	// Build a `StoredThread` from current refs synchronously. Callers that
 	// need to flush before mutating thread state (startNewThread,
@@ -762,7 +1038,11 @@ export function useChatEngine(props: ChatBaseProps) {
 		if (!isThreadHistoryReady) {
 			return;
 		}
-		if (status === "submitted" || status === "streaming") {
+		if (
+			status === "submitted" ||
+			status === "streaming" ||
+			pageToolCallsPending
+		) {
 			return;
 		}
 		if (messages.length === 0) {
@@ -790,6 +1070,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		isThreadHistoryReady,
 		messages,
 		status,
+		pageToolCallsPending,
 		persistActiveThread,
 	]);
 
@@ -824,8 +1105,11 @@ export function useChatEngine(props: ChatBaseProps) {
 		// before any await, so subsequent ref mutations below don't taint
 		// the outgoing write.
 		void flushPendingPersist();
+		dropPageToolCalls();
+		// The outgoing thread keeps its runtime session for when it is reopened.
+		transportRef.current.dispose?.();
 		setMessages([]);
-		setQueuedMessages([]);
+		discardAllQueued();
 		clearSessionId();
 		setText("");
 		const nextId = generateThreadId();
@@ -840,39 +1124,71 @@ export function useChatEngine(props: ChatBaseProps) {
 		setActiveThreadId,
 		refreshThreads,
 		flushPendingPersist,
+		discardAllQueued,
+		dropPageToolCalls,
 	]);
 
 	const switchThread = useCallback(
 		async (threadId: string) => {
 			switchEpochRef.current += 1;
 			const epoch = switchEpochRef.current;
-			await flushPendingPersist();
-			if (epoch !== switchEpochRef.current) {
-				return;
+			// Stopped first and busy until the switch ends, so the outgoing thread is
+			// saved with every tool call answered and no queued message reaches it.
+			const stopped = await stopPageToolCalls({ keepBusy: true });
+			try {
+				if (stopped) {
+					// Nothing was saved while the page worked; the updater reads the live messages.
+					setMessages((live) => {
+						messagesRef.current = live;
+						return live;
+					});
+					await persistActiveThread();
+				} else {
+					dropPageToolCalls();
+				}
+				await flushPendingPersist();
+				if (epoch !== switchEpochRef.current) {
+					return;
+				}
+				const stored = await loadThread(threadId);
+				if (epoch !== switchEpochRef.current) {
+					return;
+				}
+				if (!stored) {
+					return;
+				}
+				transportRef.current.dispose?.();
+				// Restore the session before announcing the switch, so the
+				// `thread.changed` event carries the target thread's session id.
+				if (stored.sessionId) {
+					sessionIdRef.current = stored.sessionId;
+					setSessionIdState(stored.sessionId);
+				} else {
+					clearSessionId();
+				}
+				setActiveThreadId(stored.threadId);
+				threadCreatedAtRef.current = stored.createdAt;
+				threadTitleRef.current = stored.title;
+				setMessages(stored.messages);
+				discardAllQueued();
+				setText("");
+			} finally {
+				if (stopped) {
+					releasePageToolCalls();
+				}
 			}
-			const stored = await loadThread(threadId);
-			if (epoch !== switchEpochRef.current) {
-				return;
-			}
-			if (!stored) {
-				return;
-			}
-			// Restore the session before announcing the switch, so the
-			// `thread.changed` event carries the target thread's session id.
-			if (stored.sessionId) {
-				sessionIdRef.current = stored.sessionId;
-				setSessionIdState(stored.sessionId);
-			} else {
-				clearSessionId();
-			}
-			setActiveThreadId(stored.threadId);
-			threadCreatedAtRef.current = stored.createdAt;
-			threadTitleRef.current = stored.title;
-			setMessages(stored.messages);
-			setQueuedMessages([]);
-			setText("");
 		},
-		[setMessages, clearSessionId, setActiveThreadId, flushPendingPersist],
+		[
+			setMessages,
+			clearSessionId,
+			setActiveThreadId,
+			flushPendingPersist,
+			discardAllQueued,
+			stopPageToolCalls,
+			dropPageToolCalls,
+			releasePageToolCalls,
+			persistActiveThread,
+		],
 	);
 
 	const deleteThread = useCallback(
@@ -880,32 +1196,55 @@ export function useChatEngine(props: ChatBaseProps) {
 			// Drop pending + await in-flight persist for the thread we're
 			// deleting — otherwise an already-fired `upsertThread` can settle
 			// after `deleteThreadFromStore` and resurrect the row.
+			let stopped = false;
 			if (activeThreadIdRef.current === threadId) {
 				// Invalidate any in-flight `switchThread` targeting this thread.
 				switchEpochRef.current += 1;
+				// Stopped first and busy until the delete ends, so a queued message never
+				// follows an unanswered tool call.
+				stopped = await stopPageToolCalls({ keepBusy: true });
+				if (!stopped) {
+					dropPageToolCalls();
+				}
 				if (persistTimerRef.current) {
 					clearTimeout(persistTimerRef.current);
 					persistTimerRef.current = undefined;
 				}
+			}
+			try {
 				const inflight = persistInflightRef.current;
-				if (inflight) {
+				if (activeThreadIdRef.current === threadId && inflight) {
 					await inflight;
 				}
-			}
-			await deleteThreadFromStore(threadId);
-			await refreshThreads();
-			if (activeThreadIdRef.current === threadId) {
-				setMessages([]);
-				setQueuedMessages([]);
-				clearSessionId();
-				setText("");
-				activeThreadIdRef.current = undefined;
-				setActiveThreadIdState(undefined);
-				threadCreatedAtRef.current = undefined;
-				threadTitleRef.current = undefined;
+				await deleteThreadFromStore(threadId);
+				transportRef.current.forget?.(threadId);
+				await refreshThreads();
+				if (activeThreadIdRef.current === threadId) {
+					transportRef.current.dispose?.();
+					setMessages([]);
+					discardAllQueued();
+					clearSessionId();
+					setText("");
+					activeThreadIdRef.current = undefined;
+					setActiveThreadIdState(undefined);
+					threadCreatedAtRef.current = undefined;
+					threadTitleRef.current = undefined;
+				}
+			} finally {
+				if (stopped) {
+					releasePageToolCalls();
+				}
 			}
 		},
-		[setMessages, clearSessionId, refreshThreads],
+		[
+			setMessages,
+			clearSessionId,
+			refreshThreads,
+			discardAllQueued,
+			stopPageToolCalls,
+			dropPageToolCalls,
+			releasePageToolCalls,
+		],
 	);
 
 	// Sync controlled `activeThreadId` after mount. The mount effect seeds
@@ -940,6 +1279,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		[],
 	);
 
+	const displayedStatus = pageToolCallsPending ? "streaming" : status;
 	const lastMessage = messages[messages.length - 1];
 	const hasMessages = messages.length > 0;
 	const showLoaderBubble =
@@ -953,7 +1293,7 @@ export function useChatEngine(props: ChatBaseProps) {
 
 	return {
 		messages,
-		status,
+		status: displayedStatus,
 		text,
 		setText,
 		handleSubmit,
@@ -964,6 +1304,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		hasMessages,
 		sendMessage,
 		sendMessageAndWait,
+		stop,
 		reset,
 		queuedMessages,
 		queueFull,
@@ -977,5 +1318,6 @@ export function useChatEngine(props: ChatBaseProps) {
 		startNewThread,
 		switchThread,
 		deleteThread,
+		keepsSession,
 	};
 }

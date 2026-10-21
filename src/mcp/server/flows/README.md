@@ -25,15 +25,22 @@ type FlowToolInput =
   | {
       action: "start";
       intent: string;
-      stateUpdates?: Record<string, unknown>;
     }
   | {
-      action: "continue";
+      action: "continue" | "reset";
       stateUpdates?: Record<string, unknown>;
     };
 ```
 
-`intent` is required on `start` and should summarize the user's goal for the flow, including relevant prior context that led to triggering it, if available.
+`intent` is required on `start` and should summarize the user's goal for the flow.
+
+The tool listing names no state field: `stateUpdates` is an untyped record. The session's first interrupt or widget response carries `fields`, every state field with its type, enum values and description (members of a `z.object` group as dot-paths), once per conversation. Each question also names its own field with a `fieldSchema`.
+
+Any call (`start`, `continue`, `reset`) writes the answer to a field the run has asked as sent, plus any other declared field whose value fits its Zod schema. The flow skips the questions those values fill, and their validators run when the flow reaches them. A field no question asks (a classification the opener implies, a locale) is set the same way. A value that does not fit its schema, or a key the state does not declare, is dropped.
+
+A field marked `neverPrefilled(schema)` is left out of `fields` and takes a value only once the run has asked it, as a field or as a group member. Mark a consent or attestation this way, and a widget pick that must happen on screen.
+
+Everything in `state` is exposed to the conversation: listed in `fields` and writable. A value the model must never see or set, such as a lookup id that decides what gets priced, stays out of `state`. Compute it in the node that needs it, or keep it in a server-side store keyed by `ctx.sessionId`, the session the flow's own record is stored under.
 
 ### Tool output
 

@@ -4,9 +4,21 @@ export const es: Messages = {
 	promptInput: {
 		placeholder: "¿Qué te gustaría saber?",
 		uploadFiles: "Subir archivos",
+		uploadFilesUpTo: "Subir un documento, hasta {limit}",
+		uploadFilesUpToWithPages:
+			"Subir un documento, hasta {limit} y {pages} páginas",
 		stop: "Detener",
 		submit: "Enviar",
 		removeAttachments: "Eliminar todos los archivos adjuntos",
+		removeAttachment: "Quitar archivo",
+		uploading: "Subiendo…",
+		retry: "Reintentar",
+		retryUpload: "Reintentar la subida",
+		uploadFailed: "La subida no se completó.",
+		dropToAttach: "Suelta para adjuntar",
+		errorAccept: "{name} no es un tipo de archivo que acepte este chat.",
+		errorTooLarge: "{name} supera {limit}.",
+		errorTooMany: "Puedes adjuntar hasta {limit} archivos.",
 	},
 	workingIndicator: {
 		default: "Un momento…",
@@ -30,6 +42,9 @@ export const es: Messages = {
 	},
 	attachments: {
 		attachmentFallback: "adjunto",
+		kindPdf: "PDF",
+		kindImage: "Imagen",
+		kindFile: "Archivo",
 		fileFallback: "archivo",
 	},
 	threadMenu: {

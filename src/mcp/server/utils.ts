@@ -1,3 +1,6 @@
+import { readAttachedDocuments } from "../../documents/messages.js";
+import type { AttachedDocument } from "../../documents/types.js";
+
 // ============================================================================
 // Meta key extraction helpers
 // ============================================================================
@@ -74,6 +77,17 @@ const FILE_NAME_KEYS = ["filename", "file_name", "fileName", "name"] as const;
 
 /** Meta key for flow execution path (nodesVisited, flowId). */
 export const FLOW_META_KEY = "waniwani/flow" as const;
+
+/**
+ * Instruction appended to an intent/context field description when PII is to be
+ * kept out of the captured value.
+ *
+ * Shared so flow tools (`createFlow({ omitIntentPII })`) and plain tools
+ * (`withWaniwani({ captureIntent: { omitPII } })`) ask the model for the same
+ * thing — a privacy wording change has to land in exactly one place.
+ */
+export const OMIT_PII_NOTE =
+	" Do not include PII (names, emails, phones, addresses, IDs, ages, birthdates) — summarize abstractly." as const;
 
 export type { SuggestionsMeta } from "../../shared/meta-keys";
 export { SUGGESTIONS_META_KEY } from "../../shared/meta-keys";
@@ -152,6 +166,8 @@ export interface AttachedFile {
 	url: string;
 	filename: string;
 }
+
+export type { AttachedDocument };
 
 function isRecordValue(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -247,6 +263,24 @@ function filesUnder(candidate: unknown): AttachedFile[] {
 
 	collect(candidate);
 	return files;
+}
+
+const DOCUMENTS_META_KEY = "waniwani/documents";
+
+/**
+ * Documents the visitor attached to this chat turn, stamped by the Waniwani chat
+ * route under `waniwani/documents`. The bytes stay on the platform, so each entry
+ * is a handle: spread one straight into `documents.extract({ documentId, schema })`.
+ * Empty on hosts that upload nothing, which is every host but the web widget.
+ */
+export function extractAttachedDocuments(
+	meta: Record<string, unknown> | undefined,
+): AttachedDocument[] {
+	if (!meta) {
+		return [];
+	}
+	const raw = meta[DOCUMENTS_META_KEY];
+	return readAttachedDocuments(Array.isArray(raw) ? raw : [raw]);
 }
 
 const SOURCE_SESSION_KEYS = [
@@ -361,4 +395,13 @@ export function extractSourceFromHeaders(
 		return "chatgpt";
 	}
 	return undefined;
+}
+
+const MAX_CLIENT_NAME_SOURCE_LENGTH = 100;
+
+export function extractSourceFromClientName(
+	clientInfo: ExtractSourceClientInfo | undefined,
+): string | undefined {
+	const name = clientInfo?.name?.trim();
+	return name ? name.slice(0, MAX_CLIENT_NAME_SOURCE_LENGTH) : undefined;
 }

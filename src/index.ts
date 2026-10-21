@@ -1,12 +1,21 @@
 // Waniwani SDK
 
 // Error
+export { readAttachedDocuments } from "./documents/messages.js";
 export type {
+	AttachedDocument,
 	DocumentExtractInput,
 	DocumentExtractResult,
+	DocumentExtractStoredInput,
+	DocumentExtractUrlInput,
 	DocumentSchema,
 	DocumentsClient,
 } from "./documents/types.js";
+export type {
+	EmailClient,
+	EmailSendInput,
+	EmailSendResult,
+} from "./email/types.js";
 export { WaniWaniError } from "./error.js";
 
 // Types - KB Client

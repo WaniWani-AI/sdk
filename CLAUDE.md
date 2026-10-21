@@ -10,7 +10,7 @@ The SDK ships two public tiers plus a private one. The legacy tier was removed i
 
 Truly open source. Works standalone with any state backend.
 
-- `createFlow`, `StateGraph`, `START`, `END`, `redacted`, `createFlowTestHarness` from `@waniwani/sdk/mcp`
+- `createFlow`, `StateGraph`, `START`, `END`, `redacted`, `neverPrefilled`, `createFlowTestHarness` from `@waniwani/sdk/mcp`
 - `KvStore` interface, `MemoryKvStore` from `@waniwani/sdk/mcp`
 
 `createFlow().compile()` requires either an explicit `{ store }` OR `WANIWANI_API_KEY`. With neither, it throws at compile time with a clear migration message.
@@ -93,6 +93,7 @@ const flow = createFlow({ /* …same… */ }).compile(); // hosted flow state, a
 - Typecheck: `bun run typecheck`
 - Lint: `bun run lint`
 - Test: `bun test`
+- Flow eval (live models through the AI Gateway, costs tokens): `bun run eval:flows`. The release workflow runs it with `--sdk local,<last release> --fail-on-regression` on every release, and does not publish on a regression. See `evals/flows/README.md`.
 - Pre-commit: always run `bun biome check . --fix`
 
 ## Releasing (version bumps)

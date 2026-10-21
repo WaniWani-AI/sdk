@@ -29,6 +29,8 @@ export { flowOutputSchema } from "./output-schema";
 export { redacted } from "./redacted";
 // Builder
 export { StateGraph } from "./state-graph";
+// Schema field marker: filled only once the flow asks for it
+export { neverPrefilled } from "./state-updates";
 // Test utilities
 export type { FlowTestResult } from "./test-utils";
 export { createFlowTestHarness } from "./test-utils";

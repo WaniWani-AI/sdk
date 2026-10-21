@@ -9,6 +9,8 @@ import {
 	resolveWidgetResourceUri,
 	type ToolDefinitionsMap,
 } from "../ai-elements/tool";
+import { startWidget, type WidgetTimer } from "../lib/timing";
+import { useWidgetTimingSink } from "../lib/timing-context";
 import { cn } from "../lib/utils";
 
 const DEFAULT_RESOURCE_ENDPOINT = "/api/mcp/resource";
@@ -19,6 +21,8 @@ const PROTOCOL_VERSION = "2026-01-26";
 const RESIZE_ANIMATION_MS = 300;
 const HANDSHAKE_TIMEOUT_MS = 3000;
 const MAX_RETRIES = 3;
+/** How long a frame that says it is initialized may take to report a size before we report what we have. */
+const SIZE_REPORT_TIMEOUT_MS = 2000;
 
 function normalizeString(value: unknown): string | undefined {
 	if (typeof value !== "string") {
@@ -187,6 +191,23 @@ export function McpAppFrame({
 		return `${resourceEndpoint}${separator}uri=${encodeURIComponent(resourceUri)}`;
 	}, [resourceEndpoint, resourceUri]);
 
+	const timingSink = useWidgetTimingSink();
+	const timingRef = useRef<WidgetTimer | null>(null);
+	const sizeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
+	useEffect(() => {
+		const timer = startWidget(resourceUri, timingSink);
+		timingRef.current = timer;
+		return () => {
+			clearTimeout(sizeTimerRef.current);
+			if (!timer.has("initialized")) {
+				timer.report("timeout", retryCountRef.current);
+			}
+			timingRef.current = null;
+		};
+	}, [resourceUri, timingSink]);
+
 	const isDarkRef = useRef(isDark);
 	isDarkRef.current = isDark;
 
@@ -290,6 +311,7 @@ export function McpAppFrame({
 			// ui/initialize — widget requests handshake
 			if (method === "ui/initialize" && id != null) {
 				handshakeReceived = true;
+				timingRef.current?.mark("initialize");
 				clearTimeout(handshakeTimer);
 				postToIframe({
 					jsonrpc: "2.0",
@@ -320,6 +342,11 @@ export function McpAppFrame({
 			// ui/notifications/initialized — widget confirms init, we send tool data
 			if (method === "ui/notifications/initialized") {
 				initializedRef.current = true;
+				timingRef.current?.mark("initialized");
+				sizeTimerRef.current = setTimeout(
+					() => timingRef.current?.report("ok", retryCountRef.current),
+					SIZE_REPORT_TIMEOUT_MS,
+				);
 				const input = toolInputRef.current;
 				const result = toolResultRef.current;
 				const resultMeta =
@@ -379,6 +406,9 @@ export function McpAppFrame({
 
 			// ui/notifications/size-changed — widget reports content size
 			if (method === "ui/notifications/size-changed") {
+				clearTimeout(sizeTimerRef.current);
+				timingRef.current?.mark("firstSize");
+				timingRef.current?.report("ok", retryCountRef.current);
 				const params = data.params;
 				const newHeight =
 					typeof params?.height === "number" ? params.height : undefined;
@@ -621,6 +651,7 @@ export function McpAppFrame({
 		<iframe
 			ref={iframeRef}
 			src={iframeSrc}
+			onLoad={() => timingRef.current?.mark("iframeLoad")}
 			sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
 			className={cn(
 				!isFullscreen && "ww:rounded-md ww:border ww:border-border",

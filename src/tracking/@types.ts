@@ -78,6 +78,14 @@ export interface PageViewedProperties {
 	language?: string;
 	/** IANA timezone of the visitor. */
 	timezone?: string;
+	/** `screen.width` in CSS pixels. */
+	screenWidth?: number;
+	/** `screen.height` in CSS pixels. */
+	screenHeight?: number;
+	/** `window.innerWidth` in CSS pixels, scrollbar included. */
+	viewportWidth?: number;
+	/** `window.innerHeight` in CSS pixels. */
+	viewportHeight?: number;
 }
 
 export interface ToolCalledProperties {
@@ -274,7 +282,8 @@ export interface RevenueOptionSelectedInput
 /**
  * Input for `track.leadQualified()` — identity only (`externalId`, `email`,
  * `name`) plus the shared tracking context. There is no acquisition-source
- * property; the envelope `source` (the origin channel) is set automatically.
+ * property; the envelope `source` comes from `meta` or the frontend client's
+ * `source` option, and is left out when neither identifies the caller.
  */
 export interface RevenueLeadQualifiedInput
 	extends TrackingContext,

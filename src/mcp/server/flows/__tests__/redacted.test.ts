@@ -4,12 +4,14 @@ import { MemoryKvStore } from "../../kv/memory-kv-store";
 import type { McpServer } from "../@types";
 import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
+import { readRedactedFields } from "../definition-meta";
+import { hasFieldMark } from "../field-marks";
 import {
 	collectRedactedStateFields,
 	isFieldRedacted,
-	REDACTED_STATE_UPDATE_FIELDS_META_KEY,
 	redacted,
 } from "../redacted";
+import { neverPrefilled } from "../state-updates";
 
 type Handler = (input: unknown, extra: unknown) => Promise<unknown>;
 type RegisterToolArgs = [string, Record<string, unknown>, Handler];
@@ -44,6 +46,14 @@ describe("redacted()", () => {
 		expect(fields.sort()).toEqual(["ages", "zipcode"]);
 	});
 
+	test("combines with neverPrefilled, in either order", () => {
+		expect(isFieldRedacted(neverPrefilled(redacted(z.string())))).toBe(true);
+		expect(isFieldRedacted(redacted(neverPrefilled(z.string())))).toBe(true);
+		expect(
+			hasFieldMark(redacted(neverPrefilled(z.string())), "neverPrefilled"),
+		).toBe(true);
+	});
+
 	test("empty state returns empty list", () => {
 		expect(collectRedactedStateFields(undefined)).toEqual([]);
 		expect(collectRedactedStateFields({})).toEqual([]);
@@ -69,14 +79,15 @@ describe("flow compile — redacted state fields on tool _meta", () => {
 		await flow.register(mock.server);
 
 		const [, config] = mock.registered[0] ?? [];
-		const meta = config?._meta as Record<string, unknown> | undefined;
-		expect(meta).toBeDefined();
-		expect(
-			(meta?.[REDACTED_STATE_UPDATE_FIELDS_META_KEY] as string[]).sort(),
-		).toEqual(["ages", "zipcode"]);
+		expect(readRedactedFields(config?._meta).sort()).toEqual([
+			"ages",
+			"zipcode",
+		]);
+		// The server reads the list; `tools/list` never sends it.
+		expect(JSON.stringify(config?._meta)).not.toContain("zipcode");
 	});
 
-	test("omits _meta when no fields are marked", async () => {
+	test("carries no redacted list when no fields are marked", async () => {
 		const flow = createFlow({
 			id: "plain_flow",
 			title: "Plain",
@@ -92,7 +103,6 @@ describe("flow compile — redacted state fields on tool _meta", () => {
 		await flow.register(mock.server);
 
 		const [, config] = mock.registered[0] ?? [];
-		const meta = config?._meta as Record<string, unknown> | undefined;
-		expect(meta?.[REDACTED_STATE_UPDATE_FIELDS_META_KEY]).toBe(undefined);
+		expect(readRedactedFields(config?._meta)).toEqual([]);
 	});
 });

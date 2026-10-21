@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { resolveWidgetAutoHeight, resolveWidgetResourceUri } from "./tool";
+import {
+	resolveWidgetAutoHeight,
+	resolveWidgetResourceUri,
+	toolInputForDisplay,
+} from "./tool";
 
 describe("resolveWidgetResourceUri", () => {
 	const definitionsWithNested = {
@@ -166,5 +170,30 @@ describe("resolveWidgetAutoHeight", () => {
 				},
 			),
 		).toBe(false);
+	});
+});
+
+describe("toolInputForDisplay", () => {
+	const input = {
+		plan: "premium",
+		intent: "Compare home insurance",
+		_meta: { "waniwani/sessionId": "s_1" },
+	};
+
+	test("hides _meta and keeps the arguments", () => {
+		const shown = { plan: "premium", intent: "Compare home insurance" };
+		expect(toolInputForDisplay(input, false)).toEqual(shown);
+		expect(toolInputForDisplay(input, undefined)).toEqual(shown);
+	});
+
+	test("shows everything in debug mode", () => {
+		expect(toolInputForDisplay(input, true)).toBe(input);
+	});
+
+	test("passes non-object input through", () => {
+		expect(toolInputForDisplay("raw", false)).toBe("raw");
+		expect(toolInputForDisplay(undefined, false)).toBeUndefined();
+		const list = [1, 2];
+		expect(toolInputForDisplay(list, false)).toBe(list);
 	});
 });

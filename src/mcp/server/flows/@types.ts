@@ -370,6 +370,12 @@ export type NodeContext<TState> = {
 	state: Partial<TState>;
 	/** Request metadata from the MCP call */
 	meta?: Record<string, unknown>;
+	/**
+	 * The session the flow's state is stored under. Key server-side data by it,
+	 * such as a lookup id the conversation must never see or set: everything in
+	 * `state` is listed to the model and writable from the conversation.
+	 */
+	sessionId?: string;
 	/** Create an interrupt signal — pause and ask the user questions */
 	interrupt: TypedInterrupt<TState>;
 	/** Create a widget signal — pause and show a UI widget */
@@ -519,8 +525,12 @@ export type FlowConfig = {
 	 *
 	 * The state definition serves two purposes:
 	 * 1. Type inference — `TState` is automatically derived, no explicit generic needed
-	 * 2. AI protocol — field names, types, and descriptions are included in the tool
-	 *    description so the AI can pre-fill answers via `_meta.flow.state`
+	 * 2. AI protocol — field names, types, and descriptions go out in `fields` on
+	 *    the session's first question or widget, so the AI can send any value the
+	 *    user already gave. Mark a field with `neverPrefilled()` to keep it out.
+	 *
+	 * Every field here is exposed to the conversation. Keep a value the model
+	 * must never see or set out of `state`, keyed by `ctx.sessionId` instead.
 	 *
 	 * @example
 	 * ```ts
@@ -596,6 +606,13 @@ export type RegisteredFlow = {
 		 */
 		outputSchema: FlowOutputSchema;
 		annotations?: ToolAnnotations;
+		/**
+		 * Definition metadata. Carries the flow graph, which `withWaniwani` reads
+		 * to recognize the tool as a flow (funnel sync, telemetry capture), so
+		 * registering this config directly behaves exactly like `register()`.
+		 * The entry is server-only: `tools/list` never sends it.
+		 */
+		_meta: Record<string, unknown>;
 	};
 	/** Tool callback — pass to `server.registerTool(flow.name, flow.config, flow.handler)`. */
 	handler: FlowToolHandler;
@@ -621,6 +638,11 @@ export type FlowToolInput = {
 	intent?: string;
 	/** Optional when `action` is `"start"`. Describes the situation/environment that led the user to start this flow. */
 	context?: string;
+	/**
+	 * Values keyed by the field names the flow's responses give. The engine
+	 * merges the answers to fields the run has asked, and any other declared
+	 * field whose value fits its schema (see `state-updates.ts`).
+	 */
 	stateUpdates?: Record<string, unknown>;
 	/** Session identifier echoed in the response. Pass it back on "continue" and "reset" calls. */
 	sessionId?: string;
@@ -647,6 +669,11 @@ export type FlowInternalState = {
 	 * once delivered, so later responses in the same conversation leave it out.
 	 */
 	intro?: FlowIntroPayload;
+	/**
+	 * Every field the conversation may fill, waiting to ride on the session's
+	 * first question or widget. Gone once delivered.
+	 */
+	fields?: Record<string, FieldSchemaInfo>;
 };
 
 export type FlowTokenContent = {
@@ -654,6 +681,12 @@ export type FlowTokenContent = {
 	state: Record<string, unknown>;
 	field?: string;
 	widgetId?: string;
+	/**
+	 * Every field this run has asked for, through an interrupt question or a
+	 * widget's `field`. An answer to one of these merges as sent, and a field
+	 * marked `neverPrefilled()` merges only once it is here.
+	 */
+	asked?: string[];
 	/** The engine's own state for this session. Never flow state. */
 	internal?: FlowInternalState;
 };
@@ -684,6 +717,8 @@ export type FlowInterruptContent = {
 	/** Multi-question */
 	questions?: InterruptQuestionData[];
 	context?: string;
+	/** Every field the conversation may fill. On the session's first question or widget only. */
+	fields?: Record<string, FieldSchemaInfo>;
 };
 
 export type FlowWidgetContent = {
@@ -706,6 +741,8 @@ export type FlowWidgetContent = {
 	field?: string;
 	/** JIT schema fragment for the field the widget fills. */
 	fieldSchema?: FieldSchemaInfo;
+	/** Every field the conversation may fill. On the session's first question or widget only. */
+	fields?: Record<string, FieldSchemaInfo>;
 };
 
 export type FlowCompleteContent = {

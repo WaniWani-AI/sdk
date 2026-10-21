@@ -19,6 +19,11 @@ import {
 	useRef,
 	useState,
 } from "react";
+import {
+	autoHeightFromMeta,
+	metaOf,
+	resourceUriFromMeta,
+} from "../../../shared/view-uri";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
 import { Button } from "../ui/button";
@@ -396,6 +401,26 @@ export type ToolInputProps = HTMLAttributes<HTMLDivElement> & {
 	debug?: boolean;
 };
 
+/**
+ * The tool call arguments worth showing a user, outside debug mode: everything
+ * but `_meta`. Debug mode shows everything.
+ */
+export function toolInputForDisplay(
+	input: ToolUIPart["input"],
+	debug: boolean | undefined,
+): ToolUIPart["input"] {
+	if (
+		debug ||
+		typeof input !== "object" ||
+		input === null ||
+		Array.isArray(input)
+	) {
+		return input;
+	}
+	const { _meta, ...rest } = input as Record<string, unknown>;
+	return rest;
+}
+
 /** Displays the tool call request parameters as a collapsible JSON section labeled "Request". */
 export function ToolInput({
 	className,
@@ -404,18 +429,10 @@ export function ToolInput({
 	...props
 }: ToolInputProps) {
 	const { t } = useTranslation();
-	const filtered = useMemo(() => {
-		if (
-			!debug &&
-			typeof input === "object" &&
-			input !== null &&
-			!Array.isArray(input)
-		) {
-			const { _meta, ...rest } = input as Record<string, unknown>;
-			return rest;
-		}
-		return input;
-	}, [input, debug]);
+	const filtered = useMemo(
+		() => toolInputForDisplay(input, debug),
+		[input, debug],
+	);
 
 	return (
 		<CollapsibleJSON
@@ -443,60 +460,6 @@ export type ToolDefinitionsMap = Record<
 	{ _meta?: Record<string, unknown> }
 >;
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-	if (typeof value !== "object" || value === null) {
-		return undefined;
-	}
-	return value as Record<string, unknown>;
-}
-
-function getUiObject(
-	meta: Record<string, unknown> | undefined,
-): Record<string, unknown> | undefined {
-	return asRecord(meta?.ui);
-}
-
-function extractOutputMeta(
-	output: unknown,
-): Record<string, unknown> | undefined {
-	return asRecord(asRecord(output)?._meta);
-}
-
-/**
- * Extract a widget resource URI from a `_meta` object, checking all three
- * shapes the spec and in-the-wild servers use, in priority order:
- *
- * 1. `_meta.ui.resourceUri` — MCP Apps preferred (nested)
- * 2. `_meta["ui/resourceUri"]` — MCP Apps legacy/compat (flat)
- * 3. `_meta["openai/outputTemplate"]` — OpenAI Apps SDK
- */
-function extractResourceUriFromMeta(
-	meta: Record<string, unknown> | undefined,
-): string | undefined {
-	if (!meta) {
-		return undefined;
-	}
-	const nested = getUiObject(meta)?.resourceUri;
-	if (typeof nested === "string" && nested.length > 0) {
-		return nested;
-	}
-	const flat = meta["ui/resourceUri"];
-	if (typeof flat === "string" && flat.length > 0) {
-		return flat;
-	}
-	const openai = meta["openai/outputTemplate"];
-	if (typeof openai === "string" && openai.length > 0) {
-		return openai;
-	}
-	return undefined;
-}
-
-function extractAutoHeightFromMeta(
-	meta: Record<string, unknown> | undefined,
-): boolean {
-	return getUiObject(meta)?.autoHeight === true;
-}
-
 /**
  * Resolve the widget resource URI for a tool part.
  *
@@ -518,14 +481,12 @@ export function resolveWidgetResourceUri(
 	toolDefinitions?: ToolDefinitionsMap,
 ): string | undefined {
 	if (toolName) {
-		const fromDef = extractResourceUriFromMeta(
-			toolDefinitions?.[toolName]?._meta,
-		);
+		const fromDef = resourceUriFromMeta(toolDefinitions?.[toolName]?._meta);
 		if (fromDef) {
 			return fromDef;
 		}
 	}
-	return extractResourceUriFromMeta(extractOutputMeta(output));
+	return resourceUriFromMeta(metaOf(output));
 }
 
 /**
@@ -539,11 +500,11 @@ export function resolveWidgetAutoHeight(
 	toolDefinitions?: ToolDefinitionsMap,
 ): boolean {
 	if (toolName) {
-		if (extractAutoHeightFromMeta(toolDefinitions?.[toolName]?._meta)) {
+		if (autoHeightFromMeta(toolDefinitions?.[toolName]?._meta)) {
 			return true;
 		}
 	}
-	return extractAutoHeightFromMeta(extractOutputMeta(output));
+	return autoHeightFromMeta(metaOf(output));
 }
 
 /**

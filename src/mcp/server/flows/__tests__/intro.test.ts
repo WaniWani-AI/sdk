@@ -36,7 +36,10 @@ const INSTRUCTIONS =
 	"Introduce yourself as Léa from Acme in one short friendly sentence.";
 
 type IntroPayload = { verbatim?: string; instructions?: string };
-type Payload = Record<string, unknown> & { intro?: IntroPayload };
+type Payload = Record<string, unknown> & {
+	intro?: IntroPayload;
+	nextStep?: string;
+};
 
 const quotePicker: RegisteredTool = {
 	id: "quote_picker",
@@ -47,12 +50,18 @@ const quotePicker: RegisteredTool = {
 
 /**
  * Home insurance flow: address, then postcode, then city, then occupancy.
- * Opening the conversation with an address already stated skips the first
- * three nodes, which is the case the intro exists for.
+ * `known` adds an action node ahead of the questions that fills those fields
+ * (the way a node reads what the host already knows), so the first response
+ * can land deep in the graph, which is the case the intro exists for.
  */
-function quoteFlow(options?: { intro?: FlowIntro; store?: FlowStore }) {
+function quoteFlow(options?: {
+	intro?: FlowIntro;
+	store?: FlowStore;
+	known?: Record<string, string>;
+}) {
 	const store = options?.store ?? new MemoryFlowStore();
-	const flow = createFlow({
+	const known = options?.known;
+	const builder = createFlow({
 		id: "home_quote",
 		title: "Home insurance quote",
 		description: "Quote a home insurance policy.",
@@ -83,11 +92,14 @@ function quoteFlow(options?: { intro?: FlowIntro; store?: FlowStore }) {
 			run: ({ interrupt }) =>
 				interrupt({ occupancy: { question: "Is the flat owned or rented?" } }),
 		})
-		.addEdge(START, "ask_address")
+		.addNode({ id: "known", run: () => known ?? {} })
+		.addEdge("known", "ask_address")
 		.addEdge("ask_address", "ask_postcode")
 		.addEdge("ask_postcode", "ask_city")
 		.addEdge("ask_city", "ask_occupancy")
-		.addEdge("ask_occupancy", END)
+		.addEdge("ask_occupancy", END);
+	const flow = builder
+		.addEdge(START, known ? "known" : "ask_address")
 		.compile({ store });
 
 	return { flow, store };
@@ -135,28 +147,22 @@ function parsePayload(result: unknown): Payload {
 	return JSON.parse(content[0]?.text ?? "") as Payload;
 }
 
-const PREFILLED_LOCATION = {
+const KNOWN_LOCATION = {
 	address: "12 rue de Rivoli",
 	postcode: "75001",
 	city: "Paris",
 };
 
 describe("flow intro", () => {
-	test("rides along on a start that skips pre-filled nodes", async () => {
+	test("rides along on a start that skips filled nodes", async () => {
 		const { flow, store } = quoteFlow({
 			intro: { verbatim: VERBATIM, instructions: INSTRUCTIONS },
+			known: KNOWN_LOCATION,
 		});
 		const handler = await handlerFor(flow);
 
 		const parsed = parsePayload(
-			await handler(
-				{
-					action: "start",
-					intent: INTENT,
-					stateUpdates: PREFILLED_LOCATION,
-				},
-				EXTRA,
-			),
+			await handler({ action: "start", intent: INTENT }, EXTRA),
 		);
 
 		expect(parsed.status).toBe("interrupt");
@@ -180,13 +186,13 @@ describe("flow intro", () => {
 	});
 
 	test("is absent on the following continue", async () => {
-		const { flow, store } = quoteFlow({ intro: VERBATIM });
+		const { flow, store } = quoteFlow({
+			intro: VERBATIM,
+			known: KNOWN_LOCATION,
+		});
 		const handler = await handlerFor(flow);
 
-		await handler(
-			{ action: "start", intent: INTENT, stateUpdates: PREFILLED_LOCATION },
-			EXTRA,
-		);
+		await handler({ action: "start", intent: INTENT }, EXTRA);
 		const parsed = parsePayload(
 			await handler(
 				{ action: "continue", stateUpdates: { occupancy: "tenant" } },
@@ -200,23 +206,22 @@ describe("flow intro", () => {
 	});
 
 	test("rides along on a start that completes the whole flow", async () => {
-		const { flow, store } = quoteFlow({ intro: VERBATIM });
+		const { flow, store } = quoteFlow({
+			intro: VERBATIM,
+			known: { ...KNOWN_LOCATION, occupancy: "owner" },
+		});
 		const handler = await handlerFor(flow);
 
 		const parsed = parsePayload(
-			await handler(
-				{
-					action: "start",
-					intent: INTENT,
-					stateUpdates: { ...PREFILLED_LOCATION, occupancy: "owner" },
-				},
-				EXTRA,
-			),
+			await handler({ action: "start", intent: INTENT }, EXTRA),
 		);
 
 		expect(parsed.status).toBe("complete");
 		expect(parsed.intro).toEqual({ verbatim: VERBATIM });
-		expect((await store.get(SESSION_ID))?.internal).toBeUndefined();
+		// `fields` waits for a question: a completed run fills nothing.
+		expect(Object.keys((await store.get(SESSION_ID))?.internal ?? {})).toEqual([
+			"fields",
+		]);
 	});
 
 	test("rides along when the first step is a widget", async () => {
@@ -268,10 +273,13 @@ describe("flow intro", () => {
 		const { flow, store } = quoteFlow({ intro: VERBATIM });
 		const handler = await handlerFor(flow);
 
-		await handler(
-			{ action: "start", intent: INTENT, stateUpdates: PREFILLED_LOCATION },
-			EXTRA,
-		);
+		await handler({ action: "start", intent: INTENT }, EXTRA);
+		for (const [field, value] of Object.entries(KNOWN_LOCATION)) {
+			await handler(
+				{ action: "continue", stateUpdates: { [field]: value } },
+				EXTRA,
+			);
+		}
 		const parsed = parsePayload(
 			await handler({ action: "reset", stateUpdates: { city: "Lyon" } }, EXTRA),
 		);
@@ -328,6 +336,7 @@ describe("flow intro", () => {
 			step: "ask_address",
 			state: {},
 			field: "address",
+			asked: ["address"],
 		});
 	});
 
@@ -339,7 +348,7 @@ describe("flow intro", () => {
 		// Mid-flow record with no intro left on it.
 		await store.set(SESSION_ID, {
 			step: "ask_occupancy",
-			state: PREFILLED_LOCATION,
+			state: KNOWN_LOCATION,
 			field: "occupancy",
 		});
 
@@ -366,7 +375,7 @@ describe("flow intro", () => {
 		// version knows, plus a field it has never heard of.
 		await store.set(SESSION_ID, {
 			step: "ask_occupancy",
-			state: PREFILLED_LOCATION,
+			state: KNOWN_LOCATION,
 			field: "occupancy",
 			internal: {
 				intro: { verbatim: VERBATIM },
@@ -387,13 +396,28 @@ describe("flow intro", () => {
 		} as FlowTokenContent["internal"]);
 	});
 
-	test("the protocol block only mentions intro when the flow declares one", async () => {
+	test("the intro guidance rides the response carrying the intro, never the description", async () => {
 		const { flow: withIntro } = quoteFlow({ intro: VERBATIM });
-		const { flow: without } = quoteFlow();
+		const handler = await handlerFor(withIntro);
 
-		expect(withIntro.config.description).toContain("OPENING MESSAGE");
-		expect(withIntro.config.description).toContain("word for word");
-		expect(without.config.description).not.toContain("OPENING MESSAGE");
+		const first = parsePayload(
+			await handler({ action: "start", intent: INTENT }, EXTRA),
+		);
+		expect(first.intro).toEqual({ verbatim: VERBATIM });
+		expect(first.nextStep).toContain("word for word");
+
+		// Second turn: no intro, so no intro guidance either.
+		const second = parsePayload(
+			await handler(
+				{ action: "continue", stateUpdates: { address: "12 rue de Rivoli" } },
+				EXTRA,
+			),
+		);
+		expect(second.intro).toBeUndefined();
+		expect(second.nextStep).not.toContain("word for word");
+
+		expect(withIntro.config.description).not.toContain("word for word");
+		expect(withIntro.config.description).not.toContain("intro");
 	});
 
 	test("an empty intro fails at compile time", () => {

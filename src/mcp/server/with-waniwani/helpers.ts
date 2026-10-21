@@ -9,11 +9,13 @@ import type { WaniWaniClient } from "../../../types.js";
 import {
 	extractSessionId,
 	extractSource,
+	extractSourceFromClientName,
 	FLOW_META_KEY,
 	WIDGET_CONFIG_META_KEY,
 } from "../utils.js";
 import type { WidgetTokenCache } from "../widget-token.js";
 import type { FunnelSyncPayload } from "./funnel-sync.js";
+import type { ToolTelemetry } from "./intent-capture.js";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -128,7 +130,7 @@ export function buildTrackInput(
 		cause?: ErrorCauseType;
 	},
 	clientInfo?: { name: string; version: string },
-	io?: { input?: unknown; output?: unknown },
+	io?: { input?: unknown; output?: unknown; telemetry?: ToolTelemetry },
 	kbSearch?: KbSearchTrace[],
 ): TrackInput {
 	const toolType = resolveToolType(toolName, options.toolType);
@@ -195,11 +197,14 @@ export function buildTrackInput(
 			type: toolType,
 			...(timing ?? {}),
 			...(input !== undefined && { input }),
+			...(io?.telemetry && { telemetry: io.telemetry }),
 			...(output !== undefined && { output }),
 			...(kbSearch && kbSearch.length > 0 && { kbSearch }),
 		},
 		meta: mergedMeta,
-		source: extractSource(mergedMeta ?? meta, clientInfo),
+		source:
+			extractSource(mergedMeta ?? meta, clientInfo) ??
+			extractSourceFromClientName(clientInfo),
 		metadata: {
 			...(options.metadata ?? {}),
 			...(clientInfo && { clientInfo }),

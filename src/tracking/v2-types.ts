@@ -16,7 +16,7 @@ export interface V2EventEnvelope {
 	id: string;
 	type: V2EnvelopeType;
 	name: EventType;
-	source: string;
+	source?: string;
 	timestamp: string;
 	correlation: V2CorrelationIds;
 	properties: Record<string, unknown>;

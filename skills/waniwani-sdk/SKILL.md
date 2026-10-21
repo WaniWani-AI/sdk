@@ -42,6 +42,7 @@ it is the complete page index, always current, and cheap to read.
 | Know where each event belongs in a flow | [/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation) |
 | Check a typed event payload | [/sdk/reference/event-schema](https://docs.waniwani.ai/sdk/reference/event-schema) |
 | Add knowledge-base search | [/sdk/knowledge-base/overview](https://docs.waniwani.ai/sdk/knowledge-base/overview) |
+| Send an email from a tool or flow node | [/sdk/modules/email](https://docs.waniwani.ai/sdk/modules/email) |
 | Embed the chat widget | [/sdk/chat/embed](https://docs.waniwani.ai/sdk/chat/embed) (script tag), [/sdk/chat/react](https://docs.waniwani.ai/sdk/chat/react) |
 | Read the exact tool contract a flow compiles to | [/sdk/reference/flow-tool-contract](https://docs.waniwani.ai/sdk/reference/flow-tool-contract) |
 | Tunnel a dev server for remote testing | [/sdk/guides/tunnel](https://docs.waniwani.ai/sdk/guides/tunnel) |
@@ -55,7 +56,7 @@ Dashboard and free API key: [app.waniwani.ai](https://app.waniwani.ai).
 - **Open source, no API key.** `createFlow`, `StateGraph`, `START`, `END`, the `KvStore` interface,
   `MemoryKvStore`. Runs against any state backend you implement.
 - **Free tier, one env var (`WANIWANI_API_KEY`).** Same SDK, plus hosted flow state, event tracking,
-  funnel analytics, knowledge base, chat widget, and the dashboard playground.
+  funnel analytics, knowledge base, email, chat widget, and the dashboard playground.
 
 Default to the OSS path. Reach for the free tier when the user asks for tracking, analytics, hosted
 state, KB, or chat, and say plainly that it needs a key.
@@ -89,6 +90,24 @@ With neither a store nor a key, `.compile()` throws and tells you how to fix it.
 fallback.
 
 ## Removed surfaces
+
+Changed in 0.24.0: a flow's tool listing no longer names state fields under `stateUpdates`, and
+`flow.config._meta` no longer types or sends `_flowGraph` (read `flow.flowGraph`). In 0.24.0 to
+0.24.2, `start` merges no `stateUpdates`, and `continue` and `reset` merge only fields the run has
+asked. `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.23-to-0.24` applies the migration.
+
+Changed in 0.25.0: the session's first question or widget lists every state field in `fields`,
+and any call writes a declared field whose value fits its schema, including one no question asks.
+Everything in `state` is exposed that way, so a lookup id or price the user must not choose stays out of
+`state` (key it by `ctx.sessionId` in your own store). Wrap a consent or a must-see widget pick in
+`neverPrefilled(schema)` so only an answer to its own question counts.
+`npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.24-to-0.25` applies the migration, from 0.24.x
+or straight from 0.23.x.
+
+Removed in 0.23.0: `withWaniwani`'s `captureTelemetry` option and the `CaptureTelemetryOptions` type.
+Use `captureIntent` / `CaptureIntentOptions`. Wrapped tools now advertise one optional `intent`
+string instead of a `telemetry` object. `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.22-to-0.23`
+applies the migration.
 
 Removed in 0.20.0. An import error for any of these means the code is on a pre-0.20 pattern:
 `createTool`, `createResource`, `registerTools`, `toNextJsHandler`, `toExpressJsHandler`,
@@ -124,7 +143,7 @@ Every version hop also ships a self-contained migration skill you can invoke dir
 `migrate-waniwani-sdk-<from>-to-<to>`. For the latest release:
 
 ```bash
-npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.19-to-0.20
+npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.24-to-0.25
 ```
 
 ## Guided playbooks
@@ -154,9 +173,15 @@ npx skills add Waniwani-AI/sdk -s audit-tracking        # read-only audit of an 
   `@waniwani/sdk/mcp/react`, the chat widget from `@waniwani/sdk/chat`.
 - **Forgetting `START` / `END` edges**: every flow needs `addEdge(START, firstNode)` and
   `addEdge(lastNode, END)`.
-- **Adding a first node just to greet the user or state a GDPR notice**: pre-filled state skips
-  opening nodes, so that message never lands. Use `intro` on the flow config instead
+- **Adding a first node just to greet the user or state a GDPR notice**: an opening node is
+  skipped once its fields are filled, by an earlier action or by an answer the user gave up
+  front, so that message may never land. Use `intro` on the flow config instead
   ([/sdk/flows/intro](https://docs.waniwani.ai/sdk/flows/intro)).
+- **Writing instructions into `createFlow({ description })`**: the description is the whole consent
+  card a ChatGPT user approves. Numbered protocols, `Do NOT`, `You MUST call X first` and other
+  attempts to steer the model get flagged as a **Suspicious Instruction** on that card. Describe what
+  the flow does in a sentence or two; the engine puts the protocol on each response as `nextStep`
+  ([/sdk/reference/flow-tool-contract](https://docs.waniwani.ai/sdk/reference/flow-tool-contract)).
 - **Calling `interrupt` / `showWidget` directly**: they come from the handler context,
   `({ interrupt }) => interrupt(...)`.
 - **Answering from memory**: if you have not fetched the docs page for what you are writing, fetch it.

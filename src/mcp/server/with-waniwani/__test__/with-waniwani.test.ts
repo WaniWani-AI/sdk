@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { z } from "zod";
 import type { TrackInput } from "../../../../tracking/@types.js";
 import { withWaniwani } from "../index.js";
 
@@ -101,6 +102,15 @@ function mockServer() {
 			(server.registerTool as (...a: unknown[]) => void)(...args);
 		},
 	};
+}
+
+function withClientInfo(
+	mock: ReturnType<typeof mockServer>,
+	clientInfo: { name: string; version: string },
+) {
+	Object.assign(mock.server, {
+		server: { getClientVersion: () => clientInfo },
+	});
 }
 
 describe("withWaniwani", () => {
@@ -251,6 +261,101 @@ describe("withWaniwani", () => {
 			(extra._meta as Record<string, unknown>)["waniwani/source"],
 		).toBeUndefined();
 		expect(tracked[0]?.source).toBe("chatgpt");
+	});
+
+	test("names an unrecognised client on tool.called", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+		withClientInfo(mock, { name: "Cursor", version: "1.4.2" });
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.({}, { _meta: {} });
+
+		expect(tracked[0]?.source).toBe("Cursor");
+	});
+
+	// `waniwani/source` gates widget tracking and flow branches, which only know
+	// recognised sources.
+	test("keeps an unrecognised client name out of _meta", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+		withClientInfo(mock, { name: "Cursor", version: "1.4.2" });
+
+		withWaniwani(mock.server, { client, injectWidgetToken: true });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra: { _meta: Record<string, unknown> } = { _meta: {} };
+		const result = await handler?.({}, extra);
+
+		expect(extra._meta["waniwani/source"]).toBeUndefined();
+		expect(result).toHaveProperty(["_meta", "waniwani/widget", "endpoint"]);
+		expect(result).not.toHaveProperty(["_meta", "waniwani/widget", "source"]);
+	});
+
+	test("a recognised header wins over an unrecognised client name", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+		withClientInfo(mock, { name: "mcp-remote", version: "0.1.0" });
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{},
+			{ _meta: {}, requestInfo: { headers: { "user-agent": "Claude-User" } } },
+		);
+
+		expect(tracked[0]?.source).toBe("claude");
+	});
+
+	test("ignores a blank client name", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+		withClientInfo(mock, { name: "   ", version: "1.0.0" });
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra: { _meta: Record<string, unknown> } = { _meta: {} };
+		await handler?.({}, extra);
+
+		expect(extra._meta["waniwani/source"]).toBeUndefined();
+		expect(tracked[0]?.source).toBeUndefined();
+	});
+
+	test("trims and caps an unrecognised client name", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+		withClientInfo(mock, { name: `  ${"x".repeat(500)}  `, version: "1.0.0" });
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.({}, { _meta: {} });
+
+		expect(tracked[0]?.source).toBe("x".repeat(100));
 	});
 
 	test("correlates the tracked event to a sessionId tool argument when _meta has none", async () => {
@@ -899,6 +1004,9 @@ describe("withWaniwani", () => {
 		mock.registerTool(
 			"flow_tool",
 			{
+				// A compiled flow tool always declares an input schema, and declaring
+				// one keeps the MCP SDK's `(args, extra)` handler shape.
+				inputSchema: { action: z.string(), stateUpdates: z.unknown() },
 				_meta: {
 					"waniwani/redactedStateUpdateFields": ["ages", "zipcode"],
 				},

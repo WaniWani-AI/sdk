@@ -85,6 +85,28 @@ describe("firePageView", () => {
 		}
 	});
 
+	test("carries the screen and the viewport as separate sizes", async () => {
+		const { calls, restore } = mockFetch();
+		// Smaller than the 1024x768 screen, so a swapped screen/viewport field fails.
+		win.happyDOM.setViewport({ width: 1023, height: 692 });
+		try {
+			await firePageView({
+				api: "https://app.waniwani.ai/api/mcp/chat",
+				token: "wwp_test",
+				channelId: "chan_1",
+			});
+			expect(calls).toHaveLength(1);
+			const [ev] = JSON.parse(calls[0].init.body as string).events;
+			expect(ev.properties.screenWidth).toBe(1024);
+			expect(ev.properties.screenHeight).toBe(768);
+			expect(ev.properties.viewportWidth).toBe(1023);
+			expect(ev.properties.viewportHeight).toBe(692);
+		} finally {
+			win.happyDOM.setViewport({ width: 1024, height: 768 });
+			restore();
+		}
+	});
+
 	test("fires at most once per (api, token, channel) per page", async () => {
 		const { calls, restore } = mockFetch();
 		try {
@@ -110,6 +132,21 @@ describe("firePageView", () => {
 			await firePageView({
 				api: "https://app.waniwani.ai/api/mcp/chat",
 				token: "",
+				source: "acme-web",
+			});
+			expect(calls).toHaveLength(0);
+		} finally {
+			restore();
+		}
+	});
+
+	test("sends nothing when the chat api is a customer runtime", async () => {
+		const { calls, restore } = mockFetch();
+		try {
+			await firePageView({
+				api: "https://acme.example/agent/v1/chat",
+				token: "wwp_test",
+				channelId: "chan_1",
 				source: "acme-web",
 			});
 			expect(calls).toHaveLength(0);

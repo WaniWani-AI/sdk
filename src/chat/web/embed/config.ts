@@ -2,7 +2,7 @@
 // Embed Config — types and resolution
 // ============================================================================
 
-import type { ChatTheme } from "../@types";
+import type { ChatTheme, DocumentUploadConfig } from "../@types";
 import type { Locale } from "../i18n";
 import type { VisitorIdInput } from "../lib/visitor-context";
 import type { VisibilityRules } from "./visibility";
@@ -37,6 +37,72 @@ export interface ChatAppearance {
 	 * render as plain text. Opt in for a "both sides bubbled" chat style.
 	 */
 	assistantBubble?: boolean;
+}
+
+/**
+ * Visual treatment of the in-flow composer (`mode: "composer"`). The surface
+ * is page content, so it has to sit inside designs the SDK never sees: a hero
+ * band, a card in a help center, a row of filters.
+ *
+ * - `"glow"` (default) — filled box on a card shadow, with the one-off border
+ *   glow sweep once the config resolves. The attention-grabbing option.
+ * - `"outline"` — the same box without the sweep. Sits quietly inside a card
+ *   or a form that already carries its own chrome.
+ *
+ * Two, because a variant is a starting point rather than the ceiling. Radius,
+ * fill, border, shadow and the send button read from `--ww-composer-*` CSS
+ * custom properties, so a host restyles the box from its own stylesheet
+ * instead of waiting for a variant here (a fully rounded search bar is
+ * `--ww-composer-radius: 9999px`). See the chat embed docs for the list.
+ */
+export type ComposerVariant = "glow" | "outline";
+
+/** Composer scale. Padding, text size and send-button size move together. */
+export type ComposerSize = "sm" | "md" | "lg";
+
+/**
+ * Presentation options for the `mode: "composer"` surface. Every field is
+ * cosmetic — behavior (first message opens the panel) is the same throughout.
+ */
+export interface ComposerAppearance {
+	/** Visual treatment. Defaults to `"glow"`. */
+	variant?: ComposerVariant;
+	/** Scale. Defaults to `"md"`. */
+	size?: ComposerSize;
+	/**
+	 * Render the channel's suggestion pills under the box. Defaults to `true`;
+	 * set `false` for a bare input in a tight layout.
+	 */
+	showSuggestions?: boolean;
+	/**
+	 * Horizontal alignment of the suggestion pills, and of the label when the
+	 * composer renders as a trigger. Defaults to `"start"`.
+	 */
+	align?: "start" | "center";
+	/**
+	 * Render the composer as a tap target instead of a live input: nothing is
+	 * typed in the page, and a click opens the panel where the caret lands.
+	 * Defaults to `false`.
+	 *
+	 * For hosts that want one tap into the full chat and no in-page composing.
+	 * The box keeps its variant's chrome and whatever CSS is set on it — only
+	 * the textarea is swapped for the trigger. `mobileTrigger` applies the same
+	 * swap on phones only; this one applies at every width.
+	 */
+	trigger?: boolean;
+	/**
+	 * On phone-width viewports, render the composer as a tap target instead of
+	 * a live input: one tap opens the full-screen panel and types there.
+	 * Defaults to `true`.
+	 *
+	 * Typing into an in-page box on a phone is the worse half of the handoff —
+	 * the soft keyboard covers the composer, the first message opens a
+	 * full-screen panel over it, and focus has to move mid-sentence. Going
+	 * straight to the panel skips all of it. The box keeps its variant's
+	 * chrome and whatever CSS is set on it; only the input is swapped for the
+	 * trigger. Set `false` to keep a real input at every width.
+	 */
+	mobileTrigger?: boolean;
 }
 
 /**
@@ -79,6 +145,20 @@ export interface PageSuggestionsEntry {
  * public token. It only carries display-facing fields (title, welcome message,
  * placeholder, suggestions) — system prompt and step budget stay server-side.
  */
+/**
+ * Where the page finds the MCP server whose tools it publishes to a browsing
+ * agent, and whether to publish them at all.
+ */
+export interface WebMcpEmbedConfig {
+	/**
+	 * On unless explicitly switched off.
+	 *
+	 * The page's own switch, for markup that wants the chat but not the tools on
+	 * this particular page.
+	 */
+	enabled?: boolean;
+}
+
 export interface EmbedConfig {
 	/** Waniwani chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
 	api?: string;
@@ -101,6 +181,18 @@ export interface EmbedConfig {
 	visitorId?: VisitorIdInput;
 	/** Override MCP server URL (optional — resolved from environment by default). */
 	mcpServerUrl?: string;
+	/**
+	 * WebMCP: publish this site's MCP tools to a browsing agent standing on the
+	 * page, via `document.modelContext`.
+	 *
+	 * A third surface for the same flows, alongside the connector and this chat.
+	 * On by default, and needs no configuration: the token identifies the
+	 * environment and the hosted API resolves its MCP server per request, the
+	 * same way `/config` and `/resource` already do.
+	 *
+	 * Surfaced as `data-webmcp` on the script tag.
+	 */
+	webmcp?: WebMcpEmbedConfig;
 	/**
 	 * Agent channel ID. Sent to the chat API so the Waniwani app routes the
 	 * conversation to the right agent. Surfaced as `data-channel-id` on the
@@ -158,6 +250,19 @@ export interface EmbedConfig {
 	 */
 	enableThreadHistory?: boolean;
 	/**
+	 * Documents module state, served by the platform. The composer offers the
+	 * paperclip, the drop target and paste only while `enabled` is true.
+	 */
+	documentUpload?: DocumentUploadConfig;
+	/** Where a chat opens a session with the agent runtime directly. Set by the platform's remote config only. */
+	sessionApi?: string;
+	/**
+	 * The channel's custom metadata, as `/config` serves it. Timing beacons read
+	 * it from the remote config only; setting it here sends nothing.
+	 * @internal
+	 */
+	metadata?: Record<string, string>;
+	/**
 	 * Theme preset + per-property overrides. The script tag exposes the
 	 * preset via `data-theme="light|dark|auto"`; programmatic callers can
 	 * additionally pass `variables` to tweak individual colours.
@@ -184,10 +289,25 @@ export interface EmbedConfig {
 	 *   pills) into `[data-waniwani-embed]`, sized by your own CSS — a hero
 	 *   search box, a card in a help page. Sending the first message opens the
 	 *   same panel `"floating"` uses, over the page.
+	 * - `"off"` mounts no chat surface at all: no dock, no inline box, no
+	 *   panel. The script still publishes the site's tools over WebMCP and
+	 *   still exposes `WaniWani.chat.track` / `.identify` on the host page, so
+	 *   a site can carry the tag (and be reachable by a browsing agent)
+	 *   without showing a widget to its visitors. The chat methods
+	 *   (`open()`, `sendMessage()`, …) are no-ops, and no `page.viewed` event
+	 *   fires because no chat loads its channel config.
 	 *
 	 * Surfaced as `data-mode` on the embed script tag.
 	 */
-	mode?: "inline" | "floating" | "composer";
+	mode?: "inline" | "floating" | "composer" | "off";
+	/**
+	 * Presentation of the in-flow composer. Only applies when `mode` is
+	 * `"composer"`. Surfaced as `data-composer-variant`, `data-composer-size`,
+	 * `data-composer-suggestions`, `data-composer-align`,
+	 * `data-composer-trigger` and `data-composer-mobile-trigger` on the embed
+	 * script tag.
+	 */
+	composer?: ComposerAppearance;
 	/**
 	 * Default height for the inline embed container. Any CSS length
 	 * (`"500px"`, `"80vh"`, …) or a bare number (treated as `px`). Applied to
@@ -213,6 +333,19 @@ export interface EmbedConfig {
 	 * `data-appear-delay`.
 	 */
 	appearDelay?: number;
+	/**
+	 * Whether the floating dock slides away at the bottom of the page so it
+	 * doesn't cover the host's footer. On by default: the dock hides once the
+	 * page's `<footer>` (or `[role="contentinfo"]`) scrolls into view, or
+	 * within 120px of the end of the page when there's no footer, and comes
+	 * back as soon as the visitor scrolls up. `false` keeps the dock pinned
+	 * the whole way down. A number hides it within that many px of the end of
+	 * the page instead of tracking the footer. Never hides the open chat
+	 * panel, or the dock while the visitor has text typed in it. Only applies
+	 * when `mode` is `"floating"`. Surfaced as `data-hide-at-bottom`
+	 * (`"false"` or a pixel distance).
+	 */
+	hideAtBottom?: boolean | number;
 	/**
 	 * Opt out of the top-of-funnel `page.viewed` event the widget fires once
 	 * on mount. Leave unset (or `false`) to keep the default landing-funnel
@@ -358,6 +491,15 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.mcpServerUrl = mcpServerUrl;
 	}
 
+	// Declines the surface on a page that should stay quiet, without touching
+	// the channel every other page shares.
+	const webmcpFlag = str("data-webmcp");
+	if (webmcpFlag) {
+		config.webmcp = {
+			enabled: webmcpFlag !== "false" && webmcpFlag !== "off",
+		};
+	}
+
 	const channelId = str("data-channel-id");
 	if (channelId) {
 		config.channelId = channelId;
@@ -420,9 +562,39 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	if (
 		modeRaw === "inline" ||
 		modeRaw === "floating" ||
-		modeRaw === "composer"
+		modeRaw === "composer" ||
+		modeRaw === "off"
 	) {
 		config.mode = modeRaw;
+	}
+
+	const composer: ComposerAppearance = {};
+	const composerVariant = str("data-composer-variant")?.trim().toLowerCase();
+	if (composerVariant === "glow" || composerVariant === "outline") {
+		composer.variant = composerVariant;
+	}
+	const composerSize = str("data-composer-size")?.trim().toLowerCase();
+	if (composerSize === "sm" || composerSize === "md" || composerSize === "lg") {
+		composer.size = composerSize;
+	}
+	const composerSuggestions = bool("data-composer-suggestions");
+	if (composerSuggestions !== undefined) {
+		composer.showSuggestions = composerSuggestions;
+	}
+	const composerAlign = str("data-composer-align")?.trim().toLowerCase();
+	if (composerAlign === "start" || composerAlign === "center") {
+		composer.align = composerAlign;
+	}
+	const composerTrigger = bool("data-composer-trigger");
+	if (composerTrigger !== undefined) {
+		composer.trigger = composerTrigger;
+	}
+	const composerMobileTrigger = bool("data-composer-mobile-trigger");
+	if (composerMobileTrigger !== undefined) {
+		composer.mobileTrigger = composerMobileTrigger;
+	}
+	if (Object.keys(composer).length > 0) {
+		config.composer = composer;
 	}
 
 	const height = str("data-height");
@@ -443,6 +615,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		}
 	}
 
+	const hideAtBottom = parseHideAtBottom(str("data-hide-at-bottom"));
+	if (hideAtBottom !== undefined) {
+		config.hideAtBottom = hideAtBottom;
+	}
+
 	const disclaimerRaw = str("data-disclaimer");
 	if (disclaimerRaw !== undefined) {
 		const trimmed = disclaimerRaw.trim();
@@ -455,6 +632,27 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	}
 
 	return config;
+}
+
+/**
+ * `data-hide-at-bottom`: `"true"` / `"false"`, or a non-negative pixel
+ * distance (`"200"`). Anything else is ignored.
+ */
+function parseHideAtBottom(
+	raw: string | undefined,
+): boolean | number | undefined {
+	if (raw === undefined) {
+		return undefined;
+	}
+	const value = raw.trim().toLowerCase();
+	if (value === "" || value === "true") {
+		return true;
+	}
+	if (value === "false") {
+		return false;
+	}
+	const px = Number(value);
+	return Number.isFinite(px) && px >= 0 ? px : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -495,6 +693,12 @@ export function resolveConfig(
 	const fromScript = scriptConfig ?? parseConfigFromScript();
 
 	const appearance = mergeAppearance(remote, fromScript, programmatic);
+	const composer: ComposerAppearance = {
+		...(remote?.composer ?? {}),
+		...compact(fromScript.composer),
+		...compact(programmatic?.composer),
+	};
+	const hasComposer = Object.keys(composer).length > 0;
 
 	const merged: EmbedConfig = {
 		token: "",
@@ -503,6 +707,7 @@ export function resolveConfig(
 		...compact(fromScript),
 		...compact(programmatic),
 		...(appearance ? { appearance } : {}),
+		...(hasComposer ? { composer } : {}),
 	};
 
 	if (!merged.token) {
