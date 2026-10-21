@@ -1,0 +1,50 @@
+name: Flow eval
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "skills/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Every run compares main with the last release, so a newer run covers
+# everything an older one would have caught.
+concurrency:
+  group: flow-eval
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - name: Flow eval against the last release
+        run: |
+          if [[ -z "$AI_GATEWAY_API_KEY" ]]; then
+            echo "::error::The flow eval needs the AI_GATEWAY_API_KEY secret."
+            exit 1
+          fi
+          # The baseline is the version npm serves as latest, so the run reads no git tags.
+          BASELINE=$(npm view @waniwani/sdk version)
+          set +e
+          bun run eval:flows --sdk "local,$BASELINE" --fail-on-regression 2>&1 | tee eval.log
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          {
+            echo "### Flow eval: main against $BASELINE"
+            echo '```'
+            cat eval.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$STATUS"
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
