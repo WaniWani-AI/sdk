@@ -56,3 +56,4 @@ describe("kb.search retrieval trace", () => {
 		]);
 	});
 });
+
