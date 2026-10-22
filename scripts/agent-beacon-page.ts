@@ -38,6 +38,7 @@ const server = Bun.serve({
 				headers: { "Content-Type": "application/javascript" },
 			});
 		}
+		console.log(`${pathname} ${request.headers.get("user-agent") ?? ""}`);
 		return new Response(page(pathname), {
 			headers: { "Content-Type": "text/html; charset=utf-8" },
 		});
