@@ -194,6 +194,17 @@ export interface EmbedConfig {
 	 */
 	webmcp?: WebMcpEmbedConfig;
 	/**
+	 * Report a page view that shows signs of browser automation (a WebDriver
+	 * flag, a headless browser, automation globals, input no person makes) to
+	 * the site's agent traffic. It sends the names of the signals seen, the page
+	 * URL without its query and the referrer's origin and path, and only when a
+	 * signal fires. No cookie, no stored id.
+	 *
+	 * On by default. Surfaced as `data-agent-beacon` on the script tag (`"off"`
+	 * or `"false"` turns it off).
+	 */
+	agentBeacon?: boolean;
+	/**
 	 * Agent channel ID. Sent to the chat API so the Waniwani app routes the
 	 * conversation to the right agent. Surfaced as `data-channel-id` on the
 	 * embed script tag.
@@ -498,6 +509,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.webmcp = {
 			enabled: webmcpFlag !== "false" && webmcpFlag !== "off",
 		};
+	}
+
+	const agentBeaconFlag = str("data-agent-beacon")?.trim().toLowerCase();
+	if (agentBeaconFlag !== undefined) {
+		config.agentBeacon = !["false", "0", "off"].includes(agentBeaconFlag);
 	}
 
 	const channelId = str("data-channel-id");

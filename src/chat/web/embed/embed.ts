@@ -22,6 +22,7 @@ import {
 	getOrCreateVisitorId,
 	setVisitorId,
 } from "../lib/visitor-context";
+import { startAgentBeacon } from "./agent-beacon";
 import { ComposerChat, type ComposerChatHandle } from "./composer-chat";
 import type { EmbedConfig } from "./config";
 import {
@@ -772,6 +773,18 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 		console.error("[Waniwani] WebMCP setup failed", error);
 	}
 
+	let beacon: { stop: () => void } | null = null;
+	if (config.agentBeacon !== false && config.token) {
+		try {
+			beacon = startAgentBeacon({
+				api: config.api ?? "",
+				token: config.token,
+			});
+		} catch (error) {
+			console.error("[Waniwani] Agent beacon setup failed", error);
+		}
+	}
+
 	let mounted: MountedEmbed;
 	if (config.mode === "off") {
 		mounted = mountOff();
@@ -815,6 +828,7 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 		destroy: () => {
 			void trackClient.shutdown();
 			webmcp?.destroy();
+			beacon?.stop();
 			mounted.destroy();
 		},
 	};

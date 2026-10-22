@@ -332,3 +332,89 @@ describe("init on a WebMCP browser", () => {
 		).toBe(true);
 	});
 });
+
+describe("init and the agent beacon", () => {
+	const captureBeacons = () => {
+		const sent: string[] = [];
+		const original = Reflect.get(win.navigator, "sendBeacon");
+		Object.defineProperty(win.navigator, "sendBeacon", {
+			configurable: true,
+			writable: true,
+			value: (url: string) => {
+				sent.push(url);
+				return true;
+			},
+		});
+		Object.defineProperty(win.navigator, "webdriver", {
+			configurable: true,
+			writable: true,
+			value: true,
+		});
+		return {
+			sent,
+			restore: () => {
+				Object.defineProperty(win.navigator, "sendBeacon", {
+					configurable: true,
+					writable: true,
+					value: original,
+				});
+				Reflect.deleteProperty(win.navigator, "webdriver");
+			},
+		};
+	};
+
+	test("an automated page with the chat initialised reports to the api's own origin", () => {
+		installFetch(() => Response.json({ tools: [] }));
+		const beacons = captureBeacons();
+		try {
+			act(() => {
+				chat().init({ api: API, token: TOKEN, mode: "off" });
+			});
+			win.dispatchEvent(new win.Event("pagehide"));
+
+			expect(beacons.sent).toEqual([
+				"https://api.example.test/api/v2/agent-traffic/beacon",
+			]);
+		} finally {
+			beacons.restore();
+		}
+	});
+
+	test("agentBeacon false sends nothing, however automated the page", () => {
+		installFetch(() => Response.json({ tools: [] }));
+		const beacons = captureBeacons();
+		try {
+			act(() => {
+				chat().init({
+					api: API,
+					token: TOKEN,
+					mode: "off",
+					agentBeacon: false,
+				});
+			});
+			win.dispatchEvent(new win.Event("pagehide"));
+
+			expect(beacons.sent).toEqual([]);
+		} finally {
+			beacons.restore();
+		}
+	});
+
+	test("after destroy the page sends nothing when it hides", () => {
+		installFetch(() => Response.json({ tools: [] }));
+		const beacons = captureBeacons();
+		try {
+			act(() => {
+				chat().init({ api: API, token: TOKEN, mode: "off" });
+			});
+			act(() => {
+				chat().destroy();
+			});
+			win.dispatchEvent(new win.Event("pagehide"));
+
+			expect(beacons.sent).toEqual([]);
+		} finally {
+			beacons.restore();
+		}
+	});
+});
