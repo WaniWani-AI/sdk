@@ -71,7 +71,6 @@ export const createInputWatcher = (target: EventTarget) => {
 	let movesSinceDown = 0;
 	let anchor: Point | null = null;
 	let sawMotion = false;
-	let clicked = false;
 
 	const onUntrusted = (event: Event) => {
 		if (!event.isTrusted) {
@@ -100,17 +99,15 @@ export const createInputWatcher = (target: EventTarget) => {
 		if (!sawMotion) {
 			signals.add("click_without_motion");
 		} else if (anchor && movesSinceDown <= TELEPORT_MAX_MOVES) {
-			// Before the first click the anchor is the first move, so the jump onto the target is the move itself.
 			const distance = Math.hypot(
 				event.clientX - anchor.x,
 				event.clientY - anchor.y,
 			);
-			if (!clicked || distance > TELEPORT_DISTANCE_PX) {
+			if (distance > TELEPORT_DISTANCE_PX) {
 				signals.add("pointer_teleport");
 			}
 		}
 
-		clicked = true;
 		movesSinceDown = 0;
 		anchor = { x: event.clientX, y: event.clientY };
 	};
@@ -163,15 +160,12 @@ const newPageViewId = (): string =>
 		: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 const send = (endpoint: string, payload: AgentBeaconPayload): void => {
-	const body = JSON.stringify(payload);
-	// text/plain keeps the request simple, so no CORS preflight runs on unload.
-	const blob = new Blob([body], { type: "text/plain" });
-	if (navigator.sendBeacon?.(endpoint, blob)) {
-		return;
-	}
+	// A fetch can leave out credentials, where sendBeacon always sends cookies cross-origin.
+	// text/plain keeps it a simple request, so no CORS preflight runs on unload.
 	void fetch(endpoint, {
 		method: "POST",
-		body,
+		body: JSON.stringify(payload),
+		headers: { "Content-Type": "text/plain" },
 		keepalive: true,
 		mode: "no-cors",
 		credentials: "omit",

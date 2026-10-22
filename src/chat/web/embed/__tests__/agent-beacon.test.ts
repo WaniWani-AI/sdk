@@ -47,10 +47,11 @@ const KNOWN_SIGNALS = [
 	"pointer_teleport",
 ];
 
-type Sent = { url: string; data: Blob };
+type Sent = { url: string; init: RequestInit | undefined };
 
 let win: Window;
 let sent: Sent[];
+let beaconCalls: number;
 
 const define = (target: object, key: string, value: unknown) => {
 	Object.defineProperty(target, key, {
@@ -81,14 +82,24 @@ const installPage = (input: { url?: string; referrer?: string } = {}) => {
 	define(win.document, "referrer", input.referrer ?? "");
 	define(win.document, "visibilityState", "visible");
 	sent = [];
-	define(win.navigator, "sendBeacon", (url: string, data: Blob) => {
-		sent.push({ url, data });
+	beaconCalls = 0;
+	define(win.navigator, "sendBeacon", () => {
+		beaconCalls += 1;
 		return true;
+	});
+	Object.assign(globalThis, {
+		fetch: async (input: string | URL | Request, init?: RequestInit) => {
+			sent.push({ url: String(input), init });
+			return new Response(null, { status: 204 });
+		},
 	});
 };
 
 const payloads = async (): Promise<Record<string, unknown>[]> =>
-	Promise.all(sent.map(async (entry) => JSON.parse(await entry.data.text())));
+	sent.map((entry) => JSON.parse(String(entry.init?.body)));
+
+const headerOf = (init: RequestInit | undefined, name: string): string | null =>
+	new Headers(init?.headers).get(name);
 
 const trusted = <T extends object>(event: T): T => {
 	define(event, "isTrusted", true);
@@ -306,23 +317,33 @@ describe("createInputWatcher", () => {
 		expect(watcher.signals()).toEqual(["pointer_teleport"]);
 	});
 
-	test("a first click reached in one move straight onto the target is a teleport", () => {
+	test("a first click whose single move jumped far from the first position is a teleport", () => {
 		const watcher = createInputWatcher(window);
 
+		fire(move(10, 10));
 		fire(move(640, 400));
 		fire(press(640, 400));
 
 		expect(watcher.signals()).toEqual(["pointer_teleport"]);
 	});
 
-	test("a first click reached in two moves is a teleport", () => {
+	test("a first click reached in one move onto the target raises nothing, since nothing says where it came from", () => {
 		const watcher = createInputWatcher(window);
 
-		fire(move(320, 200));
 		fire(move(640, 400));
 		fire(press(640, 400));
 
-		expect(watcher.signals()).toEqual(["pointer_teleport"]);
+		expect(watcher.signals()).toEqual([]);
+	});
+
+	test("a first click two short moves from the first position raises nothing", () => {
+		const watcher = createInputWatcher(window);
+
+		fire(move(600, 380));
+		fire(move(640, 400));
+		fire(press(640, 400));
+
+		expect(watcher.signals()).toEqual([]);
 	});
 
 	test("a first click after a short run of moves raises nothing", () => {
@@ -454,7 +475,10 @@ describe("startAgentBeacon", () => {
 		const beacon = startAgentBeacon({ api: API, token: TOKEN });
 		win.dispatchEvent(new win.Event("pagehide"));
 
-		expect(sent[0]?.data.type.startsWith("text/plain")).toBe(true);
+		expect(
+			headerOf(sent[0]?.init, "content-type")?.startsWith("text/plain"),
+		).toBe(true);
+		expect(sent[0]?.init?.method).toBe("POST");
 		beacon.stop();
 	});
 
@@ -576,37 +600,29 @@ describe("startAgentBeacon", () => {
 		expect(sent).toEqual([]);
 	});
 
-	test("a browser that refuses the beacon falls back to a keepalive post with no credentials", async () => {
+	test("every report is a keepalive post that carries no cookie and never goes through sendBeacon", async () => {
+		jest.useFakeTimers();
 		define(navigator, "webdriver", true);
-		define(navigator, "sendBeacon", () => false);
-		const posted: { url: string; init: RequestInit | undefined }[] = [];
-		Object.assign(globalThis, {
-			fetch: async (input: string | URL | Request, init?: RequestInit) => {
-				posted.push({ url: String(input), init });
-				return new Response(null, { status: 204 });
-			},
-		});
 		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(5_000);
+		win.dispatchEvent(new win.Event("keydown"));
+		hidePage();
 
-		win.dispatchEvent(new win.Event("pagehide"));
-
-		expect(posted).toHaveLength(1);
-		expect(posted[0]?.url).toBe(
-			"https://app.waniwani.ai/api/v2/agent-traffic/beacon",
-		);
-		expect(posted[0]?.init?.method).toBe("POST");
-		expect(posted[0]?.init?.keepalive).toBe(true);
-		expect(posted[0]?.init?.credentials).toBe("omit");
-		expect(JSON.parse(String(posted[0]?.init?.body))).toMatchObject({
-			v: 1,
-			signals: ["webdriver"],
-		});
+		expect(sent).toHaveLength(2);
+		for (const entry of sent) {
+			expect(entry.url).toBe(
+				"https://app.waniwani.ai/api/v2/agent-traffic/beacon",
+			);
+			expect(entry.init?.method).toBe("POST");
+			expect(entry.init?.keepalive).toBe(true);
+			expect(entry.init?.credentials).toBe("omit");
+		}
+		expect(beaconCalls).toBe(0);
 		beacon.stop();
 	});
 
-	test("a failing fallback post never throws into the page", async () => {
+	test("a failing post never throws into the page", async () => {
 		define(navigator, "webdriver", true);
-		define(navigator, "sendBeacon", undefined);
 		Object.assign(globalThis, {
 			fetch: async () => {
 				throw new TypeError("network down");
