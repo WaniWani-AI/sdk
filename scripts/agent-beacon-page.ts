@@ -25,7 +25,7 @@ const page = (path: string) => `<!doctype html>
 <body>
   <h1>Agent beacon test: ${path}</h1>
   <p><a href="/pricing">/pricing</a> · <a href="/docs">/docs</a></p>
-  <script src="/embed.js" data-token="${values.token}" data-api="${api}" data-mode="off"></script>
+  <script src="/embed.js" data-token="${values.token}" data-api="${api}" data-mode="off" data-agent-beacon="on"></script>
 </body>
 </html>`;
 
