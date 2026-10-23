@@ -774,7 +774,7 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 	}
 
 	let beacon: { stop: () => void } | null = null;
-	if (config.agentBeacon !== false && config.token) {
+	if (config.agentBeacon === true && config.token) {
 		try {
 			beacon = startAgentBeacon({
 				api: config.api ?? "",

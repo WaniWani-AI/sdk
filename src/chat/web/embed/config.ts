@@ -200,8 +200,8 @@ export interface EmbedConfig {
 	 * URL without its query and the referrer's origin and path, and only when a
 	 * signal fires. No cookie, no stored id.
 	 *
-	 * On by default. Surfaced as `data-agent-beacon` on the script tag (`"off"`
-	 * or `"false"` turns it off).
+	 * Off by default. Surfaced as `data-agent-beacon` on the script tag
+	 * (`"on"`, `"true"`, `"1"` or the bare attribute turns it on).
 	 */
 	agentBeacon?: boolean;
 	/**
@@ -513,7 +513,7 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 
 	const agentBeaconFlag = str("data-agent-beacon")?.trim().toLowerCase();
 	if (agentBeaconFlag !== undefined) {
-		config.agentBeacon = !["false", "0", "off"].includes(agentBeaconFlag);
+		config.agentBeacon = ["on", "true", "1", ""].includes(agentBeaconFlag);
 	}
 
 	const channelId = str("data-channel-id");

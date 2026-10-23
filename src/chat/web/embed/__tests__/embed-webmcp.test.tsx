@@ -383,7 +383,7 @@ describe("init and the agent beacon", () => {
 		const beacons = captureBeacons();
 		try {
 			act(() => {
-				chat().init({ api: API, token: TOKEN, mode: "off" });
+				chat().init({ api: API, token: TOKEN, mode: "off", agentBeacon: true });
 			});
 			win.dispatchEvent(new win.Event("pagehide"));
 
@@ -393,6 +393,22 @@ describe("init and the agent beacon", () => {
 					credentials: "omit",
 				},
 			]);
+			expect(beacons.beaconCalls()).toBe(0);
+		} finally {
+			beacons.restore();
+		}
+	});
+
+	test("an init with no beacon option sends nothing, however automated the page", () => {
+		installFetch(() => Response.json({ tools: [] }));
+		const beacons = captureBeacons();
+		try {
+			act(() => {
+				chat().init({ api: API, token: TOKEN, mode: "off" });
+			});
+			win.dispatchEvent(new win.Event("pagehide"));
+
+			expect(beacons.sent).toEqual([]);
 			expect(beacons.beaconCalls()).toBe(0);
 		} finally {
 			beacons.restore();
@@ -424,7 +440,7 @@ describe("init and the agent beacon", () => {
 		const beacons = captureBeacons();
 		try {
 			act(() => {
-				chat().init({ api: API, token: TOKEN, mode: "off" });
+				chat().init({ api: API, token: TOKEN, mode: "off", agentBeacon: true });
 			});
 			act(() => {
 				chat().destroy();

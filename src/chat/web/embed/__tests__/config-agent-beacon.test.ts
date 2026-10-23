@@ -40,52 +40,52 @@ afterAll(() => {
 });
 
 describe("data-agent-beacon on the script tag", () => {
-	test("absent leaves the beacon on by default", () => {
+	test("absent leaves the beacon off", () => {
 		const parsed = parseConfigFromScript();
 
 		expect(parsed.token).toBe("wwp_public");
-		expect(parsed.agentBeacon).not.toBe(false);
+		expect(parsed.agentBeacon).not.toBe(true);
 	});
 
-	for (const value of ["off", "false"]) {
-		test(`"${value}" turns the beacon off`, () => {
-			installScript({ "data-agent-beacon": value });
-
-			expect(parseConfigFromScript().agentBeacon).toBe(false);
-		});
-	}
-
-	for (const value of ["OFF", "False", " off ", "0"]) {
-		test(`"${value}", written the way the other boolean attributes accept it, turns the beacon off`, () => {
-			installScript({ "data-agent-beacon": value });
-
-			expect(parseConfigFromScript().agentBeacon).toBe(false);
-		});
-	}
-
-	for (const value of ["on", "true"]) {
-		test(`"${value}" keeps the beacon on`, () => {
+	for (const value of ["on", "true", "1", "", "ON", "True", " on ", " 1 "]) {
+		test(`"${value}" turns the beacon on`, () => {
 			installScript({ "data-agent-beacon": value });
 
 			expect(parseConfigFromScript().agentBeacon).toBe(true);
 		});
 	}
 
-	test("an empty attribute keeps the beacon on", () => {
-		installScript({ "data-agent-beacon": "" });
+	for (const value of ["off", "false", "0", "maybe", "yes please", "OFF"]) {
+		test(`"${value}" leaves the beacon off`, () => {
+			installScript({ "data-agent-beacon": value });
 
-		expect(parseConfigFromScript().agentBeacon).not.toBe(false);
-	});
+			expect(parseConfigFromScript().agentBeacon).not.toBe(true);
+		});
+	}
 });
 
 describe("agentBeacon passed to init", () => {
-	test("false survives config resolution", () => {
+	test("true survives config resolution", () => {
+		expect(
+			resolveConfig({ token: "wwp_public", agentBeacon: true }).agentBeacon,
+		).toBe(true);
+	});
+
+	test("left out, the resolved config does not turn the beacon on", () => {
+		expect(resolveConfig({ token: "wwp_public" }).agentBeacon).not.toBe(true);
+	});
+
+	test("the script tag's opt-in turns it on for an init with no option", () => {
+		installScript({ "data-agent-beacon": "on" });
+
+		expect(resolveConfig({ token: "wwp_public" }).agentBeacon).toBe(true);
+	});
+
+	test("an init that says false wins over the script tag's opt-in", () => {
+		installScript({ "data-agent-beacon": "on" });
+
 		expect(
 			resolveConfig({ token: "wwp_public", agentBeacon: false }).agentBeacon,
 		).toBe(false);
-	});
-
-	test("left out, the resolved config does not turn the beacon off", () => {
-		expect(resolveConfig({ token: "wwp_public" }).agentBeacon).not.toBe(false);
 	});
 });
