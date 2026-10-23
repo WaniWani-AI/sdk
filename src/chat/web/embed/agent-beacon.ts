@@ -20,7 +20,7 @@ const AUTOMATION_GLOBALS = [
 	"__webdriver_script_fn",
 	"__fxdriver_unwrapped",
 ];
-// ChromeDriver leaves a `cdc_…` property on the document.
+// ChromeDriver leaves a `cdc_…` property on the window, and older versions a `$cdc_…` one on the document.
 const CHROMEDRIVER_KEY = /^\$?cdc_/;
 const HEADLESS_BRAND = /headless/i;
 const TELEPORT_DISTANCE_PX = 100;
@@ -53,8 +53,8 @@ export const readEnvironmentSignals = (input: {
 	}
 
 	const hasGlobal = AUTOMATION_GLOBALS.some((name) => name in win);
-	const hasChromeDriverKey = Object.keys(doc).some((key) =>
-		CHROMEDRIVER_KEY.test(key),
+	const hasChromeDriverKey = [...Object.keys(win), ...Object.keys(doc)].some(
+		(key) => CHROMEDRIVER_KEY.test(key),
 	);
 	if (hasGlobal || hasChromeDriverKey) {
 		signals.push("automation_global");

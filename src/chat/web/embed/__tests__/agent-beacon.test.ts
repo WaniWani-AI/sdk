@@ -207,6 +207,38 @@ describe("readEnvironmentSignals", () => {
 		});
 	}
 
+	for (const key of [
+		"cdc_adoQpoasnfa76pfcZLmcfl_Array",
+		"cdc_adoQpoasnfa76pfcZLmcfl_Promise",
+	]) {
+		test(`the ChromeDriver key ${key} on the window is an automation global`, () => {
+			Reflect.set(window, key, () => {});
+
+			expect(readEnvironmentSignals({ win: window, doc: document })).toEqual([
+				"automation_global",
+			]);
+		});
+	}
+
+	test("a ChromeDriver key on both the window and the document is one signal", () => {
+		Reflect.set(window, "cdc_adoQpoasnfa76pfcZLmcfl_Symbol", {});
+		Reflect.set(document, "$cdc_asdjflasutopfhvcZLmcfl_", {});
+
+		expect(readEnvironmentSignals({ win: window, doc: document })).toEqual([
+			"automation_global",
+		]);
+	});
+
+	for (const key of ["xcdc_abc", "cdcx", "cdc", "my_cdc_value", "$cdcx_"]) {
+		test(`the look-alike ${key} on the window is not an automation global`, () => {
+			Reflect.set(window, key, {});
+
+			expect(readEnvironmentSignals({ win: window, doc: document })).toEqual(
+				[],
+			);
+		});
+	}
+
 	test("a page global that only mentions playwright is not an automation global", () => {
 		define(window, "playwrightDemo", true);
 		Reflect.set(document, "abc_cdc_", {});
