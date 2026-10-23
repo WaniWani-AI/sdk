@@ -332,3 +332,124 @@ describe("init on a WebMCP browser", () => {
 		).toBe(true);
 	});
 });
+
+describe("init and the agent beacon", () => {
+	const captureBeacons = () => {
+		const sent: { url: string; credentials: RequestCredentials | undefined }[] =
+			[];
+		let beaconCalls = 0;
+		const original = Reflect.get(win.navigator, "sendBeacon");
+		const pageFetch = globalThis.fetch;
+		Object.defineProperty(win.navigator, "sendBeacon", {
+			configurable: true,
+			writable: true,
+			value: () => {
+				beaconCalls += 1;
+				return true;
+			},
+		});
+		globalThis.fetch = Object.assign(
+			async (input: string | URL | Request, init?: RequestInit) => {
+				const url = input instanceof Request ? input.url : String(input);
+				if (url.includes("/agent-traffic/beacon")) {
+					sent.push({ url, credentials: init?.credentials });
+					return new Response(null, { status: 204 });
+				}
+				return pageFetch(input, init);
+			},
+			{ preconnect: REAL_FETCH.preconnect },
+		);
+		Object.defineProperty(win.navigator, "webdriver", {
+			configurable: true,
+			writable: true,
+			value: true,
+		});
+		return {
+			sent,
+			beaconCalls: () => beaconCalls,
+			restore: () => {
+				Object.defineProperty(win.navigator, "sendBeacon", {
+					configurable: true,
+					writable: true,
+					value: original,
+				});
+				Reflect.deleteProperty(win.navigator, "webdriver");
+			},
+		};
+	};
+
+	test("an automated page with the chat initialised reports to the api's own origin", () => {
+		installFetch(() => Response.json({ tools: [] }));
+		const beacons = captureBeacons();
+		try {
+			act(() => {
+				chat().init({ api: API, token: TOKEN, mode: "off", agentBeacon: true });
+			});
+			win.dispatchEvent(new win.Event("pagehide"));
+
+			expect(beacons.sent).toEqual([
+				{
+					url: "https://api.example.test/api/v2/agent-traffic/beacon",
+					credentials: "omit",
+				},
+			]);
+			expect(beacons.beaconCalls()).toBe(0);
+		} finally {
+			beacons.restore();
+		}
+	});
+
+	test("an init with no beacon option sends nothing, however automated the page", () => {
+		installFetch(() => Response.json({ tools: [] }));
+		const beacons = captureBeacons();
+		try {
+			act(() => {
+				chat().init({ api: API, token: TOKEN, mode: "off" });
+			});
+			win.dispatchEvent(new win.Event("pagehide"));
+
+			expect(beacons.sent).toEqual([]);
+			expect(beacons.beaconCalls()).toBe(0);
+		} finally {
+			beacons.restore();
+		}
+	});
+
+	test("agentBeacon false sends nothing, however automated the page", () => {
+		installFetch(() => Response.json({ tools: [] }));
+		const beacons = captureBeacons();
+		try {
+			act(() => {
+				chat().init({
+					api: API,
+					token: TOKEN,
+					mode: "off",
+					agentBeacon: false,
+				});
+			});
+			win.dispatchEvent(new win.Event("pagehide"));
+
+			expect(beacons.sent).toEqual([]);
+		} finally {
+			beacons.restore();
+		}
+	});
+
+	test("after destroy the page sends nothing when it hides", () => {
+		installFetch(() => Response.json({ tools: [] }));
+		const beacons = captureBeacons();
+		try {
+			act(() => {
+				chat().init({ api: API, token: TOKEN, mode: "off", agentBeacon: true });
+			});
+			act(() => {
+				chat().destroy();
+			});
+			win.dispatchEvent(new win.Event("pagehide"));
+
+			expect(beacons.sent).toEqual([]);
+		} finally {
+			beacons.restore();
+		}
+	});
+});
