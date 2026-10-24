@@ -107,6 +107,8 @@ export interface WaniwaniChatOverrides {
 	 * String overrides the default wording; `false` hides it.
 	 */
 	disclaimer?: string | false;
+	/** @internal Enterprise only: hides the "powered by Waniwani" logo. */
+	hidePoweredBy?: boolean;
 	/**
 	 * UI language for built-in labels. One of `"en"`, `"fr"`, `"es"`.
 	 * When omitted, the widget detects the locale from `<html lang>` /
@@ -255,6 +257,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				showToolCalls: overrides?.showToolCalls,
 				appearance: overrides?.appearance,
 				disclaimer: overrides?.disclaimer,
+				hidePoweredBy: overrides?.hidePoweredBy,
 				locale: overrides?.locale,
 			}),
 			[
@@ -271,6 +274,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				overrides?.showToolCalls,
 				overrides?.appearance,
 				overrides?.disclaimer,
+				overrides?.hidePoweredBy,
 				overrides?.locale,
 			],
 		);
@@ -516,6 +520,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}
 					disclaimer={config.disclaimer}
+					hidePoweredBy={config.hidePoweredBy}
 					documentUpload={config.documentUpload}
 					allowAttachments={overrides?.allowAttachments}
 					locale={config.locale}

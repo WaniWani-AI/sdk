@@ -97,6 +97,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			initializing = false,
 			onScreen = true,
 			disclaimer,
+			hidePoweredBy = false,
 		} = props;
 
 		// Preset → base theme. `light` and the unset case let the CSS
@@ -701,8 +702,8 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 									</output>
 								)}
 								<div className="ww:pt-2 ww:pb-1 ww:flex ww:flex-nowrap ww:justify-center ww:items-center ww:gap-1.5">
-									<PoweredBy />
-									<AiDisclaimer text={disclaimer} />
+									{!hidePoweredBy && <PoweredBy />}
+									<AiDisclaimer text={disclaimer} standalone={hidePoweredBy} />
 								</div>
 							</div>
 						</div>

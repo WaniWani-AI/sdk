@@ -66,6 +66,8 @@ export interface Messages {
 	};
 	aiDisclaimer: {
 		default: string;
+		/** Shown in place of `default` when the "powered by" logo is hidden, so the line still says it is an AI. */
+		standalone: string;
 	};
 	exportSession: {
 		saving: string;
@@ -151,6 +153,7 @@ export const en: Messages = {
 	},
 	aiDisclaimer: {
 		default: "can make mistakes",
+		standalone: "AI agent. It can make mistakes.",
 	},
 	exportSession: {
 		saving: "saving...",

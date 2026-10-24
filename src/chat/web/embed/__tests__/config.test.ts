@@ -321,6 +321,31 @@ describe("parseConfigFromScript — data-disable-page-view", () => {
 	});
 });
 
+describe("parseConfigFromScript — data-hide-powered-by", () => {
+	test("undefined when unspecified, so the logo shows by default", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "tok" });
+		expect(cfg.hidePoweredBy).toBeUndefined();
+	});
+
+	test("'true' hides the logo and keeps the disclaimer text", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-powered-by": "true",
+			"data-disclaimer": "Asistente de IA. Verifique la información.",
+		});
+		expect(cfg.hidePoweredBy).toBe(true);
+		expect(cfg.disclaimer).toBe("Asistente de IA. Verifique la información.");
+	});
+
+	test("'false' keeps the logo", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-powered-by": "false",
+		});
+		expect(cfg.hidePoweredBy).toBe(false);
+	});
+});
+
 describe("parseConfigFromScript — data-show-tool-calls", () => {
 	test("undefined when unspecified — consumers default to full panels", async () => {
 		const cfg = await parseWithAttrs({ "data-token": "tok" });
