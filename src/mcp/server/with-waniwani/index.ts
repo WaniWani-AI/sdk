@@ -41,6 +41,7 @@ import {
 	takeIntentArgument,
 } from "./intent-capture.js";
 import { extractTransportSessionId } from "./transport-session.js";
+import { declareWidgetConnectDomain, trackingOrigin } from "./widget-csp.js";
 
 type UnknownRecord = Record<string, unknown>;
 type RawHandler = (
@@ -92,7 +93,9 @@ export type WithWaniwaniOptions = {
 	 * widgets can send events directly to the Waniwani backend.
 	 *
 	 * Always injects `endpoint`. Injects `token` when an API key is configured
-	 * and token minting succeeds.
+	 * and token minting succeeds. Also adds the endpoint's origin to the connect
+	 * domains of every widget resource's CSP, so the host's sandbox lets the
+	 * widget reach it.
 	 *
 	 * @default true
 	 */
@@ -462,7 +465,9 @@ function createWrappedHandler(
  *
  * When `injectWidgetToken` is enabled (default), tracking config is injected
  * into tool response `_meta.waniwani` so browser widgets can post events
- * directly to the Waniwani backend without a server-side proxy.
+ * directly to the Waniwani backend without a server-side proxy, and that
+ * backend's origin is added to the connect domains of every widget resource's
+ * CSP (`ui.csp.connectDomains`, `openai/widgetCSP.connect_domains`).
  *
  * Widget metadata declared on the tool **definition** (e.g. skybridge's
  * `registerWidget`, raw MCP `_meta["ui/resourceUri"]` / `_meta.ui.resourceUri`,
@@ -507,6 +512,13 @@ export async function withWaniwani(
 		funnelSync: null,
 		intentCapture: createIntentCapture(opts.captureIntent),
 	};
+
+	const widgetConnectDomain = injectToken
+		? trackingOrigin(tracker._config.apiUrl ?? DEFAULT_BASE_URL)
+		: undefined;
+	if (widgetConnectDomain) {
+		declareWidgetConnectDomain(server, widgetConnectDomain);
+	}
 
 	const originalRegisterTool = server.registerTool.bind(server) as (
 		...args: unknown[]
