@@ -285,6 +285,8 @@ export interface ChatBaseProps {
 	 * Pass a string to override the wording, or `false` to hide it entirely.
 	 */
 	disclaimer?: string | false;
+	/** @internal Enterprise only: hides the "powered by Waniwani" logo. */
+	hidePoweredBy?: boolean;
 	/**
 	 * UI language for built-in labels (buttons, placeholders, status text).
 	 * Supports `"en"`, `"fr"`, `"es"`. When omitted, the widget detects the

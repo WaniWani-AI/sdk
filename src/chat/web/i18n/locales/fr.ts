@@ -65,6 +65,7 @@ export const fr: Messages = {
 	},
 	aiDisclaimer: {
 		default: "peut faire des erreurs",
+		standalone: "Agent IA. Il peut faire des erreurs.",
 	},
 	exportSession: {
 		saving: "enregistrement...",

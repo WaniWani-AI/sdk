@@ -169,6 +169,8 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 					enableThreadHistory={config.enableThreadHistory}
 					documentUpload={config.documentUpload}
 					showToolCalls={config.showToolCalls}
+					disclaimer={config.disclaimer}
+					hidePoweredBy={config.hidePoweredBy}
 					locale={config.locale}
 					initializing={!ready}
 				/>

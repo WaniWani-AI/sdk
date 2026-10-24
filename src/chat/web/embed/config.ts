@@ -253,6 +253,8 @@ export interface EmbedConfig {
 	 * to hide).
 	 */
 	disclaimer?: string | false;
+	/** @internal Enterprise only: hides the "powered by Waniwani" logo. */
+	hidePoweredBy?: boolean;
 	/** URL to a custom stylesheet injected into the shadow root. */
 	css?: string;
 	/**
@@ -557,6 +559,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const hideHeader = bool("data-hide-header");
 	if (hideHeader !== undefined) {
 		config.hideHeader = hideHeader;
+	}
+
+	const hidePoweredBy = bool("data-hide-powered-by");
+	if (hidePoweredBy !== undefined) {
+		config.hidePoweredBy = hidePoweredBy;
 	}
 
 	const themeRaw = str("data-theme");
