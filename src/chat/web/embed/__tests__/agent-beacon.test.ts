@@ -25,6 +25,13 @@ const GLOBAL_KEYS = [
 	"PointerEvent",
 	"KeyboardEvent",
 	"WheelEvent",
+	"InputEvent",
+	"HTMLElement",
+	"HTMLFormElement",
+	"Element",
+	"MutationObserver",
+	"FormData",
+	"matchMedia",
 	"fetch",
 ] as const;
 const originals = new Map(
@@ -77,10 +84,12 @@ const installPage = (input: { url?: string; referrer?: string } = {}) => {
 		Object.assign(globalThis, { [key]: Reflect.get(win, key) });
 	}
 	Object.assign(globalThis, { window: win });
+	Object.assign(win, { SyntaxError });
 	define(win.navigator, "webdriver", false);
 	define(win.navigator, "userAgent", CHROME_UA);
 	define(win.document, "referrer", input.referrer ?? "");
 	define(win.document, "visibilityState", "visible");
+	define(win.document, "readyState", "complete");
 	sent = [];
 	beaconCalls = 0;
 	define(win.navigator, "sendBeacon", () => {
@@ -122,6 +131,49 @@ const fire = (event: unknown) => {
 	if (event instanceof win.Event) {
 		win.dispatchEvent(event);
 	}
+};
+
+const typeInto = (
+	target: InstanceType<typeof win.HTMLElement>,
+	inputType = "insertText",
+) => {
+	target.dispatchEvent(
+		trusted(new win.InputEvent("input", { inputType, bubbles: true })),
+	);
+};
+
+const keyOn = (target: InstanceType<typeof win.HTMLElement>) => {
+	target.dispatchEvent(
+		trusted(new win.KeyboardEvent("keydown", { key: "a", bubbles: true })),
+	);
+};
+
+const addField = () => {
+	const field = win.document.createElement("textarea");
+	win.document.body.append(field);
+	return field;
+};
+
+const addForm = (action = "/quote?plan=pro") => {
+	const form = win.document.createElement("form");
+	form.setAttribute("action", action);
+	form.append(win.document.createElement("input"));
+	win.document.body.append(form);
+	return form;
+};
+
+const intentFieldOf = (form: InstanceType<typeof win.HTMLFormElement>) => {
+	const field = form.querySelector("[data-waniwani-intent] textarea");
+	if (!(field instanceof win.HTMLTextAreaElement)) {
+		throw new Error("form has no intent field");
+	}
+	return field;
+};
+
+const submit = (form: InstanceType<typeof win.HTMLFormElement>) => {
+	form.dispatchEvent(
+		new win.Event("submit", { bubbles: true, cancelable: true }),
+	);
 };
 
 const hidePage = () => {
@@ -412,6 +464,246 @@ describe("createInputWatcher", () => {
 		expect(watcher.signals()).toEqual([]);
 	});
 
+	test("text typed into a field that never got a key press is text without keys", () => {
+		const watcher = createInputWatcher(window);
+		const field = addField();
+
+		typeInto(field);
+
+		expect(watcher.signals()).toEqual(["text_without_keys"]);
+	});
+
+	test("text typed into a field after a key press on it raises nothing", () => {
+		const watcher = createInputWatcher(window);
+		const field = addField();
+
+		keyOn(field);
+		typeInto(field);
+		typeInto(field);
+
+		expect(watcher.signals()).toEqual([]);
+	});
+
+	test("a key press on one field does not cover text that appears in another", () => {
+		const watcher = createInputWatcher(window);
+		const typed = addField();
+		const filled = addField();
+
+		keyOn(typed);
+		typeInto(typed);
+		typeInto(filled);
+
+		expect(watcher.signals()).toEqual(["text_without_keys"]);
+	});
+
+	const usePointer = (pointer: "coarse" | "fine" | null) => {
+		Object.assign(globalThis, {
+			matchMedia:
+				pointer === null
+					? undefined
+					: (query: string) => ({
+							matches: query === `(pointer: ${pointer})`,
+							media: query,
+						}),
+		});
+	};
+
+	test("on a touch-first device, text with no key press is still text without keys", () => {
+		usePointer("coarse");
+		const watcher = createInputWatcher(window);
+
+		typeInto(addField());
+
+		expect(watcher.signals()).toEqual(["text_without_keys"]);
+	});
+
+	test("on a fine-pointer device, text with no key press is still text without keys", () => {
+		usePointer("fine");
+		const watcher = createInputWatcher(window);
+
+		typeInto(addField());
+
+		expect(watcher.signals()).toEqual(["text_without_keys"]);
+	});
+
+	test("with no matchMedia at all, text with no key press is text without keys", () => {
+		usePointer(null);
+		const watcher = createInputWatcher(window);
+
+		typeInto(addField());
+
+		expect(watcher.signals()).toEqual(["text_without_keys"]);
+	});
+
+	test("on a touch-first device, untrusted input is still untrusted", () => {
+		usePointer("coarse");
+		const announced: string[] = [];
+		const watcher = createInputWatcher(window, (signal) => {
+			announced.push(signal);
+		});
+		const field = addField();
+
+		field.dispatchEvent(
+			new win.InputEvent("input", { inputType: "insertText", bubbles: true }),
+		);
+		win.dispatchEvent(new win.Event("keydown"));
+
+		expect(watcher.signals()).toEqual(["untrusted_input"]);
+		expect(announced).toEqual(["untrusted_input"]);
+	});
+
+	test("on a touch-first device, a scripted click with no motion is still flagged", () => {
+		usePointer("coarse");
+		const watcher = createInputWatcher(window);
+
+		fire(press(200, 300));
+
+		expect(watcher.signals()).toEqual(["click_without_motion"]);
+	});
+
+	test("a key press after the text arrived does not undo the signal", () => {
+		const watcher = createInputWatcher(window);
+		const field = addField();
+
+		typeInto(field);
+		keyOn(field);
+
+		expect(watcher.signals()).toEqual(["text_without_keys"]);
+	});
+
+	for (const inputType of [
+		"insertReplacementText",
+		"insertFromPaste",
+		"insertCompositionText",
+		"deleteContentBackward",
+		"deleteContentForward",
+		"insertFromDrop",
+	]) {
+		test(`a trusted ${inputType} input with no key press raises nothing`, () => {
+			const watcher = createInputWatcher(window);
+			const field = addField();
+
+			typeInto(field, inputType);
+
+			expect(watcher.signals()).toEqual([]);
+		});
+	}
+
+	test("a script-dispatched input is untrusted and never text without keys", () => {
+		const watcher = createInputWatcher(window);
+		const field = addField();
+
+		field.dispatchEvent(
+			new win.InputEvent("input", { inputType: "insertText", bubbles: true }),
+		);
+
+		expect(watcher.signals()).toEqual(["untrusted_input"]);
+	});
+
+	test("an untrusted input right after a person typed in the same field raises nothing", () => {
+		const watcher = createInputWatcher(window);
+		const field = addField();
+
+		keyOn(field);
+		field.dispatchEvent(
+			new win.InputEvent("input", { inputType: "insertText", bubbles: true }),
+		);
+
+		expect(watcher.signals()).toEqual([]);
+	});
+
+	test("an untrusted input after a trusted input on the same field raises nothing", () => {
+		const watcher = createInputWatcher(window);
+		const field = addField();
+
+		keyOn(field);
+		typeInto(field);
+		field.dispatchEvent(new win.Event("input", { bubbles: true }));
+
+		expect(watcher.signals()).toEqual([]);
+	});
+
+	test("an untrusted input on a field nobody typed in is untrusted, even after typing elsewhere", () => {
+		const watcher = createInputWatcher(window);
+		const typed = addField();
+		const other = addField();
+
+		keyOn(typed);
+		typeInto(typed);
+		other.dispatchEvent(new win.Event("input", { bubbles: true }));
+
+		expect(watcher.signals()).toEqual(["untrusted_input"]);
+	});
+
+	test("a field that got only untrusted input earlier is still untrusted on the next one", () => {
+		const watcher = createInputWatcher(window);
+		const field = addField();
+
+		field.dispatchEvent(new win.Event("input", { bubbles: true }));
+		field.dispatchEvent(new win.Event("input", { bubbles: true }));
+
+		expect(watcher.signals()).toEqual(["untrusted_input"]);
+	});
+
+	test("a trusted key press on a field does not excuse an untrusted key press on it", () => {
+		const watcher = createInputWatcher(window);
+		const field = addField();
+
+		keyOn(field);
+		field.dispatchEvent(new win.KeyboardEvent("keydown", { bubbles: true }));
+
+		expect(watcher.signals()).toEqual(["untrusted_input"]);
+	});
+
+	test("a script-dispatched key press does not excuse trusted text that follows", () => {
+		const watcher = createInputWatcher(window);
+		const field = addField();
+
+		field.dispatchEvent(new win.KeyboardEvent("keydown", { bubbles: true }));
+		typeInto(field);
+
+		expect([...watcher.signals()].sort()).toEqual([
+			"text_without_keys",
+			"untrusted_input",
+		]);
+	});
+
+	test("each new signal is announced once, and repeats are not announced again", () => {
+		const announced: string[] = [];
+		const watcher = createInputWatcher(window, (signal) => {
+			announced.push(signal);
+		});
+		const first = addField();
+		const second = addField();
+
+		typeInto(first);
+		typeInto(second);
+		win.dispatchEvent(new win.Event("keydown"));
+		win.dispatchEvent(new win.Event("wheel"));
+		fire(press(10, 10));
+		fire(press(20, 20));
+
+		expect(announced).toEqual([
+			"text_without_keys",
+			"untrusted_input",
+			"click_without_motion",
+		]);
+		watcher.stop();
+	});
+
+	test("after stop, text without keys is not recorded or announced", () => {
+		const announced: string[] = [];
+		const watcher = createInputWatcher(window, (signal) => {
+			announced.push(signal);
+		});
+		watcher.stop();
+
+		typeInto(addField());
+
+		expect(watcher.signals()).toEqual([]);
+		expect(announced).toEqual([]);
+	});
+
 	test("after stop, nothing more is recorded", () => {
 		const watcher = createInputWatcher(window);
 		watcher.stop();
@@ -420,6 +712,298 @@ describe("createInputWatcher", () => {
 		fire(press(10, 10));
 
 		expect(watcher.signals()).toEqual([]);
+	});
+});
+
+describe("startAgentBeacon and the intent field", () => {
+	const intentBodies = async () =>
+		(await payloads()).filter((body) => "intent" in body);
+
+	test("an ordinary visit never adds anything to its forms", () => {
+		jest.useFakeTimers();
+		const form = addForm();
+		const before = form.outerHTML;
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(10_000);
+		submit(form);
+		hidePage();
+
+		expect(form.outerHTML).toBe(before);
+		expect(win.document.querySelector("[data-waniwani-intent]")).toBeNull();
+		beacon.stop();
+	});
+
+	test("a page with automation at start gets a visible field once it settles", () => {
+		jest.useFakeTimers();
+		define(navigator, "webdriver", true);
+		const form = addForm();
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(999);
+		expect(form.querySelector("[data-waniwani-intent]")).toBeNull();
+		jest.advanceTimersByTime(1);
+
+		const field = intentFieldOf(form);
+		expect(field.hasAttribute("tabindex")).toBe(false);
+		expect(field.hasAttribute("name")).toBe(false);
+		beacon.stop();
+	});
+
+	test("the first signal of any kind after the page settled adds the field", () => {
+		jest.useFakeTimers();
+		const form = addForm();
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(5_000);
+		expect(form.querySelector("[data-waniwani-intent]")).toBeNull();
+
+		typeInto(addField());
+
+		expect(form.firstElementChild).toBe(
+			intentFieldOf(form).closest("[data-waniwani-intent]"),
+		);
+		beacon.stop();
+	});
+
+	test("an agent's answer is sent with the page's signals and the form's path when the form is submitted", async () => {
+		jest.useFakeTimers();
+		define(navigator, "webdriver", true);
+		const form = addForm("https://shop.example/quote/start?ref=abc#top");
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(1_000);
+
+		intentFieldOf(form).value = "  Comparing car insurance prices for a user  ";
+		submit(form);
+
+		const bodies = await payloads();
+		expect(bodies).toHaveLength(2);
+		const body = bodies[1];
+		expect(Object.keys(body ?? {}).sort()).toEqual([
+			"elapsedMs",
+			"intent",
+			"intentForm",
+			"pageViewId",
+			"referrer",
+			"signals",
+			"token",
+			"url",
+			"v",
+		]);
+		expect(body).toMatchObject({
+			intent: "Comparing car insurance prices for a user",
+			intentForm: "/quote/start",
+			signals: ["webdriver"],
+			url: "https://shop.example/pricing",
+			pageViewId: bodies[0]?.pageViewId,
+		});
+		for (const entry of sent) {
+			expect(entry.init?.keepalive).toBe(true);
+			expect(entry.init?.credentials).toBe("omit");
+			expect(
+				headerOf(entry.init, "content-type")?.startsWith("text/plain"),
+			).toBe(true);
+		}
+		beacon.stop();
+	});
+
+	test("building a form's data on a page with a signal sends the answer, with no submit event, and the data never holds it", async () => {
+		jest.useFakeTimers();
+		const form = addForm("/quote/start");
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(1_000);
+		win.dispatchEvent(new win.Event("keydown"));
+		intentFieldOf(form).value = "Getting a quote for a user";
+
+		const data = new win.FormData(form);
+		const event = new win.Event("formdata", { bubbles: true });
+		define(event, "formData", data);
+		form.dispatchEvent(event);
+
+		const bodies = await intentBodies();
+		expect(bodies).toHaveLength(1);
+		expect(bodies[0]).toMatchObject({
+			intent: "Getting a quote for a user",
+			intentForm: "/quote/start",
+			signals: ["untrusted_input"],
+		});
+		expect(
+			[...data.values()].some(
+				(value) => value === "Getting a quote for a user",
+			),
+		).toBe(false);
+		beacon.stop();
+	});
+
+	test("an answer left unsubmitted on a page with a signal goes out when the page hides", async () => {
+		jest.useFakeTimers();
+		const form = addForm();
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(1_000);
+		win.dispatchEvent(new win.Event("keydown"));
+
+		intentFieldOf(form).value = "Booking a demo";
+		hidePage();
+
+		expect((await intentBodies()).map((body) => body.intent)).toEqual([
+			"Booking a demo",
+		]);
+		beacon.stop();
+	});
+
+	test("a page sends at most two intent reports, however many answers it submits", async () => {
+		jest.useFakeTimers();
+		define(navigator, "webdriver", true);
+		const form = addForm();
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(1_000);
+		const field = intentFieldOf(form);
+
+		for (const text of ["first", "second", "third"]) {
+			field.value = text;
+			submit(form);
+		}
+		field.value = "fourth";
+		hidePage();
+		submit(form);
+
+		expect((await intentBodies()).map((body) => body.intent)).toEqual([
+			"first",
+			"second",
+		]);
+		beacon.stop();
+	});
+
+	test("after stop the intent field is gone and a submit sends nothing", () => {
+		jest.useFakeTimers();
+		define(navigator, "webdriver", true);
+		const form = addForm();
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(1_000);
+		const field = intentFieldOf(form);
+		field.value = "Too late";
+
+		beacon.stop();
+		form.append(field);
+		submit(form);
+		hidePage();
+
+		expect(form.querySelector("[data-waniwani-intent]")).toBeNull();
+		expect(sent).toHaveLength(1);
+	});
+
+	test("after stop a new signal adds no field", () => {
+		jest.useFakeTimers();
+		const form = addForm();
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(1_000);
+
+		beacon.stop();
+		win.dispatchEvent(new win.Event("keydown"));
+		jest.advanceTimersByTime(10_000);
+
+		expect(form.querySelector("[data-waniwani-intent]")).toBeNull();
+	});
+});
+
+describe("startAgentBeacon on a crawler", () => {
+	const GOOGLEBOT_UA =
+		"Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/131.0.6778.204 Safari/537.36";
+	const MANUS_UA =
+		"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36; Manus-User/1.0";
+
+	const countObservers = () => {
+		let created = 0;
+		const Base = win.MutationObserver;
+		Object.assign(globalThis, {
+			MutationObserver: class extends Base {
+				constructor(callback: ConstructorParameters<typeof Base>[0]) {
+					super(callback);
+					created += 1;
+				}
+			},
+		});
+		return () => created;
+	};
+
+	test("a crawler still reports its signals at once and never gets an intent field", async () => {
+		jest.useFakeTimers();
+		define(navigator, "userAgent", GOOGLEBOT_UA);
+		define(navigator, "webdriver", true);
+		const observers = countObservers();
+		const form = addForm();
+		const before = form.outerHTML;
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+
+		expect((await payloads()).map((body) => body.signals)).toEqual([
+			["webdriver"],
+		]);
+		jest.advanceTimersByTime(10_000);
+		win.dispatchEvent(new win.Event("keydown"));
+		typeInto(addField());
+		submit(form);
+		hidePage();
+		jest.advanceTimersByTime(10_000);
+
+		expect(win.document.querySelector("[data-waniwani-intent]")).toBeNull();
+		expect(form.outerHTML).toBe(before);
+		expect(observers()).toBe(0);
+		const bodies = await payloads();
+		expect(bodies).toHaveLength(2);
+		expect(bodies.some((body) => "intent" in body)).toBe(false);
+		const later = bodies[1]?.signals;
+		expect(Array.isArray(later) ? [...later].sort() : later).toEqual([
+			"text_without_keys",
+			"untrusted_input",
+			"webdriver",
+		]);
+		beacon.stop();
+	});
+
+	test("a crawler's beacon still stops cleanly", () => {
+		jest.useFakeTimers();
+		define(navigator, "userAgent", GOOGLEBOT_UA);
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		win.dispatchEvent(new win.Event("keydown"));
+
+		expect(() => beacon.stop()).not.toThrow();
+		jest.advanceTimersByTime(10_000);
+		hidePage();
+
+		expect(sent).toEqual([]);
+	});
+
+	test("a fetcher acting for a person, like ChatGPT-User, gets the field on its first signal", () => {
+		jest.useFakeTimers();
+		define(
+			navigator,
+			"userAgent",
+			"Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot",
+		);
+		const form = addForm();
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(1_000);
+		expect(form.querySelector("[data-waniwani-intent]")).toBeNull();
+
+		win.dispatchEvent(new win.Event("keydown"));
+
+		expect(form.firstElementChild?.hasAttribute("data-waniwani-intent")).toBe(
+			true,
+		);
+		beacon.stop();
+	});
+
+	test("a browser agent that names itself outside the list still gets the field on its first signal", () => {
+		jest.useFakeTimers();
+		define(navigator, "userAgent", MANUS_UA);
+		const form = addForm();
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(1_000);
+		expect(form.querySelector("[data-waniwani-intent]")).toBeNull();
+
+		win.dispatchEvent(new win.Event("keydown"));
+
+		expect(form.firstElementChild?.hasAttribute("data-waniwani-intent")).toBe(
+			true,
+		);
+		beacon.stop();
 	});
 });
 
@@ -459,18 +1043,68 @@ describe("startAgentBeacon", () => {
 		beacon.stop();
 	});
 
-	test("an automated page reports once a few seconds after load, not at once", async () => {
+	test("a page that shows automation at start reports at once, and only once while nothing new is seen", () => {
 		jest.useFakeTimers();
 		define(navigator, "webdriver", true);
 		const beacon = startAgentBeacon({ api: API, token: TOKEN });
-
-		expect(sent).toEqual([]);
-		jest.advanceTimersByTime(10_000);
 
 		expect(sent).toHaveLength(1);
 		expect(sent[0]?.url).toBe(
 			"https://app.waniwani.ai/api/v2/agent-traffic/beacon",
 		);
+		jest.advanceTimersByTime(10_000);
+
+		expect(sent).toHaveLength(1);
+		beacon.stop();
+	});
+
+	test("a page with no automation at start waits three seconds before reporting a signal it saw", () => {
+		jest.useFakeTimers();
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		win.dispatchEvent(new win.Event("keydown"));
+
+		jest.advanceTimersByTime(2_999);
+		expect(sent).toEqual([]);
+		jest.advanceTimersByTime(1);
+
+		expect(sent).toHaveLength(1);
+		beacon.stop();
+	});
+
+	test("a signal that first fires after the three seconds waits for the page to hide", async () => {
+		jest.useFakeTimers();
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		jest.advanceTimersByTime(5_000);
+
+		win.dispatchEvent(new win.Event("keydown"));
+		jest.advanceTimersByTime(60_000);
+		expect(sent).toEqual([]);
+		hidePage();
+
+		expect((await payloads()).map((body) => body.signals)).toEqual([
+			["untrusted_input"],
+		]);
+		beacon.stop();
+	});
+
+	test("a page sends at most three signal reports, however many new signals it shows", () => {
+		jest.useFakeTimers();
+		define(navigator, "webdriver", true);
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		win.dispatchEvent(new win.Event("keydown"));
+		hidePage();
+		fire(press(10, 10));
+		hidePage();
+		const field = win.document.createElement("textarea");
+		win.document.body.append(field);
+		field.dispatchEvent(
+			trusted(
+				new win.InputEvent("input", { inputType: "insertText", bubbles: true }),
+			),
+		);
+		hidePage();
+
+		expect(sent).toHaveLength(3);
 		beacon.stop();
 	});
 
@@ -551,10 +1185,12 @@ describe("startAgentBeacon", () => {
 	test("a visibilitychange to visible sends nothing", () => {
 		define(navigator, "webdriver", true);
 		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		win.dispatchEvent(new win.Event("keydown"));
+		const before = sent.length;
 
 		win.document.dispatchEvent(new win.Event("visibilitychange"));
 
-		expect(sent).toEqual([]);
+		expect(sent).toHaveLength(before);
 		beacon.stop();
 	});
 
@@ -622,14 +1258,27 @@ describe("startAgentBeacon", () => {
 
 	test("stopping before the first report means nothing is ever sent", () => {
 		jest.useFakeTimers();
-		define(navigator, "webdriver", true);
 		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+		win.dispatchEvent(new win.Event("keydown"));
 
 		beacon.stop();
 		jest.advanceTimersByTime(10_000);
 		hidePage();
 
 		expect(sent).toEqual([]);
+	});
+
+	test("stopping after the report at start sends nothing more, even when new signals fire and the page hides", () => {
+		jest.useFakeTimers();
+		define(navigator, "webdriver", true);
+		const beacon = startAgentBeacon({ api: API, token: TOKEN });
+
+		beacon.stop();
+		win.dispatchEvent(new win.Event("keydown"));
+		jest.advanceTimersByTime(10_000);
+		hidePage();
+
+		expect(sent).toHaveLength(1);
 	});
 
 	test("every report is a keepalive post that carries no cookie and never goes through sendBeacon", async () => {

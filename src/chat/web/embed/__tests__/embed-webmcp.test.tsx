@@ -435,19 +435,21 @@ describe("init and the agent beacon", () => {
 		}
 	});
 
-	test("after destroy the page sends nothing when it hides", () => {
+	test("after destroy the page sends nothing more, even when it shows a new signal and hides", () => {
 		installFetch(() => Response.json({ tools: [] }));
 		const beacons = captureBeacons();
 		try {
 			act(() => {
 				chat().init({ api: API, token: TOKEN, mode: "off", agentBeacon: true });
 			});
+			expect(beacons.sent).toHaveLength(1);
 			act(() => {
 				chat().destroy();
 			});
+			win.dispatchEvent(new win.Event("keydown"));
 			win.dispatchEvent(new win.Event("pagehide"));
 
-			expect(beacons.sent).toEqual([]);
+			expect(beacons.sent).toHaveLength(1);
 		} finally {
 			beacons.restore();
 		}

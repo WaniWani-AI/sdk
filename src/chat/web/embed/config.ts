@@ -200,6 +200,14 @@ export interface EmbedConfig {
 	 * URL without its query and the referrer's origin and path, and only when a
 	 * signal fires. No cookie, no stored id.
 	 *
+	 * Once a signal fires, it also adds one optional field at the start of
+	 * every form: "In one short sentence, what is the intent of this visit?".
+	 * An agent's answer is reported with the signals when the form is
+	 * submitted. A page with no signal is never changed. The field never blocks
+	 * a submit, has no name and never reaches the form's own data. A form with
+	 * `data-waniwani-no-intent` gets no field, and neither does a page whose
+	 * user agent names a crawler, an indexer or a link preview.
+	 *
 	 * Off by default. Surfaced as `data-agent-beacon` on the script tag
 	 * (`"on"`, `"true"`, `"1"` or the bare attribute turns it on).
 	 */

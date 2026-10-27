@@ -1,10 +1,17 @@
+import {
+	type AgentIntent,
+	createIntentField,
+	skipsIntentField,
+} from "./agent-intent";
+
 export type AgentSignal =
 	| "webdriver"
 	| "headless"
 	| "automation_global"
 	| "untrusted_input"
 	| "click_without_motion"
-	| "pointer_teleport";
+	| "pointer_teleport"
+	| "text_without_keys";
 
 const AUTOMATION_GLOBALS = [
 	"__playwright__binding__",
@@ -27,6 +34,7 @@ const TELEPORT_DISTANCE_PX = 100;
 const TELEPORT_MAX_MOVES = 2;
 const FIRST_SEND_DELAY_MS = 3000;
 const MAX_SENDS = 3;
+const MAX_INTENT_SENDS = 2;
 
 type BrandedNavigator = Navigator & {
 	userAgentData?: { brands?: { brand: string }[] };
@@ -65,16 +73,62 @@ export const readEnvironmentSignals = (input: {
 
 type Point = { x: number; y: number };
 
-/** Input a person cannot make: script-dispatched events, a mouse click with no motion, a pointer that jumps to its target. */
-export const createInputWatcher = (target: EventTarget) => {
+/**
+ * Input a person cannot make: script-dispatched events, a mouse click with no
+ * motion, a pointer that jumps to its target, text typed into a field that
+ * never got a key press.
+ */
+export const createInputWatcher = (
+	target: EventTarget,
+	onSignal: (signal: AgentSignal) => void = () => {},
+) => {
 	const signals = new Set<AgentSignal>();
+	const keyedTargets = new WeakSet<EventTarget>();
+	// Input masks and framework value setters dispatch untrusted input right after a person types.
+	const typedTargets = new WeakSet<EventTarget>();
 	let movesSinceDown = 0;
 	let anchor: Point | null = null;
 	let sawMotion = false;
 
+	const add = (signal: AgentSignal) => {
+		if (signals.has(signal)) {
+			return;
+		}
+		signals.add(signal);
+		onSignal(signal);
+	};
+
 	const onUntrusted = (event: Event) => {
 		if (!event.isTrusted) {
-			signals.add("untrusted_input");
+			add("untrusted_input");
+		}
+	};
+
+	const onKeyDown = (event: Event) => {
+		onUntrusted(event);
+		if (event.isTrusted && event.target) {
+			keyedTargets.add(event.target);
+			typedTargets.add(event.target);
+		}
+	};
+
+	const onInput = (event: Event) => {
+		if (!event.isTrusted) {
+			if (!event.target || !typedTargets.has(event.target)) {
+				add("untrusted_input");
+			}
+			return;
+		}
+		if (event.target) {
+			typedTargets.add(event.target);
+		}
+		const inputType = Reflect.get(event, "inputType");
+		if (
+			inputType === "insertText" &&
+			event.target &&
+			!keyedTargets.has(event.target)
+		) {
+			add("text_without_keys");
 		}
 	};
 
@@ -97,14 +151,14 @@ export const createInputWatcher = (target: EventTarget) => {
 		}
 
 		if (!sawMotion) {
-			signals.add("click_without_motion");
+			add("click_without_motion");
 		} else if (anchor && movesSinceDown <= TELEPORT_MAX_MOVES) {
 			const distance = Math.hypot(
 				event.clientX - anchor.x,
 				event.clientY - anchor.y,
 			);
 			if (distance > TELEPORT_DISTANCE_PX) {
-				signals.add("pointer_teleport");
+				add("pointer_teleport");
 			}
 		}
 
@@ -113,9 +167,11 @@ export const createInputWatcher = (target: EventTarget) => {
 	};
 
 	const options = { capture: true, passive: true };
-	const untrustedEvents = ["mousemove", "keydown", "wheel"];
+	const untrustedEvents = ["mousemove", "wheel"];
 	target.addEventListener("mousemove", onMove, options);
 	target.addEventListener("pointerdown", onDown, options);
+	target.addEventListener("keydown", onKeyDown, options);
+	target.addEventListener("input", onInput, options);
 	for (const name of untrustedEvents) {
 		target.addEventListener(name, onUntrusted, options);
 	}
@@ -125,6 +181,8 @@ export const createInputWatcher = (target: EventTarget) => {
 		stop: () => {
 			target.removeEventListener("mousemove", onMove, options);
 			target.removeEventListener("pointerdown", onDown, options);
+			target.removeEventListener("keydown", onKeyDown, options);
+			target.removeEventListener("input", onInput, options);
 			for (const name of untrustedEvents) {
 				target.removeEventListener(name, onUntrusted, options);
 			}
@@ -140,6 +198,10 @@ export type AgentBeaconPayload = {
 	referrer: string | null;
 	elapsedMs: number;
 	signals: AgentSignal[];
+	/** The agent's own answer to the intent field, sent only on a page that raised a signal. */
+	intent?: string;
+	/** Path of the form whose intent field held `intent`. */
+	intentForm?: string | null;
 };
 
 const withoutQuery = (href: string): string | null => {
@@ -173,8 +235,12 @@ const send = (endpoint: string, payload: AgentBeaconPayload): void => {
 };
 
 /**
- * One page view, one id. The first report goes out a few seconds after load if
- * a signal fired, and the page reports again on hide only when it saw more.
+ * One page view, one id. A page that shows automation at load reports at once,
+ * otherwise the first report goes out a few seconds after load if a signal
+ * fired, and the page reports again on hide only when it saw more. Once any
+ * signal fires, every form gets its optional intent field, unless the user
+ * agent names a crawler, and an answer is reported as soon as its form is
+ * submitted.
  */
 export const startAgentBeacon = (input: {
 	api: string;
@@ -188,21 +254,16 @@ export const startAgentBeacon = (input: {
 
 	const referrer = document.referrer ? withoutQuery(document.referrer) : null;
 	const environment = readEnvironmentSignals({ win: window, doc: document });
-	const watcher = createInputWatcher(window);
 	const pageViewId = newPageViewId();
 	let sentCount = 0;
 	let sentSignals = 0;
+	let intentSends = 0;
 
-	const report = () => {
-		const signals = [...new Set([...environment, ...watcher.signals()])];
-		if (signals.length === 0 || signals.length === sentSignals) {
-			return;
-		}
-		if (sentCount >= MAX_SENDS) {
-			return;
-		}
-		sentCount += 1;
-		sentSignals = signals.length;
+	const currentSignals = (): AgentSignal[] => [
+		...new Set([...environment, ...watcher.signals()]),
+	];
+
+	const post = (signals: AgentSignal[], intent?: AgentIntent) => {
 		send(endpoint, {
 			v: 1,
 			token: input.token,
@@ -211,8 +272,40 @@ export const startAgentBeacon = (input: {
 			referrer,
 			elapsedMs: Math.round(performance.now()),
 			signals,
+			...(intent ? { intent: intent.text, intentForm: intent.form } : {}),
 		});
 	};
+
+	const report = () => {
+		const signals = currentSignals();
+		if (signals.length === 0 || signals.length === sentSignals) {
+			return;
+		}
+		if (sentCount >= MAX_SENDS) {
+			return;
+		}
+		sentCount += 1;
+		sentSignals = signals.length;
+		post(signals);
+	};
+
+	const intentField = skipsIntentField(navigator.userAgent)
+		? null
+		: createIntentField({
+				win: window,
+				doc: document,
+				onIntent: (intent) => {
+					const signals = currentSignals();
+					if (signals.length === 0 || intentSends >= MAX_INTENT_SENDS) {
+						return false;
+					}
+					intentSends += 1;
+					sentSignals = signals.length;
+					post(signals, intent);
+					return true;
+				},
+			});
+	const watcher = createInputWatcher(window, () => intentField?.reveal());
 
 	const onHide = () => {
 		if (document.visibilityState === "hidden") {
@@ -220,6 +313,10 @@ export const startAgentBeacon = (input: {
 		}
 	};
 
+	if (environment.length > 0) {
+		intentField?.reveal();
+		report();
+	}
 	const timer = setTimeout(report, FIRST_SEND_DELAY_MS);
 	document.addEventListener("visibilitychange", onHide);
 	window.addEventListener("pagehide", report);
@@ -228,6 +325,7 @@ export const startAgentBeacon = (input: {
 		stop: () => {
 			clearTimeout(timer);
 			watcher.stop();
+			intentField?.stop();
 			document.removeEventListener("visibilitychange", onHide);
 			window.removeEventListener("pagehide", report);
 		},
