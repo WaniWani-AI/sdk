@@ -73,7 +73,6 @@ export const readEnvironmentSignals = (input: {
 
 type Point = { x: number; y: number };
 
-// Dictation and some on-screen keyboards insert text with no key press.
 const touchPrimary = (): boolean =>
 	typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 
