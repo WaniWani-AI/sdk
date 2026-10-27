@@ -508,15 +508,13 @@ describe("createInputWatcher", () => {
 		});
 	};
 
-	test("on a touch-first device, text with no key press raises nothing", () => {
+	test("on a touch-first device, text with no key press is still text without keys", () => {
 		usePointer("coarse");
 		const watcher = createInputWatcher(window);
-		const field = addField();
 
-		typeInto(field);
 		typeInto(addField());
 
-		expect(watcher.signals()).toEqual([]);
+		expect(watcher.signals()).toEqual(["text_without_keys"]);
 	});
 
 	test("on a fine-pointer device, text with no key press is still text without keys", () => {
@@ -561,22 +559,6 @@ describe("createInputWatcher", () => {
 		fire(press(200, 300));
 
 		expect(watcher.signals()).toEqual(["click_without_motion"]);
-	});
-
-	test("on a touch-first page, keyless text does not add the intent field or a report", () => {
-		jest.useFakeTimers();
-		usePointer("coarse");
-		const form = addForm();
-		const beacon = startAgentBeacon({ api: API, token: TOKEN });
-		jest.advanceTimersByTime(1_000);
-
-		typeInto(addField());
-		jest.advanceTimersByTime(10_000);
-		hidePage();
-
-		expect(form.querySelector("[data-waniwani-intent]")).toBeNull();
-		expect(sent).toEqual([]);
-		beacon.stop();
 	});
 
 	test("a key press after the text arrived does not undo the signal", () => {

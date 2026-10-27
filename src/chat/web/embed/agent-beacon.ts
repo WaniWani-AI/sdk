@@ -73,9 +73,6 @@ export const readEnvironmentSignals = (input: {
 
 type Point = { x: number; y: number };
 
-const touchPrimary = (): boolean =>
-	typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
-
 /**
  * Input a person cannot make: script-dispatched events, a mouse click with no
  * motion, a pointer that jumps to its target, text typed into a field that
@@ -129,8 +126,7 @@ export const createInputWatcher = (
 		if (
 			inputType === "insertText" &&
 			event.target &&
-			!keyedTargets.has(event.target) &&
-			!touchPrimary()
+			!keyedTargets.has(event.target)
 		) {
 			add("text_without_keys");
 		}
