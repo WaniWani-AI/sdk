@@ -2,6 +2,7 @@
 // Chat Theme
 // ============================================================================
 
+import type { Consent } from "../../shared/consent";
 import type { ChatAppearance, ShowToolCalls } from "./embed/config";
 import type { MessageOverrides } from "./i18n";
 import type { PreChatSuggestions } from "./lib/resolve-suggestions";
@@ -186,6 +187,16 @@ export interface ChatBaseProps {
 	 * always use the auto id.
 	 */
 	visitorId?: VisitorIdInput;
+	/**
+	 * The visitor's answer to the site's consent banner. `"granted"` (default)
+	 * persists the visitor ids on the device and fires `page.viewed` on mount.
+	 * `"pending"` keeps the ids in memory for this page and holds `page.viewed`
+	 * until the value turns `"granted"`. `"denied"` drops the held event and
+	 * deletes ids a previous grant stored. The chat works in every state. Pass
+	 * the live CMP state; `setConsent()` from `@waniwani/sdk/chat` does the same
+	 * from outside React.
+	 */
+	consent?: Consent;
 	/** Additional headers to send with chat API requests */
 	headers?: Record<string, string>;
 	/**

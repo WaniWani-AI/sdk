@@ -2,6 +2,7 @@
 // Embed Config — types and resolution
 // ============================================================================
 
+import { type Consent, isConsent } from "../../../shared/consent";
 import type { ChatTheme, DocumentUploadConfig } from "../@types";
 import type { Locale } from "../i18n";
 import type { VisitorIdInput } from "../lib/visitor-context";
@@ -179,6 +180,17 @@ export interface EmbedConfig {
 	 * an id that resolves later still, call `WaniWani.chat.setVisitorId(id)`.
 	 */
 	visitorId?: VisitorIdInput;
+	/**
+	 * The visitor's answer to the site's consent banner (CMP). `"granted"`
+	 * (default) persists the visitor ids on the device and fires `page.viewed`
+	 * on load. `"pending"` keeps the ids in memory for this page, reads and
+	 * writes nothing on the device for them, and holds `page.viewed` until
+	 * `WaniWani.chat.setConsent("granted")`. `"denied"` drops the held event
+	 * and deletes ids a previous grant stored. The chat works in every state;
+	 * its conversation resume key moves to `sessionStorage` without consent.
+	 * Surfaced as `data-consent` on the script tag.
+	 */
+	consent?: Consent;
 	/** Override MCP server URL (optional — resolved from environment by default). */
 	mcpServerUrl?: string;
 	/**
@@ -490,6 +502,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const visitorId = str("data-visitor-id");
 	if (visitorId) {
 		config.visitorId = visitorId;
+	}
+
+	const consent = str("data-consent")?.trim().toLowerCase();
+	if (isConsent(consent)) {
+		config.consent = consent;
 	}
 
 	const title = str("data-title");

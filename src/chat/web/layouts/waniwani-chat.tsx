@@ -8,6 +8,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { type Consent, setConsent } from "../../../shared/consent";
 import type { FrontendTrackingClient } from "../../../tracking/frontend";
 import type {
 	ChatAppearance,
@@ -190,6 +191,16 @@ export interface WaniwaniChatProps {
 	 * the auto id.
 	 */
 	visitorId?: VisitorIdInput;
+	/**
+	 * The visitor's answer to the site's consent banner. `"granted"` (default)
+	 * persists the visitor ids on the device and fires `page.viewed` on mount.
+	 * `"pending"` keeps the ids in memory for this page and holds `page.viewed`
+	 * until the value turns `"granted"`. `"denied"` drops the held event and
+	 * deletes ids a previous grant stored. The chat works in every state. Pass
+	 * the live CMP state; `setConsent()` from `@waniwani/sdk/chat` does the same
+	 * from outside React.
+	 */
+	consent?: Consent;
 	/** Additional class names applied to the root element. */
 	className?: string;
 	/**
@@ -215,8 +226,20 @@ const DEFAULT_API = "https://app.waniwani.ai/api/mcp/chat";
 
 export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 	function WaniwaniChat(props, ref) {
-		const { token, channelId, className, visitorId, overrides, onEvent } =
-			props;
+		const {
+			token,
+			channelId,
+			className,
+			visitorId,
+			consent,
+			overrides,
+			onEvent,
+		} = props;
+		// Applied during render, ahead of every effect in the tree, so the first
+		// id read and the mount's `page.viewed` already see the host's answer.
+		if (consent !== undefined) {
+			setConsent(consent);
+		}
 
 		// The inner ChatEmbed handle; the ref we expose augments it with the
 		// tracking surface (`track`, `identify`).
@@ -507,6 +530,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					transport={transport}
 					headers={{ Authorization: `Bearer ${config.token}` }}
 					visitorId={visitorId}
+					consent={consent}
 					skipRemoteConfig
 					body={body}
 					appearance={config.appearance}

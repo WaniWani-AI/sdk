@@ -12,6 +12,7 @@ import "./boot-clock";
 import type { UIMessage } from "ai";
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { type Consent, getConsent, setConsent } from "../../../shared/consent";
 import type { TrackFn, TrackInput } from "../../../tracking/@types";
 import {
 	createChatTrackClient,
@@ -99,6 +100,16 @@ declare global {
 				setVisitorId: (id: string) => string;
 				/** Read the visitor id the widget sends on each request. */
 				getVisitorId: () => string;
+				/**
+				 * Pass the visitor's answer from the site's consent banner.
+				 * `"granted"` persists the visitor ids and sends a held
+				 * `page.viewed`; `"denied"` drops it and deletes stored ids.
+				 * Safe to call before `init()`. Returns the effective state (an
+				 * unknown value is ignored).
+				 */
+				setConsent: (consent: Consent) => Consent;
+				/** Read the consent state the widget applies. */
+				getConsent: () => Consent;
 			};
 		};
 	}
@@ -130,6 +141,10 @@ interface EmbedInstance {
 	setVisitorId: (id: string) => string;
 	/** Read the visitor id the widget sends on each request. */
 	getVisitorId: () => string;
+	/** Pass the visitor's answer from the site's consent banner. */
+	setConsent: (consent: Consent) => Consent;
+	/** Read the consent state the widget applies. */
+	getConsent: () => Consent;
 }
 
 /**
@@ -139,7 +154,12 @@ interface EmbedInstance {
  */
 type MountedEmbed = Omit<
 	EmbedInstance,
-	"track" | "identify" | "setVisitorId" | "getVisitorId"
+	| "track"
+	| "identify"
+	| "setVisitorId"
+	| "getVisitorId"
+	| "setConsent"
+	| "getConsent"
 >;
 
 let currentInstance: EmbedInstance | null = null;
@@ -754,6 +774,12 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 	const scriptConfig = parseConfigFromScript();
 	const config = resolveConfig(options, undefined, scriptConfig);
 
+	// Before the visitor id below and before mount, so neither the first id
+	// read nor `page.viewed` runs under the default.
+	if (config.consent) {
+		setConsent(config.consent);
+	}
+
 	// Seed a host-supplied visitor id before mount so the very first chat
 	// request and the host-page tracking client both pick it up. Accepts a
 	// literal or a sync/async resolver; an async one applies once it settles.
@@ -825,6 +851,8 @@ function init(options?: Partial<EmbedConfig>): EmbedInstance {
 		identify: (userId, traits) => trackClient.identify(userId, traits),
 		setVisitorId: (id) => setVisitorId(id),
 		getVisitorId: () => getOrCreateVisitorId(),
+		setConsent: (consent) => setConsent(consent),
+		getConsent: () => getConsent(),
 		destroy: () => {
 			void trackClient.shutdown();
 			webmcp?.destroy();
@@ -857,6 +885,13 @@ const uninitializedTrack = createNoopChatTrackClient(
 );
 const liveTrack = (): TrackFn =>
 	currentInstance ? currentInstance.track : uninitializedTrack.track;
+
+// Read at load, ahead of `init()`, so a `getVisitorId()` call made before the
+// chat mounts already honors `data-consent`.
+const scriptConsent = parseConfigFromScript().consent;
+if (scriptConsent) {
+	setConsent(scriptConsent);
+}
 
 window.WaniWani = window.WaniWani || {};
 window.WaniWani.chat = {
@@ -897,6 +932,8 @@ window.WaniWani.chat = {
 	// ready, whether or not the chat has mounted.
 	setVisitorId: (id: string) => setVisitorId(id),
 	getVisitorId: () => getOrCreateVisitorId(),
+	setConsent: (consent: Consent) => setConsent(consent),
+	getConsent: () => getConsent(),
 };
 
 // ---------------------------------------------------------------------------

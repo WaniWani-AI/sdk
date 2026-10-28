@@ -1,3 +1,4 @@
+import { getConsent, onConsentChange } from "../../../shared/consent";
 import type { WidgetMode } from "../embed/widget-events";
 import { platformEndpoint } from "./api-url";
 import { debugLog } from "./debug";
@@ -18,6 +19,22 @@ export interface FirePageViewOptions {
 
 // One landing per (api|token|channelId) per page: StrictMode double-mounts, and an inline plus a floating widget share a channel.
 const fired = new Set<string>();
+
+// Page views asked for while consent is pending, sent once it is granted.
+const held = new Map<string, FirePageViewOptions>();
+
+onConsentChange((consent) => {
+	if (consent === "pending") {
+		return;
+	}
+	const waiting = [...held.values()];
+	held.clear();
+	if (consent === "granted") {
+		for (const opts of waiting) {
+			void firePageView(opts);
+		}
+	}
+});
 
 function dedupeKey(api: string, token: string, channelId?: string): string {
 	return `${api}|${token}|${channelId ?? ""}`;
@@ -50,6 +67,16 @@ export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 
 	const key = dedupeKey(api, token, channelId);
 	if (fired.has(key)) {
+		return;
+	}
+	const consent = getConsent();
+	if (consent !== "granted") {
+		debugLog(
+			`page.viewed ${consent === "pending" ? "held until consent" : "skipped: consent denied"}`,
+		);
+		if (consent === "pending") {
+			held.set(key, opts);
+		}
 		return;
 	}
 	fired.add(key);
@@ -109,4 +136,5 @@ export async function firePageView(opts: FirePageViewOptions): Promise<void> {
 /** Test-only: reset the once-per-page guard. */
 export function __resetPageViewGuard(): void {
 	fired.clear();
+	held.clear();
 }
