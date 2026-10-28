@@ -11,7 +11,53 @@
  * as a key for conversational state. See {@link getOrCreateVisitorId}.
  */
 
+import { hasStorageConsent, onConsentChange } from "./consent";
+
 const VISITOR_ID_KEY = "waniwani-visitor-id";
+
+// The id this page uses while consent is not granted. Never written to device
+// storage, so a reload without consent starts a new visitor.
+let pageVisitorId: string | null = null;
+// Whether `pageVisitorId` came from the host (`setVisitorId`) and so must win
+// over a stored id once consent is granted.
+let pageVisitorIdFromHost = false;
+
+onConsentChange((consent) => {
+	if (consent === "granted") {
+		return;
+	}
+	pageVisitorId = null;
+	pageVisitorIdFromHost = false;
+	if (consent === "denied") {
+		try {
+			localStorage.removeItem(VISITOR_ID_KEY);
+		} catch {
+			// Storage unavailable: nothing was persisted there to delete.
+		}
+	}
+});
+
+/**
+ * Move the page-only id to storage after consent is granted. A host-supplied
+ * id replaces the stored one; an auto-minted id only fills an empty slot, so a
+ * returning visitor keeps the id their earlier visits carried.
+ */
+function persistPageVisitorId(): void {
+	const id = pageVisitorId;
+	const fromHost = pageVisitorIdFromHost;
+	pageVisitorId = null;
+	pageVisitorIdFromHost = false;
+	if (id === null) {
+		return;
+	}
+	try {
+		if (fromHost || !localStorage.getItem(VISITOR_ID_KEY)) {
+			localStorage.setItem(VISITOR_ID_KEY, id);
+		}
+	} catch {
+		// Ignore storage failures.
+	}
+}
 
 /**
  * A random opaque id, generated synchronously. Prefers `crypto.randomUUID`
@@ -49,12 +95,21 @@ function randomId(): string {
  * races an in-flight promise and never fails on a non-secure context — callers
  * can rely on a visitor id being present on the very first event or request.
  *
+ * Without storage consent (see `shared/consent.ts`) the id is held in memory
+ * for this page and nothing is read from or written to `localStorage`.
+ *
  * Not a session id, and not usable as one. This value is stable across days, so
  * keying conversational state on it resumes a flow abandoned last week in the
  * middle of the question it was abandoned on. Pair it with a tab-scoped session
  * id and send both.
  */
 export function getOrCreateVisitorId(): string {
+	if (!hasStorageConsent()) {
+		pageVisitorId ??= randomId();
+		return pageVisitorId;
+	}
+	persistPageVisitorId();
+
 	try {
 		const stored = localStorage.getItem(VISITOR_ID_KEY);
 		if (stored) {
@@ -96,6 +151,14 @@ export function setVisitorId(id: string): string {
 	if (!trimmed) {
 		return getOrCreateVisitorId();
 	}
+
+	if (!hasStorageConsent()) {
+		pageVisitorId = trimmed;
+		pageVisitorIdFromHost = true;
+		return trimmed;
+	}
+	pageVisitorId = null;
+	pageVisitorIdFromHost = false;
 
 	try {
 		localStorage.setItem(VISITOR_ID_KEY, trimmed);
