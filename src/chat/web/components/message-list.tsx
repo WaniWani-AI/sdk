@@ -92,6 +92,8 @@ interface MessageListProps {
 	/** Called when a welcome screen suggestion card is clicked. */
 	onSuggestionSelect?: (suggestion: string) => void;
 	resourceEndpoint?: string;
+	/** Renders every widget frame in an opaque origin. See `McpAppFrameProps.isolated`. */
+	isolateWidgets?: boolean;
 	chatSessionId?: string;
 	isDark?: boolean;
 	onFollowUp?: (message: {
@@ -148,6 +150,7 @@ export function MessageList({
 	welcome,
 	onSuggestionSelect,
 	resourceEndpoint,
+	isolateWidgets = false,
 	chatSessionId,
 	isDark,
 	onFollowUp,
@@ -475,6 +478,7 @@ export function MessageList({
 														| undefined,
 												}}
 												resourceEndpoint={resourceEndpoint}
+												isolated={isolateWidgets}
 												chatSessionId={chatSessionId}
 												isDark={isDark}
 												autoHeight={autoHeight}

@@ -324,6 +324,15 @@ export interface ChatEmbedMcpConfig {
 	 * If not provided, widget-initiated tool calls will be ignored.
 	 */
 	onCallTool?: CallToolHandler;
+	/**
+	 * Run every widget in an opaque origin, so it cannot reach the host page's
+	 * cookies, storage or same-origin APIs, even if it navigates its own frame
+	 * or opens a popup. Set it when the widgets render tool output you do not
+	 * trust, such as a recorded conversation. A widget that needs
+	 * `localStorage` or cookies does not work in this mode.
+	 * @default false
+	 */
+	isolateWidgets?: boolean;
 }
 
 /** Handler signature for MCP tool calls from widgets. */

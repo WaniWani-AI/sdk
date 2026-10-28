@@ -116,6 +116,14 @@ export interface McpAppFrameProps {
 	/** When true, the iframe fills its container (fullscreen mode). */
 	isFullscreen?: boolean;
 	/**
+	 * When true, the widget always runs in an opaque origin: the sandbox drops
+	 * `allow-same-origin` and `allow-popups-to-escape-sandbox`, so neither a
+	 * navigation inside the frame nor a popup it opens can reach the host
+	 * origin's cookies or storage. Use it for widgets that render untrusted
+	 * tool output, such as a replayed conversation.
+	 */
+	isolated?: boolean;
+	/**
 	 * Cached tool catalog keyed by tool name. Passed through so that
 	 * follow-up `tools/call` requests from the widget iframe can be
 	 * correctly classified as widget-producing (spec-canonical definition
@@ -123,6 +131,10 @@ export interface McpAppFrameProps {
 	 */
 	toolDefinitions?: ToolDefinitionsMap;
 }
+
+const DEFAULT_SANDBOX =
+	"allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox";
+const ISOLATED_SANDBOX = "allow-scripts allow-forms allow-popups";
 
 export function McpAppFrame({
 	resourceUri,
@@ -138,6 +150,7 @@ export function McpAppFrame({
 	onCallTool,
 	onDisplayModeChange,
 	isFullscreen = false,
+	isolated = false,
 	toolDefinitions,
 }: McpAppFrameProps) {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -652,7 +665,7 @@ export function McpAppFrame({
 			ref={iframeRef}
 			src={iframeSrc}
 			onLoad={() => timingRef.current?.mark("iframeLoad")}
-			sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+			sandbox={isolated ? ISOLATED_SANDBOX : DEFAULT_SANDBOX}
 			className={cn(
 				!isFullscreen && "ww:rounded-md ww:border ww:border-border",
 				className,
