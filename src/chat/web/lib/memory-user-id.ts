@@ -1,3 +1,5 @@
+import { hasStorageConsent, onConsentChange } from "../../../shared/consent";
+
 export const DB_NAME = "waniwani-memory";
 export const DB_VERSION = 2;
 export const IDS_STORE = "ids";
@@ -10,6 +12,20 @@ const KEY = "memoryUserId";
 const LOCAL_STORAGE_KEY = "waniwani-memory-user-id";
 
 let inMemoryFallbackId: string | null = null;
+// Used while consent is not granted, so nothing touches IndexedDB or
+// localStorage for this id.
+let pageMemoryUserId: string | null = null;
+
+onConsentChange((consent) => {
+	if (consent === "granted") {
+		pageMemoryUserId = null;
+		return;
+	}
+	pageMemoryUserId = null;
+	if (consent === "denied") {
+		void deleteStoredMemoryUserId();
+	}
+});
 
 function generateUuid(): string {
 	if (
@@ -122,7 +138,53 @@ function tryLocalStorage(): string | null {
 	}
 }
 
+/** Remove the persisted id from both stores. Never throws. */
+export async function deleteStoredMemoryUserId(): Promise<void> {
+	inMemoryFallbackId = null;
+	try {
+		localStorage.removeItem(LOCAL_STORAGE_KEY);
+	} catch {
+		// Storage unavailable: nothing was persisted there.
+	}
+	if (typeof indexedDB === "undefined") {
+		return;
+	}
+	await new Promise<void>((resolve) => {
+		try {
+			// No version: an existing database opens as it is, and a missing one
+			// raises `upgradeneeded`, which is aborted so a denial never creates it.
+			const req = indexedDB.open(DB_NAME);
+			req.onupgradeneeded = () => req.transaction?.abort();
+			req.onerror = () => resolve();
+			req.onsuccess = () => {
+				const db = req.result;
+				try {
+					const tx = db.transaction(STORE_NAME, "readwrite");
+					tx.objectStore(STORE_NAME).delete(KEY);
+					tx.oncomplete =
+						tx.onerror =
+						tx.onabort =
+							() => {
+								db.close();
+								resolve();
+							};
+				} catch {
+					db.close();
+					resolve();
+				}
+			};
+		} catch {
+			resolve();
+		}
+	});
+}
+
 export async function getOrCreateMemoryUserId(): Promise<string> {
+	if (!hasStorageConsent()) {
+		pageMemoryUserId ??= generateUuid();
+		return pageMemoryUserId;
+	}
+
 	const fromIdb = await tryIndexedDb();
 	if (fromIdb) {
 		return fromIdb;

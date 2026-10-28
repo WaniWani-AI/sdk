@@ -5,6 +5,7 @@ import type { ChatTransport, FileUIPart, UIMessage } from "ai";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AttachedDocument } from "../../../documents/types";
+import { setConsent } from "../../../shared/consent";
 import type { ModelContextUpdate } from "../../../shared/model-context";
 import { hasModelContext } from "../../../shared/model-context";
 import type { ChatBaseProps, ChatTransportLifecycle } from "../@types";
@@ -140,6 +141,12 @@ export function useChatEngine(props: ChatBaseProps) {
 		activeThreadId: controlledThreadId,
 		onThreadChange,
 	} = props;
+
+	// Applied during render so the mount effects below read ids under the
+	// host's answer.
+	if (props.consent !== undefined) {
+		setConsent(props.consent);
+	}
 
 	// Seed a host-supplied visitor id (e.g. the PostHog / Amplitude distinct id)
 	// so every request correlates to the id the host site already tracks. Read

@@ -1,5 +1,10 @@
 // Chat Widget Module - Client-side React components
 
+export {
+	type Consent,
+	getConsent,
+	setConsent,
+} from "../../shared/consent";
 export type {
 	ChatAppearance,
 	ChatBaseProps,

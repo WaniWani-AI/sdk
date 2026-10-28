@@ -1,6 +1,7 @@
 import type { UIMessageChunk } from "ai";
 import { EveAgentStore, type MessageStreamEvent } from "eve/client";
 import type { AttachedDocument } from "../../../../documents/types";
+import { hasStorageConsent } from "../../../../shared/consent";
 import { installEveShims } from "./shims";
 import { type EveEvent, uiMessageChunks } from "./ui-stream";
 
@@ -61,11 +62,9 @@ function storageKey(key: string): string {
 	return `waniwani:eve-conversation:${key}`;
 }
 
-export function savedSession(key: string): SavedSession | null {
+function parseSaved(raw: string | null): SavedSession | null {
 	try {
-		const parsed: unknown = JSON.parse(
-			localStorage.getItem(storageKey(key)) ?? "null",
-		);
+		const parsed: unknown = JSON.parse(raw ?? "null");
 		return typeof parsed === "object" &&
 			parsed !== null &&
 			"conversationId" in parsed &&
@@ -82,12 +81,38 @@ export function savedSession(key: string): SavedSession | null {
 	}
 }
 
-export function saveSession(key: string, saved: SavedSession | null): void {
+function read(storage: () => Storage, key: string): SavedSession | null {
 	try {
-		if (saved) {
-			localStorage.setItem(storageKey(key), JSON.stringify(saved));
+		return parseSaved(storage().getItem(storageKey(key)));
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * With storage consent the resume secret lives in `localStorage` and reopens
+ * the conversation on a later visit. Without it, `sessionStorage` keeps it for
+ * this tab only, so a reload still resumes and closing the tab forgets it.
+ */
+export function savedSession(key: string): SavedSession | null {
+	if (!hasStorageConsent()) {
+		return read(() => sessionStorage, key);
+	}
+	return read(() => localStorage, key) ?? read(() => sessionStorage, key);
+}
+
+export function saveSession(key: string, saved: SavedSession | null): void {
+	const id = storageKey(key);
+	try {
+		sessionStorage.removeItem(id);
+	} catch {}
+	try {
+		if (!saved) {
+			localStorage.removeItem(id);
+		} else if (hasStorageConsent()) {
+			localStorage.setItem(id, JSON.stringify(saved));
 		} else {
-			localStorage.removeItem(storageKey(key));
+			sessionStorage.setItem(id, JSON.stringify(saved));
 		}
 	} catch {}
 }
