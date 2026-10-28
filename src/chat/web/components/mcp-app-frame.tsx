@@ -662,6 +662,8 @@ export function McpAppFrame({
 
 	return (
 		<iframe
+			// The browser applies a changed `sandbox` only on the next navigation, so a mode change remounts the frame.
+			key={isolated ? "isolated" : "default"}
 			ref={iframeRef}
 			src={iframeSrc}
 			onLoad={() => timingRef.current?.mark("iframeLoad")}
