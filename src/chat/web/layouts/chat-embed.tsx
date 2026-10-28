@@ -598,6 +598,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 								welcome={welcome}
 								onSuggestionSelect={handleSuggestionSelect}
 								resourceEndpoint={resourceEndpoint}
+								isolateWidgets={mcp?.isolateWidgets === true}
 								chatSessionId={engine.sessionId}
 								isDark={isDark}
 								onFollowUp={handleWidgetMessage}
