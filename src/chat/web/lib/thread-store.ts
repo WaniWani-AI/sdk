@@ -3,10 +3,11 @@ import {
 	openMemoryDb,
 	THREADS_BY_USER_INDEX,
 	THREADS_STORE,
-} from "./memory-user-id";
+} from "./memory-db";
 
 export interface StoredThread {
 	threadId: string;
+	/** The owner's visitor id. The field keeps this name because the IndexedDB index reads it. */
 	memoryUserId: string;
 	title: string;
 	messages: UIMessage[];
