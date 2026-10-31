@@ -1,174 +1,28 @@
 {
-  "name": "@waniwani/sdk",
-  "version": "0.25.4-beta.0",
-  "description": "MCP distribution SDK. Build sales funnels, lead generation, booking, and quote apps on top of your MCP server. Event tracking, flows, widgets, knowledge base.",
+  "name": "waniwani-sdk-workspace",
+  "private": true,
   "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    },
-    "./mcp": {
-      "types": "./dist/mcp/index.d.ts",
-      "import": "./dist/mcp/index.js",
-      "default": "./dist/mcp/index.js"
-    },
-    "./mcp/react": {
-      "types": "./dist/mcp/react.d.ts",
-      "import": "./dist/mcp/react.js",
-      "default": "./dist/mcp/react.js"
-    },
-    "./mcp/react/skybridge": {
-      "types": "./dist/mcp/react/skybridge.d.ts",
-      "import": "./dist/mcp/react/skybridge.js",
-      "default": "./dist/mcp/react/skybridge.js"
-    },
-    "./chat": {
-      "types": "./dist/chat/index.d.ts",
-      "import": "./dist/chat/index.js",
-      "default": "./dist/chat/index.js"
-    },
-    "./chat/styles.css": "./dist/chat/styles.css",
-    "./chat/embed.js": "./dist/chat/embed.js",
-    "./kb": {
-      "types": "./dist/kb/index.d.ts",
-      "import": "./dist/kb/index.js",
-      "default": "./dist/kb/index.js"
-    },
-    "./documents": {
-      "types": "./dist/documents/index.d.ts",
-      "import": "./dist/documents/index.js",
-      "default": "./dist/documents/index.js"
-    },
-    "./internal": {
-      "types": "./dist/internal/index.d.ts",
-      "import": "./dist/internal/index.js",
-      "default": "./dist/internal/index.js"
-    }
-  },
-  "files": [
-    "dist"
+  "workspaces": [
+    "packages/*"
   ],
   "scripts": {
-    "build": "rm -rf dist && bun run typecheck && bun run lint && tsup && bun run build:chat-css && bun run build:embed-css && bun run check:browser-bundles",
-    "check:browser-bundles": "bun scripts/check-browser-bundles.ts",
-    "build:chat-css": "tailwindcss -i src/chat/web/tailwind.css -o dist/chat/styles.css --minify",
-    "build:embed-css": "bun run scripts/inline-embed-css.ts",
-    "dev": "tsx --watch src/index.ts",
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
-    "test": "bun test",
-    "eval:flows": "bun evals/flows/run.ts",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p evals",
+    "build": "bun run --cwd packages/chat build && bun run --cwd packages/sdk build",
+    "typecheck": "tsc --noEmit && bun run --cwd packages/protocol typecheck && bun run --cwd packages/chat typecheck && bun run --cwd packages/sdk typecheck",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
-    "prepublishOnly": "bun run build",
-    "release": "npm run release:patch",
-    "release:patch": "npm version patch && git push --follow-tags",
-    "release:minor": "npm version minor && git push --follow-tags",
-    "release:major": "npm version major && git push --follow-tags",
-    "release:beta": "npm version prerelease --preid beta && git push --follow-tags",
-    "release:alpha": "npm version prerelease --preid alpha && git push --follow-tags",
+    "test": "bun test",
+    "eval:flows": "bun run --cwd packages/sdk eval:flows",
+    "storybook": "bun run --cwd packages/chat storybook",
     "postinstall": "lefthook install || true"
   },
-  "peerDependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "react": ">=18.0.0",
-    "zod": ">=4.0.0",
-    "@ai-sdk/react": ">=1.0.0",
-    "ai": ">=6.0.141",
-    "@ai-sdk/mcp": ">=1.0.0",
-    "skybridge": ">=0.35.0"
-  },
-  "peerDependenciesMeta": {
-    "skybridge": {
-      "optional": true
-    },
-    "@modelcontextprotocol/sdk": {
-      "optional": true
-    },
-    "zod": {
-      "optional": true
-    },
-    "react": {
-      "optional": true
-    },
-    "@ai-sdk/react": {
-      "optional": true
-    },
-    "ai": {
-      "optional": true
-    },
-    "@ai-sdk/mcp": {
-      "optional": true
-    }
-  },
   "devDependencies": {
-    "@ai-sdk/mcp": "^1.0.0",
-    "@ai-sdk/react": "^3.0.134",
     "@biomejs/biome": "^2.3.13",
-    "@modelcontextprotocol/sdk": "^1.30.0",
-    "@storybook/react-vite": "^10.4.6",
-    "@streamdown/cjk": "^1.0.1",
-    "@streamdown/code": "^1.0.1",
-    "@tailwindcss/cli": "^4.1.18",
-    "@tailwindcss/postcss": "^4.1.18",
-    "@tailwindcss/vite": "^4.3.2",
     "@types/bun": "^1.3.12",
     "@types/node": "^22.10.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.3",
-    "ai": "^6.0.141",
-    "clsx": "^2.1.1",
-    "eve": "0.68.0",
-    "fake-indexeddb": "^6.2.5",
-    "happy-dom": "^20.7.0",
     "lefthook": "^2.0.16",
-    "lucide-react": "^0.563.0",
-    "postcss": "^8.5.6",
-    "react": "^19.0.0",
-    "react-dom": "^19.2.4",
-    "storybook": "^10.5.2",
-    "streamdown": "^2.1.0",
-    "tailwind-merge": "^3.4.0",
-    "tailwindcss": "^4",
-    "tsup": "^8.3.5",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.3",
-    "use-stick-to-bottom": "^1.1.3",
-    "vite": "^8.1.0",
-    "zod": "^4.0.0"
+    "typescript": "^5.7.3"
   },
   "overrides": {
     "zod": "^4.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/WaniWani-AI/sdk"
-  },
-  "keywords": [
-    "sdk",
-    "mcp",
-    "waniwani",
-    "mcp-funnel",
-    "mcp-distribution",
-    "mcp-sdk",
-    "sales-funnel",
-    "lead-generation",
-    "lead-capture",
-    "booking",
-    "insurance",
-    "quote",
-    "conversational-mcp",
-    "flows",
-    "knowledge-base",
-    "tracking",
-    "events",
-    "tools",
-    "widgets"
-  ],
-  "author": "Waniwani",
-  "license": "MIT"
+  }
 }

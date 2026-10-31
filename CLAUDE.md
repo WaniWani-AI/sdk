@@ -2,6 +2,12 @@
 
 SDK for [app.waniwani.ai](https://app.waniwani.ai) — open-source flow engine plus optional hosted tier for tracking, KB, and chat.
 
+The repo is a bun workspace with two published packages and one private package:
+
+- `packages/sdk` → `@waniwani/sdk`: flows, KV stores, tracking, KB, documents, `withWaniwani`, `useWaniwani`.
+- `packages/chat` → `@waniwani/chat`: the chat widget, React components and `embed.js` in one package.
+- `packages/protocol` → `@waniwani/protocol`, private and never published: the wire contract both sides share (`shared/*`, the WebMCP bridge and types, the tracking client and types, the document and KB types). tsup inlines it into both packages, code and `.d.ts`. `packages/chat` imports nothing outside itself except `@waniwani/protocol`; keep it that way.
+
 ## Public API tiers
 
 The SDK ships two public tiers plus a private one. The legacy tier was removed in 0.20.0: no `src/legacy/`, no re-exports, no entry point serving it.
@@ -24,8 +30,9 @@ Same SDK, hosted features added when the key is present.
 - `createKbClient` from `@waniwani/sdk/kb`
 - `useWaniwani` from `@waniwani/sdk/mcp/react` (also OSS — degrades to no-op without config; BYO endpoint also supported). Host-agnostic: takes the tool-response `_meta` as data via the `toolResponseMetadata` option, or an explicit `{ endpoint, source }`; it opens no host connection and reads no React context. Returns `{ sessionId, track, identify, flush }` where `track` is the same typed `TrackFn` as the server client; emits one `widget_render` automatically.
 - `useWaniwani` from `@waniwani/sdk/mcp/react/skybridge` — the skybridge-host adapter. Reads skybridge's `useToolInfo().responseMetadata` and feeds it to the core hook, so skybridge-hosted widgets call `useWaniwani()` bare. `skybridge` is an optional peer dependency.
-- `WaniwaniChat` (hosted React chat — recommended), themes, `embed.js` (IIFE for non-React hosts), `styles.css` from `@waniwani/sdk/chat`. Both expose host-page tracking: `WaniWani.chat.track` / `.identify` on the embed global, `track` / `identify` on the `ChatHandle` ref.
-- `ChatEmbed` from `@waniwani/sdk/chat` — bare-bones bring-your-own-backend primitive (no `track`/`identify`). Exposed but **not** the recommended path for new code; reach for it only when self-hosting the chat backend.
+- `WaniwaniChat` (hosted React chat — recommended), themes, `embed.js` (IIFE for non-React hosts), `styles.css` from `@waniwani/chat`. Both expose host-page tracking: `WaniWani.chat.track` / `.identify` on the embed global, `track` / `identify` on the `ChatHandle` ref.
+- `ChatEmbed` from `@waniwani/chat` — bare-bones bring-your-own-backend primitive (no `track`/`identify`). Exposed but **not** the recommended path for new code; reach for it only when self-hosting the chat backend.
+- `@waniwani/sdk/chat` is a `@deprecated` re-export of `@waniwani/chat` (an optional peer of the SDK), and `@waniwani/sdk/dist/chat/embed.js` is a copy of the embed for self-hosted pages. Both are removed in 0.28.0. Never use them in new code or docs.
 
 Tracking is one client on four surfaces (server `waniwani()`, scoped client in handlers/flows, `useWaniwani()` in widgets, `chat.track` on chat host pages); all except the top-level server client attach session identity automatically. The scoped client exposes `sessionId`; identity accepted by ingest is `sessionId` OR `externalUserId` OR `visitorId`. `withWaniwani` injects the widget tracking config under `_meta["waniwani/widget"]`.
 
@@ -42,25 +49,38 @@ The old `@waniwani/sdk/evals` public entry (with `chat`, `conversation`, `saveSc
 ## Project structure
 
 ```
-src/
-├── index.ts              # waniwani() client, defineConfig, WaniWaniError
-├── waniwani.ts
-├── tracking/             # Event tracking (free tier)
-├── kb/                   # Knowledge base (free tier)
-├── internal/             # Private surface for app.waniwani.ai (replayScenario)
-├── mcp/
-│   ├── index.ts          # Public exports for @waniwani/sdk/mcp
-│   ├── server/
-│   │   ├── flows/        # OSS: createFlow, StateGraph
-│   │   ├── kv/           # OSS interface + MemoryKvStore + WaniwaniKvStore
-│   │   ├── with-waniwani/# Free tier wrapper (no-key safe)
-│   │   ├── tracking-route.ts
-│   │   ├── widget-token.ts
-│   │   └── scoped-client.ts
-│   └── react/            # useWaniwani (+ the skybridge adapter)
-└── chat/
-    └── web/              # Free tier chat widget (WaniwaniChat, ChatEmbed, embed.js IIFE)
+packages/
+├── sdk/                      # @waniwani/sdk
+│   ├── src/
+│   │   ├── index.ts          # waniwani() client, defineConfig, WaniWaniError
+│   │   ├── waniwani.ts
+│   │   ├── tracking/         # Server tracking client (free tier)
+│   │   ├── kb/               # Knowledge base (free tier)
+│   │   ├── documents/        # Documents client (free tier)
+│   │   ├── internal/         # Private surface for app.waniwani.ai (replayScenario)
+│   │   ├── webmcp/           # widget-step: the server side of WebMCP
+│   │   ├── chat/             # Deprecated re-export of @waniwani/chat (removed in 0.28.0)
+│   │   └── mcp/
+│   │       ├── index.ts      # Public exports for @waniwani/sdk/mcp
+│   │       ├── server/
+│   │       │   ├── flows/    # OSS: createFlow, StateGraph
+│   │       │   ├── kv/       # OSS interface + MemoryKvStore + WaniwaniKvStore
+│   │       │   ├── with-waniwani/ # Free tier wrapper (no-key safe)
+│   │       │   ├── tracking-route.ts
+│   │       │   ├── widget-token.ts
+│   │       │   └── scoped-client.ts
+│   │       └── react/        # useWaniwani (+ the skybridge adapter)
+│   ├── evals/flows/          # Live-model flow eval (release gate)
+│   └── scripts/              # Post-build: copy the chat embed, check the browser bundle
+├── chat/                     # @waniwani/chat
+│   ├── src/                  # Free tier chat widget (WaniwaniChat, ChatEmbed, embed/ for embed.js)
+│   ├── scripts/              # Post-build: inline CSS into embed.js, check the browser bundle
+│   └── .storybook/
+└── protocol/                 # @waniwani/protocol (private): shared/, webmcp/, tracking/, documents/, kb/types
+scripts/bump.ts               # Version bump behind each package's `bun run release:*`
 ```
+
+Each package has its own `package.json`, `tsconfig.json` (extends `tsconfig.base.json`) and, for the published two, `tsup.config.ts`. One `biome.json`, one `lefthook.yml` and one `bun.lock` at the root. Import protocol modules as `@waniwani/protocol/<path>` (for example `@waniwani/protocol/tracking/frontend`), never by a relative path across packages.
 
 ## Usage
 
@@ -88,17 +108,23 @@ const flow = createFlow({ /* …same… */ }).compile(); // hosted flow state, a
 
 **Only use `bun`.**
 
-- Build: `bun run build`
-- Dev: `bun run dev`
-- Typecheck: `bun run typecheck`
+All commands run from the repo root unless noted.
+
+- Build: `bun run build` (the chat first, then the SDK, which copies the chat's `embed.js`)
+- Dev: `bun run --cwd packages/sdk dev`
+- Typecheck: `bun run typecheck` (root scripts, protocol, chat, SDK)
 - Lint: `bun run lint`
-- Test: `bun test`
-- Flow eval (live models through the AI Gateway, costs tokens): `bun run eval:flows`. The release workflow runs it with `--sdk local,<last release> --fail-on-regression` on every release, and does not publish on a regression. See `evals/flows/README.md`.
+- Test: `bun test` (every package)
+- Storybook: `bun run storybook`
+- Flow eval (live models through the AI Gateway, costs tokens): `bun run eval:flows`. The release workflow runs it with `--sdk local,<last release> --fail-on-regression` on every `@waniwani/sdk` release, and does not publish on a regression. See `packages/sdk/evals/flows/README.md`.
+- Release: `bun run release:<patch|minor|major|beta|alpha>` inside `packages/sdk` or `packages/chat` (see below)
 - Pre-commit: always run `bun biome check . --fix`
 
 ## Releasing (version bumps)
 
 **A feature/fix branch or PR must NEVER bump the version.** Leave `package.json`'s `version` untouched in any branch that changes code, and do not add a changelog `## <version>:` section for a version that has not been cut. The version bump is always its own separate branch and PR, cut once the code changes have landed. If a task asks for a change and a release in one go, do the code change first, then cut the bump separately — never in the same PR.
+
+Each published package has its own version. To cut a release, run `bun run release:<patch|minor|major|beta|alpha>` in that package's folder (`bun run release` is a patch). `scripts/bump.ts` bumps `package.json`, refreshes `bun.lock`, commits, tags and pushes: `v<version>` for `@waniwani/sdk` (the tags it always had), `chat-v<version>` for `@waniwani/chat`. The tag push runs `.github/workflows/release.yml`, which publishes that one package (the flow eval gates the SDK). The workflow's manual dispatch takes the same package and bump choices. A release of one package never publishes the other.
 
 `@waniwani/sdk` is `0.x`, so **minor bumps may break the public API** — and every breaking change is a migration our users have to do. The rule: no user should have to figure out an upgrade by hand. Whenever a release contains a breaking change, ship the migration alongside it so an agent can auto-apply it in one pass.
 
@@ -131,11 +157,11 @@ Target SDK **users**, not SDK developers.
 
 | Source area | Docs page to update (`docs/docs/`) |
 |---|---|
-| `src/mcp/server/flows/` | `sdk/flows/*.mdx`, `sdk/reference/flow-tool-contract.mdx` |
-| `src/tracking/` + `src/mcp/server/scoped-client.ts` | `sdk/tracking/*.mdx`, `sdk/reference/event-schema.mdx` |
-| `src/mcp/server/kv/` | `sdk/flows/kv-store.mdx`, `sdk/reference/kv-store-api.mdx` |
-| `src/kb/` | `sdk/knowledge-base/overview.mdx` |
-| `src/chat/web/` | `sdk/chat/embed.mdx`, `sdk/chat/react.mdx` |
+| `packages/sdk/src/mcp/server/flows/` | `sdk/flows/*.mdx`, `sdk/reference/flow-tool-contract.mdx` |
+| `packages/sdk/src/tracking/`, `packages/protocol/src/tracking/` + `packages/sdk/src/mcp/server/scoped-client.ts` | `sdk/tracking/*.mdx`, `sdk/reference/event-schema.mdx` |
+| `packages/sdk/src/mcp/server/kv/` | `sdk/flows/kv-store.mdx`, `sdk/reference/kv-store-api.mdx` |
+| `packages/sdk/src/kb/` | `sdk/knowledge-base/overview.mdx` |
+| `packages/chat/src/` | `sdk/chat/embed.mdx`, `sdk/chat/react.mdx` |
 | Setup / env vars / entry points | `sdk/configuration/*.mdx`, `sdk/reference/entry-points.mdx` |
 | Self-hosting | `sdk/deployment/self-hosting.mdx` |
 | Version upgrades / migrations | `sdk/changelog.mdx`, plus a `migrate-waniwani-sdk-<from>-to-<to>` sibling skill per hop |
@@ -150,10 +176,10 @@ Guided playbooks that walk a user through a multi-step build (init a project, cr
 
 ## CSS / Tailwind
 
-All Tailwind classes in `src/chat/web/` use the `ww` prefix (e.g. `ww:flex`, `ww:bg-primary`). This prevents the SDK's styles from leaking into host applications.
+All Tailwind classes in `packages/chat/src/` use the `ww` prefix (e.g. `ww:flex`, `ww:bg-primary`). This prevents the SDK's styles from leaking into host applications.
 
-- Prefix is configured via `@import "tailwindcss" prefix(ww);` in `src/chat/web/tailwind.css`
-- `tailwind-merge` is configured with `prefix: "ww"` in `src/chat/web/lib/utils.ts`
+- Prefix is configured via `@import "tailwindcss" prefix(ww);` in `packages/chat/src/tailwind.css`
+- `tailwind-merge` is configured with `prefix: "ww"` in `packages/chat/src/lib/utils.ts`
 - Always use the `ww:` prefix when adding new Tailwind classes in chat components
 - Theme CSS variables are prefixed too: `--color-*` becomes `--ww-color-*` in generated CSS
 
@@ -161,5 +187,5 @@ All Tailwind classes in `src/chat/web/` use the `ww` prefix (e.g. `ww:flex`, `ww
 
 - **OSS first, hosted opt-in.** Anything documented for new code should work without an API key, or clearly state that the key is required and explain what it unlocks.
 - Zero runtime dependencies on the core path.
-- Serverless-first (<5KB core bundle).
+- Serverless-first (<5KB core bundle). The chat lives in `@waniwani/chat` so a server install never downloads it.
 - Type-safe end-to-end (Zod state schemas, inferred node contexts).

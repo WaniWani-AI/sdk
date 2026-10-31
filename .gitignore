@@ -30,5 +30,5 @@ package-lock.json
 test-results/
 storybook-static/
 # Flow eval: published SDK installs and run transcripts
-evals/.cache/
-evals/flows/results/
+packages/sdk/evals/.cache/
+packages/sdk/evals/flows/results/

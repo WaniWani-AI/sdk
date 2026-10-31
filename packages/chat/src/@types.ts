@@ -1,0 +1,493 @@
+// ============================================================================
+// Chat Theme
+// ============================================================================
+
+import type { ChatAppearance, ShowToolCalls } from "./embed/config";
+import type { MessageOverrides } from "./i18n";
+import type { PreChatSuggestions } from "./lib/resolve-suggestions";
+import type { VisitorIdInput } from "./lib/visitor-context";
+
+export type {
+	ChatAppearance,
+	ShowToolCalls,
+	ThemePreset,
+} from "./embed/config";
+export type { Locale } from "./i18n";
+export type { MessageOverrides };
+export type { VisitorIdInput };
+
+export interface ChatTheme {
+	/** Primary brand color (bubble, send button, user messages) */
+	primaryColor?: string;
+	/** Primary text color on primary background */
+	primaryForeground?: string;
+	/** Chat panel background */
+	backgroundColor?: string;
+	/** Default text color */
+	textColor?: string;
+	/** Secondary/muted text */
+	mutedColor?: string;
+	/** Border color */
+	borderColor?: string;
+	/** Border width for the panel (px). Defaults to 0 (no border). */
+	borderWidth?: number;
+	/** Box-shadow shorthand applied to the panel. Use any valid CSS box-shadow string (e.g. `"0 10px 25px rgba(0,0,0,0.1)"`). Defaults to `none`. */
+	boxShadow?: string;
+	/** Assistant message bubble background */
+	assistantBubbleColor?: string;
+	/** User message bubble background */
+	userBubbleColor?: string;
+	/** Input field background */
+	inputBackgroundColor?: string;
+	/** Border radius for the panel (px) */
+	borderRadius?: number;
+	/** Border radius for message bubbles (px) */
+	messageBorderRadius?: number;
+	/** Font family */
+	fontFamily?: string;
+	/** Header background color (card layout). Falls back to backgroundColor. */
+	headerBackgroundColor?: string;
+	/** Header text color. Falls back to textColor. */
+	headerTextColor?: string;
+	/** Status dot color. Defaults to green (#22c55e). */
+	statusColor?: string;
+	/** Tool call JSON section background. Defaults to light gray / #262626 in dark. */
+	toolCardColor?: string;
+	/** Text color inside the user message bubble. Falls back to `primaryForeground`. */
+	userBubbleTextColor?: string;
+	/** Text color inside the assistant message bubble (only visible when `appearance.assistantBubble` is enabled). Falls back to `textColor`. */
+	assistantBubbleTextColor?: string;
+	/** Horizontal padding inside message bubbles (px). Defaults to 16. */
+	messagePaddingX?: number;
+	/** Vertical padding inside message bubbles (px). Defaults to 12. */
+	messagePaddingY?: number;
+	/** Max width of a message bubble as a CSS length/percentage. Defaults to `"80%"`. */
+	messageMaxWidth?: string;
+	/** Base font size for message text (px). When unset, messages use the CSS default of `1rem` (16px at the standard root font size). */
+	fontSize?: number;
+	/** Base line height for message text (unitless string, e.g. `"1.5"`). Defaults to `"1.5"`. */
+	lineHeight?: string;
+	/** Frosted-glass tint color for the floating bar's suggestion card, layered
+	 *  over the backdrop blur. Programmatic-only via appearance.variables.
+	 *  Unset = the default neutral glass (unchanged). */
+	glassTint?: string;
+	/** Strength of the glass tint, 0–1 as a unitless string (e.g. "0.5").
+	 *  Unset/"0" = no tint (default rendering). */
+	glassTintStrength?: string;
+}
+
+// ============================================================================
+// Welcome Screen
+// ============================================================================
+
+export interface WelcomeConfig {
+	/** Icon displayed above the title. Accepts any React node (e.g. an SVG or img). */
+	icon?: React.ReactNode;
+	/** Title text shown prominently in the welcome screen. */
+	title: string;
+	/** Description text shown below the title. */
+	description?: string;
+	/** Suggestion cards shown in the welcome screen. Disappear after the first message. */
+	suggestions?: string[];
+}
+
+// ============================================================================
+// Suggestions
+// ============================================================================
+
+export interface SuggestionsConfig {
+	/**
+	 * Starter prompts shown before the user sends their first message.
+	 * Defaults to an empty array.
+	 */
+	initial?: string[];
+}
+
+/**
+ * Per-slot class name overrides for the chat widget. Each string is appended
+ * to the slot's own classes (merged with `tailwind-merge`, `ww` prefix). Use
+ * with your own (prefixed or plain) CSS to restyle any element. In the React
+ * path these reach into internals directly; in the `<script>` embed, prefer
+ * the stable `.ww-*` semantic classes with a `data-css` stylesheet.
+ */
+export interface ChatClassNames {
+	/** Root chat container. */
+	root?: string;
+	/** Sticky header bar. */
+	header?: string;
+	/** Every message wrapper (both roles). */
+	message?: string;
+	/** The user message bubble content. */
+	userBubble?: string;
+	/** The assistant message bubble content. */
+	assistantBubble?: string;
+	/** The input bar container. */
+	input?: string;
+}
+
+// ============================================================================
+// Shared Base Props
+// ============================================================================
+
+/** What the platform reports about the documents module for this project. */
+export interface DocumentUploadConfig {
+	enabled: boolean;
+	/** Refused before the upload starts. */
+	maxBytes: number;
+	/** Stated to the visitor; the OCR vendor is what enforces it. */
+	maxPdfPages: number;
+	/** The chat request refuses more than this, so the composer must not take more. */
+	maxFiles: number;
+	/** MIME types the platform accepts. */
+	accept: string[];
+}
+
+export interface ChatBaseProps {
+	/** Waniwani project API key */
+	apiKey?: string;
+	/** Chat API endpoint URL. Defaults to Waniwani hosted endpoint */
+	api?: string;
+	/**
+	 * Builds the transport turns are sent through. Defaults to the chat's own
+	 * HTTP transport to `api`, which it also hands the factory as `fallback`.
+	 */
+	transport?: ChatTransportFactory;
+	/** Pre-loaded messages to display when the chat mounts. */
+	initialMessages?: import("ai").UIMessage[];
+
+	/** Initial greeting shown before user types */
+	welcomeMessage?: string;
+	/**
+	 * Rich welcome screen shown when the conversation is empty.
+	 * Replaces `welcomeMessage` with a centered layout featuring an icon, title,
+	 * description, and card-style suggestion prompts.
+	 * Takes precedence over `welcomeMessage` when provided.
+	 */
+	welcome?: WelcomeConfig;
+	/**
+	 * Theme preset (`light`/`dark`/`auto`) plus per-property overrides.
+	 * See `ChatAppearance` for the shape.
+	 */
+	appearance?: ChatAppearance;
+	/** Per-slot class name overrides. See {@link ChatClassNames}. */
+	classNames?: ChatClassNames;
+	/**
+	 * Override the anonymous visitor id the widget generates with one you
+	 * already track (a PostHog / Amplitude / Segment distinct id, your own
+	 * cookie, etc.). The chat sends it on every request, so Waniwani sessions
+	 * and events correlate to the same visitor, and server-side MCP tools and
+	 * flows read it back as `context.waniwani.visitorId`.
+	 *
+	 * A string, or a resolver that returns one — sync
+	 * (`() => posthog.get_distinct_id()`) or async
+	 * (`async () => (await sdk.ready()).id`), for analytics SDKs whose id is
+	 * only ready after they bootstrap. A blank / failed result is ignored, so
+	 * the auto-generated, `localStorage`-persisted id is kept. Leave unset to
+	 * always use the auto id.
+	 */
+	visitorId?: VisitorIdInput;
+	/** Additional headers to send with chat API requests */
+	headers?: Record<string, string>;
+	/**
+	 * Extra headers for the document upload and discard requests, merged over
+	 * `headers` for those calls only. Set it where those endpoints take a
+	 * different credential than the chat; everything else in `headers` still
+	 * goes out. Matching names replace, case-insensitively. Browser-visible, so
+	 * public credentials only.
+	 */
+	uploadHeaders?: Record<string, string>;
+	/** Additional body fields to send with each chat request */
+	body?: Record<string, unknown>;
+	/** Enable file attachments in the input. Defaults to false. */
+	allowAttachments?: boolean;
+	/**
+	 * Document upload, as the platform reports it on `GET /api/mcp/chat/config`.
+	 * The composer offers a paperclip, a drop target and paste only while
+	 * `enabled` is true, and the upload endpoint enforces the same flag.
+	 */
+	documentUpload?: DocumentUploadConfig;
+	/** Placeholder text shown in the input field. Defaults to "Ask me anything...". Animates with a typing effect. */
+	placeholder?: string;
+	/**
+	 * Name of a custom DOM event to listen for that triggers focus (scroll + glow) and optionally sends a message.
+	 * Dispatch via `new CustomEvent('triggerDemoRequest', { detail: { message: 'Hi!' } })`.
+	 * Set to `false` to disable. Defaults to `"triggerDemoRequest"`.
+	 */
+	triggerEvent?: string | false;
+	/** Callback fired when a message is sent */
+	onMessageSent?: (message: string) => void;
+	/** Callback fired when a response is received */
+	onResponseReceived?: () => void;
+	/** @experimental Answers tool calls the server left without a result: the return value goes back to the AI as the result, a throw as an error result, and the chat then carries on. Ignored with a custom `transport`. */
+	onToolCall?: (call: {
+		toolCallId: string;
+		toolName: string;
+		input: unknown;
+	}) => unknown;
+	/**
+	 * Suggestion pills. The row obeys a fixed hierarchy — flow > followup >
+	 * page > channel — and every origin is always active.
+	 *
+	 * `false` hides the row; `true` / unset is the default. `{ initial: [...] }`
+	 * sets starter prompts. Embed hosts pass the resolved
+	 * {@link PreChatSuggestions} from `useSuggestions(config)` instead, which
+	 * carries the prompt ids needed for click attribution.
+	 */
+	suggestions?: boolean | SuggestionsConfig | PreChatSuggestions;
+	/**
+	 * Handler for MCP tool calls from widgets.
+	 * Called when a widget uses `callServerTool` (MCP Apps standard).
+	 * If not provided, defaults to POSTing to `${api}/tool`.
+	 */
+	onCallTool?: CallToolHandler;
+	/**
+	 * Enable debug mode. When true, the `_meta` field is shown in tool call
+	 * inputs and outputs instead of being filtered out.
+	 * Tip: set to `process.env.NEXT_PUBLIC_WANIWANI_DEBUG === '1'` to mirror
+	 * the server-side `WANIWANI_DEBUG` env var.
+	 */
+	debug?: boolean;
+	/**
+	 * How the agent's tool-call activity renders. Steps are grouped into a
+	 * single collapsible "chain of thought" that auto-expands while the agent
+	 * works and collapses to a summary once it settles.
+	 *
+	 * - `true` (default) — each step expands to its request/response JSON.
+	 * - `"titles-only"` — step labels only, no JSON.
+	 * - `false` — the chain is hidden entirely, along with the reasoning
+	 *   trace; only the generic "On it…" indicator shows while the agent works.
+	 *
+	 * MCP App widgets attached to a tool call are always rendered.
+	 */
+	showToolCalls?: ShowToolCalls;
+	/**
+	 * Skip fetching `/config` and `/tools` from the API on mount.
+	 * Use when the chat endpoint doesn't serve these routes (e.g. embed widgets
+	 * talking directly to the Waniwani app).
+	 * @internal
+	 */
+	skipRemoteConfig?: boolean;
+	/**
+	 * Persist the conversation across page reloads using IndexedDB so the user
+	 * can resume previous threads. Defaults to `false` — opt in explicitly.
+	 */
+	enableThreadHistory?: boolean;
+	/**
+	 * Force a specific thread to be active. When provided, the embed renders
+	 * that thread's messages and ignores the most-recently-updated default.
+	 */
+	activeThreadId?: string;
+	/** Fired whenever the active thread changes (new chat, switch, delete). */
+	onThreadChange?: (threadId: string) => void;
+	/**
+	 * AI transparency notice rendered under the input (EU AI Act compliance).
+	 * Defaults to `"AI can make mistakes. Verify important information."`.
+	 * Pass a string to override the wording, or `false` to hide it entirely.
+	 */
+	disclaimer?: string | false;
+	/** @internal Enterprise only: hides the "powered by Waniwani" logo. */
+	hidePoweredBy?: boolean;
+	/**
+	 * UI language for built-in labels (buttons, placeholders, status text).
+	 * Supports `"en"`, `"fr"`, `"es"`. When omitted, the widget detects the
+	 * locale from `<html lang>` and `navigator.language(s)`, falling back
+	 * to English.
+	 */
+	locale?: string;
+	/**
+	 * Per-key overrides on top of the resolved locale catalog. Use this to
+	 * tweak individual built-in strings without contributing a new locale.
+	 *
+	 * ```tsx
+	 * messages={{ promptInput: { placeholder: "Ask the agent…" } }}
+	 * ```
+	 */
+	messages?: MessageOverrides;
+}
+
+// ============================================================================
+// ChatEmbed Props (standalone, bring-your-own-backend chat)
+// ============================================================================
+
+/**
+ * MCP Apps configuration for {@link ChatEmbedProps}.
+ *
+ * Only needed when your backend proxies an MCP server whose tools return
+ * widget metadata (`_meta.ui.resourceUri`). Without this, tool calls still
+ * render with collapsible input/output — just no iframe widgets.
+ */
+export interface ChatEmbedMcpConfig {
+	/** Endpoint that serves MCP app resources (HTML widgets). Called as `GET ${resourceEndpoint}?uri=...`. */
+	resourceEndpoint: string;
+	/**
+	 * Handler for MCP tool calls triggered by widgets via `callServerTool`.
+	 * If not provided, widget-initiated tool calls will be ignored.
+	 */
+	onCallTool?: CallToolHandler;
+}
+
+/** Handler signature for MCP tool calls from widgets. */
+export type CallToolHandler = (params: {
+	name: string;
+	arguments: Record<string, unknown>;
+}) => Promise<{
+	content?: Array<{ type: string; text?: string }>;
+	structuredContent?: Record<string, unknown>;
+	_meta?: Record<string, unknown>;
+}>;
+
+/**
+ * **Advanced / bare-bones primitive.** Most apps should use
+ * `WaniwaniChat` instead — it wires up the hosted Waniwani backend
+ * (`app.waniwani.ai`) from a single `wwp_...` token and applies the
+ * dashboard's display config automatically.
+ *
+ * `ChatEmbed` is the unmanaged escape hatch: you bring your own `api`
+ * endpoint, your own auth headers, your own theme, and your own
+ * (optional) MCP resource endpoint for widgets. Nothing is fetched or
+ * defaulted for you — `skipRemoteConfig` is implied by the BYO design.
+ * Reach for it when:
+ *
+ * - You self-host the chat backend (Next.js/Express route, your own
+ *   provider) and don't want Waniwani's hosted features.
+ * - You need full control over headers, body, and tool-call dispatch.
+ *
+ * The component fills its parent container (`width: 100%; height: 100%`)
+ * with no header, border, or shadow.
+ *
+ * @example
+ * ```tsx
+ * // Self-hosted chat endpoint, no MCP App widgets
+ * <ChatEmbed
+ *   api="/api/my-chat-endpoint"
+ *   body={{ environmentId, sessionId }}
+ *   appearance={{ theme: "dark" }}
+ * />
+ *
+ * // Self-hosted chat endpoint with MCP App widgets
+ * <ChatEmbed
+ *   api="/api/my-chat-endpoint"
+ *   mcp={{ resourceEndpoint: "/api/mcp/resource" }}
+ * />
+ * ```
+ */
+export interface ChatEmbedProps
+	extends Omit<ChatBaseProps, "api" | "onCallTool"> {
+	/** The chat API endpoint URL. Required — there is no default. */
+	api: string;
+	/** Additional class names applied to the root element (e.g. Tailwind classes). */
+	className?: string;
+	/** MCP Apps configuration. Only needed if your backend serves widget resources. */
+	mcp?: ChatEmbedMcpConfig;
+	/** Hide the input bar at the bottom, making the chat read-only. */
+	readOnly?: boolean;
+	/**
+	 * Sticky header title. When set (or when `enableThreadHistory` is true, or
+	 * `headerActions` is provided), a sticky header is rendered at the top of
+	 * the chat. Without any of these, the chat is headerless.
+	 */
+	title?: string;
+	/** Extra React node rendered in the sticky header, right of the title. */
+	headerActions?: React.ReactNode;
+	/**
+	 * Force-hide the sticky header even when `title`, `enableThreadHistory`,
+	 * or `headerActions` would otherwise show it. Useful when the host page
+	 * already provides its own chrome.
+	 */
+	hideHeader?: boolean;
+	/**
+	 * @internal
+	 * When `true`, the root renders at `opacity: 0` so the chrome doesn't
+	 * paint with stale defaults while the layout's remote config is still
+	 * loading. Flipping to `false` triggers a single coordinated fade-in.
+	 * Set by `WaniwaniChat` / the IIFE embed; standalone `ChatEmbed` callers
+	 * should leave this unset.
+	 */
+	initializing?: boolean;
+	/**
+	 * @internal
+	 * Whether the chat is actually on screen. `false` suppresses
+	 * `suggestions.shown` impressions, so a mount kept hidden behind other
+	 * chrome (the floating dock) never reports pills the visitor cannot see.
+	 * Defaults to `true`; standalone `ChatEmbed` callers should leave it unset.
+	 */
+	onScreen?: boolean;
+}
+
+// ============================================================================
+// Imperative Handle (ref API)
+// ============================================================================
+
+export interface ChatHandle {
+	/** Programmatically send a user message into the chat */
+	sendMessage: (text: string) => void;
+	/**
+	 * Send a user message and wait for the assistant response to complete.
+	 * Returns the final assistant message. Useful for eval/testing flows.
+	 */
+	sendMessageAndWait: (text: string) => Promise<unknown>;
+	/** Clear all messages and start a fresh conversation */
+	reset: () => void;
+	/** Scroll to the chat input, focus it, and show a highlight glow */
+	focus: () => void;
+	/** Current chat messages */
+	messages: import("ai").UIMessage[];
+	/** Session ID used for event correlation. Available after the first message. */
+	sessionId: string | undefined;
+	/**
+	 * Track a funnel event from the host page with the chat session attached
+	 * automatically. Same surface as the server client: callable with a typed
+	 * event, plus the flat revenue helpers (`track.converted({ ... })`, ...).
+	 * Present on `WaniwaniChat` (hosted); absent on the bare `ChatEmbed`
+	 * primitive, which has no Waniwani credential to send events with.
+	 */
+	track?: import("@waniwani/protocol/tracking/@types").TrackFn;
+	/**
+	 * Tie the visitor to a stable user id (emits `user.identified`).
+	 * Present on `WaniwaniChat` only, like `track`.
+	 */
+	identify?: (
+		userId: string,
+		traits?: Record<string, unknown>,
+	) => Promise<{ eventId: string }>;
+}
+
+/** What the chat hands a transport factory. */
+export interface ChatTransportContext {
+	/** The chat's HTTP transport to `api`. */
+	fallback: import("ai").ChatTransport<import("ai").UIMessage>;
+	headers: () => Record<string, string> | undefined;
+	/** The channel, visitor and MCP `extra` a turn is attributed to. */
+	body: () => Record<string, unknown>;
+	/** Whether the chat keeps saved threads, whose messages the chat restores itself. */
+	threadHistory: () => boolean;
+	/** The active saved thread, started if there is none. Undefined without saved threads. */
+	threadId: () => string | undefined;
+	/** Whether the chat already shows messages the transport did not restore. */
+	hasMessages: () => boolean;
+	/** The documents attached to the message being sent, handed over once. */
+	takeTurnInput: () => {
+		documents?: import("@waniwani/protocol/documents/types").AttachedDocument[];
+	};
+	onSession: (sessionId: string) => void;
+}
+
+/** Optional hooks the chat calls on a transport. */
+export interface ChatTransportLifecycle {
+	/** The visitor started typing their first message. */
+	prepare?(): void;
+	/** On mount: the conversation this browser already holds, as messages to show. */
+	restore?(): Promise<import("ai").UIMessage[]>;
+	/** The visitor started a new conversation. */
+	reset?(): void;
+	/** A saved thread was deleted. */
+	forget?(threadId: string): void;
+	/** Whether a page load brings the session back, which the New chat button needs. */
+	keepsSession?(): boolean;
+	dispose?(): void;
+}
+
+export type ChatTransportFactory = (
+	context: ChatTransportContext,
+) => import("ai").ChatTransport<import("ai").UIMessage> &
+	ChatTransportLifecycle;

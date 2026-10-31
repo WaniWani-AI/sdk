@@ -1,0 +1,16 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		// `@waniwani/protocol` is never published. Mapping it to its source lets
+		// the declaration build inline its types instead of importing them.
+		// The deprecated `./chat` entry re-exports `@waniwani/chat`, whose
+		// source stands in for its build, so typecheck needs no chat build.
+		"paths": {
+			"@waniwani/protocol/webmcp": ["../protocol/src/webmcp/index.ts"],
+			"@waniwani/protocol/*": ["../protocol/src/*"],
+			"@waniwani/chat": ["../chat/src/index.ts"]
+		}
+	},
+	"include": ["src/**/*", "../../bun-test.d.ts"],
+	"exclude": ["node_modules", "dist"]
+}
