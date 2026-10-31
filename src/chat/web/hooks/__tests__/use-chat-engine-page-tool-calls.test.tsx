@@ -31,6 +31,7 @@ for (const key of [
 	"cancelAnimationFrame",
 	"getComputedStyle",
 	"screen",
+	"localStorage",
 ] as const) {
 	// biome-ignore lint/suspicious/noExplicitAny: test setup
 	(globalThis as any)[key] = (win as any)[key];
@@ -81,7 +82,7 @@ mock.module("../../lib/thread-store", () => ({
 }));
 
 const { useChatEngine } = await import("../use-chat-engine");
-const { getOrCreateMemoryUserId } = await import("../../lib/memory-user-id");
+const { getOrCreateVisitorId } = await import("../../../../shared/visitor-id");
 type HookReturn = ReturnType<typeof useChatEngine>;
 type EngineProps = Parameters<typeof useChatEngine>[0];
 type ToolCallHandler = NonNullable<EngineProps["onToolCall"]>;
@@ -1350,18 +1351,18 @@ function endStream(stream: ControlledStream | undefined) {
 }
 
 async function clearThreads(): Promise<string> {
-	const memoryUserId = await getOrCreateMemoryUserId();
-	for (const t of await threadStore.listThreads(memoryUserId)) {
+	const visitorId = getOrCreateVisitorId();
+	for (const t of await threadStore.listThreads(visitorId)) {
 		await threadStore.deleteThread(t.threadId);
 	}
-	return memoryUserId;
+	return visitorId;
 }
 
 async function storeThread(threadId: string, messages: UIMessage[]) {
 	const now = new Date().toISOString();
 	await threadStore.upsertThread({
 		threadId,
-		memoryUserId: await getOrCreateMemoryUserId(),
+		memoryUserId: getOrCreateVisitorId(),
 		title: threadId,
 		messages,
 		createdAt: now,
@@ -2479,5 +2480,380 @@ describe("overlapping thread actions never clear a newer conversation's busy sta
 		expect(engine().isLoading).toBe(false);
 		expect(engine().queuedMessages).toHaveLength(0);
 		expect(chatPosts).toHaveLength(1);
+	});
+});
+
+// One device id: the visitor id keys requests, thread history and the legacy migration.
+
+const MEMORY_DB = "waniwani-memory";
+const LEGACY_LS_KEY = "waniwani-memory-user-id";
+const VISITOR_LS_KEY = "waniwani-visitor-id";
+
+async function untilAsync(
+	label: string,
+	cond: () => Promise<boolean>,
+	timeoutMs = 2000,
+) {
+	const start = Date.now();
+	while (!(await cond())) {
+		if (Date.now() - start > timeoutMs) {
+			throw new Error(`timed out waiting for: ${label}`);
+		}
+		await tick(10);
+	}
+}
+
+function withFreshDevice() {
+	let previousIdb: unknown;
+	beforeEach(() => {
+		// biome-ignore lint/suspicious/noExplicitAny: test setup
+		previousIdb = (globalThis as any).indexedDB;
+		// biome-ignore lint/suspicious/noExplicitAny: test setup
+		(globalThis as any).indexedDB = new IDBFactory();
+		win.localStorage.clear();
+	});
+	afterEach(() => {
+		// biome-ignore lint/suspicious/noExplicitAny: test teardown
+		(globalThis as any).indexedDB = previousIdb;
+		win.localStorage.clear();
+	});
+}
+
+async function seedLegacyDevice(
+	legacyId: string,
+	threads: Array<{ threadId: string; owner: string; text: string }>,
+) {
+	const db = await new Promise<IDBDatabase>((resolve, reject) => {
+		const req = indexedDB.open(MEMORY_DB, 2);
+		req.onupgradeneeded = () => {
+			req.result.createObjectStore("ids");
+			const t = req.result.createObjectStore("threads", {
+				keyPath: "threadId",
+			});
+			t.createIndex("by_memoryUserId", "memoryUserId", { unique: false });
+			t.createIndex("by_updatedAt", "updatedAt", { unique: false });
+		};
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
+	});
+	await new Promise<void>((resolve, reject) => {
+		const tx = db.transaction(["ids", "threads"], "readwrite");
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+		tx.objectStore("ids").put(legacyId, "memoryUserId");
+		const now = new Date().toISOString();
+		for (const t of threads) {
+			tx.objectStore("threads").put({
+				threadId: t.threadId,
+				memoryUserId: t.owner,
+				title: t.threadId,
+				messages: [
+					{
+						id: `${t.threadId}_u`,
+						role: "user",
+						parts: [{ type: "text", text: t.text }],
+					},
+					{
+						id: `${t.threadId}_a`,
+						role: "assistant",
+						parts: [{ type: "text", text: "ok" }],
+					},
+				],
+				createdAt: now,
+				updatedAt: now,
+			});
+		}
+	});
+	db.close();
+}
+
+async function readLegacyKey(): Promise<unknown> {
+	const db = await new Promise<IDBDatabase>((resolve, reject) => {
+		const req = indexedDB.open(MEMORY_DB);
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
+	});
+	const value = await new Promise((resolve, reject) => {
+		const r = db
+			.transaction("ids", "readonly")
+			.objectStore("ids")
+			.get("memoryUserId");
+		r.onsuccess = () => resolve(r.result);
+		r.onerror = () => reject(r.error);
+	});
+	db.close();
+	return value;
+}
+
+async function databaseNames(): Promise<string[]> {
+	return (await indexedDB.databases()).map((d) => d.name ?? "");
+}
+
+describe("chat requests carry the visitor id and no second device id", () => {
+	withFreshDevice();
+
+	test("no memoryUserId anywhere in the request, and visitor.id is the visitor id", async () => {
+		win.localStorage.setItem(LEGACY_LS_KEY, "legacy-device-1");
+		mount();
+		await settle();
+		replies.push(textAnswer("hi"));
+
+		send("hello");
+		await until("POST", () => chatPosts.length === 1);
+
+		const body = chatPosts[0]?.body ?? {};
+		const visitor = body.visitor as Record<string, unknown> | undefined;
+		expect(visitor?.id).toBe(getOrCreateVisitorId());
+		expect(win.localStorage.getItem(VISITOR_LS_KEY)).toBe(
+			visitor?.id as string,
+		);
+		expect(JSON.stringify(body)).not.toContain("memoryUserId");
+		expect(JSON.stringify(body)).not.toContain("legacy-device-1");
+	});
+
+	test("a caller-supplied visitor.client is passed through untouched", async () => {
+		mount({
+			body: {
+				visitor: { name: "Ada", client: { plan: "gold", seats: 3 } },
+			},
+		});
+		await settle();
+		replies.push(textAnswer("hi"));
+
+		send("hello");
+		await until("POST", () => chatPosts.length === 1);
+
+		const visitor = chatPosts[0]?.body.visitor as Record<string, unknown>;
+		expect(visitor.client).toEqual({ plan: "gold", seats: 3 });
+		expect(visitor.name).toBe("Ada");
+		expect(visitor.id).toBe(getOrCreateVisitorId());
+	});
+
+	test("caller extra keys reach the request and no memoryUserId is added to extra", async () => {
+		mount({ body: { extra: { plan: "gold" } } });
+		await settle();
+		replies.push(textAnswer("hi"));
+
+		send("hello");
+		await until("POST", () => chatPosts.length === 1);
+
+		const extra = chatPosts[0]?.body.extra as Record<string, unknown>;
+		expect(extra.plan).toBe("gold");
+		expect(Object.keys(extra)).not.toContain("memoryUserId");
+	});
+
+	test("a host-supplied visitor id is the request's visitor.id", async () => {
+		mount({ visitorId: "host-visitor-7" });
+		await settle();
+		replies.push(textAnswer("hi"));
+
+		send("hello");
+		await until("POST", () => chatPosts.length === 1);
+
+		const visitor = chatPosts[0]?.body.visitor as Record<string, unknown>;
+		expect(visitor.id).toBe("host-visitor-7");
+	});
+});
+
+describe("thread history is keyed by the visitor id", () => {
+	withFreshDevice();
+
+	test("a saved thread's owner is the visitor id sent on the request", async () => {
+		mount({ enableThreadHistory: true });
+		await settle();
+		replies.push(textAnswer("hi"));
+
+		send("hello");
+		await until("answered", () =>
+			engine().messages.some((m) => m.role === "assistant"),
+		);
+		await until("idle", () => engine().status === "ready");
+		const threadId = engine().activeThreadId;
+		if (!threadId) {
+			throw new Error("no active thread");
+		}
+		await untilAsync("thread saved", async () =>
+			Boolean(await threadStore.loadThread(threadId)),
+		);
+
+		const saved = await threadStore.loadThread(threadId);
+		const sentId = (chatPosts[0]?.body.visitor as Record<string, unknown>).id;
+		expect(saved?.memoryUserId).toBe(getOrCreateVisitorId());
+		expect(saved?.memoryUserId).toBe(sentId as string);
+	});
+
+	test("a host-supplied visitor id owns the saved thread", async () => {
+		mount({ enableThreadHistory: true, visitorId: "host-visitor-7" });
+		await settle();
+		replies.push(textAnswer("hi"));
+
+		send("hello");
+		await until(
+			"idle after answer",
+			() =>
+				engine().messages.some((m) => m.role === "assistant") &&
+				engine().status === "ready",
+		);
+		await untilAsync(
+			"thread saved",
+			async () =>
+				(await threadStore.listThreads("host-visitor-7")).length === 1,
+		);
+
+		const [saved] = await threadStore.listThreads("host-visitor-7");
+		expect(saved?.threadId).toBe(engine().activeThreadId as string);
+	});
+
+	test("an async host visitor id: the saved thread's owner matches the visitor.id on the request", async () => {
+		mount({ enableThreadHistory: true, visitorId: async () => "host-async-9" });
+		await settle();
+		replies.push(textAnswer("hi"));
+
+		send("hello");
+		await until(
+			"idle after answer",
+			() =>
+				engine().messages.some((m) => m.role === "assistant") &&
+				engine().status === "ready",
+		);
+		const threadId = engine().activeThreadId;
+		if (!threadId) {
+			throw new Error("no active thread");
+		}
+		await untilAsync("thread saved", async () =>
+			Boolean(await threadStore.loadThread(threadId)),
+		);
+
+		const saved = await threadStore.loadThread(threadId);
+		const sentId = (chatPosts[0]?.body.visitor as Record<string, unknown>).id;
+		expect(sentId).toBe("host-async-9");
+		expect(saved?.memoryUserId).toBe(sentId as string);
+	});
+
+	test("an async host visitor id: the conversation from one visit loads on the next", async () => {
+		const resolveHostId = async () => "host-async-9";
+		mount({ enableThreadHistory: true, visitorId: resolveHostId });
+		await settle();
+		replies.push(textAnswer("hi"));
+		send("hello");
+		await until(
+			"idle after answer",
+			() =>
+				engine().messages.some((m) => m.role === "assistant") &&
+				engine().status === "ready",
+		);
+		const firstThreadId = engine().activeThreadId;
+		if (!firstThreadId) {
+			throw new Error("no active thread");
+		}
+		await untilAsync("thread saved", async () =>
+			Boolean(await threadStore.loadThread(firstThreadId)),
+		);
+		act(() => {
+			root.unmount();
+		});
+
+		root = createRoot(container);
+		hookRef = { current: null };
+		mount({ enableThreadHistory: true, visitorId: resolveHostId });
+		await settle();
+		await settle();
+
+		expect(engine().activeThreadId).toBe(firstThreadId);
+	});
+
+	test("a thread stored under the visitor id loads on mount", async () => {
+		await storeThread("t_mine", [
+			{ id: "u1", role: "user", parts: [{ type: "text", text: "mine" }] },
+		]);
+		mount({ enableThreadHistory: true });
+		await until("thread loaded", () => engine().activeThreadId === "t_mine");
+
+		expect(engine().messages.map((m) => m.id)).toEqual(["u1"]);
+		expect(engine().threads.map((t) => t.threadId)).toEqual(["t_mine"]);
+	});
+
+	test("a thread stored under another id is neither loaded nor listed", async () => {
+		const now = new Date().toISOString();
+		await threadStore.upsertThread({
+			threadId: "t_theirs",
+			memoryUserId: "someone-else",
+			title: "theirs",
+			messages: [
+				{ id: "x1", role: "user", parts: [{ type: "text", text: "theirs" }] },
+			],
+			createdAt: now,
+			updatedAt: now,
+		});
+		mount({ enableThreadHistory: true });
+		await settle();
+		await settle();
+
+		expect(engine().activeThreadId).not.toBe("t_theirs");
+		expect(engine().messages).toHaveLength(0);
+		expect(engine().threads.map((t) => t.threadId)).not.toContain("t_theirs");
+	});
+});
+
+describe("the engine migrates the legacy device id on mount", () => {
+	withFreshDevice();
+
+	test("with thread history off, legacy threads move to the visitor id and the legacy id is deleted", async () => {
+		const visitorId = getOrCreateVisitorId();
+		await seedLegacyDevice("legacy-dev", [
+			{ threadId: "t_legacy", owner: "legacy-dev", text: "old" },
+			{ threadId: "t_theirs", owner: "someone-else", text: "theirs" },
+		]);
+		win.localStorage.setItem(LEGACY_LS_KEY, "legacy-dev");
+
+		mount();
+		await untilAsync(
+			"legacy key deleted",
+			async () => (await readLegacyKey()) === undefined,
+		);
+		await settle();
+
+		expect((await threadStore.loadThread("t_legacy"))?.memoryUserId).toBe(
+			visitorId,
+		);
+		expect((await threadStore.loadThread("t_theirs"))?.memoryUserId).toBe(
+			"someone-else",
+		);
+		expect(win.localStorage.getItem(LEGACY_LS_KEY)).toBeNull();
+	});
+
+	test("with thread history on, a thread saved under the legacy id loads on mount", async () => {
+		await seedLegacyDevice("legacy-dev", [
+			{ threadId: "t_legacy", owner: "legacy-dev", text: "old question" },
+		]);
+
+		mount({ enableThreadHistory: true });
+		await until(
+			"legacy thread loaded",
+			() => engine().activeThreadId === "t_legacy",
+		);
+
+		expect(engine().messages.map((m) => m.id)).toEqual([
+			"t_legacy_u",
+			"t_legacy_a",
+		]);
+		expect(engine().threads.map((t) => t.threadId)).toEqual(["t_legacy"]);
+	});
+
+	test("with thread history off and no database, mounting and chatting creates no database", async () => {
+		mount();
+		await settle();
+		replies.push(textAnswer("hi"));
+		send("hello");
+		await until(
+			"idle after answer",
+			() =>
+				engine().messages.some((m) => m.role === "assistant") &&
+				engine().status === "ready",
+		);
+		await settle();
+
+		expect(await databaseNames()).not.toContain(MEMORY_DB);
+		expect(win.localStorage.getItem(LEGACY_LS_KEY)).toBeNull();
 	});
 });

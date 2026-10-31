@@ -13,6 +13,7 @@ import { useWidgetEvents } from "../embed/widget-events-context";
 import { buildApiUrl } from "../lib/api-url";
 import { discardDocument } from "../lib/document-upload";
 import { LenientChatTransport } from "../lib/lenient-chat-transport";
+import { migrateLegacyMemoryUserId } from "../lib/memory-db";
 import {
 	deleteThread as deleteThreadFromStore,
 	deriveThreadTitle,
@@ -223,11 +224,11 @@ export function useChatEngine(props: ChatBaseProps) {
 		if (!enableThreadHistory) {
 			return;
 		}
-		const memoryUserId = visitorContextRef.current?.memoryUserId;
-		if (!memoryUserId) {
+		const ownerId = getOrCreateVisitorId();
+		if (!ownerId) {
 			return;
 		}
-		const list = await listThreads(memoryUserId);
+		const list = await listThreads(ownerId);
 		setThreads(list);
 	}, [enableThreadHistory]);
 
@@ -290,18 +291,21 @@ export function useChatEngine(props: ChatBaseProps) {
 				// Best-effort — silently ignore failures
 			}
 
+			const ownerId = getOrCreateVisitorId();
+			if (ownerId) {
+				await migrateLegacyMemoryUserId(ownerId);
+			}
 			if (!enableThreadHistory) {
 				return;
 			}
-			const memoryUserId = visitorContextRef.current?.memoryUserId;
-			if (!memoryUserId) {
+			if (!ownerId) {
 				setIsThreadHistoryReady(true);
 				return;
 			}
 
 			try {
 				const targetId =
-					controlledThreadId ?? (await getActiveThreadId(memoryUserId));
+					controlledThreadId ?? (await getActiveThreadId(ownerId));
 				if (cancelled || mountEpoch !== switchEpochRef.current) {
 					return;
 				}
@@ -310,7 +314,7 @@ export function useChatEngine(props: ChatBaseProps) {
 					if (cancelled || mountEpoch !== switchEpochRef.current) {
 						return;
 					}
-					if (stored && stored.memoryUserId === memoryUserId) {
+					if (stored && stored.memoryUserId === ownerId) {
 						activeThreadIdRef.current = stored.threadId;
 						setActiveThreadIdState(stored.threadId);
 						threadCreatedAtRef.current = stored.createdAt;
@@ -367,12 +371,8 @@ export function useChatEngine(props: ChatBaseProps) {
 				!Array.isArray(callerValue)
 					? (callerValue as Record<string, unknown>)
 					: undefined;
-			const memoryUserId = visitorContextRef.current?.memoryUserId;
 			const locale = visitorContextRef.current?.language;
 			const autoExtra: Record<string, unknown> = {};
-			if (memoryUserId) {
-				autoExtra.memoryUserId = memoryUserId;
-			}
 			if (locale) {
 				autoExtra.locale = locale;
 			}
@@ -451,20 +451,11 @@ export function useChatEngine(props: ChatBaseProps) {
 					resolvedBody.visitor !== null
 						? (resolvedBody.visitor as Record<string, unknown>)
 						: {};
-				const existingClient =
-					typeof existingVisitor.client === "object" &&
-					existingVisitor.client !== null
-						? (existingVisitor.client as Record<string, unknown>)
-						: {};
 				resolvedBody.visitor = {
 					...existingVisitor,
 					// Anonymous visitor id — the server stamps it onto chat events'
 					// `visitor_id` so visits link a `page.viewed` to its conversation.
 					id: visitorId,
-					client: {
-						...existingClient,
-						...(vc && { memoryUserId: vc.memoryUserId }),
-					},
 				};
 
 				// Read per send, so it follows a single-page site's in-app navigation.
@@ -747,15 +738,16 @@ export function useChatEngine(props: ChatBaseProps) {
 						// Best-effort — silently ignore failures
 					}
 				}
-				const memoryUserId = ctx?.memoryUserId;
-				if (!memoryUserId || cancelled || epoch !== switchEpochRef.current) {
+				const ownerId = ctx ? getOrCreateVisitorId() : undefined;
+				if (!ownerId || cancelled || epoch !== switchEpochRef.current) {
 					if (!cancelled) {
 						setIsThreadHistoryReady(true);
 					}
 					return;
 				}
+				await migrateLegacyMemoryUserId(ownerId);
 				const targetId =
-					controlledThreadId ?? (await getActiveThreadId(memoryUserId));
+					controlledThreadId ?? (await getActiveThreadId(ownerId));
 				if (cancelled || epoch !== switchEpochRef.current) {
 					return;
 				}
@@ -764,7 +756,7 @@ export function useChatEngine(props: ChatBaseProps) {
 					if (cancelled || epoch !== switchEpochRef.current) {
 						return;
 					}
-					if (stored && stored.memoryUserId === memoryUserId) {
+					if (stored && stored.memoryUserId === ownerId) {
 						activeThreadIdRef.current = stored.threadId;
 						setActiveThreadIdState(stored.threadId);
 						threadCreatedAtRef.current = stored.createdAt;
@@ -991,10 +983,10 @@ export function useChatEngine(props: ChatBaseProps) {
 		if (!enableThreadHistoryRef.current) {
 			return undefined;
 		}
-		const memoryUserId = visitorContextRef.current?.memoryUserId;
+		const ownerId = getOrCreateVisitorId();
 		const threadId = activeThreadIdRef.current;
 		const msgs = messagesRef.current;
-		if (!memoryUserId || !threadId || msgs.length === 0) {
+		if (!ownerId || !threadId || msgs.length === 0) {
 			return undefined;
 		}
 		if (!threadCreatedAtRef.current) {
@@ -1013,7 +1005,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		}
 		return {
 			threadId,
-			memoryUserId,
+			memoryUserId: ownerId,
 			title: threadTitleRef.current,
 			messages: msgs,
 			sessionId: sessionIdRef.current,

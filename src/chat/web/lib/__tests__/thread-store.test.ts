@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { UIMessage } from "ai";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { Window } from "happy-dom";
@@ -21,16 +21,22 @@ beforeEach(() => {
 	(globalThis as any).indexedDB = new IDBFactory();
 });
 
+afterEach(() => {
+	// biome-ignore lint/suspicious/noExplicitAny: test teardown
+	(globalThis as any).indexedDB = new IDBFactory();
+	win.localStorage.clear();
+});
+
 async function importThreadStore() {
 	return (await import(
 		`../thread-store?t=${Date.now()}-${Math.random()}`
 	)) as typeof import("../thread-store");
 }
 
-async function importMemoryUserId() {
+async function importMemoryDb() {
 	return (await import(
-		`../memory-user-id?t=${Date.now()}-${Math.random()}`
-	)) as typeof import("../memory-user-id");
+		`../memory-db?t=${Date.now()}-${Math.random()}`
+	)) as typeof import("../memory-db");
 }
 
 function makeMessage(id: string, text: string): UIMessage {
@@ -144,15 +150,52 @@ describe("thread-store", () => {
 		expect(u2.map((t) => t.threadId)).toEqual(["b"]);
 	});
 
-	test("upgrade path v1 → v2 preserves the ids store", async () => {
-		// Open as v1 with only the legacy `ids` store, write a memoryUserId.
+	test("upgrade path v1 → v2 adds the threads store and keeps the ids store", async () => {
 		await new Promise<void>((resolve, reject) => {
 			const req = indexedDB.open("waniwani-memory", 1);
 			req.onupgradeneeded = () => {
+				req.result.createObjectStore("ids");
+			};
+			req.onsuccess = () => {
 				const db = req.result;
-				if (!db.objectStoreNames.contains("ids")) {
-					db.createObjectStore("ids");
-				}
+				const tx = db.transaction("ids", "readwrite");
+				tx.objectStore("ids").put("kept", "other-key");
+				tx.oncomplete = () => {
+					db.close();
+					resolve();
+				};
+				tx.onerror = () => reject(tx.error);
+			};
+			req.onerror = () => reject(req.error);
+		});
+
+		const memDb = await importMemoryDb();
+		const db = await memDb.openMemoryDb();
+		const stores = Array.from(db.objectStoreNames).sort();
+		const kept = await new Promise((resolve, reject) => {
+			const r = db
+				.transaction("ids", "readonly")
+				.objectStore("ids")
+				.get("other-key");
+			r.onsuccess = () => resolve(r.result);
+			r.onerror = () => reject(r.error);
+		});
+		expect(db.version).toBe(2);
+		db.close();
+		expect(stores).toEqual(["ids", "threads"]);
+		expect(kept).toBe("kept");
+
+		const store = await importThreadStore();
+		await store.upsertThread(makeThread({ memoryUserId: "visitor-1" }));
+		const list = await store.listThreads("visitor-1");
+		expect(list.length).toBe(1);
+	});
+
+	test("a v1 database with a legacy id: after migration the visitor's new threads list and the legacy id is gone", async () => {
+		await new Promise<void>((resolve, reject) => {
+			const req = indexedDB.open("waniwani-memory", 1);
+			req.onupgradeneeded = () => {
+				req.result.createObjectStore("ids");
 			};
 			req.onsuccess = () => {
 				const db = req.result;
@@ -167,16 +210,25 @@ describe("thread-store", () => {
 			req.onerror = () => reject(req.error);
 		});
 
-		// Re-open via the SDK helper which now requests v2; threads store must exist
-		// AND the legacy id must still be readable.
-		const memMod = await importMemoryUserId();
-		const id = await memMod.getOrCreateMemoryUserId();
-		expect(id).toBe("legacy-user");
+		const memDb = await importMemoryDb();
+		await memDb.migrateLegacyMemoryUserId("visitor-1");
 
 		const store = await importThreadStore();
-		await store.upsertThread(makeThread({ memoryUserId: "legacy-user" }));
-		const list = await store.listThreads("legacy-user");
-		expect(list.length).toBe(1);
+		await store.upsertThread(makeThread({ memoryUserId: "visitor-1" }));
+		expect((await store.listThreads("visitor-1")).length).toBe(1);
+		expect(await store.listThreads("legacy-user")).toEqual([]);
+
+		const db = await memDb.openMemoryDb();
+		const legacy = await new Promise((resolve, reject) => {
+			const r = db
+				.transaction("ids", "readonly")
+				.objectStore("ids")
+				.get("memoryUserId");
+			r.onsuccess = () => resolve(r.result);
+			r.onerror = () => reject(r.error);
+		});
+		db.close();
+		expect(legacy).toBeUndefined();
 	});
 });
 

@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { IDBFactory } from "fake-indexeddb";
 import { Window } from "happy-dom";
 
 // ---------------------------------------------------------------------------
@@ -10,9 +11,12 @@ for (const key of ["localStorage", "navigator"] as const) {
 	(globalThis as any)[key] = (win as any)[key];
 }
 
-const { applyVisitorId, getOrCreateVisitorId, setVisitorId } = await import(
-	"./visitor-context"
-);
+const {
+	applyVisitorId,
+	collectVisitorContext,
+	getOrCreateVisitorId,
+	setVisitorId,
+} = await import("./visitor-context");
 
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
@@ -153,5 +157,59 @@ describe("applyVisitorId", () => {
 		cancel();
 		await tick();
 		expect(getOrCreateVisitorId()).toBe("existing");
+	});
+});
+
+describe("collectVisitorContext", () => {
+	// biome-ignore lint/suspicious/noExplicitAny: test setup
+	const g = globalThis as any;
+	let saved: Record<string, unknown> = {};
+
+	beforeEach(() => {
+		saved = {
+			indexedDB: g.indexedDB,
+			document: g.document,
+			screen: g.screen,
+			window: g.window,
+		};
+		g.indexedDB = new IDBFactory();
+		g.document = win.document;
+		g.screen = win.screen;
+		g.window = win;
+		localStorage.clear();
+	});
+
+	afterEach(() => {
+		for (const [key, value] of Object.entries(saved)) {
+			g[key] = value;
+		}
+		localStorage.clear();
+	});
+
+	test("carries the visitor id and no memoryUserId", async () => {
+		const ctx = await collectVisitorContext();
+
+		expect(ctx.visitorId).toBe(getOrCreateVisitorId());
+		expect(Object.keys(ctx)).not.toContain("memoryUserId");
+	});
+
+	test("a host-set visitor id is the context's visitor id", async () => {
+		setVisitorId("host-id-1");
+
+		const ctx = await collectVisitorContext();
+
+		expect(ctx.visitorId).toBe("host-id-1");
+	});
+
+	test("creates no legacy device id in localStorage or IndexedDB", async () => {
+		await collectVisitorContext();
+		await collectVisitorContext();
+
+		expect(localStorage.getItem("waniwani-memory-user-id")).toBeNull();
+		const names = (await g.indexedDB.databases()).map(
+			(d: { name?: string }) => d.name,
+		);
+		expect(names).not.toContain("waniwani-memory");
+		expect(Object.keys(localStorage)).toEqual([KEY]);
 	});
 });
