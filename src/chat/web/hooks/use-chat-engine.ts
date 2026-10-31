@@ -224,7 +224,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		if (!enableThreadHistory) {
 			return;
 		}
-		const ownerId = visitorContextRef.current?.visitorId;
+		const ownerId = getOrCreateVisitorId();
 		if (!ownerId) {
 			return;
 		}
@@ -291,7 +291,7 @@ export function useChatEngine(props: ChatBaseProps) {
 				// Best-effort — silently ignore failures
 			}
 
-			const ownerId = visitorContextRef.current?.visitorId;
+			const ownerId = getOrCreateVisitorId();
 			if (ownerId) {
 				await migrateLegacyMemoryUserId(ownerId);
 			}
@@ -738,7 +738,7 @@ export function useChatEngine(props: ChatBaseProps) {
 						// Best-effort — silently ignore failures
 					}
 				}
-				const ownerId = ctx?.visitorId;
+				const ownerId = ctx ? getOrCreateVisitorId() : undefined;
 				if (!ownerId || cancelled || epoch !== switchEpochRef.current) {
 					if (!cancelled) {
 						setIsThreadHistoryReady(true);
@@ -983,7 +983,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		if (!enableThreadHistoryRef.current) {
 			return undefined;
 		}
-		const ownerId = visitorContextRef.current?.visitorId;
+		const ownerId = getOrCreateVisitorId();
 		const threadId = activeThreadIdRef.current;
 		const msgs = messagesRef.current;
 		if (!ownerId || !threadId || msgs.length === 0) {
