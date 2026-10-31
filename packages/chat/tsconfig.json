@@ -1,0 +1,13 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		// `@waniwani/protocol` is never published. Mapping it to its source lets
+		// the declaration build inline its types instead of importing them.
+		"paths": {
+			"@waniwani/protocol/webmcp": ["../protocol/src/webmcp/index.ts"],
+			"@waniwani/protocol/*": ["../protocol/src/*"]
+		}
+	},
+	"include": ["src/**/*", "../../bun-test.d.ts"],
+	"exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@waniwani/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The wire contract between @waniwani/sdk and @waniwani/chat. Never published: tsup inlines it into both packages.",
+  "type": "module",
+  "exports": {
+    "./webmcp": "./src/webmcp/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "happy-dom": "^20.7.0"
+  }
+}

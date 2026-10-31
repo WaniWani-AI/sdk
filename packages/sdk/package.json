@@ -1,0 +1,135 @@
+{
+  "name": "@waniwani/sdk",
+  "version": "0.25.4-beta.0",
+  "description": "MCP distribution SDK. Build sales funnels, lead generation, booking, and quote apps on top of your MCP server. Event tracking, flows, widgets, knowledge base.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.js",
+      "default": "./dist/mcp/index.js"
+    },
+    "./mcp/react": {
+      "types": "./dist/mcp/react.d.ts",
+      "import": "./dist/mcp/react.js",
+      "default": "./dist/mcp/react.js"
+    },
+    "./mcp/react/skybridge": {
+      "types": "./dist/mcp/react/skybridge.d.ts",
+      "import": "./dist/mcp/react/skybridge.js",
+      "default": "./dist/mcp/react/skybridge.js"
+    },
+    "./chat": {
+      "types": "./dist/chat/index.d.ts",
+      "import": "./dist/chat/index.js",
+      "default": "./dist/chat/index.js"
+    },
+    "./chat/styles.css": "./dist/chat/styles.css",
+    "./chat/embed.js": "./dist/chat/embed.js",
+    "./kb": {
+      "types": "./dist/kb/index.d.ts",
+      "import": "./dist/kb/index.js",
+      "default": "./dist/kb/index.js"
+    },
+    "./documents": {
+      "types": "./dist/documents/index.d.ts",
+      "import": "./dist/documents/index.js",
+      "default": "./dist/documents/index.js"
+    },
+    "./internal": {
+      "types": "./dist/internal/index.d.ts",
+      "import": "./dist/internal/index.js",
+      "default": "./dist/internal/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && bun run typecheck && tsup && bun run build:chat-shim && bun run check:browser-bundles",
+    "build:chat-shim": "bun scripts/copy-chat-shim.ts",
+    "check:browser-bundles": "bun scripts/check-browser-bundles.ts",
+    "dev": "tsx --watch src/index.ts",
+    "test": "bun test",
+    "eval:flows": "bun evals/flows/run.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p evals",
+    "prepublishOnly": "bun run build",
+    "release": "bun run release:patch",
+    "release:patch": "bun ../../scripts/bump.ts patch",
+    "release:minor": "bun ../../scripts/bump.ts minor",
+    "release:major": "bun ../../scripts/bump.ts major",
+    "release:beta": "bun ../../scripts/bump.ts beta",
+    "release:alpha": "bun ../../scripts/bump.ts alpha"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@waniwani/chat": ">=0.26.0",
+    "react": ">=18.0.0",
+    "zod": ">=4.0.0",
+    "ai": ">=6.0.141",
+    "skybridge": ">=0.35.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "@waniwani/chat": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    },
+    "ai": {
+      "optional": true
+    },
+    "skybridge": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@ai-sdk/mcp": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@types/react": "^19.0.0",
+    "ai": "^6.0.141",
+    "react": "^19.0.0",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "zod": "^4.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WaniWani-AI/sdk",
+    "directory": "packages/sdk"
+  },
+  "keywords": [
+    "sdk",
+    "mcp",
+    "waniwani",
+    "mcp-funnel",
+    "mcp-distribution",
+    "mcp-sdk",
+    "sales-funnel",
+    "lead-generation",
+    "lead-capture",
+    "booking",
+    "insurance",
+    "quote",
+    "conversational-mcp",
+    "flows",
+    "knowledge-base",
+    "tracking",
+    "events",
+    "tools",
+    "widgets"
+  ],
+  "author": "Waniwani",
+  "license": "MIT"
+}

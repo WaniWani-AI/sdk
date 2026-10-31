@@ -1,11 +1,21 @@
 name: Release to npm
 
+# `bun run release:<bump>` in packages/sdk pushes a `v*` tag, and in
+# packages/chat a `chat-v*` tag (scripts/bump.ts). The tag picks the package.
 on:
   push:
     tags:
       - "v*"
+      - "chat-v*"
   workflow_dispatch:
     inputs:
+      package:
+        description: "Package to release"
+        required: true
+        type: choice
+        options:
+          - sdk
+          - chat
       bump:
         description: "Version bump type"
         required: true
@@ -55,7 +65,28 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - name: Resolve the package
+        id: pkg
+        run: |
+          if [[ "$EVENT" == "workflow_dispatch" ]]; then
+            NAME="$INPUT"
+          elif [[ "$REF" == chat-v* ]]; then
+            NAME=chat
+          else
+            NAME=sdk
+          fi
+          if [[ "$NAME" == "chat" ]]; then PREFIX="chat-v"; else PREFIX="v"; fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "dir=packages/$NAME" >> "$GITHUB_OUTPUT"
+          echo "prefix=$PREFIX" >> "$GITHUB_OUTPUT"
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT: ${{ inputs.package }}
+          REF: ${{ github.ref_name }}
+
+      # The flow eval gates @waniwani/sdk only. The chat has no eval yet.
       - name: Flow eval against the last release
+        if: steps.pkg.outputs.name == 'sdk'
         run: |
           if [[ "$EVENT" == "workflow_dispatch" ]]; then
             PREV=$(git describe --tags --abbrev=0 --match 'v*' HEAD)
@@ -88,30 +119,28 @@ jobs:
 
       - name: Bump version and create tag
         if: github.event_name == 'workflow_dispatch'
+        working-directory: ${{ steps.pkg.outputs.dir }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          BUMP="${{ inputs.bump }}"
-          if [[ "$BUMP" == "beta" ]]; then
-            npm version prerelease --preid beta
-          elif [[ "$BUMP" == "alpha" ]]; then
-            npm version prerelease --preid alpha
-          else
-            npm version "$BUMP"
-          fi
-          git push --follow-tags
+          bun run "release:$BUMP"
+        env:
+          BUMP: ${{ inputs.bump }}
 
       - name: Determine tag
         id: tag
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "value=v$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+            echo "value=${PREFIX}$(jq -r .version "$DIR/package.json")" >> "$GITHUB_OUTPUT"
           else
             echo "value=$TAG" >> "$GITHUB_OUTPUT"
           fi
         env:
           TAG: ${{ github.ref_name }}
+          DIR: ${{ steps.pkg.outputs.dir }}
+          PREFIX: ${{ steps.pkg.outputs.prefix }}
 
+      # Builds both packages: the SDK build copies the chat's embed.js.
       - run: bun run build
 
       - name: Determine release channel
@@ -132,18 +161,26 @@ jobs:
 
       - name: Check if already published
         id: check
+        working-directory: ${{ steps.pkg.outputs.dir }}
         run: |
+          NAME=$(jq -r .name package.json)
           VERSION=$(jq -r .version package.json)
-          if npm view "@waniwani/sdk@$VERSION" version 2>/dev/null; then
+          if npm view "$NAME@$VERSION" version 2>/dev/null; then
             echo "published=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::v$VERSION is already published to npm, skipping"
+            echo "::notice::$NAME@$VERSION is already published to npm, skipping"
           else
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Publish to npm
         if: steps.check.outputs.published == 'false'
+        working-directory: ${{ steps.pkg.outputs.dir }}
         run: npm publish --access public --tag ${{ steps.channel.outputs.npm_tag }} --provenance --ignore-scripts
+        env:
+          # Trusted publishing (OIDC) covers every package with a trusted
+          # publisher on npmjs.com. NPM_TOKEN is only for a package that has
+          # none yet: npm cannot attach one before the first publish.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # No CDN purge step: the chat embed is served via the app.waniwani.ai/embed.js
       # loader, which resolves the latest version server-side (short-cached) and
@@ -154,12 +191,14 @@ jobs:
       - name: Create GitHub Release
         if: steps.check.outputs.published == 'false'
         run: |
-          if [[ "$PRERELEASE" == "true" ]]; then
-            gh release create "$TAG" --generate-notes --prerelease
-          else
-            gh release create "$TAG" --generate-notes
-          fi
+          # Notes start at this package's previous tag, not the other package's.
+          PREV=$(git describe --tags --abbrev=0 --match "${PREFIX}*" "$TAG^" 2>/dev/null || true)
+          ARGS=(--generate-notes)
+          if [[ -n "$PREV" ]]; then ARGS+=(--notes-start-tag "$PREV"); fi
+          if [[ "$PRERELEASE" == "true" ]]; then ARGS+=(--prerelease); fi
+          gh release create "$TAG" "${ARGS[@]}"
         env:
           GH_TOKEN: ${{ github.event_name == 'workflow_dispatch' && secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.tag.outputs.value }}
+          PREFIX: ${{ steps.pkg.outputs.prefix }}
           PRERELEASE: ${{ steps.channel.outputs.prerelease }}

@@ -1,0 +1,1104 @@
+import { describe, expect, test } from "bun:test";
+import type { TrackInput } from "@waniwani/protocol/tracking/@types";
+import { z } from "zod";
+import { withWaniwani } from "../index.js";
+
+function mockClient() {
+	const tracked: TrackInput[] = [];
+	let flushed = 0;
+	return {
+		client: {
+			track: async (event: TrackInput) => {
+				tracked.push(event);
+				return { eventId: `evt_mock_${tracked.length}` };
+			},
+			identify: async (
+				_userId: string,
+				_properties?: Record<string, unknown>,
+				_meta?: Record<string, unknown>,
+			) => {
+				return { eventId: "evt_mock_identify" };
+			},
+			flush: async () => {
+				flushed += 1;
+			},
+			kb: {
+				ingest: async () => ({
+					ingested: 0,
+					errors: [],
+					chunksIngested: 0,
+					filesProcessed: 0,
+				}),
+				search: async () => [],
+				sources: async () => [],
+			},
+			_config: {
+				apiUrl: "https://test.waniwani.ai",
+				apiKey: undefined,
+				tracking: {
+					endpointPath: "/api/mcp/events/v2/batch",
+					flushIntervalMs: 1000,
+					maxBatchSize: 20,
+					maxBufferSize: 1000,
+					maxRetries: 3,
+					retryBaseDelayMs: 200,
+					retryMaxDelayMs: 2000,
+					shutdownTimeoutMs: 2000,
+				},
+			},
+		},
+		tracked,
+		get flushed() {
+			return flushed;
+		},
+	};
+}
+
+function mockClientWithApiKey() {
+	const base = mockClient();
+	return {
+		...base,
+		client: {
+			...base.client,
+			_config: {
+				...base.client._config,
+				apiKey: "wwk_test",
+			},
+		},
+	};
+}
+
+type Handler = (input: unknown, extra: unknown) => Promise<unknown>;
+type RegisterToolArgs = [string, Record<string, unknown>, Handler];
+type RegisteredToolEntry = {
+	handler: Handler;
+	_meta?: Record<string, unknown>;
+};
+
+function mockServer() {
+	const registered: RegisterToolArgs[] = [];
+	const _registeredTools: Record<string, RegisteredToolEntry> = {};
+	const server = {
+		_registeredTools,
+		registerTool: (...args: unknown[]) => {
+			const typed = args as RegisterToolArgs;
+			registered.push(typed);
+			// Mirror the MCP SDK: store the (possibly wrapped) handler plus the
+			// definition `_meta` in `_registeredTools[name]`. In-place wrapping
+			// reassigns `entry.handler` and reads `entry._meta`.
+			const definitionMeta = (typed[1] as { _meta?: Record<string, unknown> })
+				?._meta;
+			_registeredTools[typed[0]] = {
+				handler: typed[2],
+				...(definitionMeta && { _meta: definitionMeta }),
+			};
+		},
+	};
+	return {
+		server: server as unknown as Parameters<typeof withWaniwani>[0],
+		registered,
+		_registeredTools,
+		registerTool: (...args: unknown[]) => {
+			(server.registerTool as (...a: unknown[]) => void)(...args);
+		},
+	};
+}
+
+function withClientInfo(
+	mock: ReturnType<typeof mockServer>,
+	clientInfo: { name: string; version: string },
+) {
+	Object.assign(mock.server, {
+		server: { getClientVersion: () => clientInfo },
+	});
+}
+
+describe("withWaniwani", () => {
+	test("emits tool.called after execution with durationMs and status ok", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("pricing", { description: "Get pricing" }, async () => ({
+			text: "done",
+		}));
+
+		expect(mock.registered).toHaveLength(1);
+		expect(mock.registered[0]?.[0]).toBe("pricing");
+
+		const handler = mock.registered[0]?.[2];
+		const result = await handler?.({}, { _meta: { requestId: "req-1" } });
+
+		expect(result).toMatchObject({ text: "done" });
+		expect(tracked).toHaveLength(1);
+		expect(tracked[0]).toMatchObject({
+			event: "tool.called",
+			properties: {
+				name: "pricing",
+				type: "other",
+				status: "ok",
+				input: {},
+				output: { text: "done" },
+			},
+		});
+		const props = (tracked[0] as { properties: Record<string, unknown> })
+			.properties;
+		expect(typeof props.durationMs).toBe("number");
+		expect(props.durationMs).toBeGreaterThanOrEqual(0);
+	});
+
+	test("emits status error with errorMessage on handler failure", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("failing-tool", { description: "Fails" }, async () => {
+			throw new Error("tool broke");
+		});
+
+		const handler = mock.registered[0]?.[2];
+
+		let thrownError: Error | undefined;
+		try {
+			await handler?.({}, {});
+		} catch (e) {
+			thrownError = e as Error;
+		}
+
+		expect(thrownError).toBeDefined();
+		expect(thrownError?.message).toBe("tool broke");
+
+		expect(tracked).toHaveLength(1);
+		expect(tracked[0]).toMatchObject({
+			event: "tool.called",
+			properties: {
+				name: "failing-tool",
+				type: "other",
+				status: "error",
+				errorMessage: "tool broke",
+				cause: "unknown",
+			},
+		});
+	});
+
+	test("prevents double wrapping", async () => {
+		const { server } = mockServer();
+
+		const wrapped1 = await withWaniwani(server, {
+			client: mockClient().client,
+		});
+		const wrapped2 = await withWaniwani(wrapped1, {
+			client: mockClient().client,
+		});
+
+		expect(wrapped1).toBe(wrapped2);
+	});
+
+	test("extracts _meta from extra and passes as meta", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.({}, { _meta: { "openai/sessionId": "session-1" } });
+
+		expect(tracked[0]?.meta).toEqual({
+			"openai/sessionId": "session-1",
+		});
+	});
+
+	test("stamps resolved source into _meta from request headers (Claude)", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra = {
+			_meta: {},
+			requestInfo: { headers: { "user-agent": "Claude-User" } },
+		} as Record<string, unknown>;
+		await handler?.({}, extra);
+
+		// Stamped into the live request _meta so flow nodes / nested handlers see it.
+		expect((extra._meta as Record<string, unknown>)["waniwani/source"]).toBe(
+			"claude",
+		);
+		// And carried through to the tracked event source.
+		expect(tracked[0]?.source).toBe("claude");
+	});
+
+	test("does not override an explicit _meta source with header detection", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra = {
+			_meta: { "openai/sessionId": "v1/abc" },
+			requestInfo: { headers: { "user-agent": "Claude-User" } },
+		} as Record<string, unknown>;
+		await handler?.({}, extra);
+
+		// openai session resolves to chatgpt; the header fallback must not run.
+		expect(
+			(extra._meta as Record<string, unknown>)["waniwani/source"],
+		).toBeUndefined();
+		expect(tracked[0]?.source).toBe("chatgpt");
+	});
+
+	test("names an unrecognised client on tool.called", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+		withClientInfo(mock, { name: "Cursor", version: "1.4.2" });
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.({}, { _meta: {} });
+
+		expect(tracked[0]?.source).toBe("Cursor");
+	});
+
+	// `waniwani/source` gates widget tracking and flow branches, which only know
+	// recognised sources.
+	test("keeps an unrecognised client name out of _meta", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+		withClientInfo(mock, { name: "Cursor", version: "1.4.2" });
+
+		withWaniwani(mock.server, { client, injectWidgetToken: true });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra: { _meta: Record<string, unknown> } = { _meta: {} };
+		const result = await handler?.({}, extra);
+
+		expect(extra._meta["waniwani/source"]).toBeUndefined();
+		expect(result).toHaveProperty(["_meta", "waniwani/widget", "endpoint"]);
+		expect(result).not.toHaveProperty(["_meta", "waniwani/widget", "source"]);
+	});
+
+	test("a recognised header wins over an unrecognised client name", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+		withClientInfo(mock, { name: "mcp-remote", version: "0.1.0" });
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{},
+			{ _meta: {}, requestInfo: { headers: { "user-agent": "Claude-User" } } },
+		);
+
+		expect(tracked[0]?.source).toBe("claude");
+	});
+
+	test("ignores a blank client name", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+		withClientInfo(mock, { name: "   ", version: "1.0.0" });
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra: { _meta: Record<string, unknown> } = { _meta: {} };
+		await handler?.({}, extra);
+
+		expect(extra._meta["waniwani/source"]).toBeUndefined();
+		expect(tracked[0]?.source).toBeUndefined();
+	});
+
+	test("trims and caps an unrecognised client name", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+		withClientInfo(mock, { name: `  ${"x".repeat(500)}  `, version: "1.0.0" });
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.({}, { _meta: {} });
+
+		expect(tracked[0]?.source).toBe("x".repeat(100));
+	});
+
+	test("correlates the tracked event to a sessionId tool argument when _meta has none", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("show_widget", { description: "Widget" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const extra = { _meta: {} } as Record<string, unknown>;
+		await handler?.({ sessionId: "flow-session-9" }, extra);
+
+		// Tracked event is correlated to the forwarded session id...
+		expect(
+			(tracked[0]?.meta as Record<string, unknown>)["waniwani/sessionId"],
+		).toBe("flow-session-9");
+		// ...without mutating the live request _meta the handler/flow observed.
+		expect(
+			(extra._meta as Record<string, unknown>)["waniwani/sessionId"],
+		).toBeUndefined();
+	});
+
+	test("does not override an existing _meta session with the sessionId argument", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("show_widget", { description: "Widget" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{ sessionId: "arg-session" },
+			{ _meta: { "openai/sessionId": "v1/transport" } },
+		);
+
+		expect(
+			(tracked[0]?.meta as Record<string, unknown>)["openai/sessionId"],
+		).toBe("v1/transport");
+		expect(
+			(tracked[0]?.meta as Record<string, unknown>)["waniwani/sessionId"],
+		).toBeUndefined();
+	});
+
+	test("flushes after tool call when flushAfterToolCall is set", async () => {
+		const mock = mockClient();
+		const srv = mockServer();
+
+		withWaniwani(srv.server, {
+			client: mock.client,
+			flushAfterToolCall: true,
+		});
+
+		srv.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = srv.registered[0]?.[2];
+		await handler?.({}, {});
+
+		expect(mock.flushed).toBe(1);
+	});
+
+	test("injects widget endpoint metadata even without token cache", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.({}, {})) as Record<string, unknown>;
+		const meta = result._meta as Record<string, unknown>;
+		const waniwani = meta["waniwani/widget"] as Record<string, unknown>;
+
+		expect(waniwani.endpoint).toBe(
+			"https://test.waniwani.ai/api/mcp/events/v2/batch",
+		);
+		expect(waniwani.token).toBe(undefined);
+	});
+
+	test("injects session and geo metadata into the first widget result", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.(
+			{},
+			{
+				_meta: {
+					"waniwani/sessionId": "session-1",
+					"waniwani/geoLocation": {
+						country: "SK",
+						city: "Bratislava",
+					},
+				},
+			},
+		)) as Record<string, unknown>;
+		const meta = result._meta as Record<string, unknown>;
+		const waniwani = meta["waniwani/widget"] as Record<string, unknown>;
+
+		expect(waniwani.sessionId).toBe("session-1");
+		expect(waniwani.geoLocation).toEqual({
+			country: "SK",
+			city: "Bratislava",
+		});
+		expect(meta["waniwani/sessionId"]).toBe("session-1");
+		expect(meta["waniwani/geoLocation"]).toEqual({
+			country: "SK",
+			city: "Bratislava",
+		});
+		expect(meta["waniwani/userLocation"]).toEqual({
+			country: "SK",
+			city: "Bratislava",
+		});
+	});
+
+	test("wraps tools registered before withWaniwani() in place", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		// Register FIRST (the register-then-wrap footgun)
+		let rawCalls = 0;
+		mock.registerTool("pricing", { description: "Get pricing" }, async () => {
+			rawCalls += 1;
+			return { text: "done" };
+		});
+
+		// Then wrap
+		withWaniwani(mock.server, { client });
+
+		// The handler stored on `_registeredTools` is the one the MCP runtime
+		// invokes — that's what should now be wrapped.
+		const handler = mock._registeredTools.pricing?.handler;
+		expect(handler).toBeDefined();
+
+		const extra: Record<string, unknown> = { _meta: { requestId: "req-1" } };
+		const result = (await handler?.({}, extra)) as Record<string, unknown>;
+
+		expect(rawCalls).toBe(1);
+		expect(result).toMatchObject({ text: "done" });
+		expect(tracked).toHaveLength(1);
+		expect(tracked[0]).toMatchObject({
+			event: "tool.called",
+			properties: {
+				name: "pricing",
+				type: "other",
+				status: "ok",
+				input: {},
+				output: { text: "done" },
+			},
+		});
+
+		// Scoped client was injected into extra (same behavior as register-after path)
+		expect(extra["waniwani/client"]).toBeDefined();
+
+		// Widget endpoint metadata injected into the result
+		const meta = result._meta as Record<string, unknown>;
+		const waniwaniConfig = meta["waniwani/widget"] as Record<string, unknown>;
+		expect(waniwaniConfig.endpoint).toBe(
+			"https://test.waniwani.ai/api/mcp/events/v2/batch",
+		);
+	});
+
+	test("does not double-wrap across two withWaniwani() calls", async () => {
+		const mockA = mockClient();
+		const mockB = mockClient();
+		const mock = mockServer();
+
+		mock.registerTool("pricing", { description: "Get pricing" }, async () => ({
+			text: "done",
+		}));
+
+		withWaniwani(mock.server, { client: mockA.client });
+		// Second call is a no-op due to `__waniwaniWrapped`
+		withWaniwani(mock.server, { client: mockB.client });
+
+		const handler = mock._registeredTools.pricing?.handler;
+		await handler?.({}, {});
+
+		// Only the first wrap's client tracked the event; no double emission
+		expect(mockA.tracked).toHaveLength(1);
+		expect(mockB.tracked).toHaveLength(0);
+	});
+
+	test("wraps tools registered both before and after withWaniwani()", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		mock.registerTool("before", { description: "Before" }, async () => ({
+			text: "before-result",
+		}));
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("after", { description: "After" }, async () => ({
+			text: "after-result",
+		}));
+
+		const beforeHandler = mock._registeredTools.before?.handler;
+		const afterHandler = mock._registeredTools.after?.handler;
+
+		await beforeHandler?.({}, {});
+		await afterHandler?.({}, {});
+
+		expect(tracked).toHaveLength(2);
+		const names = tracked.map((t) => (t.properties as { name: string }).name);
+		expect(names).toContain("before");
+		expect(names).toContain("after");
+	});
+
+	test("forwards widget metadata from tool definition into tool result", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		// Register a widget tool the way skybridge does — widget metadata lives
+		// on the tool definition _meta, the handler itself returns nothing widget-y.
+		mock.registerTool(
+			"magic-8-ball",
+			{
+				description: "For fortune-telling",
+				_meta: {
+					"openai/outputTemplate": "ui://widgets/apps-sdk/magic-8-ball.html",
+					"ui/resourceUri": "ui://widgets/ext-apps/magic-8-ball.html",
+					ui: {
+						resourceUri: "ui://widgets/ext-apps/magic-8-ball.html",
+					},
+				},
+			},
+			async () => ({
+				structuredContent: { answer: "It is certain" },
+				content: [],
+				isError: false,
+			}),
+		);
+
+		const handler = mock._registeredTools["magic-8-ball"]?.handler;
+		const result = (await handler?.({}, {})) as Record<string, unknown>;
+
+		const meta = result._meta as Record<string, unknown>;
+		expect(meta["openai/outputTemplate"]).toBe(
+			"ui://widgets/apps-sdk/magic-8-ball.html",
+		);
+		expect(meta["ui/resourceUri"]).toBe(
+			"ui://widgets/ext-apps/magic-8-ball.html",
+		);
+		expect(meta.ui).toEqual({
+			resourceUri: "ui://widgets/ext-apps/magic-8-ball.html",
+		});
+	});
+
+	test("forwards widget metadata for tools registered before withWaniwani()", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		// Register first (skybridge-style, with definition _meta) then wrap.
+		mock.registerTool(
+			"magic-8-ball",
+			{
+				description: "For fortune-telling",
+				_meta: {
+					"ui/resourceUri": "ui://widgets/ext-apps/magic-8-ball.html",
+					ui: {
+						resourceUri: "ui://widgets/ext-apps/magic-8-ball.html",
+					},
+				},
+			},
+			async () => ({
+				structuredContent: { answer: "It is certain" },
+				content: [],
+				isError: false,
+			}),
+		);
+
+		withWaniwani(mock.server, { client });
+
+		const handler = mock._registeredTools["magic-8-ball"]?.handler;
+		const result = (await handler?.({}, {})) as Record<string, unknown>;
+
+		const meta = result._meta as Record<string, unknown>;
+		expect(meta["ui/resourceUri"]).toBe(
+			"ui://widgets/ext-apps/magic-8-ball.html",
+		);
+		expect(meta.ui).toEqual({
+			resourceUri: "ui://widgets/ext-apps/magic-8-ball.html",
+		});
+	});
+
+	test("handler-set widget metadata wins over tool definition", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool(
+			"magic-8-ball",
+			{
+				description: "For fortune-telling",
+				_meta: {
+					"ui/resourceUri": "ui://widgets/ext-apps/from-definition.html",
+					ui: {
+						resourceUri: "ui://widgets/ext-apps/from-definition.html",
+					},
+				},
+			},
+			async () => ({
+				structuredContent: { answer: "Ask again later" },
+				content: [],
+				isError: false,
+				_meta: {
+					"ui/resourceUri": "ui://widgets/ext-apps/from-handler.html",
+					ui: {
+						resourceUri: "ui://widgets/ext-apps/from-handler.html",
+					},
+				},
+			}),
+		);
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.({}, {})) as Record<string, unknown>;
+
+		const meta = result._meta as Record<string, unknown>;
+		expect(meta["ui/resourceUri"]).toBe(
+			"ui://widgets/ext-apps/from-handler.html",
+		);
+		expect(meta.ui).toEqual({
+			resourceUri: "ui://widgets/ext-apps/from-handler.html",
+		});
+	});
+
+	test("bridges extra.sessionId into _meta when host provides no session ID", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.(
+			{},
+			{ sessionId: "transport-sid-123" },
+		)) as Record<string, unknown>;
+
+		// Session ID should appear in tracked event meta
+		expect(tracked[0]?.meta).toMatchObject({
+			"waniwani/sessionId": "transport-sid-123",
+		});
+
+		// Session ID should be injected into result _meta
+		const meta = result._meta as Record<string, unknown>;
+		expect(meta["waniwani/sessionId"]).toBe("transport-sid-123");
+	});
+
+	test("bridges mcp-session-id header into _meta when host provides no session ID", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{},
+			{
+				requestInfo: {
+					headers: { "mcp-session-id": "header-sid-456" },
+				},
+			},
+		);
+
+		expect(tracked[0]?.meta).toMatchObject({
+			"waniwani/sessionId": "header-sid-456",
+		});
+	});
+
+	test("does not override existing _meta session ID with transport session ID", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{},
+			{
+				sessionId: "transport-sid",
+				_meta: { "openai/sessionId": "host-sid" },
+			},
+		);
+
+		// Host-provided session ID takes precedence
+		expect(tracked[0]?.meta).toMatchObject({
+			"openai/sessionId": "host-sid",
+		});
+		expect(
+			(tracked[0]?.meta as Record<string, unknown>)["waniwani/sessionId"],
+		).toBe(undefined);
+	});
+
+	test("does not touch _meta when the tool definition has no widget keys", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client, injectWidgetToken: false });
+
+		mock.registerTool(
+			"plain-tool",
+			{
+				description: "No widget",
+				_meta: { "waniwani/internalFlag": true },
+			},
+			async () => ({
+				content: [{ type: "text", text: "ok" }],
+				isError: false,
+			}),
+		);
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.({}, {})) as Record<string, unknown>;
+
+		const meta = result._meta as Record<string, unknown> | undefined;
+		expect(meta?.["openai/outputTemplate"]).toBe(undefined);
+		expect(meta?.["ui/resourceUri"]).toBe(undefined);
+		expect(meta?.ui).toBe(undefined);
+	});
+
+	test("injects request metadata even when widget token injection is disabled", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, {
+			client,
+			injectWidgetToken: false,
+		});
+
+		mock.registerTool("search", { description: "Search" }, async () => ({
+			text: "ok",
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.(
+			{},
+			{
+				_meta: {
+					"waniwani/sessionId": "session-1",
+					"waniwani/geoLocation": {
+						country: "SK",
+					},
+				},
+			},
+		)) as Record<string, unknown>;
+		const meta = result._meta as Record<string, unknown>;
+
+		expect(meta["waniwani/sessionId"]).toBe("session-1");
+		expect(meta["waniwani/geoLocation"]).toEqual({
+			country: "SK",
+		});
+		expect(meta["waniwani/userLocation"]).toEqual({
+			country: "SK",
+		});
+		expect(meta["waniwani/widget"]).toBe(undefined);
+	});
+
+	test("stripLocationFields removes listed fields from known location meta keys", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, {
+			client,
+			stripLocationFields: ["latitude", "longitude", "city", "region"],
+		});
+
+		mock.registerTool("pricing", {}, async () => ({
+			_meta: {
+				"openai/userLocation": {
+					city: "Madrid",
+					region: "Madrid",
+					country: "ES",
+					latitude: "40.4",
+					longitude: "-3.7",
+				},
+			},
+			content: [],
+		}));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{},
+			{
+				_meta: {
+					"openai/userLocation": {
+						city: "Madrid",
+						region: "Madrid",
+						country: "ES",
+						latitude: "40.4",
+						longitude: "-3.7",
+					},
+					"waniwani/geoLocation": {
+						country: "ES",
+						city: "Madrid",
+						latitude: "40.4",
+						longitude: "-3.7",
+					},
+				},
+			},
+		);
+
+		const event = tracked[0] as {
+			meta?: Record<string, unknown>;
+			properties: { output?: { _meta?: Record<string, unknown> } };
+		};
+		expect(event.meta?.["openai/userLocation"]).toEqual({ country: "ES" });
+		expect(event.meta?.["waniwani/geoLocation"]).toEqual({ country: "ES" });
+		expect(event.properties.output?._meta?.["openai/userLocation"]).toEqual({
+			country: "ES",
+		});
+	});
+
+	test("stripLocationFields defaults to empty — no redaction", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool("pricing", {}, async () => ({ content: [] }));
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{},
+			{
+				_meta: {
+					"openai/userLocation": {
+						city: "Madrid",
+						country: "ES",
+						latitude: "40.4",
+						longitude: "-3.7",
+					},
+				},
+			},
+		);
+
+		const event = tracked[0] as { meta?: Record<string, unknown> };
+		expect(event.meta?.["openai/userLocation"]).toEqual({
+			city: "Madrid",
+			country: "ES",
+			latitude: "40.4",
+			longitude: "-3.7",
+		});
+	});
+
+	test("attaches funnelSync metadata when flow graphs are registered", async () => {
+		const { client, tracked } = mockClientWithApiKey();
+		const mock = mockServer();
+
+		mock.registerTool(
+			"flow-tool",
+			{
+				description: "A flow tool",
+				_meta: {
+					_flowGraph: {
+						flowId: "onboarding",
+						title: "Onboarding Flow",
+						nodes: [
+							{ id: "n1", type: "widget", label: "Welcome" },
+							{ id: "n2", type: "action", label: "Complete" },
+						],
+						edges: [{ from: "n1", to: "n2", type: "direct" }],
+					},
+				},
+			},
+			async () => ({ content: [] }),
+		);
+
+		await withWaniwani(mock.server, { client });
+
+		const handler = mock._registeredTools["flow-tool"]?.handler;
+		await handler?.({}, {});
+
+		expect(tracked).toHaveLength(1);
+		const metadata = tracked[0]?.metadata as Record<string, unknown>;
+		expect(metadata.funnelSync).toBeDefined();
+
+		const funnelSync = metadata.funnelSync as {
+			compositeHash: string;
+			flows: Array<{ flowId: string; configHash: string }>;
+		};
+		expect(funnelSync.compositeHash).toBeTypeOf("string");
+		expect(funnelSync.compositeHash.length).toBeGreaterThan(0);
+		expect(funnelSync.flows).toHaveLength(1);
+		expect(funnelSync.flows[0].flowId).toBe("onboarding");
+		expect(funnelSync.flows[0].configHash).toBeTypeOf("string");
+	});
+
+	test("does not attach funnelSync metadata when no flow graphs are registered", async () => {
+		const { client, tracked } = mockClientWithApiKey();
+		const mock = mockServer();
+
+		mock.registerTool("plain-tool", { description: "No flows" }, async () => ({
+			content: [],
+		}));
+
+		await withWaniwani(mock.server, { client });
+
+		const handler = mock._registeredTools["plain-tool"]?.handler;
+		await handler?.({}, {});
+
+		expect(tracked).toHaveLength(1);
+		const metadata = tracked[0]?.metadata as Record<string, unknown>;
+		expect(metadata.funnelSync).toBeUndefined();
+	});
+
+	test("auto-redacts stateUpdates fields listed in tool definition _meta", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client, applyFieldRedactions: true });
+
+		let handlerSaw: unknown;
+		mock.registerTool(
+			"flow_tool",
+			{
+				// A compiled flow tool always declares an input schema, and declaring
+				// one keeps the MCP SDK's `(args, extra)` handler shape.
+				inputSchema: { action: z.string(), stateUpdates: z.unknown() },
+				_meta: {
+					"waniwani/redactedStateUpdateFields": ["ages", "zipcode"],
+				},
+			},
+			async (input: unknown) => {
+				handlerSaw = input;
+				return { content: [] };
+			},
+		);
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{
+				action: "continue",
+				stateUpdates: { ages: "35,32", zipcode: "28001", modality: "all" },
+			},
+			{},
+		);
+
+		expect(handlerSaw).toEqual({
+			action: "continue",
+			stateUpdates: { ages: "35,32", zipcode: "28001", modality: "all" },
+		});
+
+		const event = tracked[0] as {
+			properties: { input?: Record<string, unknown> };
+		};
+		expect(event.properties.input).toEqual({
+			action: "continue",
+			stateUpdates: {
+				ages: "REDACTED",
+				zipcode: "REDACTED",
+				modality: "all",
+			},
+		});
+	});
+
+	test("applyFieldRedactions defaults to false — markers are ignored", async () => {
+		const { client, tracked } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool(
+			"flow_tool",
+			{
+				_meta: {
+					"waniwani/redactedStateUpdateFields": ["ages"],
+				},
+			},
+			async () => ({ content: [] }),
+		);
+
+		const handler = mock.registered[0]?.[2];
+		await handler?.(
+			{ action: "continue", stateUpdates: { ages: "35,32" } },
+			{},
+		);
+
+		const event = tracked[0] as {
+			properties: { input?: Record<string, unknown> };
+		};
+		expect(event.properties.input).toEqual({
+			action: "continue",
+			stateUpdates: { ages: "35,32" },
+		});
+	});
+
+	test("preserves unknown namespaced _meta keys on the tool result", async () => {
+		const { client } = mockClient();
+		const mock = mockServer();
+
+		withWaniwani(mock.server, { client });
+
+		mock.registerTool(
+			"flow_like",
+			{ description: "Returns _meta" },
+			async () => ({
+				content: [{ type: "text", text: "{}" }],
+				_meta: {
+					"waniwani/suggestions": { suggestions: ["Bronze", "Gold"] },
+				},
+			}),
+		);
+
+		const handler = mock.registered[0]?.[2];
+		const result = (await handler?.({}, { _meta: { requestId: "req-1" } })) as {
+			_meta?: Record<string, unknown>;
+		};
+
+		expect(result._meta?.["waniwani/suggestions"]).toEqual({
+			suggestions: ["Bronze", "Gold"],
+		});
+	});
+});

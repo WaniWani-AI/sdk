@@ -1,0 +1,57 @@
+/**
+ * Post-build: Inline CSS into the embed IIFE bundle.
+ *
+ * src/embed/embed-css.ts contains a placeholder:
+ *   const EMBED_CSS = "__WANIWANI_EMBED_CSS__";
+ *
+ * It lives in one module, imported by every root that needs it (the chat's and
+ * the WebMCP overlay's), so the string below appears exactly once in the
+ * bundle — which matters, because `String.replace` swaps only the first.
+ *
+ * This script reads dist/styles.css, escapes it for JS string embedding,
+ * and replaces the placeholder in dist/embed.js.
+ */
+import { readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const distDir = resolve(import.meta.dirname, "../dist");
+
+const cssPath = resolve(distDir, "styles.css");
+const embedPath = resolve(distDir, "embed.js");
+
+// Read CSS
+const css = readFileSync(cssPath, "utf-8");
+
+// Read embed JS
+let embedJs = readFileSync(embedPath, "utf-8");
+
+// Escape CSS for embedding in a JS string:
+// - Escape backslashes first, then quotes, then newlines
+const escaped = css
+	.replace(/\\/g, "\\\\")
+	.replace(/"/g, '\\"')
+	.replace(/\n/g, "\\n")
+	.replace(/\r/g, "");
+
+// Replace placeholder
+const placeholder = "__WANIWANI_EMBED_CSS__";
+if (!embedJs.includes(placeholder)) {
+	console.error(
+		`ERROR: Placeholder "${placeholder}" not found in ${embedPath}`,
+	);
+	console.error(
+		'Make sure src/embed/embed-css.ts contains: const EMBED_CSS = "__WANIWANI_EMBED_CSS__";',
+	);
+	process.exit(1);
+}
+
+// Use function replacement to avoid `$`-pattern interpretation in the CSS
+embedJs = embedJs.replace(placeholder, () => escaped);
+
+// Write back
+writeFileSync(embedPath, embedJs, "utf-8");
+
+const sizeKB = (Buffer.byteLength(embedJs) / 1024).toFixed(1);
+console.log(
+	`✓ Inlined ${css.length} bytes of CSS into embed.js (total: ${sizeKB} KB)`,
+);

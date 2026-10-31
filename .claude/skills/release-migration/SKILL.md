@@ -10,9 +10,11 @@ allowed-tools: Read, Glob, Grep, Edit, Write, Bash
 
 Inspired by how the AI SDK ships `migrate-*` skills for each major: we keep the equivalent baked into the SDK's own docs so upgrading is a one-pass, auto-applied operation.
 
+The repo publishes two packages, each with its own version: `@waniwani/sdk` (`packages/sdk`) and `@waniwani/chat` (`packages/chat`). Both are `0.x`. The rule below applies to a breaking change in either one. The docs changelog and the `migrate-waniwani-sdk-*` skills cover both, because SDK users reach the chat through the same docs.
+
 ## When to run
 
-- Bumping the version in `package.json`
+- Bumping the version of `packages/sdk` or `packages/chat`
 - Landing any change to the **public API tiers** (see [CLAUDE.md](../../../CLAUDE.md) — OSS / Free tier / Legacy surfaces)
 - Preparing changelog / release notes
 - Deprecating or removing an exported symbol
@@ -35,7 +37,8 @@ If the change is purely internal (no exported symbol, type, or documented behavi
 
 1. **Identify the breaking changes.** Diff the public surface against the last release:
    ```bash
-   git diff <last-tag>..HEAD -- src/ | grep -E '^\-.*export'
+   git diff v<last-sdk-version>..HEAD -- packages/sdk/src packages/protocol/src | grep -E '^\-.*export'
+   git diff chat-v<last-chat-version>..HEAD -- packages/chat/src packages/protocol/src | grep -E '^\-.*export'
    ```
    Cross-check against the tiers in [CLAUDE.md](../../../CLAUDE.md). A renamed/removed/re-typed export, a changed function signature, a moved entry point, or a changed default is breaking. A new optional export is not.
 
@@ -49,7 +52,12 @@ If the change is purely internal (no exported symbol, type, or documented behavi
 
 4. **Write the changelog section and the migration skill** (deliverables 1 and 2). Keep them in sync: the skill is the applyable form of what the changelog describes.
 
-5. **Bump the version** in `package.json` (and commit as `<version>` per the repo's tagging convention — see recent `git log`).
+5. **Bump and publish** from the package folder, never by editing `version` by hand:
+   ```bash
+   cd packages/sdk && bun run release:minor    # or release:patch | major | beta | alpha
+   cd packages/chat && bun run release:minor
+   ```
+   `scripts/bump.ts` bumps `package.json`, refreshes `bun.lock`, commits, tags (`v<version>` for the SDK, `chat-v<version>` for the chat) and pushes. The tag push runs the release workflow for that package only. When a change needs both packages, release `@waniwani/chat` first: the SDK's deprecated `./chat` entry re-exports it.
 
 6. **Verify.** The migration must survive its own checks:
    ```bash

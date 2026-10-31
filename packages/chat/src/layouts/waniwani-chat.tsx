@@ -1,0 +1,534 @@
+"use client";
+
+import type { FrontendTrackingClient } from "@waniwani/protocol/tracking/frontend";
+import {
+	forwardRef,
+	useEffect,
+	useImperativeHandle,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import type {
+	ChatAppearance,
+	ChatClassNames,
+	ChatHandle,
+	ShowToolCalls,
+	VisitorIdInput,
+	WelcomeConfig,
+} from "../@types";
+import type { EmbedConfig } from "../embed/config";
+import { resolveConfig } from "../embed/config";
+import {
+	fetchRemoteConfig,
+	loadCachedConfig,
+	saveCachedConfig,
+} from "../embed/remote-config";
+import { useVisibilityGate } from "../embed/use-pathname";
+import { useSuggestions } from "../embed/use-suggestions";
+import type { WidgetEvent } from "../embed/widget-events";
+import { createWidgetEventEmitter } from "../embed/widget-events";
+import { WidgetEventsProvider } from "../embed/widget-events-context";
+import { useDirectTransport } from "../hooks/use-direct-transport";
+import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
+import type { Locale, MessageOverrides } from "../i18n";
+import {
+	createChatTrackClient,
+	createNoopChatTrackClient,
+} from "../lib/chat-track";
+import { firePageView } from "../lib/page-view";
+import { markConfigSource, setTimingMetadata } from "../lib/timing";
+import { useBootTiming } from "../lib/timing-context";
+import { ChatEmbed } from "./chat-embed";
+
+/**
+ * Safety net so a stalled `/config` doesn't leave the chat surface blank
+ * forever. After this, the chrome fades in with whatever we have
+ * (programmatic overrides + defaults) even if the fetch is still pending.
+ */
+const READINESS_TIMEOUT_MS = 600;
+
+/**
+ * Per-page overrides for `WaniwaniChat`. The Waniwani dashboard is the
+ * source of truth for the agent's display config; reach for these only
+ * when you need a local tweak that doesn't justify cloning an agent.
+ *
+ * `welcome` (with a `ReactNode` icon) is the one field that cannot live
+ * in the dashboard — it has to be passed here when used.
+ */
+export interface WaniwaniChatOverrides {
+	/** Sticky header title. */
+	title?: string;
+	/**
+	 * Force-hide the sticky header. Useful when the host page already provides
+	 * its own chrome and a header would be redundant.
+	 */
+	hideHeader?: boolean;
+	/** Greeting shown before the first user message. */
+	welcomeMessage?: string;
+	/** Rich welcome screen (icon, title, suggestion cards). Takes precedence over `welcomeMessage`. */
+	welcome?: WelcomeConfig;
+	/** Placeholder for the input field. */
+	placeholder?: string;
+	/** Initial suggestion chips. */
+	suggestions?: string[];
+	/** Persist conversations across reloads in IndexedDB. */
+	enableThreadHistory?: boolean;
+	/**
+	 * How tool calls render: `true` (default) shows full request/response
+	 * panels, `"titles-only"` shows a compact indicator with just the tool
+	 * title, `false` hides tool calls entirely.
+	 */
+	showToolCalls?: ShowToolCalls;
+	/** Enable file attachments in the input. */
+	allowAttachments?: boolean;
+	/**
+	 * Theme preset (`light`/`dark`/`auto`) plus per-property overrides.
+	 *
+	 * ```tsx
+	 * appearance={{ theme: "dark", variables: { primaryColor: "#ff6b6b" } }}
+	 * ```
+	 */
+	appearance?: ChatAppearance;
+	/** Per-slot class name overrides. See `ChatClassNames`. */
+	classNames?: ChatClassNames;
+	/** Chat API URL. Defaults to `https://app.waniwani.ai/api/mcp/chat`. */
+	api?: string;
+	/** Override the MCP server URL (rarely needed). */
+	mcpServerUrl?: string;
+	/**
+	 * The app's agent-runtime session route (`/api/mcp/agent/session`). Set,
+	 * turns go straight to the agent runtime for a chat the route admits, and
+	 * through `api` for one it does not.
+	 */
+	sessionApi?: string;
+	/**
+	 * AI transparency notice rendered under the input (EU AI Act compliance).
+	 * String overrides the default wording; `false` hides it.
+	 */
+	disclaimer?: string | false;
+	/** @internal Enterprise only: hides the "powered by Waniwani" logo. */
+	hidePoweredBy?: boolean;
+	/**
+	 * UI language for built-in labels. One of `"en"`, `"fr"`, `"es"`.
+	 * When omitted, the widget detects the locale from `<html lang>` /
+	 * `navigator.language` and falls back to English.
+	 */
+	locale?: Locale;
+	/**
+	 * Per-key overrides on top of the resolved locale catalog. Lets you
+	 * tweak individual built-in strings without contributing a full locale.
+	 */
+	messages?: MessageOverrides;
+	/**
+	 * Opt out of the top-of-funnel `page.viewed` event fired once on mount.
+	 * Defaults to `false` (the event fires). Set `true` on surfaces where a
+	 * page view is meaningless and would pollute the customer's funnel — an
+	 * already-authenticated app shell, an internal tool, a preview, etc.
+	 */
+	disablePageView?: boolean;
+}
+
+/**
+ * Hosted-tier Waniwani chat. The React counterpart to the `<script>` embed.
+ *
+ * Configure the agent (title, welcome message, suggestions, theme, tool
+ * behavior) in the Waniwani dashboard — the component fetches that config
+ * on mount. Pass a `wwp_...` token and the `channelId` of the agent, and
+ * you're done.
+ *
+ * Forward a `ChatHandle` ref to drive the chat imperatively
+ * (`sendMessage`, `sendMessageAndWait`, `reset`, `focus`, `messages`).
+ *
+ * Use `overrides` only for per-page tweaks that don't justify a new agent,
+ * or for the `welcome` field (which can't be serialized to the dashboard
+ * because its `icon` is a `ReactNode`).
+ *
+ * If you are self-hosting the chat backend, use {@link ChatEmbed} instead.
+ *
+ * @example
+ * ```tsx
+ * import { useRef } from "react";
+ * import { WaniwaniChat, type ChatHandle } from "@waniwani/chat";
+ *
+ * function MyPage() {
+ *   const ref = useRef<ChatHandle>(null);
+ *
+ *   return (
+ *     <>
+ *       <WaniwaniChat
+ *         ref={ref}
+ *         token="wwp_..."
+ *         channelId="51c3658a-..."
+ *       />
+ *       <button onClick={() => ref.current?.sendMessage("Show me pricing")}>
+ *         Ask about pricing
+ *       </button>
+ *     </>
+ *   );
+ * }
+ * ```
+ */
+export interface WaniwaniChatProps {
+	/** Public token (`wwp_...`) from the Waniwani dashboard. */
+	token: string;
+	/** Agent channel ID — routes the conversation to the right agent. */
+	channelId?: string;
+	/**
+	 * Override the anonymous visitor id the widget generates with one you
+	 * already track (a PostHog / Amplitude / Segment distinct id, your own
+	 * cookie, etc.). The chat sends it on every request, so Waniwani sessions
+	 * and events correlate to the same visitor, and server-side MCP tools and
+	 * flows read it back as `context.waniwani.visitorId`.
+	 *
+	 * A string, or a resolver that returns one — sync
+	 * (`() => posthog.get_distinct_id()`) or async
+	 * (`async () => (await sdk.ready()).id`), for analytics SDKs whose id is only
+	 * ready after they bootstrap. Read live on each request, so updating it
+	 * applies to the next message. A blank / failed result is ignored, keeping
+	 * the auto-generated, `localStorage`-persisted id. Leave unset to always use
+	 * the auto id.
+	 */
+	visitorId?: VisitorIdInput;
+	/** Additional class names applied to the root element. */
+	className?: string;
+	/**
+	 * Per-page overrides of dashboard-configured display fields. The
+	 * dashboard is the source of truth; use this only when a local tweak
+	 * doesn't justify a new agent, or to pass `welcome` (whose `icon`
+	 * can't be serialized to the dashboard).
+	 */
+	overrides?: WaniwaniChatOverrides;
+	/**
+	 * Callback fired on chat lifecycle events (`chat.ready`, `message.sent`,
+	 * `message.received`, `session.started`, `thread.changed`, `chat.error`,
+	 * `suggestion.clicked`, `suggestions.shown`, `link.clicked`; `chat.opened`/`chat.closed` are
+	 * floating-embed-only and never fire here). Message events never include
+	 * the message text. Use it to mirror widget activity into the host page's
+	 * analytics. Exceptions thrown by the callback are swallowed and never
+	 * break the chat.
+	 */
+	onEvent?: (event: WidgetEvent) => void;
+}
+
+const DEFAULT_API = "https://app.waniwani.ai/api/mcp/chat";
+
+export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
+	function WaniwaniChat(props, ref) {
+		const { token, channelId, className, visitorId, overrides, onEvent } =
+			props;
+
+		// The inner ChatEmbed handle; the ref we expose augments it with the
+		// tracking surface (`track`, `identify`).
+		const innerRef = useRef<ChatHandle>(null);
+		const trackClientRef = useRef<FrontendTrackingClient | null>(null);
+
+		// One emitter per mount. The session id getter reads through the chat
+		// handle so events pick up the session id as soon as it exists.
+		// WaniwaniChat is an in-page mount and reports "inline", matching the
+		// `mode` tag on its chat requests and page.viewed events.
+		const widgetEvents = useMemo(
+			() =>
+				createWidgetEventEmitter({
+					mode: "inline",
+					getSessionId: () => innerRef.current?.sessionId,
+				}),
+			[],
+		);
+		useEffect(() => {
+			if (!onEvent) {
+				return;
+			}
+			return widgetEvents.subscribe(onEvent);
+		}, [onEvent, widgetEvents]);
+
+		const programmatic = useMemo<Partial<EmbedConfig>>(
+			() => ({
+				token,
+				channelId,
+				api: overrides?.api,
+				mcpServerUrl: overrides?.mcpServerUrl,
+				title: overrides?.title,
+				hideHeader: overrides?.hideHeader,
+				welcomeMessage: overrides?.welcomeMessage,
+				placeholder: overrides?.placeholder,
+				suggestions: overrides?.suggestions,
+				enableThreadHistory: overrides?.enableThreadHistory,
+				showToolCalls: overrides?.showToolCalls,
+				appearance: overrides?.appearance,
+				disclaimer: overrides?.disclaimer,
+				hidePoweredBy: overrides?.hidePoweredBy,
+				locale: overrides?.locale,
+			}),
+			[
+				token,
+				channelId,
+				overrides?.api,
+				overrides?.mcpServerUrl,
+				overrides?.title,
+				overrides?.hideHeader,
+				overrides?.welcomeMessage,
+				overrides?.placeholder,
+				overrides?.suggestions,
+				overrides?.enableThreadHistory,
+				overrides?.showToolCalls,
+				overrides?.appearance,
+				overrides?.disclaimer,
+				overrides?.hidePoweredBy,
+				overrides?.locale,
+			],
+		);
+
+		// Remote config is fetched once per (api, token) pair. Display fields
+		// from the dashboard are merged below the programmatic overrides, so
+		// any local override always wins.
+		//
+		// Initial state must match the server (no `window`) — reading
+		// `sessionStorage` here would cause a hydration mismatch on the
+		// cache-hit path. The cache is consulted in the `useEffect` below,
+		// which runs immediately after hydration; a cache hit flips state
+		// before the browser paints, so repeat visits still feel instant.
+		const resolvedApi = overrides?.api ?? DEFAULT_API;
+
+		const [remote, setRemote] = useState<Partial<EmbedConfig>>({});
+		const [ready, setReady] = useState<boolean>(false);
+
+		// `chat.ready` once the remote config has resolved.
+		const readyEmittedRef = useRef(false);
+		useEffect(() => {
+			if (ready && !readyEmittedRef.current) {
+				readyEmittedRef.current = true;
+				widgetEvents.emit({ name: "chat.ready" });
+			}
+		}, [ready, widgetEvents]);
+
+		// Top-of-funnel signal, fired once the channel's `/config` resolves so
+		// the event carries the channel's source. Guarded once per page inside
+		// `firePageView`; skippable via `overrides.disablePageView` on surfaces
+		// where a landing event is noise.
+		const disablePageView = overrides?.disablePageView;
+		useEffect(() => {
+			if (!token) {
+				setReady(true);
+				return;
+			}
+			// Host-supplied `channelId` prop wins over the server-resolved one,
+			// matching the `resolveConfig` merge order; a token-only mount falls
+			// back to the channel `/config` resolves from the bearer token so
+			// ingest can attribute the event.
+			const pageView = (remote: Partial<EmbedConfig>) => {
+				if (disablePageView) {
+					return;
+				}
+				void firePageView({
+					api: resolvedApi,
+					token,
+					channelId: channelId ?? remote.channelId,
+					mode: "inline",
+					source: remote.source,
+				});
+			};
+			const cached = loadCachedConfig(resolvedApi, token, channelId);
+			if (cached) {
+				setRemote(cached);
+				markConfigSource("cache");
+				setTimingMetadata(cached.metadata);
+				setReady(true);
+				pageView(cached);
+			}
+			const controller = new AbortController();
+			const safety = setTimeout(() => {
+				markConfigSource("timeout");
+				setReady(true);
+			}, READINESS_TIMEOUT_MS);
+			void fetchRemoteConfig(resolvedApi, token, controller.signal, channelId)
+				.then((r) => {
+					if (controller.signal.aborted) {
+						return;
+					}
+					if (Object.keys(r).length > 0) {
+						saveCachedConfig(resolvedApi, token, channelId, r);
+						setRemote(r);
+					}
+					markConfigSource("remote");
+					setReady(true);
+					pageView(r);
+				})
+				.catch((err) => {
+					console.error("[Waniwani] Remote config fetch failed:", err);
+					setReady(true);
+				})
+				.finally(() => clearTimeout(safety));
+			return () => {
+				controller.abort();
+				clearTimeout(safety);
+			};
+		}, [resolvedApi, token, channelId, disablePageView]);
+
+		const config = useMemo(
+			() => resolveConfig(programmatic, remote, undefined),
+			[programmatic, remote],
+		);
+
+		// The page and channel rungs for this URL; ids ride along for click
+		// attribution. Memoized inside the hook — the pill row keys an effect
+		// on this object's identity.
+		const suggestions = useSuggestions(config);
+
+		// Record every suggestion click and every rendered pill set server-side,
+		// attributed to the authored prompts involved. Same signal the script
+		// embeds record, so a React host is not a blind spot in the funnel.
+		useSuggestionIngest({
+			widgetEvents,
+			api: config.api ?? resolvedApi,
+			token: config.token ?? token,
+			channelId: config.channelId ?? channelId,
+			source: config.source,
+			mode: "inline",
+			pagePrompts: suggestions.page,
+			getSessionId: () => innerRef.current?.sessionId,
+		});
+
+		// Host-page tracking client: same public token and channel as the chat,
+		// session id attached live once the first exchange assigns one.
+		useEffect(() => {
+			if (!token) {
+				return;
+			}
+			const client = createChatTrackClient({
+				api: resolvedApi,
+				token,
+				// Host-supplied `channelId` prop wins; a token-only mount reads the
+				// server-resolved channel from the cached `/config`, same as
+				// `getSource` below.
+				channelId: () =>
+					channelId ??
+					loadCachedConfig(resolvedApi, token, channelId)?.channelId,
+				getSource: () =>
+					loadCachedConfig(resolvedApi, token, channelId)?.source ?? undefined,
+				getSessionId: () => innerRef.current?.sessionId,
+			});
+			trackClientRef.current = client;
+			return () => {
+				trackClientRef.current = null;
+				void client.shutdown();
+			};
+		}, [resolvedApi, token, channelId]);
+
+		useImperativeHandle(ref, (): ChatHandle => {
+			const trackClient = (): FrontendTrackingClient =>
+				trackClientRef.current ??
+				createNoopChatTrackClient("no public token configured");
+			const track = Object.assign(
+				(event: Parameters<FrontendTrackingClient["track"]>[0]) =>
+					trackClient().track(event),
+				{
+					priceShown: (
+						input: Parameters<FrontendTrackingClient["track"]["priceShown"]>[0],
+					) => trackClient().track.priceShown(input),
+					pricesCompared: (
+						input: Parameters<
+							FrontendTrackingClient["track"]["pricesCompared"]
+						>[0],
+					) => trackClient().track.pricesCompared(input),
+					optionSelected: (
+						input: Parameters<
+							FrontendTrackingClient["track"]["optionSelected"]
+						>[0],
+					) => trackClient().track.optionSelected(input),
+					leadQualified: (
+						input?: Parameters<
+							FrontendTrackingClient["track"]["leadQualified"]
+						>[0],
+					) => trackClient().track.leadQualified(input),
+					converted: (
+						input: Parameters<FrontendTrackingClient["track"]["converted"]>[0],
+					) => trackClient().track.converted(input),
+				},
+			);
+			return {
+				sendMessage: (text) => innerRef.current?.sendMessage(text),
+				sendMessageAndWait: (text) =>
+					innerRef.current
+						? innerRef.current.sendMessageAndWait(text)
+						: Promise.resolve(undefined),
+				reset: () => innerRef.current?.reset(),
+				focus: () => innerRef.current?.focus(),
+				get messages() {
+					return innerRef.current?.messages ?? [];
+				},
+				get sessionId() {
+					return innerRef.current?.sessionId;
+				},
+				track,
+				identify: (userId, traits) => trackClient().identify(userId, traits),
+			};
+		}, []);
+
+		// Per-URL gating. When the channel's `visibility` rules hide this path,
+		// render nothing (no leftover box) — correct for a `<WaniwaniChat>` placed
+		// in a shared layout. Held until `ready` so a hidden page never flashes;
+		// re-evaluates on SPA route changes.
+		const visible = useVisibilityGate(config.visibility, ready);
+
+		useBootTiming({
+			api: config.api ?? resolvedApi,
+			token: config.token ?? token,
+			channelId: config.channelId ?? channelId,
+			mode: "inline",
+			paintMark: "chatVisible",
+			painted: ready && visible,
+		});
+
+		// `mode` tags every chat request with the embed surface so server-logged
+		// chat events carry it in `properties.mode`, matching `page.viewed`.
+		// `WaniwaniChat` is always an in-page mount, so it reports "inline".
+		const body: Record<string, unknown> = { mode: "inline" };
+		if (config.mcpServerUrl) {
+			body.mcpServerUrl = config.mcpServerUrl;
+		}
+		if (config.channelId) {
+			body.channelId = config.channelId;
+		}
+
+		const transport = useDirectTransport(
+			overrides?.sessionApi ?? config.sessionApi,
+		);
+
+		if (!visible) {
+			return null;
+		}
+
+		return (
+			<WidgetEventsProvider value={widgetEvents}>
+				<ChatEmbed
+					ref={innerRef}
+					api={config.api ?? DEFAULT_API}
+					transport={transport}
+					headers={{ Authorization: `Bearer ${config.token}` }}
+					visitorId={visitorId}
+					skipRemoteConfig
+					body={body}
+					appearance={config.appearance}
+					classNames={overrides?.classNames}
+					title={config.title}
+					hideHeader={config.hideHeader}
+					welcomeMessage={config.welcomeMessage}
+					welcome={overrides?.welcome}
+					placeholder={config.placeholder}
+					suggestions={suggestions}
+					enableThreadHistory={config.enableThreadHistory}
+					showToolCalls={config.showToolCalls}
+					disclaimer={config.disclaimer}
+					hidePoweredBy={config.hidePoweredBy}
+					documentUpload={config.documentUpload}
+					allowAttachments={overrides?.allowAttachments}
+					locale={config.locale}
+					messages={overrides?.messages}
+					className={className}
+					initializing={!ready}
+				/>
+			</WidgetEventsProvider>
+		);
+	},
+);

@@ -1,7 +1,13 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.3.13/schema.json",
 	"files": {
-		"includes": ["src/**", "evals/**", "!src/chat/web/tailwind.css"]
+		"includes": [
+			"packages/*/src/**",
+			"packages/*/scripts/**",
+			"packages/sdk/evals/**",
+			"scripts/**",
+			"!packages/chat/src/tailwind.css"
+		]
 	},
 	"linter": {
 		"enabled": true,
