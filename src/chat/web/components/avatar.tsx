@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AvatarIntro, AvatarSlot } from "../@types";
-import { HOOKS } from "../hooks-contract";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 
 export type { AvatarIntro, AvatarSlot };
 
@@ -88,7 +88,7 @@ export function Avatar({
 	return (
 		<img
 			className={cn(
-				HOOKS.avatar,
+				PARTS.avatar,
 				"ww:size-[var(--ww-avatar-size)] ww:shrink-0 ww:rounded-full ww:object-cover",
 				className,
 			)}

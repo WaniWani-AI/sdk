@@ -29,10 +29,10 @@ import {
 	useState,
 } from "react";
 import type { AttachedDocument } from "../../../documents/types";
-import { HOOKS } from "../hooks-contract";
 import { useTranslation } from "../i18n";
 import { rememberDocumentPreview } from "../lib/document-previews";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { Button } from "../ui/button";
 import { DocumentTile } from "./attachments";
 
@@ -766,7 +766,7 @@ export const PromptInputTextarea = ({
 	return (
 		<textarea
 			className={cn(
-				HOOKS.textarea,
+				PARTS.textarea,
 				"ww:field-sizing-content ww:max-h-48 ww:min-h-0 ww:w-full ww:resize-none ww:border-0 ww:bg-transparent ww:px-3 ww:py-2 ww:text-base ww:sm:text-sm ww:outline-none ww:placeholder:text-muted-foreground",
 				className,
 			)}
@@ -840,7 +840,7 @@ export const PromptInputSubmit = ({
 	return (
 		<Button
 			aria-label={isGenerating ? t.promptInput.stop : t.promptInput.submit}
-			className={cn(isStop ? HOOKS.stop : HOOKS.send, className)}
+			className={cn(isStop ? PARTS.stop : PARTS.send, className)}
 			data-submit-blocked={disabled ? "true" : undefined}
 			disabled={isStop ? false : disabled || hasNothingToSend}
 			onClick={handleClick}
@@ -872,7 +872,7 @@ export const PromptInputAddAttachments = ({
 	if (hasFiles) {
 		return (
 			<Button
-				className={cn(HOOKS.attach, "ww:group ww:relative", className)}
+				className={cn(PARTS.attach, "ww:group ww:relative", className)}
 				onClick={() => attachments.clear()}
 				size="icon-sm"
 				type="button"
@@ -901,7 +901,7 @@ export const PromptInputAddAttachments = ({
 	return (
 		<Button
 			aria-label={label}
-			className={cn(HOOKS.attach, className)}
+			className={cn(PARTS.attach, className)}
 			title={label}
 			onClick={() => attachments.openFileDialog()}
 			size="icon-sm"

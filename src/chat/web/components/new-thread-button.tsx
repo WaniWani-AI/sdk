@@ -1,8 +1,8 @@
 "use client";
 
-import { HOOKS } from "../hooks-contract";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 
 function PlusIcon({ label }: { label: string }) {
 	return (
@@ -35,7 +35,7 @@ export function NewThreadButton({ onClick }: { onClick: () => void }) {
 			title={t.threadMenu.newChat}
 			aria-label={t.threadMenu.newChat}
 			className={cn(
-				HOOKS.newChat,
+				PARTS.newChat,
 				"ww:p-1.5 ww:rounded-md ww:text-muted-foreground hover:ww:text-foreground hover:ww:bg-foreground/5 ww:transition-colors ww:cursor-pointer",
 			)}
 		>

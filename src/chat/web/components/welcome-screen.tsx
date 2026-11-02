@@ -2,8 +2,8 @@
 
 import { type CSSProperties, Fragment, useEffect, useState } from "react";
 import type { AvatarIntro, WelcomeConfig } from "../@types";
-import { HOOKS } from "../hooks-contract";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { Avatar } from "./avatar";
 import { RotatingText } from "./rotating-text";
 import { Suggestions } from "./suggestions";
@@ -36,7 +36,7 @@ export function WelcomeScreen({
 	return (
 		<div
 			className={cn(
-				HOOKS.welcome,
+				PARTS.welcome,
 				"ww:flex ww:flex-col ww:items-center ww:justify-center ww:py-12 ww:px-6 ww:text-center ww:min-h-full",
 			)}
 			data-appeared={appeared ? "true" : "false"}
@@ -58,7 +58,7 @@ export function WelcomeScreen({
 			)}
 			<h2
 				className={cn(
-					HOOKS.welcomeTitle,
+					PARTS.welcomeTitle,
 					"ww:text-lg ww:font-semibold ww:text-foreground",
 				)}
 			>
@@ -67,7 +67,7 @@ export function WelcomeScreen({
 			{(Boolean(subtitles?.length) || Boolean(description)) && (
 				<p
 					className={cn(
-						HOOKS.welcomeSubtitle,
+						PARTS.welcomeSubtitle,
 						"ww:mt-1 ww:text-sm ww:text-muted-foreground ww:max-w-sm",
 					)}
 				>
@@ -85,13 +85,13 @@ export function WelcomeScreen({
 						suggestions={suggestions}
 						origin="welcome"
 						align="center"
-						className={cn(HOOKS.welcomeSuggestions, "ww:mt-4")}
+						className={cn(PARTS.welcomeSuggestions, "ww:mt-4")}
 						onSelect={(suggestion) => onSuggestionSelect?.(suggestion)}
 					/>
 				) : (
 					<div
 						className={cn(
-							HOOKS.welcomeSuggestions,
+							PARTS.welcomeSuggestions,
 							"ww:mt-6 ww:w-full ww:max-w-md ww:flex ww:flex-col ww:gap-2",
 						)}
 					>
@@ -103,7 +103,7 @@ export function WelcomeScreen({
 								data-origin="welcome"
 								data-index={index}
 								className={cn(
-									HOOKS.suggestion,
+									PARTS.suggestion,
 									"ww:w-full ww:text-left ww:rounded-xl ww:border ww:border-border ww:bg-background ww:px-4 ww:py-3 ww:text-sm",
 									"ww:text-foreground ww:hover:bg-accent ww:hover:border-primary/30",
 									"ww:transition-all ww:duration-200 ww:ease-out ww:cursor-pointer",

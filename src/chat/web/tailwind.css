@@ -431,7 +431,7 @@
 	margin-bottom: 1rem;
 }
 
-/* The copy and download toolbar above a table. Streamdown gives it no hook,
+/* The copy and download toolbar above a table. Streamdown gives it no stable class,
    so this selector is the stable way to reach it; `showTableToolbar: false`
    removes it. */
 [data-waniwani-chat] [data-streamdown="table-wrapper"] > div:first-child:has(button) {

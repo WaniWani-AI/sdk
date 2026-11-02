@@ -127,7 +127,7 @@ function setInputValue(
 	input.dispatchEvent(new win.Event("input", { bubbles: true }) as never);
 }
 
-describe("floating dock and panel hooks", () => {
+describe("floating dock and panel parts", () => {
 	test("renders the dock, its parts and a hidden panel", async () => {
 		await renderSettled(createElement(FloatingChat, { config: CONFIG }));
 
@@ -242,8 +242,8 @@ describe("floating dock and panel hooks", () => {
 	});
 });
 
-describe("dock field and card hooks", () => {
-	test("the field wrapper carries the hook and reads the radius token", async () => {
+describe("dock field and card parts", () => {
+	test("the field wrapper carries its part class and reads the radius token", async () => {
 		await renderSettled(createElement(FloatingChat, { config: CONFIG }));
 		const field = container.querySelector(
 			".ww-dock .ww-dock-field",
@@ -254,7 +254,7 @@ describe("dock field and card hooks", () => {
 		expect(field.className).not.toContain("ww:border-border");
 	});
 
-	test("the frosted card carries the hook and its expanded state", async () => {
+	test("the frosted card carries its part class and its expanded state", async () => {
 		await renderSettled(
 			createElement(FloatingChat, {
 				config: { ...CONFIG, suggestions: ["Pricing", "Support"] },
@@ -682,8 +682,8 @@ describe("floating bar behaviours", () => {
 	});
 });
 
-describe("composer box hooks", () => {
-	test("renders the composer box and a hidden panel with a close hook", async () => {
+describe("composer box parts", () => {
+	test("renders the composer box and a hidden panel with a close part", async () => {
 		const panelContainer = document.createElement("div");
 		document.body.appendChild(panelContainer);
 		portalTargets.push(panelContainer);

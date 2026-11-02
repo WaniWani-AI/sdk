@@ -1,4 +1,4 @@
-export const HOOKS = {
+export const PARTS = {
 	root: "ww-root",
 	content: "ww-content",
 	header: "ww-header",

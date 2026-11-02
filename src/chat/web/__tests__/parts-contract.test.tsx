@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { UIMessage } from "ai";
 import { Window } from "happy-dom";
-import { HOOKS } from "../hooks-contract";
+import { PARTS } from "../parts";
 
 const win = new Window({ url: "https://shop.example.com" });
 for (const key of [
@@ -60,7 +60,7 @@ const SEEDED_MESSAGES: UIMessage[] = [
 	},
 ];
 
-const CHROME_HOOKS = [
+const CHROME_PARTS = [
 	"ww-root",
 	"ww-content",
 	"ww-header",
@@ -83,8 +83,8 @@ afterEach(() => {
 	container?.remove();
 });
 
-describe("chat chrome hooks", () => {
-	test("renders every hook the chrome owns", async () => {
+describe("chat chrome parts", () => {
+	test("renders every part the chrome owns", async () => {
 		container = document.createElement("div");
 		document.body.appendChild(container);
 		root = createRoot(container);
@@ -102,8 +102,8 @@ describe("chat chrome hooks", () => {
 			);
 		});
 
-		const missing = CHROME_HOOKS.filter(
-			(hook) => container.querySelector(`.${hook}`) === null,
+		const missing = CHROME_PARTS.filter(
+			(part) => container.querySelector(`.${part}`) === null,
 		);
 		expect(missing).toEqual([]);
 		expect(
@@ -157,7 +157,7 @@ describe("chat chrome hooks", () => {
 		expect(container.querySelector(".ww-header-actions")).toBeNull();
 	});
 
-	test("renders the activity, suggestion and welcome hooks", async () => {
+	test("renders the activity, suggestion and welcome parts", async () => {
 		const activityMessages = [
 			{
 				id: "a1",
@@ -412,7 +412,7 @@ describe("chat chrome hooks", () => {
 	});
 });
 
-describe("composer row hook", () => {
+describe("composer row part", () => {
 	test("the row inside the form holds the textarea and the send button", async () => {
 		container = document.createElement("div");
 		document.body.appendChild(container);
@@ -479,10 +479,10 @@ describe("docs", () => {
 	);
 
 	if (existsSync(themingDocs)) {
-		test("docs list every hook", () => {
+		test("docs list every part", () => {
 			const docs = readFileSync(themingDocs, "utf8");
-			const undocumented = Object.values(HOOKS).filter(
-				(hook) => !docs.includes(`\`.${hook}\``),
+			const undocumented = Object.values(PARTS).filter(
+				(part) => !docs.includes(`\`.${part}\``),
 			);
 			expect(undocumented).toEqual([]);
 		});

@@ -24,9 +24,9 @@ import {
 	metaOf,
 	resourceUriFromMeta,
 } from "../../../shared/view-uri";
-import { HOOKS } from "../hooks-contract";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { Button } from "../ui/button";
 import { Shimmer } from "./shimmer";
 
@@ -229,7 +229,7 @@ export function Tool({
 			value={{ open, toggle: () => setOpen((o) => !o) }}
 		>
 			<div
-				className={cn(HOOKS.tool, "ww:mb-4 ww:w-full", className)}
+				className={cn(PARTS.tool, "ww:mb-4 ww:w-full", className)}
 				data-state={open ? "open" : "closed"}
 				style={{ animation: "ww-fade-in 0.2s ease-out" }}
 				{...props}

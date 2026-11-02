@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { HOOKS } from "../hooks-contract";
 import { formatRelativeTime, useTranslation } from "../i18n";
 import { type StoredThread, VISIBLE_THREAD_LIMIT } from "../lib/thread-store";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { NewThreadButton } from "./new-thread-button";
 
 interface ThreadMenuProps {
@@ -115,7 +115,7 @@ export function ThreadMenu({
 				aria-expanded={open}
 				data-state={open ? "open" : "closed"}
 				className={cn(
-					HOOKS.menuButton,
+					PARTS.menuButton,
 					"ww:p-1.5 ww:rounded-md ww:text-muted-foreground hover:ww:text-foreground hover:ww:bg-foreground/5 ww:transition-colors ww:cursor-pointer",
 				)}
 			>
@@ -125,7 +125,7 @@ export function ThreadMenu({
 				<div
 					role="menu"
 					className={cn(
-						HOOKS.menu,
+						PARTS.menu,
 						"ww:absolute ww:right-0 ww:top-full ww:mt-1 ww:w-72 ww:max-h-80 ww:overflow-y-auto ww:rounded-lg ww:border ww:border-border ww:bg-background ww:shadow-lg ww:z-50",
 					)}
 				>
@@ -141,7 +141,7 @@ export function ThreadMenu({
 							<div
 								key={thread.threadId}
 								className={cn(
-									HOOKS.menuItem,
+									PARTS.menuItem,
 									"ww:flex ww:items-center ww:gap-2 ww:px-3 ww:py-2 ww:text-xs hover:ww:bg-foreground/5",
 									isActive && "ww:bg-foreground/5",
 								)}

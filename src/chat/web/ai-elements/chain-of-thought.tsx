@@ -11,8 +11,8 @@ import {
 	useMemo,
 	useState,
 } from "react";
-import { HOOKS } from "../hooks-contract";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "./reasoning";
 import { Shimmer } from "./shimmer";
 
@@ -133,7 +133,7 @@ export function ChainOfThought({
 		<ChainContext.Provider value={contextValue}>
 			<div
 				className={cn(
-					HOOKS.reasoning,
+					PARTS.reasoning,
 					"ww:mb-4 ww:flex ww:flex-col ww:gap-2",
 					className,
 				)}
@@ -216,7 +216,7 @@ export function ChainOfThoughtHeader({
 			onClick={() => setOpen(!open)}
 			aria-expanded={open}
 			className={cn(
-				HOOKS.reasoningToggle,
+				PARTS.reasoningToggle,
 				"ww:flex ww:min-h-5 ww:w-full ww:items-center ww:gap-1.5 ww:text-sm ww:text-muted-foreground ww:transition-colors ww:hover:text-foreground",
 				className,
 			)}
@@ -247,7 +247,7 @@ export function ChainOfThoughtContent({
 	return (
 		<div
 			className={cn(
-				HOOKS.reasoningSteps,
+				PARTS.reasoningSteps,
 				"ww:grid ww:transition-[grid-template-rows,opacity] ww:duration-200 ww:ease-out",
 				open
 					? "ww:grid-rows-[1fr] ww:opacity-100"
@@ -344,7 +344,7 @@ export function ChainOfThoughtStep({
 
 	return (
 		<div
-			className={cn(HOOKS.reasoningStep, "ww:flex ww:gap-2", className)}
+			className={cn(PARTS.reasoningStep, "ww:flex ww:gap-2", className)}
 			data-status={status}
 			{...props}
 		>
@@ -421,7 +421,7 @@ export function ChainOfThoughtReasoning({
 }: ChainOfThoughtReasoningProps) {
 	return (
 		<div
-			className={cn(HOOKS.reasoningStep, "ww:flex ww:gap-2")}
+			className={cn(PARTS.reasoningStep, "ww:flex ww:gap-2")}
 			data-status={isStreaming ? "running" : "done"}
 		>
 			<ChainOfThoughtRail

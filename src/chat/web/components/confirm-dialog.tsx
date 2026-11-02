@@ -8,9 +8,9 @@ import {
 	useId,
 	useRef,
 } from "react";
-import { HOOKS } from "../hooks-contract";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 
 interface ConfirmDialogProps {
 	open: boolean;
@@ -134,7 +134,7 @@ export function ConfirmDialog({
 				}
 			}}
 			className={cn(
-				HOOKS.dialog,
+				PARTS.dialog,
 				"ww:pointer-events-auto ww:fixed ww:inset-0 ww:m-auto ww:h-fit ww:w-[calc(100%-2rem)] ww:max-w-[520px] ww:rounded-2xl ww:border ww:border-border ww:bg-background ww:p-6 ww:text-foreground ww:shadow-xl ww:backdrop:bg-black/40",
 			)}
 		>
@@ -144,7 +144,7 @@ export function ConfirmDialog({
 				aria-label={t.dialog.close}
 				title={t.dialog.close}
 				className={cn(
-					HOOKS.dialogClose,
+					PARTS.dialogClose,
 					"ww:absolute ww:right-3 ww:top-3 ww:rounded-md ww:p-1.5 ww:text-muted-foreground ww:transition-colors ww:cursor-pointer ww:hover:bg-foreground/5 ww:hover:text-foreground",
 				)}
 			>
@@ -153,7 +153,7 @@ export function ConfirmDialog({
 			<h2
 				id={titleId}
 				className={cn(
-					HOOKS.dialogTitle,
+					PARTS.dialogTitle,
 					"ww:pr-8 ww:text-lg ww:font-semibold ww:leading-snug",
 				)}
 			>
@@ -162,7 +162,7 @@ export function ConfirmDialog({
 			<div
 				id={textId}
 				className={cn(
-					HOOKS.dialogText,
+					PARTS.dialogText,
 					"ww:mt-2 ww:text-sm ww:text-muted-foreground",
 				)}
 			>
@@ -175,7 +175,7 @@ export function ConfirmDialog({
 			</div>
 			<div
 				className={cn(
-					HOOKS.dialogActions,
+					PARTS.dialogActions,
 					"ww:mt-6 ww:flex ww:flex-wrap ww:justify-end ww:gap-2",
 				)}
 			>
@@ -183,7 +183,7 @@ export function ConfirmDialog({
 					type="button"
 					onClick={onSecondary}
 					className={cn(
-						HOOKS.dialogSecondary,
+						PARTS.dialogSecondary,
 						"ww:rounded-lg ww:border ww:border-border ww:px-4 ww:py-2 ww:text-sm ww:font-medium ww:transition-colors ww:cursor-pointer ww:hover:bg-foreground/5",
 					)}
 				>
@@ -195,7 +195,7 @@ export function ConfirmDialog({
 					onClick={onPrimary}
 					disabled={busy}
 					className={cn(
-						HOOKS.dialogPrimary,
+						PARTS.dialogPrimary,
 						"ww:rounded-lg ww:bg-primary ww:px-4 ww:py-2 ww:text-sm ww:font-medium ww:text-primary-foreground ww:transition-colors ww:cursor-pointer ww:hover:bg-primary/90 ww:disabled:opacity-60",
 					)}
 				>

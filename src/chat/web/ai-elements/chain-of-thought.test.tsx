@@ -46,7 +46,7 @@ function renderChain(isWorking: boolean) {
 	return container.querySelector(".ww-reasoning");
 }
 
-describe("ChainOfThought hooks", () => {
+describe("ChainOfThought parts", () => {
 	test("exposes data-streaming while the chain is working", () => {
 		const chain = renderChain(true);
 		expect(chain?.getAttribute("data-streaming")).toBe("true");

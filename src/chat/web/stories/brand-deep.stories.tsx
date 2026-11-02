@@ -2,11 +2,11 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { waitFor } from "storybook/test";
 import type { EmbedConfig } from "../embed/config";
 import { FloatingChat } from "../embed/floating-chat";
-import { HOOKS } from "../hooks-contract";
+import { PARTS } from "../parts";
 
 // A fictional brand built from the script embed's surface alone: every knob in
 // `brandConfig`, a `data-css` equivalent in `BRAND_CSS`, a fetch shim for the
-// backend. Each `play` throws on the first hook missing from its state.
+// backend. Each `play` throws on the first part missing from its state.
 
 const MOCK_ORIGIN = "https://fernhill.mock";
 const MOCK_API = `${MOCK_ORIGIN}/api/mcp/chat`;
@@ -520,83 +520,83 @@ function HostPage() {
 }
 
 // ----------------------------------------------------------------------------
-// Hook assertions
+// Part assertions
 // ----------------------------------------------------------------------------
 
-type Hook = (typeof HOOKS)[keyof typeof HOOKS];
+type Part = (typeof PARTS)[keyof typeof PARTS];
 
-const DOCK_HOOKS: Hook[] = [
-	HOOKS.dock,
-	HOOKS.dockCard,
-	HOOKS.dockSuggestions,
-	HOOKS.dockField,
-	HOOKS.dockInput,
-	HOOKS.dockSend,
-	HOOKS.dockClose,
-	HOOKS.avatar,
-	HOOKS.suggestion,
+const DOCK_PARTS: Part[] = [
+	PARTS.dock,
+	PARTS.dockCard,
+	PARTS.dockSuggestions,
+	PARTS.dockField,
+	PARTS.dockInput,
+	PARTS.dockSend,
+	PARTS.dockClose,
+	PARTS.avatar,
+	PARTS.suggestion,
 ];
 
-const PANEL_HOOKS: Hook[] = [
-	HOOKS.panel,
-	HOOKS.root,
-	HOOKS.content,
-	HOOKS.header,
-	HOOKS.headerTitle,
-	HOOKS.headerActions,
-	HOOKS.menuButton,
-	HOOKS.close,
-	HOOKS.thread,
-	HOOKS.input,
-	HOOKS.inputRow,
-	HOOKS.textarea,
-	HOOKS.send,
-	HOOKS.attach,
-	HOOKS.footer,
-	HOOKS.disclaimer,
-	HOOKS.poweredBy,
+const PANEL_PARTS: Part[] = [
+	PARTS.panel,
+	PARTS.root,
+	PARTS.content,
+	PARTS.header,
+	PARTS.headerTitle,
+	PARTS.headerActions,
+	PARTS.menuButton,
+	PARTS.close,
+	PARTS.thread,
+	PARTS.input,
+	PARTS.inputRow,
+	PARTS.textarea,
+	PARTS.send,
+	PARTS.attach,
+	PARTS.footer,
+	PARTS.disclaimer,
+	PARTS.poweredBy,
 ];
 
-const WELCOME_HOOKS: Hook[] = [
-	HOOKS.welcome,
-	HOOKS.welcomeTitle,
-	HOOKS.welcomeSubtitle,
-	HOOKS.welcomeSuggestions,
+const WELCOME_PARTS: Part[] = [
+	PARTS.welcome,
+	PARTS.welcomeTitle,
+	PARTS.welcomeSubtitle,
+	PARTS.welcomeSuggestions,
 ];
 
-const SUBMITTED_HOOKS: Hook[] = [HOOKS.loader, HOOKS.stop];
+const SUBMITTED_PARTS: Part[] = [PARTS.loader, PARTS.stop];
 
-const ANSWER_HOOKS: Hook[] = [
-	HOOKS.message,
-	HOOKS.bubble,
-	HOOKS.reasoning,
-	HOOKS.reasoningToggle,
-	HOOKS.reasoningSteps,
-	HOOKS.reasoningStep,
-	HOOKS.suggestions,
+const ANSWER_PARTS: Part[] = [
+	PARTS.message,
+	PARTS.bubble,
+	PARTS.reasoning,
+	PARTS.reasoningToggle,
+	PARTS.reasoningSteps,
+	PARTS.reasoningStep,
+	PARTS.suggestions,
 ];
 
-const MENU_HOOKS: Hook[] = [HOOKS.menu, HOOKS.menuItem];
+const MENU_PARTS: Part[] = [PARTS.menu, PARTS.menuItem];
 
-const DIALOG_HOOKS: Hook[] = [
-	HOOKS.dialog,
-	HOOKS.dialogTitle,
-	HOOKS.dialogText,
-	HOOKS.dialogActions,
-	HOOKS.dialogPrimary,
-	HOOKS.dialogSecondary,
-	HOOKS.dialogClose,
+const DIALOG_PARTS: Part[] = [
+	PARTS.dialog,
+	PARTS.dialogTitle,
+	PARTS.dialogText,
+	PARTS.dialogActions,
+	PARTS.dialogPrimary,
+	PARTS.dialogSecondary,
+	PARTS.dialogClose,
 ];
 
 const TIMEOUT = { timeout: 12_000 };
 
-async function expectHooks(root: HTMLElement, hooks: Hook[]): Promise<void> {
+async function expectParts(root: HTMLElement, parts: Part[]): Promise<void> {
 	await waitFor(() => {
-		const missing = hooks.filter(
-			(hook) => root.querySelector(`.${hook}`) === null,
+		const missing = parts.filter(
+			(part) => root.querySelector(`.${part}`) === null,
 		);
 		if (missing.length > 0) {
-			throw new Error(`Missing hooks: ${missing.join(", ")}`);
+			throw new Error(`Missing parts: ${missing.join(", ")}`);
 		}
 	}, TIMEOUT);
 }
@@ -615,7 +615,7 @@ async function find<T extends HTMLElement>(
 }
 
 async function panelState(root: HTMLElement, state: string): Promise<void> {
-	await find(root, `.${HOOKS.panel}[data-state="${state}"]`);
+	await find(root, `.${PARTS.panel}[data-state="${state}"]`);
 }
 
 function stubClipboard(): void {
@@ -626,64 +626,64 @@ function stubClipboard(): void {
 }
 
 async function walkDesktop(root: HTMLElement): Promise<void> {
-	await expectHooks(root, [...DOCK_HOOKS, ...PANEL_HOOKS, ...WELCOME_HOOKS]);
+	await expectParts(root, [...DOCK_PARTS, ...PANEL_PARTS, ...WELCOME_PARTS]);
 
 	(
 		await find<HTMLButtonElement>(
 			root,
-			`.${HOOKS.dockSuggestions} .${HOOKS.suggestion}`,
+			`.${PARTS.dockSuggestions} .${PARTS.suggestion}`,
 		)
 	).click();
 	await panelState(root, "shown");
-	await expectHooks(root, SUBMITTED_HOOKS);
+	await expectParts(root, SUBMITTED_PARTS);
 
-	await find(root, `.${HOOKS.suggestions}[data-origin="followup"]`);
+	await find(root, `.${PARTS.suggestions}[data-origin="followup"]`);
 	(
 		await find<HTMLButtonElement>(
 			root,
-			`.${HOOKS.reasoning} .${HOOKS.reasoningToggle}`,
+			`.${PARTS.reasoning} .${PARTS.reasoningToggle}`,
 		)
 	).click();
-	await expectHooks(root, ANSWER_HOOKS);
+	await expectParts(root, ANSWER_PARTS);
 
-	const thread = await find(root, `.${HOOKS.panel} .${HOOKS.thread}`);
+	const thread = await find(root, `.${PARTS.panel} .${PARTS.thread}`);
 	thread.scrollTop = 0;
 	thread.dispatchEvent(new Event("scroll"));
-	await expectHooks(root, [HOOKS.scrollLatest]);
+	await expectParts(root, [PARTS.scrollLatest]);
 
 	(
 		await find<HTMLButtonElement>(
 			root,
-			`.${HOOKS.suggestions}[data-origin="followup"] .${HOOKS.suggestion}`,
+			`.${PARTS.suggestions}[data-origin="followup"] .${PARTS.suggestion}`,
 		)
 	).click();
-	await expectHooks(root, [HOOKS.tool]);
+	await expectParts(root, [PARTS.tool]);
 	await waitFor(() => {
-		if (root.querySelector(`.${HOOKS.input}[data-streaming]`)) {
+		if (root.querySelector(`.${PARTS.input}[data-streaming]`)) {
 			throw new Error("Still streaming");
 		}
 	}, TIMEOUT);
 
 	stubClipboard();
-	(await find<HTMLButtonElement>(root, `.${HOOKS.menuButton}`)).click();
-	await expectHooks(root, MENU_HOOKS);
+	(await find<HTMLButtonElement>(root, `.${PARTS.menuButton}`)).click();
+	await expectParts(root, MENU_PARTS);
 	(
 		await find<HTMLButtonElement>(
 			root,
-			`.${HOOKS.menuItem}[data-action="copy-conversation"]`,
+			`.${PARTS.menuItem}[data-action="copy-conversation"]`,
 		)
 	).click();
-	await expectHooks(root, [HOOKS.toast]);
+	await expectParts(root, [PARTS.toast]);
 
-	(await find<HTMLButtonElement>(root, `.${HOOKS.menuButton}`)).click();
+	(await find<HTMLButtonElement>(root, `.${PARTS.menuButton}`)).click();
 	(
 		await find<HTMLButtonElement>(
 			root,
-			`.${HOOKS.menuItem}[data-action="restart"]`,
+			`.${PARTS.menuItem}[data-action="restart"]`,
 		)
 	).click();
-	await expectHooks(root, DIALOG_HOOKS);
-	(await find<HTMLButtonElement>(root, `.${HOOKS.dialogClose}`)).click();
+	await expectParts(root, DIALOG_PARTS);
+	(await find<HTMLButtonElement>(root, `.${PARTS.dialogClose}`)).click();
 }
 
 // ----------------------------------------------------------------------------
@@ -745,16 +745,16 @@ export const MobileViewport: Story = {
 	play: async ({ canvasElement }) => {
 		const input = await find<HTMLInputElement>(
 			canvasElement,
-			`.${HOOKS.dockInput}`,
+			`.${PARTS.dockInput}`,
 		);
 		if (!input.readOnly) {
 			throw new Error("The bar's input should be read-only on a phone");
 		}
-		await expectHooks(canvasElement, [...DOCK_HOOKS, ...PANEL_HOOKS]);
+		await expectParts(canvasElement, [...DOCK_PARTS, ...PANEL_PARTS]);
 
 		input.click();
 		await panelState(canvasElement, "shown");
-		await expectHooks(canvasElement, WELCOME_HOOKS);
+		await expectParts(canvasElement, WELCOME_PARTS);
 
 		window.history.back();
 		await panelState(canvasElement, "hidden");
@@ -778,7 +778,7 @@ export const ReducedMotion: Story = {
 		if (!view?.matchMedia("(prefers-reduced-motion: reduce)").matches) {
 			return;
 		}
-		const panel = await find(canvasElement, `.${HOOKS.panel}`);
+		const panel = await find(canvasElement, `.${PARTS.panel}`);
 		const openDuration = view
 			.getComputedStyle(panel)
 			.getPropertyValue("--ww-panel-open-duration")

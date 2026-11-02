@@ -13,9 +13,9 @@ import {
 	useState,
 } from "react";
 import { Streamdown } from "streamdown";
-import { HOOKS } from "../hooks-contract";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { Shimmer } from "./shimmer";
 
 interface ReasoningContextValue {
@@ -140,7 +140,7 @@ export const Reasoning = memo(
 			<ReasoningContext.Provider value={contextValue}>
 				<div
 					className={cn(
-						HOOKS.reasoning,
+						PARTS.reasoning,
 						"ww:mb-4 ww:flex ww:flex-col ww:gap-2",
 						className,
 					)}
@@ -199,7 +199,7 @@ export const ReasoningTrigger = memo(
 					onClick?.(e);
 				}}
 				className={cn(
-					HOOKS.reasoningToggle,
+					PARTS.reasoningToggle,
 					"ww:flex ww:w-full ww:items-center ww:gap-2 ww:text-sm ww:text-muted-foreground ww:transition-colors ww:hover:text-foreground",
 					className,
 				)}

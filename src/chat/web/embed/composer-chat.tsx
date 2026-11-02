@@ -43,12 +43,12 @@ import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useNarrowViewport } from "../hooks/use-narrow-viewport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
-import { HOOKS } from "../hooks-contract";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
 import { useBootTiming } from "../lib/timing-context";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { themeToCSSProperties } from "../theme";
 import type { ComposerSize, EmbedConfig } from "./config";
 import { useEmbedWelcomeProps } from "./embed-welcome";
@@ -110,7 +110,7 @@ const SIZE_STYLES: Record<ComposerSize, SizeStyle> = {
 };
 
 // ----------------------------------------------------------------------------
-// Restyling hooks
+// Restyling parts
 //
 // A variant is a starting point, not the ceiling. Every visual property of the
 // box reads from a `--ww-composer-*` custom property whose fallback is the
@@ -485,7 +485,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 				onClick={() => setOpen(false)}
 				aria-label={t.launcher.close}
 				className={cn(
-					HOOKS.close,
+					PARTS.close,
 					"ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer",
 				)}
 			>
@@ -634,7 +634,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 				// browsers without `inert` support simply keep today's behavior.
 				inert={open}
 				className={cn(
-					HOOKS.composer,
+					PARTS.composer,
 					"ww:w-full ww:font-[family-name:var(--ww-font-sans)]",
 					preset === "dark" && "dark",
 				)}
@@ -691,7 +691,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 					data-state={panelState}
 					style={{ boxShadow: cardShadow }}
 					className={cn(
-						HOOKS.panel,
+						PARTS.panel,
 						"ww:fixed ww:z-[var(--ww-z-index)] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
 						// Mobile: full-screen sheet.
 						"ww:inset-0 ww:w-full ww:rounded-none",

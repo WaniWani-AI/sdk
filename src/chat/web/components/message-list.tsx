@@ -48,9 +48,9 @@ import {
 	shouldShowWorkingIndicator,
 	WorkingIndicator,
 } from "../ai-elements/working-indicator";
-import { HOOKS } from "../hooks-contract";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { Avatar } from "./avatar";
 import type { McpAppDisplayMode } from "./mcp-app-frame";
 import { McpAppFrame } from "./mcp-app-frame";
@@ -469,7 +469,7 @@ export function MessageList({
 							return (
 								<div
 									key={part.toolCallId}
-									className={HOOKS.widget}
+									className={PARTS.widget}
 									data-display-mode={isFullscreen ? "fullscreen" : "inline"}
 									style={
 										isFullscreen

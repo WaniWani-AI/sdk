@@ -3,9 +3,9 @@
 import type { ChatStatus, UIMessage } from "ai";
 import { ZapIcon } from "lucide-react";
 import type { HTMLAttributes } from "react";
-import { HOOKS } from "../hooks-contract";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { Shimmer } from "./shimmer";
 
 /**
@@ -81,7 +81,7 @@ export function WorkingIndicator({
 		<div
 			aria-live="polite"
 			className={cn(
-				HOOKS.loader,
+				PARTS.loader,
 				"ww:mb-4 ww:flex ww:w-full ww:items-center ww:gap-2 ww:text-sm ww:text-muted-foreground",
 				className,
 			)}

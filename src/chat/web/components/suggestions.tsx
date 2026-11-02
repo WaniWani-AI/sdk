@@ -1,9 +1,9 @@
 "use client";
 
 import type { CSSProperties, HTMLAttributes } from "react";
-import { HOOKS } from "../hooks-contract";
 import type { SuggestionOrigin } from "../lib/resolve-suggestions";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 
 export interface SuggestionsProps
 	extends Omit<HTMLAttributes<HTMLDivElement>, "onSelect"> {
@@ -32,7 +32,7 @@ export function Suggestions({
 
 	return (
 		<div
-			className={cn(HOOKS.suggestions, "ww:px-4 ww:py-2", className)}
+			className={cn(PARTS.suggestions, "ww:px-4 ww:py-2", className)}
 			data-layout={layout}
 			data-origin={origin}
 			{...props}
@@ -59,7 +59,7 @@ export function Suggestions({
 								data-origin={origin}
 								data-index={index}
 								className={cn(
-									HOOKS.suggestion,
+									PARTS.suggestion,
 									// `bg-accent`, not `bg-background`: inside the open panel the
 									// pills sit on the background color itself, where a
 									// background-filled pill with a hairline border is

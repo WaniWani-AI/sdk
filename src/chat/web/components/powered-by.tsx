@@ -1,8 +1,8 @@
 "use client";
 
-import { HOOKS } from "../hooks-contract";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 
 const LOGO_URL = "https://app.waniwani.ai/assets/waniwani-logo.svg";
 const HREF = "https://waniwani.ai";
@@ -20,7 +20,7 @@ export function PoweredBy() {
 			target="_blank"
 			rel="noopener noreferrer"
 			className={cn(
-				HOOKS.poweredBy,
+				PARTS.poweredBy,
 				"ww:flex ww:items-center ww:gap-1.5 ww:whitespace-nowrap ww:text-[length:var(--ww-disclaimer-size)] ww:text-[color:var(--ww-disclaimer-fg)] ww:opacity-70 hover:ww:opacity-100 ww:transition-opacity",
 			)}
 		>

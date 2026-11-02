@@ -1,8 +1,8 @@
 "use client";
 
-import { HOOKS } from "../hooks-contract";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 
 /**
  * Short notice rendered under the chat input warning users that responses
@@ -24,7 +24,7 @@ export function AiDisclaimer({
 	return (
 		<span
 			className={cn(
-				HOOKS.disclaimer,
+				PARTS.disclaimer,
 				"ww:whitespace-nowrap ww:text-[length:var(--ww-disclaimer-size)] ww:text-[color:var(--ww-disclaimer-fg)] ww:opacity-70",
 			)}
 		>

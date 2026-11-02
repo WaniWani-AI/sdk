@@ -36,7 +36,6 @@ import { useDocumentUpload } from "../hooks/use-document-upload";
 import { useMultiline } from "../hooks/use-multiline";
 import { useSuggestionRow } from "../hooks/use-suggestion-row";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
-import { HOOKS } from "../hooks-contract";
 import { I18nProvider, type Messages, useTranslation } from "../i18n";
 import { copyText, formatTranscript } from "../lib/conversation-transcript";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
@@ -48,6 +47,7 @@ import {
 } from "../lib/timing";
 import { WidgetTimingProvider } from "../lib/timing-context";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { themeToCSSProperties } from "../theme";
 import { Button } from "../ui/button";
 
@@ -620,7 +620,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				{...(masked ? { "data-waniwani-initializing": "" } : {})}
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className={cn(
-					HOOKS.root,
+					PARTS.root,
 					"ww:relative ww:w-full ww:h-full ww:flex ww:flex-col ww:bg-background ww:text-foreground ww:font-[family-name:var(--ww-font)] ww:overflow-hidden",
 					preset === "dark" && "dark",
 					className,
@@ -630,7 +630,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				{showHeader && (
 					<div
 						className={cn(
-							HOOKS.header,
+							PARTS.header,
 							"ww:shrink-0 ww:h-[var(--ww-header-height)] ww:flex ww:items-center ww:gap-2 ww:pl-4 ww:pr-3 ww:py-3 ww:border-b ww:border-border",
 							classNames?.header,
 						)}
@@ -650,7 +650,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 						{title && (
 							<div
 								className={cn(
-									HOOKS.headerTitle,
+									PARTS.headerTitle,
 									"ww:text-sm ww:font-semibold ww:truncate ww:flex-1 ww:min-w-0",
 								)}
 							>
@@ -696,7 +696,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 						{/* Rendered last so embed-host actions (e.g. the floating
 						    close button) sit at the far right of the header. */}
 						{headerActions && (
-							<div className={cn(HOOKS.headerActions, "ww:contents")}>
+							<div className={cn(PARTS.headerActions, "ww:contents")}>
 								{headerActions}
 							</div>
 						)}
@@ -706,7 +706,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				<div
 					ref={scrollRef}
 					className={cn(
-						HOOKS.thread,
+						PARTS.thread,
 						"ww:relative ww:flex-1 ww:min-h-0",
 						fullscreenToolCallId ? "ww:overflow-hidden" : "ww:overflow-y-auto",
 					)}
@@ -714,7 +714,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 					<div
 						ref={scrollContentRef}
 						className={cn(
-							HOOKS.content,
+							PARTS.content,
 							"ww:mx-auto ww:w-full ww:max-w-[var(--ww-content-max-width)] ww:px-4 ww:py-6 ww:flex ww:flex-col ww:gap-6",
 							fullscreenToolCallId && "ww:!py-0",
 						)}
@@ -771,7 +771,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 								size="icon"
 								variant="outline"
 								className={cn(
-									HOOKS.scrollLatest,
+									PARTS.scrollLatest,
 									"ww:rounded-full ww:shadow ww:pointer-events-auto",
 								)}
 								aria-label={t.thread.scrollToLatest}
@@ -795,7 +795,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 						<div className="ww:px-4 ww:pb-2 ww:pt-2">
 							<div
 								className={cn(
-									HOOKS.content,
+									PARTS.content,
 									"ww:mx-auto ww:w-full ww:max-w-[var(--ww-content-max-width)]",
 								)}
 							>
@@ -814,7 +814,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 									upload={uploads.upload}
 									onDiscard={uploads.onDiscard}
 									onError={uploads.reportError}
-									className={cn(HOOKS.input, "ww:bg-input", classNames?.input)}
+									className={cn(PARTS.input, "ww:bg-input", classNames?.input)}
 								>
 									<PromptInputDropOverlay enabled={uploads.enabled} />
 									{uploads.enabled && (
@@ -823,7 +823,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 									<div
 										ref={fieldRowRef}
 										className={cn(
-											HOOKS.inputRow,
+											PARTS.inputRow,
 											"ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-2.5",
 										)}
 									>
@@ -854,7 +854,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 								{uploads.error && (
 									<output
 										className={cn(
-											HOOKS.error,
+											PARTS.error,
 											"ww:block ww:pt-1.5 ww:text-center ww:text-destructive ww:text-xs",
 										)}
 									>
@@ -863,7 +863,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 								)}
 								<div
 									className={cn(
-										HOOKS.footer,
+										PARTS.footer,
 										"ww:pt-2 ww:pb-1 ww:flex ww:flex-nowrap ww:justify-center ww:items-center ww:gap-1.5",
 									)}
 								>

@@ -3,10 +3,10 @@
 import { EllipsisIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { MenuAction } from "../embed/config";
-import { HOOKS } from "../hooks-contract";
 import { formatRelativeTime, useTranslation } from "../i18n";
 import { type StoredThread, VISIBLE_THREAD_LIMIT } from "../lib/thread-store";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { ConfirmDialog } from "./confirm-dialog";
 import { readToastTiming, Toast } from "./toast";
 
@@ -213,7 +213,7 @@ export function ChatMenu({
 					aria-expanded={open}
 					data-state={open ? "open" : "closed"}
 					className={cn(
-						HOOKS.menuButton,
+						PARTS.menuButton,
 						"ww:p-1.5 ww:rounded-md ww:text-muted-foreground ww:transition-colors ww:cursor-pointer ww:hover:bg-foreground/5 ww:hover:text-foreground",
 					)}
 				>
@@ -224,7 +224,7 @@ export function ChatMenu({
 						role="menu"
 						aria-label={t.menu.label}
 						className={cn(
-							HOOKS.menu,
+							PARTS.menu,
 							"ww:absolute ww:right-0 ww:top-full ww:z-50 ww:mt-1 ww:min-w-[200px] ww:max-w-72 ww:max-h-80 ww:overflow-y-auto ww:rounded-lg ww:border ww:border-border ww:bg-background ww:p-1 ww:text-foreground ww:shadow-lg",
 						)}
 					>
@@ -240,7 +240,7 @@ export function ChatMenu({
 									}
 									disabled={action === "delete" && !activeThreadId}
 									onClick={() => runAction(action)}
-									className={cn(HOOKS.menuItem, ITEM_CLASS)}
+									className={cn(PARTS.menuItem, ITEM_CLASS)}
 								>
 									{labelFor(action)}
 								</button>
@@ -267,7 +267,7 @@ export function ChatMenu({
 											onSelectThread?.(thread.threadId);
 										}}
 										className={cn(
-											HOOKS.menuItem,
+											PARTS.menuItem,
 											ITEM_CLASS,
 											"ww:flex-col ww:items-start ww:gap-0",
 										)}

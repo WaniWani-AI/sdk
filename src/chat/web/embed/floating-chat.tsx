@@ -35,12 +35,12 @@ import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useNarrowViewport } from "../hooks/use-narrow-viewport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
-import { HOOKS } from "../hooks-contract";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
 import { useBootTiming } from "../lib/timing-context";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { themeToCSSProperties } from "../theme";
 import type { DockChipsTrigger, EmbedConfig } from "./config";
 import { useEmbedWelcomeProps } from "./embed-welcome";
@@ -585,7 +585,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 						}
 					}}
 					className={cn(
-						HOOKS.dockInput,
+						PARTS.dockInput,
 						"ww:min-w-0 ww:flex-1 ww:bg-transparent ww:py-1 ww:text-base ww:sm:text-sm ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground",
 					)}
 				/>
@@ -595,7 +595,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 					disabled={!composerText.trim()}
 					aria-label={t.promptInput.submit}
 					className={cn(
-						HOOKS.dockSend,
+						PARTS.dockSend,
 						"ww:relative ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:bg-foreground ww:text-background ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40",
 					)}
 				>
@@ -610,7 +610,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 				onClick={collapse}
 				aria-label={t.launcher.close}
 				className={cn(
-					HOOKS.close,
+					PARTS.close,
 					"ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer",
 				)}
 			>
@@ -646,7 +646,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 								onPointerEnter={() => setDockHovered(true)}
 								onPointerLeave={() => setDockHovered(false)}
 								className={cn(
-									HOOKS.dock,
+									PARTS.dock,
 									"ww:fixed ww:bottom-3 ww:sm:bottom-4 ww:left-0 ww:right-0 ww:mx-auto ww:z-[var(--ww-z-index)] ww:flex ww:flex-col",
 									"ww:w-[calc(100vw-2rem)] ww:transition-[max-width] ww:duration-300 ww:ease-out",
 									showCard
@@ -663,7 +663,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 								<div
 									data-expanded={showCard ? "true" : "false"}
 									className={cn(
-										HOOKS.dockCard,
+										PARTS.dockCard,
 										"ww:relative ww:flex ww:flex-col ww:rounded-[var(--ww-dock-radius)] ww:border ww:transition-all ww:duration-300 ww:ease-out",
 										showCard
 											? "ww:p-2 ww:backdrop-blur-xl ww:backdrop-saturate-150"
@@ -690,7 +690,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 											onClick={collapse}
 											aria-label={t.launcher.close}
 											className={cn(
-												HOOKS.dockClose,
+												PARTS.dockClose,
 												"ww:absolute ww:right-2 ww:top-2 ww:z-10 ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer",
 											)}
 										>
@@ -706,7 +706,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 										// the bottom of the screen, so the growth pushes upward.
 										<div
 											className={cn(
-												HOOKS.dockSuggestions,
+												PARTS.dockSuggestions,
 												"ww:grid ww:transition-all ww:duration-300 ww:ease-out",
 												suggestionsVisible
 													? "ww:grid-rows-[1fr] ww:opacity-100"
@@ -743,7 +743,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 									{config.dockGlow === false ? (
 										<div
 											className={cn(
-												HOOKS.dockField,
+												PARTS.dockField,
 												"ww:relative ww:grid ww:isolate",
 											)}
 											style={{
@@ -764,7 +764,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 											edgeSensitivity={30}
 											coneSpread={25}
 											colors={["#c084fc", "#f472b6", "#38bdf8"]}
-											className={HOOKS.dockField}
+											className={PARTS.dockField}
 											style={{ boxShadow: cardShadow }}
 										>
 											{dockComposerRow}
@@ -784,7 +784,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 								data-state={panelState}
 								style={{ boxShadow: cardShadow }}
 								className={cn(
-									HOOKS.panel,
+									PARTS.panel,
 									"ww:fixed ww:z-[var(--ww-z-index)] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
 									// Mobile: full-screen sheet.
 									"ww:inset-0 ww:w-full ww:rounded-none",
