@@ -60,8 +60,12 @@ export const fr: Messages = {
 		removeFromQueue: "Retirer de la file",
 		queued: (count: number) => `${count} en attente`,
 	},
+	thread: {
+		scrollToLatest: "Aller au dernier message",
+	},
 	poweredBy: {
 		label: "Agent IA propulsé par",
+		logoAlt: "Waniwani",
 	},
 	aiDisclaimer: {
 		default: "peut faire des erreurs",
@@ -83,5 +87,38 @@ export const fr: Messages = {
 		open: "Ouvrir le chat",
 		close: "Fermer le chat",
 		minimize: "Réduire",
+	},
+	menu: {
+		newChat: "Nouvelle conversation",
+		restart: "Redémarrer la conversation",
+		copyConversation: "Copier toute la conversation",
+		copied: "Copié",
+		copyFailed: "Copie impossible",
+		label: "Autres actions",
+	},
+	dialog: {
+		restartTitle: "Effacer cette conversation ?",
+		restartText:
+			"Elle n'est enregistrée nulle part : une fois effacée, vous ne pourrez plus la retrouver.",
+		clearWithoutCopy: "Effacer sans copier",
+		copyAndClear: "Copier et effacer",
+		confirm: "Effacer",
+		cancel: "Annuler",
+		copyError:
+			"La copie n'a pas fonctionné dans ce navigateur. Vous pouvez effacer sans copier, ou fermer pour garder la conversation.",
+		close: "Fermer",
+	},
+	toast: {
+		conversationCopied: "Conversation copiée",
+	},
+	transcript: {
+		header: (site: string, date: string) =>
+			`Conversation avec l'assistant · ${date} · ${site}`,
+		you: "Vous :",
+		assistant: "Assistant :",
+	},
+	welcome: {
+		title: "",
+		subtitle: "",
 	},
 };

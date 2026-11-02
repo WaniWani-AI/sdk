@@ -61,8 +61,12 @@ export interface Messages {
 		removeFromQueue: string;
 		queued: (count: number) => string;
 	};
+	thread: {
+		scrollToLatest: string;
+	};
 	poweredBy: {
 		label: string;
+		logoAlt: string;
 	};
 	aiDisclaimer: {
 		default: string;
@@ -85,6 +89,37 @@ export interface Messages {
 		open: string;
 		close: string;
 		minimize: string;
+	};
+	menu: {
+		newChat: string;
+		restart: string;
+		copyConversation: string;
+		copied: string;
+		copyFailed: string;
+		label: string;
+	};
+	dialog: {
+		restartTitle: string;
+		restartText: string;
+		clearWithoutCopy: string;
+		copyAndClear: string;
+		confirm: string;
+		cancel: string;
+		copyError: string;
+		close: string;
+	};
+	toast: {
+		conversationCopied: string;
+	};
+	transcript: {
+		header: (site: string, date: string) => string;
+		you: string;
+		assistant: string;
+	};
+	/** Empty by default: filled from the welcome knob. */
+	welcome: {
+		title: string;
+		subtitle: string;
 	};
 }
 
@@ -148,8 +183,12 @@ export const en: Messages = {
 		removeFromQueue: "Remove from queue",
 		queued: (count: number) => `${count} queued`,
 	},
+	thread: {
+		scrollToLatest: "Scroll to latest",
+	},
 	poweredBy: {
 		label: "AI agent powered by",
+		logoAlt: "Waniwani",
 	},
 	aiDisclaimer: {
 		default: "can make mistakes",
@@ -171,5 +210,38 @@ export const en: Messages = {
 		open: "Open chat",
 		close: "Close chat",
 		minimize: "Minimize",
+	},
+	menu: {
+		newChat: "New chat",
+		restart: "Restart the conversation",
+		copyConversation: "Copy the conversation",
+		copied: "Copied",
+		copyFailed: "Copy failed",
+		label: "More actions",
+	},
+	dialog: {
+		restartTitle: "Clear this conversation?",
+		restartText:
+			"It is not saved anywhere: once cleared, you cannot get it back.",
+		clearWithoutCopy: "Clear without copying",
+		copyAndClear: "Copy and clear",
+		confirm: "Clear",
+		cancel: "Cancel",
+		copyError:
+			"Copying did not work in this browser. You can clear without copying, or close to keep the conversation.",
+		close: "Close",
+	},
+	toast: {
+		conversationCopied: "Conversation copied",
+	},
+	transcript: {
+		header: (site: string, date: string) =>
+			`Conversation with the assistant · ${date} · ${site}`,
+		you: "You:",
+		assistant: "Assistant:",
+	},
+	welcome: {
+		title: "",
+		subtitle: "",
 	},
 };

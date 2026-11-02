@@ -1,7 +1,9 @@
 "use client";
 
-import type { HTMLAttributes } from "react";
+import type { CSSProperties, HTMLAttributes } from "react";
+import type { SuggestionOrigin } from "../lib/resolve-suggestions";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 
 export interface SuggestionsProps
 	extends Omit<HTMLAttributes<HTMLDivElement>, "onSelect"> {
@@ -10,6 +12,8 @@ export interface SuggestionsProps
 	onSelect: (suggestion: string) => void;
 	/** Horizontal alignment of the pill row. Defaults to `"start"`. */
 	align?: "start" | "center";
+	origin?: SuggestionOrigin | "welcome" | "dock";
+	layout?: "wrap" | "single-row";
 }
 
 export function Suggestions({
@@ -17,6 +21,8 @@ export function Suggestions({
 	isLoading,
 	onSelect,
 	align = "start",
+	origin,
+	layout = "wrap",
 	className,
 	...props
 }: SuggestionsProps) {
@@ -25,10 +31,15 @@ export function Suggestions({
 	}
 
 	return (
-		<div className={cn("ww:px-4 ww:py-2", className)} {...props}>
+		<div
+			className={cn(PARTS.suggestions, "ww:px-4 ww:py-2", className)}
+			data-layout={layout}
+			data-origin={origin}
+			{...props}
+		>
 			<div
 				className={cn(
-					"ww:mx-auto ww:w-full ww:max-w-3xl ww:flex ww:flex-wrap ww:gap-2",
+					"ww:mx-auto ww:w-full ww:max-w-[var(--ww-content-max-width)] ww:flex ww:flex-wrap ww:gap-2",
 					align === "center" && "ww:justify-center",
 				)}
 			>
@@ -45,17 +56,19 @@ export function Suggestions({
 								key={suggestion}
 								type="button"
 								onClick={() => onSelect(suggestion)}
+								data-origin={origin}
+								data-index={index}
 								className={cn(
+									PARTS.suggestion,
 									// `bg-accent`, not `bg-background`: inside the open panel the
 									// pills sit on the background color itself, where a
 									// background-filled pill with a hairline border is
 									// indistinguishable from plain text.
-									"ww:rounded-full ww:border ww:border-border ww:bg-accent ww:px-3.5 ww:py-1.5 ww:text-sm",
-									"ww:text-foreground ww:hover:bg-border ww:hover:border-primary/30",
+									"ww:rounded-[var(--ww-suggestion-radius)] ww:border ww:border-[color:var(--ww-suggestion-border)] ww:bg-[color:var(--ww-suggestion-bg)] ww:px-3.5 ww:py-1.5 ww:text-sm",
+									"ww:text-[color:var(--ww-suggestion-fg)] ww:hover:bg-[color:var(--ww-suggestion-hover-bg)] ww:hover:border-primary/30",
 									"ww:transition-all ww:duration-200 ww:ease-out ww:cursor-pointer",
-									"ww:animate-[ww-fade-in_0.2s_ease-out_both]",
 								)}
-								style={{ animationDelay: `${index * 50}ms` }}
+								style={{ "--ww-index": index } as CSSProperties}
 							>
 								{suggestion}
 							</button>

@@ -11,12 +11,14 @@ import { cn } from "../lib/utils";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
 	from: UIMessage["role"];
+	streaming?: boolean;
 	children?: ReactNode;
 };
 
 export const Message = ({
 	className,
 	from,
+	streaming,
 	children,
 	...props
 }: MessageProps) => (
@@ -28,6 +30,7 @@ export const Message = ({
 				: "ww-message-assistant is-assistant ww:flex-col",
 			className,
 		)}
+		data-streaming={streaming ? "true" : undefined}
 		{...props}
 	>
 		<div className={cn("ww:flex ww:min-w-0 ww:flex-col ww:gap-2", "ww:w-full")}>

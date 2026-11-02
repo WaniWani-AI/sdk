@@ -71,6 +71,36 @@ export function normalizePathname(url: string): string {
 	return (trimmed === "" ? "/" : trimmed).toLowerCase();
 }
 
+function fragmentOf(url: string): string {
+	try {
+		return decodeURIComponent(new URL(url, "http://localhost").hash.slice(1));
+	} catch {
+		return "";
+	}
+}
+
+/**
+ * The entry for this page: one whose `#fragment` names the section the
+ * visitor paused in, else the page's fragment-free entry, else its first.
+ */
+export function pickSectionSuggestions(
+	entries: PageSuggestionsEntry[],
+	pathname: string,
+	sectionKey: string | null,
+): PageSuggestionsEntry | undefined {
+	const current = normalizePathname(pathname);
+	const onPage = entries.filter(
+		(entry) => normalizePathname(entry.url) === current,
+	);
+	const section =
+		sectionKey === null
+			? undefined
+			: onPage.find((entry) => fragmentOf(entry.url) === sectionKey);
+	return (
+		section ?? onPage.find((entry) => fragmentOf(entry.url) === "") ?? onPage[0]
+	);
+}
+
 /** Validate a raw `pageSuggestions` value; malformed entries drop out. */
 export function parsePageSuggestions(value: unknown): PageSuggestionsEntry[] {
 	if (!Array.isArray(value)) {
@@ -115,25 +145,30 @@ export function parsePageSuggestions(value: unknown): PageSuggestionsEntry[] {
  * picked prompts (`page`) and the channel's fixed list (`channel`), kept
  * separate so the pill row can attribute its origin exactly. Memoized because
  * the pick is random and the identity has to hold: `useSuggestions` keys an
- * effect on this object.
+ * effect on this object. `sectionKey` is the section the scroll trigger
+ * last paused in, which can swap the page entry for a `#fragment` one.
  */
-export function useSuggestions(config: EmbedConfig): PreChatSuggestions {
+export function useSuggestions(
+	config: EmbedConfig,
+	sectionKey: string | null = null,
+): PreChatSuggestions {
 	const { pageSuggestions, suggestions } = config;
 	const pathname = usePathname();
 
+	const entry = useMemo(
+		() => pickSectionSuggestions(pageSuggestions ?? [], pathname, sectionKey),
+		[pathname, pageSuggestions, sectionKey],
+	);
+
 	return useMemo(() => {
-		const current = normalizePathname(pathname);
-		const entry = pageSuggestions?.find(
-			(candidate) => normalizePathname(candidate.url) === current,
-		);
 		const page = entry
 			? pickPagePrompts(entry.prompts).map(({ id, text }) => ({ id, text }))
 			: null;
 		debugLog("configured suggestions resolve", {
-			pathname: current,
-			matched: Boolean(entry),
+			pathname,
+			entry: entry?.url ?? null,
 			count: page?.length ?? 0,
 		});
 		return { page, channel: toSuggestions(suggestions ?? []) };
-	}, [pathname, pageSuggestions, suggestions]);
+	}, [pathname, entry, suggestions]);
 }

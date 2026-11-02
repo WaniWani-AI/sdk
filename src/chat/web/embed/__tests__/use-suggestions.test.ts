@@ -39,6 +39,7 @@ const {
 	normalizePathname,
 	parsePageSuggestions,
 	pickPagePrompts,
+	pickSectionSuggestions,
 	useSuggestions,
 } = await import("../use-suggestions");
 
@@ -321,5 +322,76 @@ describe("useSuggestions", () => {
 		await h.rerender();
 		expect(h.value.page).toBe(firstPage);
 		h.unmount();
+	});
+});
+
+describe("pickSectionSuggestions", () => {
+	const page = { url: "/pricing", prompts: [{ id: "p", text: "Page" }] };
+	const loans = {
+		url: "https://host.example/pricing#loans",
+		prompts: [{ id: "l", text: "Loans" }],
+	};
+	const advice = {
+		url: "/pricing#advice",
+		prompts: [{ id: "a", text: "Advice" }],
+	};
+	const elsewhere = {
+		url: "/docs#loans",
+		prompts: [{ id: "d", text: "Docs" }],
+	};
+	const entries = [loans, page, advice, elsewhere];
+
+	test("a section key picks the entry whose fragment matches it on this page", () => {
+		expect(pickSectionSuggestions(entries, "/pricing", "loans")).toBe(loans);
+		expect(pickSectionSuggestions(entries, "/Pricing/", "advice")).toBe(advice);
+	});
+
+	test("falls back to the pathname entry without a fragment", () => {
+		expect(pickSectionSuggestions(entries, "/pricing", "faq")).toBe(page);
+		expect(pickSectionSuggestions(entries, "/pricing", null)).toBe(page);
+	});
+
+	test("without a fragment-free entry, keeps today's first pathname match", () => {
+		expect(pickSectionSuggestions([loans, advice], "/pricing", null)).toBe(
+			loans,
+		);
+	});
+
+	test("never matches a fragment on another page", () => {
+		expect(pickSectionSuggestions([elsewhere], "/pricing", "loans")).toBe(
+			undefined,
+		);
+	});
+});
+
+describe("useSuggestions with a section key", () => {
+	test("shows the section's prompts once the scroll trigger reports it", async () => {
+		const container = win.document.createElement("div");
+		let latest: PreChatSuggestions = { page: null, channel: [] };
+		function Probe({ sectionKey }: { sectionKey: string | null }) {
+			latest = useSuggestions(
+				{
+					...BASE_CONFIG,
+					pageSuggestions: [
+						{ url: "/pricing", prompts: [{ id: "p", text: "Page" }] },
+						{ url: "/pricing#loans", prompts: [{ id: "l", text: "Loans" }] },
+					],
+				},
+				sectionKey,
+			);
+			return null;
+		}
+		// biome-ignore lint/suspicious/noExplicitAny: happy-dom Element vs DOM Element
+		const root = createRoot(container as any);
+		await act(async () => {
+			root.render(createElement(Probe, { sectionKey: null }));
+		});
+		expect(latest.page).toEqual([{ id: "p", text: "Page" }]);
+
+		await act(async () => {
+			root.render(createElement(Probe, { sectionKey: "loans" }));
+		});
+		expect(latest.page).toEqual([{ id: "l", text: "Loans" }]);
+		act(() => root.unmount());
 	});
 });

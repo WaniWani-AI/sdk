@@ -15,6 +15,7 @@ import {
 import { Streamdown } from "streamdown";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { Shimmer } from "./shimmer";
 
 interface ReasoningContextValue {
@@ -138,8 +139,13 @@ export const Reasoning = memo(
 		return (
 			<ReasoningContext.Provider value={contextValue}>
 				<div
-					className={cn("ww:mb-4 ww:flex ww:flex-col ww:gap-2", className)}
+					className={cn(
+						PARTS.reasoning,
+						"ww:mb-4 ww:flex ww:flex-col ww:gap-2",
+						className,
+					)}
 					data-state={isOpen ? "open" : "closed"}
+					data-streaming={isStreaming ? "true" : undefined}
 					style={{ animation: "ww-fade-in 0.2s ease-out" }}
 					{...props}
 				>
@@ -193,6 +199,7 @@ export const ReasoningTrigger = memo(
 					onClick?.(e);
 				}}
 				className={cn(
+					PARTS.reasoningToggle,
 					"ww:flex ww:w-full ww:items-center ww:gap-2 ww:text-sm ww:text-muted-foreground ww:transition-colors ww:hover:text-foreground",
 					className,
 				)}

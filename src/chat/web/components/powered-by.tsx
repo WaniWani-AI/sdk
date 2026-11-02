@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslation } from "../i18n";
+import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 
 const LOGO_URL = "https://app.waniwani.ai/assets/waniwani-logo.svg";
 const HREF = "https://waniwani.ai";
@@ -17,12 +19,15 @@ export function PoweredBy() {
 			href={HREF}
 			target="_blank"
 			rel="noopener noreferrer"
-			className="ww:flex ww:items-center ww:gap-1.5 ww:whitespace-nowrap ww:text-[10px] ww:sm:text-[11px] ww:text-muted-foreground ww:opacity-70 hover:ww:opacity-100 ww:transition-opacity"
+			className={cn(
+				PARTS.poweredBy,
+				"ww:flex ww:items-center ww:gap-1.5 ww:whitespace-nowrap ww:text-[length:var(--ww-disclaimer-size)] ww:text-[color:var(--ww-disclaimer-fg)] ww:opacity-70 hover:ww:opacity-100 ww:transition-opacity",
+			)}
 		>
 			<span>{t.poweredBy.label}</span>
 			<img
 				src={LOGO_URL}
-				alt="Waniwani"
+				alt={t.poweredBy.logoAlt}
 				width={72}
 				height={10}
 				data-waniwani-logo=""

@@ -10,7 +10,7 @@ import {
 	useState,
 } from "react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
-import type { ChatEmbedProps, ChatHandle } from "../@types";
+import type { ChatEmbedProps, ChatHandle, WelcomeConfig } from "../@types";
 import {
 	PromptInput,
 	PromptInputAddAttachments,
@@ -20,19 +20,24 @@ import {
 	PromptInputTextarea,
 } from "../ai-elements/prompt-input";
 import { AiDisclaimer } from "../components/ai-disclaimer";
+import { Avatar, avatarFor } from "../components/avatar";
+import { ChatMenu } from "../components/chat-menu";
 import { ChatQueue } from "../components/chat-queue";
 import { MessageList } from "../components/message-list";
 import { NewThreadButton } from "../components/new-thread-button";
 import { PoweredBy } from "../components/powered-by";
 import { Suggestions } from "../components/suggestions";
 import { ThreadMenu } from "../components/thread-menu";
+import { splitPipeList } from "../embed/config";
 import { useWidgetEvents } from "../embed/widget-events-context";
 import { useCallTool } from "../hooks/use-call-tool";
 import { useChatEngine } from "../hooks/use-chat-engine";
 import { useDocumentUpload } from "../hooks/use-document-upload";
+import { useMultiline } from "../hooks/use-multiline";
 import { useSuggestionRow } from "../hooks/use-suggestion-row";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
-import { I18nProvider, useTranslation } from "../i18n";
+import { I18nProvider, type Messages, useTranslation } from "../i18n";
+import { copyText, formatTranscript } from "../lib/conversation-transcript";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
 import {
 	bearerToken,
@@ -42,6 +47,7 @@ import {
 } from "../lib/timing";
 import { WidgetTimingProvider } from "../lib/timing-context";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { themeToCSSProperties } from "../theme";
 import { Button } from "../ui/button";
 
@@ -74,7 +80,7 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 
 const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 	function ChatEmbedInner(props, ref) {
-		const { t, ready: localeReady } = useTranslation();
+		const { t, locale: activeLocale, ready: localeReady } = useTranslation();
 		const {
 			appearance,
 			className,
@@ -83,6 +89,12 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			documentUpload,
 			welcomeMessage,
 			welcome,
+			welcomeVariant = "cards",
+			suggestionsLayout = "wrap",
+			suggestionsPosition = "above-input",
+			sendIcon = "up",
+			showTableToolbar = true,
+			avatar,
 			placeholder = t.promptInput.placeholder,
 			triggerEvent = "triggerDemoRequest",
 			api,
@@ -96,8 +108,11 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			showToolCalls = true,
 			initializing = false,
 			onScreen = true,
+			mode,
 			disclaimer,
 			hidePoweredBy = false,
+			menu,
+			restartConfirm = false,
 		} = props;
 
 		// Preset → base theme. `light` and the unset case let the CSS
@@ -175,6 +190,8 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		}, []);
 
 		const animatedPlaceholder = useTypingPlaceholder(placeholder, !engine.text);
+		const fieldRowRef = useRef<HTMLDivElement>(null);
+		const multiline = useMultiline(fieldRowRef, engine.text);
 
 		const uploads = useDocumentUpload({
 			api,
@@ -350,6 +367,22 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			suggestions: props.suggestions,
 		});
 
+		const shownWelcome =
+			welcomeVariant === "pills"
+				? resolvePillsWelcome(welcome, t, avatar, suggestionsState.suggestions)
+				: welcome;
+		const rowInWelcome =
+			welcomeVariant === "pills" &&
+			Boolean(shownWelcome) &&
+			engine.messages.length === 0;
+		const lastMessage = engine.messages[engine.messages.length - 1];
+		const rowAfterMessage =
+			suggestionsPosition === "after-message" && engine.messages.length > 0;
+		const rowShown =
+			rowInWelcome ||
+			!rowAfterMessage ||
+			(lastMessage?.role === "assistant" && engine.status === "ready");
+
 		// Announce every pill set the visitor actually saw, once per set — keyed
 		// on the array identity `useSuggestionRow` returns (a new array per
 		// config load / streamed turn), so re-renders of the same set stay
@@ -363,6 +396,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			const current = suggestionsState.suggestions;
 			if (
 				!onScreen ||
+				!rowShown ||
 				current.length === 0 ||
 				announcedSuggestionsRef.current === current
 			) {
@@ -378,6 +412,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			suggestionsState.source,
 			widgetEvents,
 			onScreen,
+			rowShown,
 		]);
 
 		// Welcome-screen cards are a second, separately-rendered set of pills:
@@ -453,6 +488,47 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			],
 		);
 
+		const composerEmpty = engine.text.trim().length === 0;
+		const suggestionRow = (
+			<Suggestions
+				suggestions={suggestionsState.suggestions}
+				isLoading={suggestionsState.isLoading}
+				origin={suggestionsState.source}
+				layout={suggestionsLayout}
+				onSelect={handleSuggestionSelect}
+			/>
+		);
+
+		const restart = useCallback(() => {
+			if (enableThreadHistory) {
+				engine.startNewThread();
+			} else {
+				engine.reset();
+			}
+			widgetEvents.emit({ name: "conversation.restarted" });
+		}, [
+			enableThreadHistory,
+			engine.startNewThread,
+			engine.reset,
+			widgetEvents,
+		]);
+
+		const copyConversation = useCallback(async () => {
+			const date = new Intl.DateTimeFormat(activeLocale, {
+				dateStyle: "long",
+			}).format(new Date());
+			const transcript = formatTranscript(engine.messages, {
+				header: t.transcript.header(window.location.hostname, date),
+				you: t.transcript.you,
+				assistant: t.transcript.assistant,
+			});
+			const copied = await copyText(transcript);
+			if (copied) {
+				widgetEvents.emit({ name: "conversation.copied" });
+			}
+			return copied;
+		}, [engine.messages, activeLocale, t, widgetEvents]);
+
 		useImperativeHandle(
 			ref,
 			() => ({
@@ -462,6 +538,8 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				},
 				sendMessageAndWait: (text: string) => engine.sendMessageAndWait(text),
 				reset: engine.reset,
+				restart,
+				copyConversation,
 				focus: focusInput,
 				get messages() {
 					return engine.messages;
@@ -477,6 +555,8 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				engine.messages,
 				engine.sessionId,
 				focusInput,
+				restart,
+				copyConversation,
 			],
 		);
 
@@ -497,11 +577,19 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			return () => window.removeEventListener(triggerEvent, handler);
 		}, [triggerEvent, engine.handleSubmit, focusInput]);
 
+		const menuActions = menu?.length ? menu : undefined;
 		const showHeader =
 			!hideHeader &&
 			Boolean(
-				title || enableThreadHistory || engine.keepsSession || headerActions,
+				title ||
+					enableThreadHistory ||
+					engine.keepsSession ||
+					headerActions ||
+					menuActions,
 			);
+
+		const headerAvatar = avatarFor(avatar, "header");
+		const composerAvatar = avatarFor(avatar, "composer");
 
 		// Hold opacity 0 until both the remote-config (caller-driven
 		// `initializing`) and the i18n auto-detect effect have settled.
@@ -526,11 +614,13 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				}}
 				data-waniwani-chat=""
 				data-waniwani-layout="embed"
+				data-mode={mode}
 				data-assistant-bubble={assistantBubble ? "true" : undefined}
 				data-color-scheme={preset === "auto" ? "auto" : undefined}
 				{...(masked ? { "data-waniwani-initializing": "" } : {})}
 				{...(isDark ? { "data-waniwani-dark": "" } : {})}
 				className={cn(
+					PARTS.root,
 					"ww:relative ww:w-full ww:h-full ww:flex ww:flex-col ww:bg-background ww:text-foreground ww:font-[family-name:var(--ww-font)] ww:overflow-hidden",
 					preset === "dark" && "dark",
 					className,
@@ -540,7 +630,8 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				{showHeader && (
 					<div
 						className={cn(
-							"ww-header ww:shrink-0 ww:flex ww:items-center ww:gap-2 ww:pl-4 ww:pr-3 ww:py-3 ww:border-b ww:border-border",
+							PARTS.header,
+							"ww:shrink-0 ww:h-[var(--ww-header-height)] ww:flex ww:items-center ww:gap-2 ww:pl-4 ww:pr-3 ww:py-3 ww:border-b ww:border-border",
 							classNames?.header,
 						)}
 						style={{
@@ -548,16 +639,48 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 							color: "var(--ww-color-card-header-foreground)",
 						}}
 					>
+						{headerAvatar && (
+							<Avatar
+								src={headerAvatar}
+								slot="header"
+								intro={avatar?.intro}
+								visible={onScreen}
+							/>
+						)}
 						{title && (
-							<div className="ww:text-sm ww:font-semibold ww:truncate ww:flex-1 ww:min-w-0">
+							<div
+								className={cn(
+									PARTS.headerTitle,
+									"ww:text-sm ww:font-semibold ww:truncate ww:flex-1 ww:min-w-0",
+								)}
+							>
 								{title}
 							</div>
 						)}
 						{!title && <div className="ww:flex-1" />}
-						{!enableThreadHistory && engine.keepsSession && (
+						{menuActions && (
+							<ChatMenu
+								actions={menuActions}
+								restartConfirm={restartConfirm}
+								onNewChat={
+									enableThreadHistory ? engine.startNewThread : engine.reset
+								}
+								onRestart={restart}
+								onCopy={copyConversation}
+								threads={engine.threads}
+								activeThreadId={engine.activeThreadId}
+								onSelectThread={(id) => {
+									void engine.switchThread(id);
+								}}
+								onDeleteThread={(id) => {
+									void engine.deleteThread(id);
+								}}
+							/>
+						)}
+						{!menuActions && !enableThreadHistory && engine.keepsSession && (
 							<NewThreadButton onClick={engine.reset} />
 						)}
-						{enableThreadHistory && (
+						{!menuActions && enableThreadHistory && (
 							<ThreadMenu
 								threads={engine.threads}
 								activeThreadId={engine.activeThreadId}
@@ -572,13 +695,18 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 						)}
 						{/* Rendered last so embed-host actions (e.g. the floating
 						    close button) sit at the far right of the header. */}
-						{headerActions}
+						{headerActions && (
+							<div className={cn(PARTS.headerActions, "ww:contents")}>
+								{headerActions}
+							</div>
+						)}
 					</div>
 				)}
 
 				<div
 					ref={scrollRef}
 					className={cn(
+						PARTS.thread,
 						"ww:relative ww:flex-1 ww:min-h-0",
 						fullscreenToolCallId ? "ww:overflow-hidden" : "ww:overflow-y-auto",
 					)}
@@ -586,7 +714,8 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 					<div
 						ref={scrollContentRef}
 						className={cn(
-							"ww:mx-auto ww:w-full ww:max-w-3xl ww:px-4 ww:py-6 ww:flex ww:flex-col ww:gap-6",
+							PARTS.content,
+							"ww:mx-auto ww:w-full ww:max-w-[var(--ww-content-max-width)] ww:px-4 ww:py-6 ww:flex ww:flex-col ww:gap-6",
 							fullscreenToolCallId && "ww:!py-0",
 						)}
 					>
@@ -595,7 +724,12 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 								messages={engine.messages}
 								status={engine.status}
 								welcomeMessage={welcomeMessage}
-								welcome={welcome}
+								welcome={shownWelcome}
+								welcomeVariant={welcomeVariant}
+								welcomeAppeared={onScreen}
+								messageAvatar={avatarFor(avatar, "message")}
+								welcomeAvatarIntro={avatar?.intro}
+								trailing={rowAfterMessage ? suggestionRow : undefined}
 								onSuggestionSelect={handleSuggestionSelect}
 								resourceEndpoint={resourceEndpoint}
 								chatSessionId={engine.sessionId}
@@ -605,6 +739,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 								fullscreenToolCallId={fullscreenToolCallId}
 								debug={debug}
 								showToolCalls={showToolCalls}
+								showTableToolbar={showTableToolbar}
 								toolDefinitions={engine.toolDefinitions}
 								messageClassNames={{
 									message: classNames?.message,
@@ -635,8 +770,11 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 								onClick={() => scrollToBottom("smooth")}
 								size="icon"
 								variant="outline"
-								className="ww:rounded-full ww:shadow ww:pointer-events-auto"
-								aria-label="Scroll to latest"
+								className={cn(
+									PARTS.scrollLatest,
+									"ww:rounded-full ww:shadow ww:pointer-events-auto",
+								)}
+								aria-label={t.thread.scrollToLatest}
 							>
 								<ArrowDownIcon className="ww:size-4" />
 							</Button>
@@ -649,18 +787,22 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 						className="ww:shrink-0 ww:bg-background"
 						style={fullscreenToolCallId ? { display: "none" } : undefined}
 					>
-						<Suggestions
-							suggestions={suggestionsState.suggestions}
-							isLoading={suggestionsState.isLoading}
-							onSelect={handleSuggestionSelect}
-						/>
+						{!rowInWelcome && !rowAfterMessage && suggestionRow}
 						<ChatQueue
 							queuedMessages={engine.queuedMessages}
 							onRemove={engine.removeQueuedMessage}
 						/>
 						<div className="ww:px-4 ww:pb-2 ww:pt-2">
-							<div className="ww:mx-auto ww:w-full ww:max-w-3xl">
+							<div
+								className={cn(
+									PARTS.content,
+									"ww:mx-auto ww:w-full ww:max-w-[var(--ww-content-max-width)]",
+								)}
+							>
 								<PromptInput
+									status={engine.status}
+									empty={composerEmpty}
+									data-multiline={multiline ? "true" : "false"}
 									onSubmit={engine.handleSubmit}
 									attachmentsEnabled={uploads.enabled}
 									globalDrop={uploads.enabled}
@@ -672,16 +814,27 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 									upload={uploads.upload}
 									onDiscard={uploads.onDiscard}
 									onError={uploads.reportError}
-									className={cn(
-										"ww-input ww:rounded-2xl ww:border-border ww:bg-input",
-										classNames?.input,
-									)}
+									className={cn(PARTS.input, "ww:bg-input", classNames?.input)}
 								>
 									<PromptInputDropOverlay enabled={uploads.enabled} />
 									{uploads.enabled && (
 										<PromptInputAttachments className="ww:px-4 ww:pt-3" />
 									)}
-									<div className="ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-2.5">
+									<div
+										ref={fieldRowRef}
+										className={cn(
+											PARTS.inputRow,
+											"ww:flex ww:items-center ww:gap-1 ww:pl-4 ww:pr-3 ww:py-2.5",
+										)}
+									>
+										{composerAvatar && (
+											<Avatar
+												src={composerAvatar}
+												slot="composer"
+												intro={avatar?.intro}
+												visible={onScreen}
+											/>
+										)}
 										{uploads.enabled && <PromptInputAddAttachments />}
 										<PromptInputTextarea
 											onChange={engine.handleTextChange}
@@ -691,17 +844,29 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 										/>
 										<PromptInputSubmit
 											status={engine.status}
+											empty={composerEmpty}
+											icon={sendIcon}
 											disabled={engine.queueFull}
 											onStop={engine.stop}
 										/>
 									</div>
 								</PromptInput>
 								{uploads.error && (
-									<output className="ww:block ww:pt-1.5 ww:text-center ww:text-destructive ww:text-xs">
+									<output
+										className={cn(
+											PARTS.error,
+											"ww:block ww:pt-1.5 ww:text-center ww:text-destructive ww:text-xs",
+										)}
+									>
 										{uploads.error.message}
 									</output>
 								)}
-								<div className="ww:pt-2 ww:pb-1 ww:flex ww:flex-nowrap ww:justify-center ww:items-center ww:gap-1.5">
+								<div
+									className={cn(
+										PARTS.footer,
+										"ww:pt-2 ww:pb-1 ww:flex ww:flex-nowrap ww:justify-center ww:items-center ww:gap-1.5",
+									)}
+								>
 									{!hidePoweredBy && <PoweredBy />}
 									<AiDisclaimer text={disclaimer} standalone={hidePoweredBy} />
 								</div>
@@ -713,3 +878,40 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		);
 	},
 );
+
+/** So a bare `data-avatar="bot.png"` still reads as an image URL to the welcome icon. */
+function absoluteUrl(src: string | undefined): string | undefined {
+	if (!src || typeof document === "undefined") {
+		return src;
+	}
+	try {
+		return new URL(src, document.baseURI).href;
+	} catch {
+		return src;
+	}
+}
+
+/**
+ * `data-welcome-*` first, `messages.welcome` for what they leave unset. Its
+ * chips are the pre-chat pill row, so they never show twice.
+ */
+function resolvePillsWelcome(
+	welcome: WelcomeConfig | undefined,
+	t: Messages,
+	avatar: ChatEmbedProps["avatar"],
+	rowSuggestions: string[],
+): WelcomeConfig | undefined {
+	const title = welcome?.title || t.welcome.title;
+	if (!title) {
+		return undefined;
+	}
+	const subtitles = welcome?.subtitles ?? splitPipeList(t.welcome.subtitle);
+	return {
+		...welcome,
+		title,
+		description: welcome?.description ?? subtitles[0],
+		subtitles,
+		icon: welcome?.icon ?? absoluteUrl(avatarFor(avatar, "welcome")),
+		suggestions: welcome?.suggestions ?? rowSuggestions,
+	};
+}
