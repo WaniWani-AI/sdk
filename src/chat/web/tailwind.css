@@ -228,7 +228,7 @@
 	--ww-send-radius: 9999px;
 	--ww-send-disabled-bg: var(--ww-send-bg);
 	--ww-send-disabled-fg: var(--ww-send-fg);
-	--ww-send-disabled-opacity: 0.5;
+	--ww-send-disabled-opacity: 1;
 	--ww-stop-bg: var(--ww-send-bg);
 	--ww-stop-fg: var(--ww-send-fg);
 	--ww-suggestion-bg: var(--ww-color-accent);
@@ -237,7 +237,7 @@
 	--ww-suggestion-radius: 9999px;
 	--ww-suggestion-hover-bg: var(--ww-color-border);
 	--ww-suggestion-stagger: 50ms;
-	--ww-input-radius: 0.5rem;
+	--ww-input-radius: 1rem;
 	--ww-input-border: var(--ww-color-border);
 	--ww-input-border-width: 1px;
 	--ww-input-shadow: none;
@@ -309,6 +309,11 @@
 		background-color: var(--ww-send-disabled-bg);
 		color: var(--ww-send-disabled-fg);
 		opacity: var(--ww-send-disabled-opacity);
+	}
+
+	/* The queue is full: dimmed whatever the empty-state tokens say. */
+	:where([data-waniwani-chat]) .ww-send[data-submit-blocked="true"] {
+		opacity: 0.5;
 	}
 
 	:where([data-waniwani-chat]) .ww-stop,

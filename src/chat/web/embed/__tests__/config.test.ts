@@ -626,18 +626,20 @@ describe("parseConfigFromScript — menu and restart confirmation", () => {
 });
 
 describe("parseConfigFromScript — floating bar behaviours", () => {
-	test("the four dock attributes parse", async () => {
+	test("the five dock and panel attributes parse", async () => {
 		const cfg = await parseWithAttrs({
 			"data-token": "wwp_test",
 			"data-dock-chips-trigger": " Scroll ",
 			"data-dock-pointer-vars": "true",
 			"data-dock-glow": "false",
-			"data-dock-readonly-mobile": "false",
+			"data-dock-readonly-mobile": "true",
+			"data-panel-history": "true",
 		});
 		expect(cfg.dockChipsTrigger).toEqual(["scroll"]);
 		expect(cfg.dockPointerVars).toBe(true);
 		expect(cfg.dockGlow).toBe(false);
-		expect(cfg.dockReadonlyMobile).toBe(false);
+		expect(cfg.dockReadonlyMobile).toBe(true);
+		expect(cfg.panelHistory).toBe(true);
 	});
 
 	test("unset attributes stay unset so the runtime defaults apply", async () => {
@@ -646,6 +648,7 @@ describe("parseConfigFromScript — floating bar behaviours", () => {
 		expect("dockPointerVars" in cfg).toBe(false);
 		expect("dockGlow" in cfg).toBe(false);
 		expect("dockReadonlyMobile" in cfg).toBe(false);
+		expect("panelHistory" in cfg).toBe(false);
 	});
 
 	test("a comma-separated chips trigger list parses, deduped, unknowns dropped", async () => {

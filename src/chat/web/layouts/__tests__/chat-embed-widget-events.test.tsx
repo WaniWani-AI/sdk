@@ -201,6 +201,17 @@ describe("ChatEmbed widget events", () => {
 		});
 	});
 
+	test("after-message keeps the pre-chat row above the input while the thread is empty", async () => {
+		const { events } = await renderEmbed({
+			suggestionsPosition: "after-message",
+		});
+
+		expect(
+			document.querySelectorAll(".ww-suggestions .ww-suggestion"),
+		).toHaveLength(2);
+		expect(shownSets(events)).toHaveLength(1);
+	});
+
 	test("welcome-screen cards announce their own impression", async () => {
 		const { events } = await renderEmbed({
 			suggestions: false,

@@ -261,6 +261,7 @@ function brandConfig(): EmbedConfig {
 		dockPointerVars: true,
 		dockGlow: false,
 		dockReadonlyMobile: true,
+		panelHistory: true,
 		documentUpload: {
 			enabled: true,
 			maxBytes: 10_000_000,

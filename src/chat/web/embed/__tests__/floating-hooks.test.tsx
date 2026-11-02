@@ -433,7 +433,11 @@ describe("floating bar behaviours", () => {
 
 	test("dock input is read-only on narrow viewports when enabled", async () => {
 		setViewportWidth(390);
-		await renderSettled(createElement(FloatingChat, { config: CONFIG }));
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: { ...CONFIG, dockReadonlyMobile: true },
+			}),
+		);
 		const input = container.querySelector(".ww-dock-input") as HTMLInputElement;
 		expect(input.readOnly).toBe(true);
 
@@ -447,13 +451,9 @@ describe("floating bar behaviours", () => {
 		).toBe("opening");
 	});
 
-	test("dock input stays editable on narrow viewports when disabled", async () => {
+	test("dock input stays editable on narrow viewports by default", async () => {
 		setViewportWidth(390);
-		await renderSettled(
-			createElement(FloatingChat, {
-				config: { ...CONFIG, dockReadonlyMobile: false },
-			}),
-		);
+		await renderSettled(createElement(FloatingChat, { config: CONFIG }));
 		const input = container.querySelector(".ww-dock-input") as HTMLInputElement;
 		expect(input.readOnly).toBe(false);
 	});
@@ -464,10 +464,25 @@ describe("floating bar behaviours", () => {
 		expect(input.readOnly).toBe(false);
 	});
 
-	test("the back gesture closes the panel on narrow viewports", async () => {
+	test("no history entry on narrow viewports by default", async () => {
 		setViewportWidth(390);
 		const ref = createRef<FloatingChatHandle>();
 		await renderSettled(createElement(FloatingChat, { config: CONFIG, ref }));
+		await act(async () => {
+			ref.current?.open();
+		});
+		expect(win.history.state).toBeNull();
+	});
+
+	test("the back gesture closes the panel on narrow viewports with panelHistory", async () => {
+		setViewportWidth(390);
+		const ref = createRef<FloatingChatHandle>();
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: { ...CONFIG, panelHistory: true },
+				ref,
+			}),
+		);
 		const panel = () =>
 			container.querySelector(".ww-panel")?.getAttribute("data-state");
 
@@ -498,7 +513,12 @@ describe("floating bar behaviours", () => {
 		setViewportWidth(390);
 		win.history.replaceState({ waniwaniPanel: true, router: 1 }, "");
 		const ref = createRef<FloatingChatHandle>();
-		await renderSettled(createElement(FloatingChat, { config: CONFIG, ref }));
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: { ...CONFIG, panelHistory: true },
+				ref,
+			}),
+		);
 		expect(win.history.state).toEqual({ router: 1 });
 
 		await act(async () => {
@@ -515,7 +535,12 @@ describe("floating bar behaviours", () => {
 
 	test("no history entry on desktop", async () => {
 		const ref = createRef<FloatingChatHandle>();
-		await renderSettled(createElement(FloatingChat, { config: CONFIG, ref }));
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: { ...CONFIG, panelHistory: true },
+				ref,
+			}),
+		);
 		await act(async () => {
 			ref.current?.open();
 		});

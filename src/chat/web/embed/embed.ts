@@ -274,9 +274,13 @@ function injectStyles(shadowRoot: ShadowRoot, config: EmbedConfig): void {
 	//     custom property), so a later same-specificity rule wins by
 	//     cascade order — no `!important` and no JS-side list of
 	//     "container vars" to keep in sync.
+	//   - `--ww-input-radius` is pinned to the 0.5rem the script embed has
+	//     always rendered (its build concatenates utility classes, so
+	//     `rounded-lg` won over the React path's `rounded-2xl`). A `data-css`
+	//     stylesheet is appended after this reset, so it still overrides it.
 	const chromeReset = document.createElement("style");
 	chromeReset.textContent =
-		"[data-waniwani-chat]{border-width:0;border-radius:0;box-shadow:none}";
+		"[data-waniwani-chat]{border-width:0;border-radius:0;box-shadow:none;--ww-input-radius:0.5rem}";
 	shadowRoot.appendChild(chromeReset);
 
 	if (config.css) {

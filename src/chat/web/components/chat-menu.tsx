@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { MenuAction } from "../embed/config";
 import { HOOKS } from "../hooks-contract";
 import { formatRelativeTime, useTranslation } from "../i18n";
-import type { StoredThread } from "../lib/thread-store";
+import { type StoredThread, VISIBLE_THREAD_LIMIT } from "../lib/thread-store";
 import { cn } from "../lib/utils";
 import { ConfirmDialog } from "./confirm-dialog";
 import { readToastTiming, Toast } from "./toast";
@@ -25,7 +25,6 @@ interface ChatMenuProps {
 type CopyStatus = "idle" | "copied" | "failed";
 
 const COPY_STATUS_MS = 3000;
-const VISIBLE_THREAD_LIMIT = 20;
 
 const ITEM_CLASS =
 	"ww:flex ww:w-full ww:items-center ww:gap-2 ww:rounded-md ww:px-3 ww:py-2 ww:text-left ww:text-sm ww:cursor-pointer ww:hover:bg-foreground/5 ww:disabled:cursor-default ww:disabled:opacity-50";

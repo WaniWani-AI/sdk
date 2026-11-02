@@ -345,7 +345,10 @@ export interface EmbedConfig {
 	disclaimer?: string | false;
 	/** Surfaced as `data-suggestions-layout`: `wrap` (default) or `single-row`. */
 	suggestionsLayout?: "wrap" | "single-row";
-	/** Surfaced as `data-suggestions-position`: `above-input` (default) or `after-message`. */
+	/**
+	 * Surfaced as `data-suggestions-position`: `above-input` (default) or
+	 * `after-message`. The pre-chat row stays above the input either way.
+	 */
 	suggestionsPosition?: "above-input" | "after-message";
 	/** Surfaced as `data-send-icon`: `up` (default) or `right`. */
 	sendIcon?: "up" | "right";
@@ -383,10 +386,16 @@ export interface EmbedConfig {
 	dockGlow?: boolean;
 	/**
 	 * Make the floating bar's input read-only on narrow viewports, so a tap
-	 * opens the panel without raising the keyboard. On by default. Surfaced as
-	 * `data-dock-readonly-mobile`.
+	 * opens the panel without raising the keyboard. Off by default. Surfaced
+	 * as `data-dock-readonly-mobile`.
 	 */
 	dockReadonlyMobile?: boolean;
+	/**
+	 * On narrow viewports, hold one browser history entry while the panel is
+	 * open so the back gesture closes it instead of leaving the page. Off by
+	 * default. Surfaced as `data-panel-history`.
+	 */
+	panelHistory?: boolean;
 	/**
 	 * What a click or focus on the floating bar's input does before any
 	 * conversation exists. `expand` (default) widens the bar and shows the
@@ -926,6 +935,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const dockReadonlyMobile = bool("data-dock-readonly-mobile");
 	if (dockReadonlyMobile !== undefined) {
 		config.dockReadonlyMobile = dockReadonlyMobile;
+	}
+
+	const panelHistory = bool("data-panel-history");
+	if (panelHistory !== undefined) {
+		config.panelHistory = panelHistory;
 	}
 
 	const dockClick = str("data-dock-click")?.trim().toLowerCase();

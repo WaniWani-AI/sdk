@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { HOOKS } from "../hooks-contract";
 import { formatRelativeTime, useTranslation } from "../i18n";
-import type { StoredThread } from "../lib/thread-store";
+import { type StoredThread, VISIBLE_THREAD_LIMIT } from "../lib/thread-store";
 import { cn } from "../lib/utils";
 import { NewThreadButton } from "./new-thread-button";
 
@@ -14,8 +14,6 @@ interface ThreadMenuProps {
 	onSelectThread: (threadId: string) => void;
 	onDeleteThread: (threadId: string) => void;
 }
-
-const VISIBLE_THREAD_LIMIT = 20;
 
 function HistoryIcon({ label }: { label: string }) {
 	return (

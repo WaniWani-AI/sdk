@@ -375,6 +375,13 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			welcomeVariant === "pills" &&
 			Boolean(shownWelcome) &&
 			engine.messages.length === 0;
+		const lastMessage = engine.messages[engine.messages.length - 1];
+		const rowAfterMessage =
+			suggestionsPosition === "after-message" && engine.messages.length > 0;
+		const rowShown =
+			rowInWelcome ||
+			!rowAfterMessage ||
+			(lastMessage?.role === "assistant" && engine.status === "ready");
 
 		// Announce every pill set the visitor actually saw, once per set — keyed
 		// on the array identity `useSuggestionRow` returns (a new array per
@@ -389,6 +396,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			const current = suggestionsState.suggestions;
 			if (
 				!onScreen ||
+				!rowShown ||
 				current.length === 0 ||
 				announcedSuggestionsRef.current === current
 			) {
@@ -404,6 +412,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			suggestionsState.source,
 			widgetEvents,
 			onScreen,
+			rowShown,
 		]);
 
 		// Welcome-screen cards are a second, separately-rendered set of pills:
@@ -720,11 +729,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 								welcomeAppeared={onScreen}
 								messageAvatar={avatarFor(avatar, "message")}
 								welcomeAvatarIntro={avatar?.intro}
-								trailing={
-									!rowInWelcome && suggestionsPosition === "after-message"
-										? suggestionRow
-										: undefined
-								}
+								trailing={rowAfterMessage ? suggestionRow : undefined}
 								onSuggestionSelect={handleSuggestionSelect}
 								resourceEndpoint={resourceEndpoint}
 								chatSessionId={engine.sessionId}
@@ -782,9 +787,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 						className="ww:shrink-0 ww:bg-background"
 						style={fullscreenToolCallId ? { display: "none" } : undefined}
 					>
-						{!rowInWelcome &&
-							suggestionsPosition === "above-input" &&
-							suggestionRow}
+						{!rowInWelcome && !rowAfterMessage && suggestionRow}
 						<ChatQueue
 							queuedMessages={engine.queuedMessages}
 							onRemove={engine.removeQueuedMessage}
@@ -876,11 +879,6 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 	},
 );
 
-/**
- * The structured welcome: `data-welcome-*` first, `messages.welcome` for what
- * they leave unset. Its chips are the pre-chat pill row, so they never show
- * twice.
- */
 /** So a bare `data-avatar="bot.png"` still reads as an image URL to the welcome icon. */
 function absoluteUrl(src: string | undefined): string | undefined {
 	if (!src || typeof document === "undefined") {
@@ -893,6 +891,10 @@ function absoluteUrl(src: string | undefined): string | undefined {
 	}
 }
 
+/**
+ * `data-welcome-*` first, `messages.welcome` for what they leave unset. Its
+ * chips are the pre-chat pill row, so they never show twice.
+ */
 function resolvePillsWelcome(
 	welcome: WelcomeConfig | undefined,
 	t: Messages,

@@ -17,6 +17,7 @@ export interface StoredThread {
 
 export const MAX_THREADS_PER_USER = 50;
 export const MAX_MESSAGES_PER_THREAD = 1000;
+export const VISIBLE_THREAD_LIMIT = 20;
 
 function isStoredThread(value: unknown): value is StoredThread {
 	if (!value || typeof value !== "object") {

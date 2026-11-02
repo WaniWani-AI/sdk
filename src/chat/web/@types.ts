@@ -474,7 +474,8 @@ export interface ChatEmbedProps
 	suggestionsLayout?: "wrap" | "single-row";
 	/**
 	 * `"after-message"` shows the suggestion row under the last assistant
-	 * message instead of above the input. Defaults to `"above-input"`.
+	 * message instead of above the input; while the conversation is empty the
+	 * row stays above the input. Defaults to `"above-input"`.
 	 */
 	suggestionsPosition?: "above-input" | "after-message";
 	/** Arrow on the send button. Defaults to `"up"`. */

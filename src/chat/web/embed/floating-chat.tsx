@@ -212,7 +212,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 		const chipsOnScroll = chipsTriggers.includes("scroll");
 		const chipsOnTimer = chipsTriggers.includes("hover") || chipsAlways;
 		const pointerVars = config.dockPointerVars === true;
-		const dockReadOnly = narrow && config.dockReadonlyMobile !== false;
+		const dockReadOnly = narrow && config.dockReadonlyMobile === true;
 		const dockClickOpens = config.dockClick === "open";
 
 		const preset = config.appearance?.theme;
@@ -436,9 +436,12 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 			setPhase("input");
 		}, []);
 
-		// On phones the panel is a full-screen sheet, so the back gesture should
-		// close it rather than leave the page.
-		usePanelHistory(narrow && visible && phase === "open", collapse);
+		// On phones the panel is a full-screen sheet, so with `panelHistory` the
+		// back gesture closes it rather than leaving the page.
+		usePanelHistory(
+			config.panelHistory === true && narrow && visible && phase === "open",
+			collapse,
+		);
 
 		// Reveal the CTAs a beat after the bar has widened. Reset whenever we
 		// leave the expanded phase so re-expanding replays the staggered entrance.

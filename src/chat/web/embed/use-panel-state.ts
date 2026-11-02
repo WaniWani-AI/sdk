@@ -1,4 +1,5 @@
 import { type RefObject, useEffect, useRef, useState } from "react";
+import { parseCssDuration } from "../lib/css-duration";
 
 export type PanelState = "opening" | "shown" | "closing" | "hidden";
 
@@ -10,15 +11,6 @@ const DEFAULT_DURATION_MS: Record<PanelDurationToken, number> = {
 	"--ww-panel-open-duration": 440,
 	"--ww-panel-close-duration": 260,
 };
-
-export function parseCssDuration(value: string): number | null {
-	const match = /^(\d*\.?\d+)(ms|s)$/.exec(value.trim());
-	if (!match) {
-		return null;
-	}
-	const amount = Number(match[1]);
-	return match[2] === "s" ? amount * 1000 : amount;
-}
 
 function readCssDuration(
 	el: HTMLElement | null,

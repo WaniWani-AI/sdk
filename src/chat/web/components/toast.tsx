@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { HOOKS } from "../hooks-contract";
+import { parseCssDuration } from "../lib/css-duration";
 import { cn } from "../lib/utils";
 
 const DEFAULT_TOAST_DURATION_MS = 2200;
@@ -60,15 +61,6 @@ export function Toast({
 			{message}
 		</output>
 	);
-}
-
-export function parseCssDuration(raw: string): number | undefined {
-	const match = /^(-?\d*\.?\d+)(ms|s)$/.exec(raw.trim());
-	if (!match) {
-		return undefined;
-	}
-	const value = Number.parseFloat(match[1]) * (match[2] === "s" ? 1000 : 1);
-	return value > 0 ? value : undefined;
 }
 
 export function readToastTiming(element: Element | null): {
