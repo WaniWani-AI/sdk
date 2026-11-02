@@ -29,8 +29,8 @@ function chatExports(): string[] {
 }
 
 describe("@waniwani/sdk/chat re-exports all of @waniwani/chat", () => {
-	test("the chat entry exports the 26 names it had inside the SDK", () => {
-		expect(chatExports()).toHaveLength(26);
+	test("the chat entry exports the 31 names it had inside the SDK", () => {
+		expect(chatExports()).toHaveLength(31);
 	});
 
 	for (const name of chatExports()) {

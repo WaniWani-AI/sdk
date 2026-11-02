@@ -34,6 +34,10 @@ export const mergeTheme = mergeThemeImpl;
 /** @deprecated Import `themeToCSSProperties` from `@waniwani/chat`. `@waniwani/sdk/chat` is removed in 0.28.0. */
 export const themeToCSSProperties = themeToCSSPropertiesImpl;
 
+/** @deprecated Import `AvatarIntro` from `@waniwani/chat`. `@waniwani/sdk/chat` is removed in 0.28.0. */
+export type AvatarIntro = Chat.AvatarIntro;
+/** @deprecated Import `AvatarSlot` from `@waniwani/chat`. `@waniwani/sdk/chat` is removed in 0.28.0. */
+export type AvatarSlot = Chat.AvatarSlot;
 /** @deprecated Import `ChatAppearance` from `@waniwani/chat`. `@waniwani/sdk/chat` is removed in 0.28.0. */
 export type ChatAppearance = Chat.ChatAppearance;
 /** @deprecated Import `ChatBaseProps` from `@waniwani/chat`. `@waniwani/sdk/chat` is removed in 0.28.0. */
@@ -46,6 +50,12 @@ export type ChatEmbedProps = Chat.ChatEmbedProps;
 export type ChatHandle = Chat.ChatHandle;
 /** @deprecated Import `ChatTheme` from `@waniwani/chat`. `@waniwani/sdk/chat` is removed in 0.28.0. */
 export type ChatTheme = Chat.ChatTheme;
+/** @deprecated Import `LocaleMessageOverrides` from `@waniwani/chat`. `@waniwani/sdk/chat` is removed in 0.28.0. */
+export type LocaleMessageOverrides = Chat.LocaleMessageOverrides;
+/** @deprecated Import `MenuAction` from `@waniwani/chat`. `@waniwani/sdk/chat` is removed in 0.28.0. */
+export type MenuAction = Chat.MenuAction;
+/** @deprecated Import `MessageOverrides` from `@waniwani/chat`. `@waniwani/sdk/chat` is removed in 0.28.0. */
+export type MessageOverrides = Chat.MessageOverrides;
 /** @deprecated Import `ShowToolCalls` from `@waniwani/chat`. `@waniwani/sdk/chat` is removed in 0.28.0. */
 export type ShowToolCalls = Chat.ShowToolCalls;
 /** @deprecated Import `SuggestionsConfig` from `@waniwani/chat`. `@waniwani/sdk/chat` is removed in 0.28.0. */

@@ -17,7 +17,7 @@ A project that never uses the chat widget has almost nothing to migrate. Bump th
 
 The chat widget (`WaniwaniChat`, `ChatEmbed`, the themes, `styles.css` and `embed.js`) ships in its own npm package, `@waniwani/chat`. `@waniwani/sdk` keeps the server side: flows, the KV stores, tracking, the knowledge base, documents, `withWaniwani` and `useWaniwani`. An MCP server that only uses `createFlow` now installs about 1.7 MB instead of 32 MB.
 
-`@waniwani/chat` exports the same 26 names that `@waniwani/sdk/chat` exported, with the same types and the same behavior. Only the import path moves.
+`@waniwani/chat` exports the same 31 names that `@waniwani/sdk/chat` exported, with the same types and the same behavior. Only the import path moves.
 
 | Old path | New path | Until 0.28.0 |
 | --- | --- | --- |
