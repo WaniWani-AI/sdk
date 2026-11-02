@@ -19,7 +19,9 @@ import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { ChatEmbed } from "../layouts/chat-embed";
 import { useBootTiming } from "../lib/timing-context";
 import type { EmbedConfig } from "./config";
+import { useEmbedWelcomeProps } from "./embed-welcome";
 import { useRemoteEmbedConfig } from "./remote-config";
+import { useEmbedMessages } from "./use-messages-url";
 import { useVisibilityGate } from "./use-pathname";
 import { useSuggestions } from "./use-suggestions";
 import { createWidgetEventEmitter } from "./widget-events";
@@ -55,11 +57,13 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		},
 		ref,
 	) {
-		const { config, ready } = useRemoteEmbedConfig(
+		const { config, ready: configReady } = useRemoteEmbedConfig(
 			initialConfig,
 			programmatic,
 			scriptConfig,
 		);
+		const { messages, ready: messagesReady } = useEmbedMessages(initialConfig);
+		const ready = configReady && messagesReady;
 
 		const chatRef = useRef<ChatHandle>(null);
 
@@ -126,6 +130,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		// attribution. Memoized inside the hook — the pill row keys an effect
 		// on this object's identity.
 		const suggestions = useSuggestions(config);
+		const welcomeProps = useEmbedWelcomeProps(config);
 
 		// Record every suggestion click and every rendered pill set server-side,
 		// attributed to the authored prompts involved.
@@ -156,6 +161,7 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 				<ChatEmbed
 					transport={transport}
 					ref={chatRef}
+					mode="inline"
 					api={config.api ?? ""}
 					headers={{ Authorization: `Bearer ${config.token}` }}
 					skipRemoteConfig
@@ -164,14 +170,22 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 					title={config.title}
 					hideHeader={config.hideHeader}
 					welcomeMessage={config.welcomeMessage}
+					{...welcomeProps}
 					placeholder={config.placeholder}
 					suggestions={suggestions}
 					enableThreadHistory={config.enableThreadHistory}
 					documentUpload={config.documentUpload}
 					showToolCalls={config.showToolCalls}
 					disclaimer={config.disclaimer}
+					suggestionsLayout={config.suggestionsLayout}
+					suggestionsPosition={config.suggestionsPosition}
+					sendIcon={config.sendIcon}
+					showTableToolbar={config.showTableToolbar}
+					menu={config.menu}
+					restartConfirm={config.restartConfirm}
 					hidePoweredBy={config.hidePoweredBy}
 					locale={config.locale}
+					messages={messages}
 					initializing={!ready}
 				/>
 			</WidgetEventsProvider>

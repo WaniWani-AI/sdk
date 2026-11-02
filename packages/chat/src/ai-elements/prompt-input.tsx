@@ -3,6 +3,7 @@
 import type { AttachedDocument } from "@waniwani/protocol/documents/types";
 import type { ChatStatus, FileUIPart } from "ai";
 import {
+	ArrowRightIcon,
 	ArrowUpIcon,
 	LoaderIcon,
 	PaperclipIcon,
@@ -31,6 +32,7 @@ import {
 import { useTranslation } from "../i18n";
 import { rememberDocumentPreview } from "../lib/document-previews";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { Button } from "../ui/button";
 import { DocumentTile } from "./attachments";
 
@@ -166,6 +168,8 @@ export type PromptInputProps = Omit<
 	maxPdfPages?: number;
 	/** Gates the picker, the drop target and the paste handler together. */
 	attachmentsEnabled?: boolean;
+	status?: ChatStatus;
+	empty?: boolean;
 	/** When set, an attachment uploads as soon as it is picked and the message carries its id. */
 	upload?: AttachmentUploader;
 	/** Called when a visitor takes an uploaded attachment back, so the copy already stored can go. */
@@ -193,6 +197,8 @@ export const PromptInput = ({
 	maxFileSize,
 	maxPdfPages,
 	attachmentsEnabled = true,
+	status,
+	empty,
 	upload,
 	onDiscard,
 	onError,
@@ -583,9 +589,15 @@ export const PromptInput = ({
 			/>
 			<form
 				className={cn(
-					"ww:relative ww:flex ww:w-full ww:flex-col ww:rounded-lg ww:border ww:border-border ww:bg-background",
+					"ww:relative ww:flex ww:w-full ww:flex-col ww:bg-background",
 					className,
 				)}
+				data-empty={
+					empty && attachmentsCtx.files.length === 0 ? "true" : undefined
+				}
+				data-streaming={
+					status === "submitted" || status === "streaming" ? "true" : undefined
+				}
 				onSubmit={handleSubmit}
 				ref={formRef}
 				{...props}
@@ -754,6 +766,7 @@ export const PromptInputTextarea = ({
 	return (
 		<textarea
 			className={cn(
+				PARTS.textarea,
 				"ww:field-sizing-content ww:max-h-48 ww:min-h-0 ww:w-full ww:resize-none ww:border-0 ww:bg-transparent ww:px-3 ww:py-2 ww:text-base ww:sm:text-sm ww:outline-none ww:placeholder:text-muted-foreground",
 				className,
 			)}
@@ -775,12 +788,16 @@ export const PromptInputTextarea = ({
 
 export type PromptInputSubmitProps = ComponentProps<typeof Button> & {
 	status?: ChatStatus;
+	empty?: boolean;
+	icon?: "up" | "right";
 	onStop?: () => void;
 };
 
 export const PromptInputSubmit = ({
 	className,
 	status,
+	empty,
+	icon = "up",
 	onStop,
 	onClick,
 	children,
@@ -788,13 +805,20 @@ export const PromptInputSubmit = ({
 	...props
 }: PromptInputSubmitProps) => {
 	const { t } = useTranslation();
+	const attachments = usePromptInputAttachments();
+	const hasNothingToSend = empty && attachments.files.length === 0;
 	const isGenerating = status === "submitted" || status === "streaming";
 	// `disabled` says the composer will not take another message. While this
 	// button is Stop it has to stay clickable, so the state moves to an attribute
 	// the Enter handler reads instead of riding on the button being disabled.
 	const isStop = isGenerating && onStop !== undefined;
 
-	let Icon = <ArrowUpIcon className="ww:size-4" />;
+	let Icon =
+		icon === "right" ? (
+			<ArrowRightIcon className="ww:size-4" data-icon="right" />
+		) : (
+			<ArrowUpIcon className="ww:size-4" data-icon="up" />
+		);
 	if (status === "submitted") {
 		Icon = <LoaderIcon className="ww:size-4 ww:animate-spin" />;
 	} else if (status === "streaming") {
@@ -816,16 +840,13 @@ export const PromptInputSubmit = ({
 	return (
 		<Button
 			aria-label={isGenerating ? t.promptInput.stop : t.promptInput.submit}
-			className={cn(
-				"ww:bg-foreground ww:text-background ww:hover:bg-foreground ww:rounded-full",
-				className,
-			)}
+			className={cn(isStop ? PARTS.stop : PARTS.send, className)}
 			data-submit-blocked={disabled ? "true" : undefined}
-			disabled={isStop ? false : disabled}
+			disabled={isStop ? false : disabled || hasNothingToSend}
 			onClick={handleClick}
-			size="icon-sm"
+			size="icon-themed"
 			type={isStop ? "button" : "submit"}
-			variant="ghost"
+			variant="themed"
 			{...props}
 		>
 			{children ?? Icon}
@@ -851,7 +872,7 @@ export const PromptInputAddAttachments = ({
 	if (hasFiles) {
 		return (
 			<Button
-				className={cn("ww:group ww:relative", className)}
+				className={cn(PARTS.attach, "ww:group ww:relative", className)}
 				onClick={() => attachments.clear()}
 				size="icon-sm"
 				type="button"
@@ -880,7 +901,7 @@ export const PromptInputAddAttachments = ({
 	return (
 		<Button
 			aria-label={label}
-			className={cn(className)}
+			className={cn(PARTS.attach, className)}
 			title={label}
 			onClick={() => attachments.openFileDialog()}
 			size="icon-sm"

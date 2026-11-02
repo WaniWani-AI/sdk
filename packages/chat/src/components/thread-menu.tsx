@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatRelativeTime, useTranslation } from "../i18n";
-import type { StoredThread } from "../lib/thread-store";
+import { type StoredThread, VISIBLE_THREAD_LIMIT } from "../lib/thread-store";
+import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { NewThreadButton } from "./new-thread-button";
 
 interface ThreadMenuProps {
@@ -12,8 +14,6 @@ interface ThreadMenuProps {
 	onSelectThread: (threadId: string) => void;
 	onDeleteThread: (threadId: string) => void;
 }
-
-const VISIBLE_THREAD_LIMIT = 20;
 
 function HistoryIcon({ label }: { label: string }) {
 	return (
@@ -113,14 +113,21 @@ export function ThreadMenu({
 				title={t.threadMenu.threadHistory}
 				aria-label={t.threadMenu.threadHistory}
 				aria-expanded={open}
-				className="ww:p-1.5 ww:rounded-md ww:text-muted-foreground hover:ww:text-foreground hover:ww:bg-foreground/5 ww:transition-colors ww:cursor-pointer"
+				data-state={open ? "open" : "closed"}
+				className={cn(
+					PARTS.menuButton,
+					"ww:p-1.5 ww:rounded-md ww:text-muted-foreground hover:ww:text-foreground hover:ww:bg-foreground/5 ww:transition-colors ww:cursor-pointer",
+				)}
 			>
 				<HistoryIcon label={t.threadMenu.threadHistory} />
 			</button>
 			{open && (
 				<div
 					role="menu"
-					className="ww:absolute ww:right-0 ww:top-full ww:mt-1 ww:w-72 ww:max-h-80 ww:overflow-y-auto ww:rounded-lg ww:border ww:border-border ww:bg-background ww:shadow-lg ww:z-50"
+					className={cn(
+						PARTS.menu,
+						"ww:absolute ww:right-0 ww:top-full ww:mt-1 ww:w-72 ww:max-h-80 ww:overflow-y-auto ww:rounded-lg ww:border ww:border-border ww:bg-background ww:shadow-lg ww:z-50",
+					)}
 				>
 					{visible.length === 0 && (
 						<div className="ww:px-3 ww:py-3 ww:text-xs ww:text-muted-foreground">
@@ -133,12 +140,15 @@ export function ThreadMenu({
 						return (
 							<div
 								key={thread.threadId}
-								className={`ww:flex ww:items-center ww:gap-2 ww:px-3 ww:py-2 ww:text-xs hover:ww:bg-foreground/5 ${
-									isActive ? "ww:bg-foreground/5" : ""
-								}`}
+								className={cn(
+									PARTS.menuItem,
+									"ww:flex ww:items-center ww:gap-2 ww:px-3 ww:py-2 ww:text-xs hover:ww:bg-foreground/5",
+									isActive && "ww:bg-foreground/5",
+								)}
 							>
 								<button
 									type="button"
+									data-action="open-thread"
 									onClick={() => {
 										onSelectThread(thread.threadId);
 										setOpen(false);
@@ -156,6 +166,7 @@ export function ThreadMenu({
 								</button>
 								<button
 									type="button"
+									data-action="delete"
 									onClick={(e) => {
 										e.stopPropagation();
 										onDeleteThread(thread.threadId);

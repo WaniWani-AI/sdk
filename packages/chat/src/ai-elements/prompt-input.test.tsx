@@ -1266,3 +1266,76 @@ describe("PromptInputSubmit — Stop and the full-queue guard are separate state
 		expect(submits()).toBe(0);
 	});
 });
+
+describe("PromptInputSubmit — empty composer and icon", () => {
+	function mountSubmit(props: Record<string, unknown>) {
+		act(() => {
+			root.render(
+				createElement(PromptInput, {
+					onSubmit: () => {},
+					children: createElement(PromptInputSubmit, props),
+				}),
+			);
+		});
+	}
+
+	test("send is disabled while the composer is empty", () => {
+		mountSubmit({ empty: true, status: "ready" });
+		expect(container.querySelector("button")?.hasAttribute("disabled")).toBe(
+			true,
+		);
+	});
+
+	test("send stays enabled as stop while streaming", () => {
+		mountSubmit({ empty: true, status: "streaming", onStop: () => {} });
+		expect(container.querySelector("button")?.hasAttribute("disabled")).toBe(
+			false,
+		);
+	});
+
+	test("send icon right renders the right arrow", () => {
+		mountSubmit({ empty: false, status: "ready", icon: "right" });
+		expect(container.querySelector("svg")?.getAttribute("data-icon")).toBe(
+			"right",
+		);
+	});
+
+	test("send icon defaults to the up arrow", () => {
+		mountSubmit({ empty: false, status: "ready" });
+		expect(container.querySelector("svg")?.getAttribute("data-icon")).toBe(
+			"up",
+		);
+	});
+
+	test("an attachment with empty text keeps send enabled", async () => {
+		act(() => {
+			root.render(
+				createElement(PromptInput, {
+					onSubmit: (message: MessageType) => {
+						submissions.push(message);
+					},
+					empty: true,
+					children: createElement(Fragment, null, [
+						createElement(Probe, { key: "probe" }),
+						createElement(PromptInputTextarea, { key: "text" }),
+						createElement(PromptInputSubmit, {
+							key: "submit",
+							empty: true,
+							status: "ready",
+						}),
+					]),
+				} as PromptInputPropsType),
+			);
+		});
+		const button = container.querySelector("button");
+		const form = container.querySelector("form");
+		expect(button?.hasAttribute("disabled")).toBe(true);
+		expect(form?.getAttribute("data-empty")).toBe("true");
+		act(() => {
+			attachments().add([file("policy.pdf", "application/pdf")]);
+		});
+		await settle();
+		expect(button?.hasAttribute("disabled")).toBe(false);
+		expect(form?.hasAttribute("data-empty")).toBe(false);
+	});
+});

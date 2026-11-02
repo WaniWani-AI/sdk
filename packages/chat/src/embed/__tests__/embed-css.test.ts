@@ -17,7 +17,12 @@ afterAll(() => {
 	});
 });
 
-const { HOST_TEXT_RESET, injectEmbedCss } = await import("../embed-css");
+const {
+	extractPropertyRules,
+	HOST_TEXT_RESET,
+	injectEmbedCss,
+	TAILWIND_PROPERTIES_STYLE_ID,
+} = await import("../embed-css");
 
 // WAN-1441: a theme's `body { font-weight: 500 }` reached the chat through the
 // shadow boundary, because inheritance crosses it even though selectors don't.
@@ -32,6 +37,32 @@ describe("injectEmbedCss", () => {
 		const styles = shadow.querySelectorAll("style");
 		expect(styles.length).toBe(1);
 		expect(styles[0]?.textContent).toBe(HOST_TEXT_RESET);
+	});
+});
+
+describe("registered Tailwind properties", () => {
+	const COMPILED =
+		'@layer theme{:root{--ww-x:1}}@property --tw-border-style{syntax:"*";inherits:false;initial-value:solid}.ww\\:border{border-style:var(--tw-border-style);border-width:1px}@property --tw-translate-x{syntax:"*";inherits:false;initial-value:0}';
+
+	test("extracts every @property block and nothing else", () => {
+		expect(extractPropertyRules(COMPILED)).toBe(
+			'@property --tw-border-style{syntax:"*";inherits:false;initial-value:solid}@property --tw-translate-x{syntax:"*";inherits:false;initial-value:0}',
+		);
+	});
+
+	test("registers them once in the document head, where shadow trees see them", () => {
+		document.getElementById(TAILWIND_PROPERTIES_STYLE_ID)?.remove();
+		const first = document.createElement("div").attachShadow({ mode: "open" });
+		const second = document.createElement("div").attachShadow({ mode: "open" });
+		injectEmbedCss(first, COMPILED);
+		injectEmbedCss(second, COMPILED);
+
+		const registered = document.head.querySelectorAll(
+			`style#${TAILWIND_PROPERTIES_STYLE_ID}`,
+		);
+		expect(registered.length).toBe(1);
+		expect(registered[0]?.textContent).toContain("@property --tw-border-style");
+		expect(first.querySelectorAll("style")[1]?.textContent).toBe(COMPILED);
 	});
 });
 

@@ -184,4 +184,6 @@ npx skills add Waniwani-AI/sdk -s audit-tracking        # read-only audit of an 
   ([/sdk/reference/flow-tool-contract](https://docs.waniwani.ai/sdk/reference/flow-tool-contract)).
 - **Calling `interrupt` / `showWidget` directly**: they come from the handler context,
   `({ interrupt }) => interrupt(...)`.
+- **Restyling the chat widget through its `ww:` utility classes**: they change between releases. Style
+  the `ww-*` part classes and `--ww-*` tokens instead ([/sdk/chat/theming](https://docs.waniwani.ai/sdk/chat/theming)).
 - **Answering from memory**: if you have not fetched the docs page for what you are writing, fetch it.

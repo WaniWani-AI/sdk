@@ -31,7 +31,7 @@ import { createWidgetEventEmitter } from "../embed/widget-events";
 import { WidgetEventsProvider } from "../embed/widget-events-context";
 import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
-import type { Locale, MessageOverrides } from "../i18n";
+import type { Locale, LocaleMessageOverrides, MessageOverrides } from "../i18n";
 import {
 	createChatTrackClient,
 	createNoopChatTrackClient,
@@ -118,8 +118,9 @@ export interface WaniwaniChatOverrides {
 	/**
 	 * Per-key overrides on top of the resolved locale catalog. Lets you
 	 * tweak individual built-in strings without contributing a full locale.
+	 * Flat (applies to every locale) or keyed by locale.
 	 */
-	messages?: MessageOverrides;
+	messages?: MessageOverrides | LocaleMessageOverrides;
 	/**
 	 * Opt out of the top-of-funnel `page.viewed` event fired once on mount.
 	 * Defaults to `false` (the event fires). Set `true` on surfaces where a
@@ -453,6 +454,9 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 						? innerRef.current.sendMessageAndWait(text)
 						: Promise.resolve(undefined),
 				reset: () => innerRef.current?.reset(),
+				restart: () => innerRef.current?.restart(),
+				copyConversation: async () =>
+					(await innerRef.current?.copyConversation()) ?? false,
 				focus: () => innerRef.current?.focus(),
 				get messages() {
 					return innerRef.current?.messages ?? [];

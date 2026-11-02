@@ -3,7 +3,7 @@
 // ============================================================================
 
 import type { ChatTheme, DocumentUploadConfig } from "../@types";
-import type { Locale } from "../i18n";
+import type { Locale, LocaleMessageOverrides, MessageOverrides } from "../i18n";
 import type { VisitorIdInput } from "../lib/visitor-context";
 import type { VisibilityRules } from "./visibility";
 import type { WidgetEvent } from "./widget-events";
@@ -115,6 +115,50 @@ export interface ComposerAppearance {
  *   a generic working indicator shows while the agent works.
  */
 export type ShowToolCalls = boolean | "titles-only";
+
+export const AVATAR_SLOTS = [
+	"welcome",
+	"header",
+	"message",
+	"composer",
+	"dock",
+] as const;
+
+/** Where the avatar image may appear. */
+export type AvatarSlot = (typeof AVATAR_SLOTS)[number];
+
+function isAvatarSlot(value: string): value is AvatarSlot {
+	return (AVATAR_SLOTS as readonly string[]).includes(value);
+}
+
+export const DOCK_CHIPS_TRIGGERS = ["hover", "scroll", "always"] as const;
+
+export type DockChipsTrigger = (typeof DOCK_CHIPS_TRIGGERS)[number];
+
+export type DockClick = "expand" | "open";
+
+export const MENU_ACTIONS = [
+	"new-chat",
+	"restart",
+	"copy-conversation",
+	"history",
+	"delete",
+] as const;
+
+/** An entry of the header menu, in the order given. */
+export type MenuAction = (typeof MENU_ACTIONS)[number];
+
+function isMenuAction(value: string): value is MenuAction {
+	return (MENU_ACTIONS as readonly string[]).includes(value);
+}
+
+/** `"a|b|"` → `["a", "b"]`: trimmed, empty entries dropped. */
+export function splitPipeList(raw: string): string[] {
+	return raw
+		.split("|")
+		.map((part) => part.trim())
+		.filter(Boolean);
+}
 
 /** Intent tier of a page prompt (discover/compare/act); one shown per tier. */
 export type PagePromptTier = "low" | "medium" | "high";
@@ -244,6 +288,44 @@ export interface EmbedConfig {
 	hideHeader?: boolean;
 	/** Welcome message shown before the first user message. */
 	welcomeMessage?: string;
+	/**
+	 * URL of the assistant's avatar image. Shown in `avatarSlots`. Surfaced as
+	 * `data-avatar`.
+	 */
+	avatar?: string;
+	/**
+	 * Where the avatar appears. Defaults to `["welcome", "header"]` when
+	 * `avatar` is set. Surfaced as `data-avatar-slots` (comma-separated).
+	 */
+	avatarSlots?: AvatarSlot[];
+	/**
+	 * URL of an animated image (GIF, animated WebP, APNG) played once per slot
+	 * before `avatar` takes over. Surfaced as `data-avatar-intro`.
+	 */
+	avatarIntro?: string;
+	/**
+	 * How long `avatarIntro` plays, in ms, counted from the moment it loads.
+	 * Defaults to 7000. Surfaced as `data-avatar-intro-duration`.
+	 */
+	avatarIntroDuration?: number;
+	/**
+	 * Title of the structured welcome shown while the conversation is empty,
+	 * in place of the `welcomeMessage` bubble. A `|` starts a new line. When
+	 * unset, `messages.welcome.title` fills it. Surfaced as
+	 * `data-welcome-title`.
+	 */
+	welcomeTitle?: string;
+	/**
+	 * Subtitles under the welcome title. More than one rotates every
+	 * `welcomeSubtitleRotate` ms. Surfaced as `data-welcome-subtitle`
+	 * (`|`-separated).
+	 */
+	welcomeSubtitle?: string[];
+	/**
+	 * Milliseconds between welcome subtitle swaps. Unset or `0` keeps the
+	 * first one. Surfaced as `data-welcome-subtitle-rotate`.
+	 */
+	welcomeSubtitleRotate?: number;
 	/** Placeholder text for the input field. */
 	placeholder?: string;
 	/** Initial suggestion chips displayed before the first message. */
@@ -261,6 +343,71 @@ export interface EmbedConfig {
 	 * to hide).
 	 */
 	disclaimer?: string | false;
+	/** Surfaced as `data-suggestions-layout`: `wrap` (default) or `single-row`. */
+	suggestionsLayout?: "wrap" | "single-row";
+	/**
+	 * Surfaced as `data-suggestions-position`: `above-input` (default) or
+	 * `after-message`. The pre-chat row stays above the input either way.
+	 */
+	suggestionsPosition?: "above-input" | "after-message";
+	/** Surfaced as `data-send-icon`: `up` (default) or `right`. */
+	sendIcon?: "up" | "right";
+	/**
+	 * Header menu entries, in order. When set, one menu replaces the New chat
+	 * and thread history buttons. Surfaced as `data-menu` (comma-separated:
+	 * `new-chat`, `restart`, `copy-conversation`, `history`, `delete`).
+	 */
+	menu?: MenuAction[];
+	/**
+	 * Ask before the menu's `restart` clears the conversation. Surfaced as
+	 * `data-restart-confirm`.
+	 */
+	restartConfirm?: boolean;
+	/**
+	 * When the floating bar's suggestion chips show, as a list whose triggers
+	 * combine (the first to fire wins). `hover` (default) expands them a beat
+	 * after the bar appears and on focus; `scroll` adds a pause after
+	 * scrolling down into a section, once per section; `always` keeps them
+	 * expanded from the moment the bar appears. A single string is accepted
+	 * and treated as a one-element list. Surfaced as `data-dock-chips-trigger`,
+	 * a comma-separated list such as `hover,scroll`.
+	 */
+	dockChipsTrigger?: DockChipsTrigger[];
+	/**
+	 * Write `--ww-pointer-x` and `--ww-pointer-y` (px, relative to the bar) on
+	 * `ww-dock` while the pointer moves over it. Off by default. Surfaced as
+	 * `data-dock-pointer-vars`.
+	 */
+	dockPointerVars?: boolean;
+	/**
+	 * `false` renders the floating bar's input without the animated border
+	 * glow. On by default. Surfaced as `data-dock-glow`.
+	 */
+	dockGlow?: boolean;
+	/**
+	 * Make the floating bar's input read-only on narrow viewports, so a tap
+	 * opens the panel without raising the keyboard. Off by default. Surfaced
+	 * as `data-dock-readonly-mobile`.
+	 */
+	dockReadonlyMobile?: boolean;
+	/**
+	 * On narrow viewports, hold one browser history entry while the panel is
+	 * open so the back gesture closes it instead of leaving the page. Off by
+	 * default. Surfaced as `data-panel-history`.
+	 */
+	panelHistory?: boolean;
+	/**
+	 * What a click or focus on the floating bar's input does before any
+	 * conversation exists. `expand` (default) widens the bar and shows the
+	 * chips; `open` opens the panel, as a tap does on phones. Surfaced as
+	 * `data-dock-click`.
+	 */
+	dockClick?: DockClick;
+	/**
+	 * `false` hides the copy and download toolbar above tables in answers.
+	 * Shown by default. Surfaced as `data-show-table-toolbar`.
+	 */
+	showTableToolbar?: boolean;
 	/** @internal Enterprise only: hides the "powered by Waniwani" logo. */
 	hidePoweredBy?: boolean;
 	/** URL to a custom stylesheet injected into the shadow root. */
@@ -296,6 +443,19 @@ export interface EmbedConfig {
 	 * English. Surfaced as `data-locale` on the embed script tag.
 	 */
 	locale?: Locale;
+	/**
+	 * Overrides for any built-in string, flat (applies to every locale) or
+	 * keyed by locale (`{ "fr": { "menu": { "restart": "…" } } }`). Layered
+	 * over the map fetched from `messagesUrl`; these win per key. Surfaced as
+	 * `data-messages` (JSON) on the embed script tag.
+	 */
+	messages?: MessageOverrides | LocaleMessageOverrides;
+	/**
+	 * URL of a JSON file with the same shape as `messages`, fetched on mount.
+	 * The chat waits for it (up to a short timeout) before it paints, so the
+	 * built-in wording never flashes. Surfaced as `data-messages-url`.
+	 */
+	messagesUrl?: string;
 	/**
 	 * How the widget renders.
 	 *
@@ -388,7 +548,8 @@ export interface EmbedConfig {
 	 * Host-page callback fired on chat lifecycle events (`chat.ready`,
 	 * `chat.opened`/`chat.closed` in floating mode, `message.sent`,
 	 * `message.received`, `session.started`, `thread.changed`, `chat.error`,
-	 * `suggestion.clicked`, `suggestions.shown`, `link.clicked`). Message events never include the
+	 * `suggestion.clicked`, `suggestions.shown`, `link.clicked`,
+	 * `conversation.copied`, `conversation.restarted`). Message events never include the
 	 * message text. The embed runs in the host page's DOM, so the callback can
 	 * forward events directly into the page's analytics.
 	 *
@@ -502,6 +663,50 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.welcomeMessage = welcomeMessage;
 	}
 
+	const avatar = str("data-avatar")?.trim();
+	if (avatar) {
+		config.avatar = avatar;
+	}
+
+	const avatarSlots = str("data-avatar-slots")
+		?.split(",")
+		.map((slot) => slot.trim().toLowerCase())
+		.filter(isAvatarSlot);
+	if (avatarSlots?.length) {
+		config.avatarSlots = avatarSlots;
+	}
+
+	const avatarIntro = str("data-avatar-intro")?.trim();
+	if (avatarIntro) {
+		config.avatarIntro = avatarIntro;
+	}
+
+	const avatarIntroDuration = Number.parseInt(
+		str("data-avatar-intro-duration")?.trim() ?? "",
+		10,
+	);
+	if (Number.isFinite(avatarIntroDuration) && avatarIntroDuration > 0) {
+		config.avatarIntroDuration = avatarIntroDuration;
+	}
+
+	const welcomeTitle = str("data-welcome-title")?.trim();
+	if (welcomeTitle) {
+		config.welcomeTitle = welcomeTitle;
+	}
+
+	const welcomeSubtitle = splitPipeList(str("data-welcome-subtitle") ?? "");
+	if (welcomeSubtitle.length > 0) {
+		config.welcomeSubtitle = welcomeSubtitle;
+	}
+
+	const welcomeSubtitleRotate = Number.parseInt(
+		str("data-welcome-subtitle-rotate")?.trim() ?? "",
+		10,
+	);
+	if (Number.isFinite(welcomeSubtitleRotate) && welcomeSubtitleRotate >= 0) {
+		config.welcomeSubtitleRotate = welcomeSubtitleRotate;
+	}
+
 	const placeholder = str("data-placeholder");
 	if (placeholder) {
 		config.placeholder = placeholder;
@@ -589,6 +794,16 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		config.locale = localeRaw;
 	}
 
+	const messages = parseMessagesAttr(str("data-messages"));
+	if (messages) {
+		config.messages = messages;
+	}
+
+	const messagesUrl = str("data-messages-url")?.trim();
+	if (messagesUrl) {
+		config.messagesUrl = messagesUrl;
+	}
+
 	const modeRaw = str("data-mode");
 	if (
 		modeRaw === "inline" ||
@@ -662,7 +877,102 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 		}
 	}
 
+	const suggestionsLayout = str("data-suggestions-layout")?.trim();
+	if (suggestionsLayout === "wrap" || suggestionsLayout === "single-row") {
+		config.suggestionsLayout = suggestionsLayout;
+	}
+
+	const suggestionsPosition = str("data-suggestions-position")?.trim();
+	if (
+		suggestionsPosition === "above-input" ||
+		suggestionsPosition === "after-message"
+	) {
+		config.suggestionsPosition = suggestionsPosition;
+	}
+
+	const sendIcon = str("data-send-icon")?.trim();
+	if (sendIcon === "up" || sendIcon === "right") {
+		config.sendIcon = sendIcon;
+	}
+
+	const menu = str("data-menu")
+		?.split(",")
+		.map((action) => action.trim().toLowerCase())
+		.filter(isMenuAction);
+	if (menu?.length) {
+		config.menu = [...new Set(menu)];
+	}
+
+	const restartConfirm = bool("data-restart-confirm");
+	if (restartConfirm !== undefined) {
+		config.restartConfirm = restartConfirm;
+	}
+
+	const dockChipsTriggers = [
+		...new Set(
+			(str("data-dock-chips-trigger") ?? "")
+				.split(",")
+				.map((value) => value.trim().toLowerCase())
+				.filter((value): value is DockChipsTrigger =>
+					(DOCK_CHIPS_TRIGGERS as readonly string[]).includes(value),
+				),
+		),
+	];
+	if (dockChipsTriggers.length > 0) {
+		config.dockChipsTrigger = dockChipsTriggers;
+	}
+
+	const dockPointerVars = bool("data-dock-pointer-vars");
+	if (dockPointerVars !== undefined) {
+		config.dockPointerVars = dockPointerVars;
+	}
+
+	const dockGlow = bool("data-dock-glow");
+	if (dockGlow !== undefined) {
+		config.dockGlow = dockGlow;
+	}
+
+	const dockReadonlyMobile = bool("data-dock-readonly-mobile");
+	if (dockReadonlyMobile !== undefined) {
+		config.dockReadonlyMobile = dockReadonlyMobile;
+	}
+
+	const panelHistory = bool("data-panel-history");
+	if (panelHistory !== undefined) {
+		config.panelHistory = panelHistory;
+	}
+
+	const dockClick = str("data-dock-click")?.trim().toLowerCase();
+	if (dockClick === "expand" || dockClick === "open") {
+		config.dockClick = dockClick;
+	}
+
+	const showTableToolbar = bool("data-show-table-toolbar");
+	if (showTableToolbar !== undefined) {
+		config.showTableToolbar = showTableToolbar;
+	}
+
 	return config;
+}
+
+function parseMessagesAttr(
+	raw: string | undefined,
+): MessageOverrides | LocaleMessageOverrides | undefined {
+	if (raw === undefined) {
+		return undefined;
+	}
+	try {
+		const parsed: unknown = JSON.parse(raw);
+		if (
+			typeof parsed === "object" &&
+			parsed !== null &&
+			!Array.isArray(parsed)
+		) {
+			return parsed as MessageOverrides | LocaleMessageOverrides;
+		}
+	} catch {}
+	console.warn("[Waniwani] Invalid data-messages JSON");
+	return undefined;
 }
 
 /**
@@ -740,6 +1050,10 @@ export function resolveConfig(
 		...(appearance ? { appearance } : {}),
 		...(hasComposer ? { composer } : {}),
 	};
+
+	if (typeof merged.dockChipsTrigger === "string") {
+		merged.dockChipsTrigger = [merged.dockChipsTrigger];
+	}
 
 	if (!merged.token) {
 		throw new Error(

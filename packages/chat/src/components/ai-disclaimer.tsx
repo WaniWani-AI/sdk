@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslation } from "../i18n";
+import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 
 /**
  * Short notice rendered under the chat input warning users that responses
@@ -20,7 +22,12 @@ export function AiDisclaimer({
 		return null;
 	}
 	return (
-		<span className="ww:whitespace-nowrap ww:text-[10px] ww:sm:text-[11px] ww:text-muted-foreground ww:opacity-70">
+		<span
+			className={cn(
+				PARTS.disclaimer,
+				"ww:whitespace-nowrap ww:text-[length:var(--ww-disclaimer-size)] ww:text-[color:var(--ww-disclaimer-fg)] ww:opacity-70",
+			)}
+		>
 			{text ||
 				(standalone ? t.aiDisclaimer.standalone : t.aiDisclaimer.default)}
 		</span>

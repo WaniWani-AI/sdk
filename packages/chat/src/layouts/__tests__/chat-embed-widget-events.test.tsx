@@ -201,6 +201,17 @@ describe("ChatEmbed widget events", () => {
 		});
 	});
 
+	test("after-message keeps the pre-chat row above the input while the thread is empty", async () => {
+		const { events } = await renderEmbed({
+			suggestionsPosition: "after-message",
+		});
+
+		expect(
+			document.querySelectorAll(".ww-suggestions .ww-suggestion"),
+		).toHaveLength(2);
+		expect(shownSets(events)).toHaveLength(1);
+	});
+
 	test("welcome-screen cards announce their own impression", async () => {
 		const { events } = await renderEmbed({
 			suggestions: false,
@@ -250,5 +261,96 @@ describe("ChatEmbed widget events", () => {
 			mode: "inline",
 			properties: { url: "https://example.com/docs" },
 		});
+	});
+});
+
+function lifecycleTransport() {
+	const calls = { reset: 0, dispose: 0 };
+	const factory = () => ({
+		sendMessages: async () => new ReadableStream(),
+		reconnectToStream: async () => null,
+		reset: () => {
+			calls.reset += 1;
+		},
+		dispose: () => {
+			calls.dispose += 1;
+		},
+	});
+	return { calls, factory: factory as unknown as EmbedProps["transport"] };
+}
+
+describe("ChatEmbed restart", () => {
+	for (const enableThreadHistory of [true, false]) {
+		test(`restart ${enableThreadHistory ? "starts a new thread" : "resets the chat"} with thread history ${enableThreadHistory ? "on" : "off"}`, async () => {
+			const handle: { current: import("../../@types").ChatHandle | null } = {
+				current: null,
+			};
+			const { calls, factory } = lifecycleTransport();
+			const { events } = await renderEmbed({
+				ref: handle,
+				transport: factory,
+				enableThreadHistory,
+			});
+			const before = { ...calls };
+
+			await act(async () => {
+				handle.current?.restart();
+			});
+
+			expect(calls.reset - before.reset).toBe(enableThreadHistory ? 0 : 1);
+			expect(calls.dispose - before.dispose).toBe(enableThreadHistory ? 1 : 0);
+			expect(events.map((e) => e.name)).toContain("conversation.restarted");
+		});
+	}
+});
+
+describe("ChatEmbed header menu", () => {
+	test("without menu the header keeps its own controls", async () => {
+		await renderEmbed({ title: "Assistant" });
+
+		expect(document.querySelector(".ww-header")).not.toBeNull();
+		expect(document.querySelector(".ww-menu-button")).toBeNull();
+		expect(document.querySelector(".ww-dialog")).toBeNull();
+	});
+
+	test("menu replaces the header controls with one menu", async () => {
+		await renderEmbed({ menu: ["new-chat", "restart"] });
+
+		expect(document.querySelector(".ww-header .ww-menu-button")).not.toBeNull();
+		expect(document.querySelector(".ww-new-chat")).toBeNull();
+	});
+
+	test("restart and copyConversation on the handle emit their events", async () => {
+		const handle: { current: import("../../@types").ChatHandle | null } = {
+			current: null,
+		};
+		const written: string[] = [];
+		Object.defineProperty(navigator, "clipboard", {
+			value: {
+				writeText: async (text: string) => {
+					written.push(text);
+				},
+			},
+			configurable: true,
+		});
+		const { events } = await renderEmbed({ ref: handle });
+
+		await act(async () => {
+			handle.current?.restart();
+		});
+		let copied = false;
+		await act(async () => {
+			copied = (await handle.current?.copyConversation()) ?? false;
+		});
+		delete (navigator as unknown as Record<string, unknown>).clipboard;
+
+		expect(copied).toBe(true);
+		expect(written).toHaveLength(1);
+		expect(written[0]).toContain(window.location.hostname);
+		expect(
+			events
+				.map((e) => e.name)
+				.filter((name) => name.startsWith("conversation.")),
+		).toEqual(["conversation.restarted", "conversation.copied"]);
 	});
 });

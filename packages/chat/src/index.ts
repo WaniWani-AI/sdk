@@ -1,12 +1,17 @@
 // Chat Widget Module - Client-side React components
 
 export type {
+	AvatarIntro,
+	AvatarSlot,
 	ChatAppearance,
 	ChatBaseProps,
 	ChatEmbedMcpConfig,
 	ChatEmbedProps,
 	ChatHandle,
 	ChatTheme,
+	LocaleMessageOverrides,
+	MenuAction,
+	MessageOverrides,
 	ShowToolCalls,
 	SuggestionsConfig,
 	ThemePreset,

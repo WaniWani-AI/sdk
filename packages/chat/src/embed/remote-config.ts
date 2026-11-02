@@ -80,7 +80,7 @@ export function saveCachedConfig(
  * forever. After this, render with whatever config we have (programmatic +
  * defaults) even if the fetch is still in flight.
  */
-const READINESS_TIMEOUT_MS = 600;
+export const READINESS_TIMEOUT_MS = 600;
 
 interface RemoteConfigResponse {
 	welcomeMessage: string | null;

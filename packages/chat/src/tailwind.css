@@ -67,6 +67,7 @@
 	--color-card-header: #ffffff;
 	--color-card-header-foreground: #1f2937;
 	--color-status: #22c55e;
+	--color-destructive: #dc2626;
 	--color-tool-card: #f4f4f5;
 	--color-user-bubble-text: #1f2937;
 	--color-assistant-bubble-text: #1f2937;
@@ -83,24 +84,25 @@
    Panel: expands open from the centered docked input's footprint via an
    animated `clip-path` inset, so it grows out of the bar — up, left, and
    right. The resting clip uses a negative inset so the panel's drop shadow
-   isn't clipped away.
+   isn't clipped away. `opening` shares the `shown` end state and `closing`
+   the `hidden` one, so the SDK's motion is one transition per direction while
+   client CSS can hang its own keyframes on the transient states.
+
+   End states apply everywhere; the motion only runs when the visitor has not
+   asked for reduced motion, so the fallback is an instant swap.
 
    The shadow host overlay is `pointer-events: none`; a shown dock/panel must
    opt back in or real clicks pass straight through to the page.
    ───────────────────────────────────────────────────────────────────── */
-[data-waniwani-floating="dock"] {
-	transition: opacity 0.32s ease,
-		transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.3s ease,
-		visibility 0s linear 0.42s;
+[data-waniwani-floating="dock"],
+[data-waniwani-floating="panel"] {
+	transition: none;
 }
 [data-waniwani-floating="dock"][data-appeared="true"][data-state="shown"] {
 	visibility: visible;
 	opacity: 1;
 	transform: translateY(0);
 	pointer-events: auto;
-	transition: opacity 0.32s ease,
-		transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.3s ease,
-		visibility 0s;
 }
 /* Not yet appeared, or hidden because the panel took over. */
 [data-waniwani-floating="dock"][data-appeared="false"],
@@ -111,20 +113,16 @@
 	transform: translateY(1rem);
 }
 
-[data-waniwani-floating="panel"] {
-	transition: clip-path 0.44s cubic-bezier(0.22, 1, 0.36, 1),
-		opacity 0.26s ease, visibility 0s linear 0.44s;
-}
+[data-waniwani-floating="panel"][data-state="opening"],
 [data-waniwani-floating="panel"][data-state="shown"] {
 	visibility: visible;
 	opacity: 1;
 	pointer-events: auto;
 	clip-path: inset(-40px round 18px);
-	transition: clip-path 0.44s cubic-bezier(0.22, 1, 0.36, 1),
-		opacity 0.26s ease, visibility 0s;
 }
 /* Closed clip — a wide, short rounded bar at the bottom matching the docked
    input's footprint, so the panel appears to grow up and out of it. */
+[data-waniwani-floating="panel"][data-state="closing"],
 [data-waniwani-floating="panel"][data-state="hidden"] {
 	opacity: 0;
 	visibility: hidden;
@@ -135,23 +133,37 @@
 /* Mobile: the panel is a full-screen sheet — reveal it edge-to-edge (no
    rounding) from a centered strip near the bottom where the dock spans. */
 @media (max-width: 639px) {
+	[data-waniwani-floating="panel"][data-state="opening"],
 	[data-waniwani-floating="panel"][data-state="shown"] {
 		clip-path: inset(0 round 0);
 	}
+	[data-waniwani-floating="panel"][data-state="closing"],
 	[data-waniwani-floating="panel"][data-state="hidden"] {
 		clip-path: inset(calc(100% - 72px) 6% 0 6% round 22px);
 	}
 }
 
-@media (prefers-reduced-motion: reduce) {
-	[data-waniwani-floating="dock"],
-	[data-waniwani-floating="panel"] {
-		transition: visibility 0s linear 0.01s;
-		clip-path: none;
+@media (prefers-reduced-motion: no-preference) {
+	[data-waniwani-floating="dock"] {
+		transition: opacity 0.32s ease,
+			transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.3s ease,
+			visibility 0s linear 0.42s;
 	}
-	[data-waniwani-floating="dock"][data-appeared="true"][data-state="shown"],
+	[data-waniwani-floating="dock"][data-appeared="true"][data-state="shown"] {
+		transition: opacity 0.32s ease,
+			transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.3s ease,
+			visibility 0s;
+	}
+
+	[data-waniwani-floating="panel"] {
+		transition: clip-path var(--ww-panel-close-duration) cubic-bezier(0.22, 1, 0.36, 1),
+			opacity var(--ww-panel-close-duration) ease,
+			visibility 0s linear var(--ww-panel-close-duration);
+	}
+	[data-waniwani-floating="panel"][data-state="opening"],
 	[data-waniwani-floating="panel"][data-state="shown"] {
-		transition: visibility 0s;
+		transition: clip-path var(--ww-panel-open-duration) cubic-bezier(0.22, 1, 0.36, 1),
+			opacity var(--ww-panel-close-duration) ease, visibility 0s;
 	}
 }
 
@@ -193,8 +205,8 @@
 	--ww-color-card-header: var(--ww-header-bg, #ffffff);
 	--ww-color-card-header-foreground: var(--ww-header-text, #1f2937);
 	--ww-color-status: var(--ww-status, #22c55e);
+	--ww-color-destructive: var(--ww-destructive, #dc2626);
 	--ww-color-tool-card: var(--ww-tool-card, #f4f4f5);
-	--ww-radius: var(--ww-radius, 16px);
 	--ww-font-sans: var(--ww-font, system-ui, -apple-system, "Segoe UI", sans-serif);
 	--ww-color-user-bubble-text: var(--ww-user-bubble-text, var(--ww-color-primary-foreground));
 	--ww-color-assistant-bubble-text: var(--ww-assistant-bubble-text, var(--ww-color-foreground));
@@ -209,6 +221,53 @@
 	--ww-glass: color-mix(in srgb, var(--ww-glass-tint, transparent) calc(var(--ww-glass-tint-opacity, 0) * 100%), rgba(236, 238, 244, 0.6));
 	--ww-glass-border: rgba(0, 0, 0, 0.06);
 
+	--ww-content-max-width: 48rem;
+	--ww-send-bg: var(--ww-color-foreground);
+	--ww-send-fg: var(--ww-color-background);
+	--ww-send-size: 1.75rem;
+	--ww-send-radius: 9999px;
+	--ww-send-disabled-bg: var(--ww-send-bg);
+	--ww-send-disabled-fg: var(--ww-send-fg);
+	--ww-send-disabled-opacity: 1;
+	--ww-stop-bg: var(--ww-send-bg);
+	--ww-stop-fg: var(--ww-send-fg);
+	--ww-suggestion-bg: var(--ww-color-accent);
+	--ww-suggestion-fg: var(--ww-color-foreground);
+	--ww-suggestion-border: var(--ww-color-border);
+	--ww-suggestion-radius: 9999px;
+	--ww-suggestion-hover-bg: var(--ww-color-border);
+	--ww-suggestion-stagger: 50ms;
+	--ww-input-radius: 1rem;
+	--ww-input-border: var(--ww-color-border);
+	--ww-input-border-width: 1px;
+	--ww-input-shadow: none;
+	--ww-header-height: auto;
+	--ww-avatar-size: 2rem;
+	--ww-panel-width: 1000px;
+	--ww-panel-height: 720px;
+	--ww-panel-radius: 1rem;
+	--ww-panel-offset: 1rem;
+	--ww-panel-open-duration: 440ms;
+	--ww-panel-close-duration: 260ms;
+	--ww-dock-width: 440px;
+	--ww-dock-width-expanded: 720px;
+	--ww-dock-radius: 20px;
+	/* Paint the expanded card (`ww-dock-card`), not the bar at rest. */
+	--ww-dock-bg: var(--ww-glass);
+	--ww-dock-border: var(--ww-glass-border);
+	--ww-dock-field-radius: 16px;
+	--ww-dock-field-border: var(--ww-color-border);
+	--ww-dock-field-border-width: 1px;
+	--ww-heading-1: 1.875rem;
+	--ww-heading-2: 1.5rem;
+	--ww-heading-3: 1.25rem;
+	--ww-disclaimer-fg: var(--ww-color-muted-foreground);
+	--ww-disclaimer-size: 0.6875rem;
+	/* lightningcss rounds a bare 2147483002 to 2147480000; splitting it keeps the exact value */
+	--ww-z-index: calc(var(--ww-z-index-hi, 2147) * 1000000 + 483002);
+	--ww-toast-duration: 2200ms;
+	--ww-toast-leave-duration: 200ms;
+
 	/* Opt-in panel chrome. Defaults are no-ops so customers who slot
 	   `<ChatEmbed>` into their own bordered/shadowed container see no
 	   change. Set `appearance.variables.borderWidth` / `boxShadow` or
@@ -217,6 +276,77 @@
 	border-width: var(--ww-border-width, 0);
 	border-color: var(--ww-color-border);
 	box-shadow: var(--ww-shadow, none);
+}
+
+@media (width < 40rem) {
+	[data-waniwani-chat] {
+		--ww-disclaimer-size: 0.625rem;
+	}
+}
+
+:where([data-waniwani-chat]) {
+	border-radius: var(--ww-radius, 0);
+}
+
+/* Layered so the utilities a React consumer passes through `classNames` win,
+   while a client's unlayered `data-css` rule still beats them both. */
+@layer components {
+	:where([data-waniwani-chat]) .ww-input {
+		border-radius: var(--ww-input-radius);
+		border-color: var(--ww-input-border);
+		border-width: var(--ww-input-border-width);
+		box-shadow: var(--ww-input-shadow);
+	}
+
+	:where([data-waniwani-chat]) .ww-send,
+	:where([data-waniwani-chat]) .ww-send:hover {
+		background-color: var(--ww-send-bg);
+		color: var(--ww-send-fg);
+		flex-shrink: 0;
+	}
+
+	:where([data-waniwani-chat]) .ww-send:disabled {
+		background-color: var(--ww-send-disabled-bg);
+		color: var(--ww-send-disabled-fg);
+		opacity: var(--ww-send-disabled-opacity);
+	}
+
+	/* The queue is full: dimmed whatever the empty-state tokens say. */
+	:where([data-waniwani-chat]) .ww-send[data-submit-blocked="true"] {
+		opacity: 0.5;
+	}
+
+	:where([data-waniwani-chat]) .ww-stop,
+	:where([data-waniwani-chat]) .ww-stop:hover {
+		background-color: var(--ww-stop-bg);
+		color: var(--ww-stop-fg);
+		flex-shrink: 0;
+	}
+}
+
+:where([data-waniwani-chat]) .ww-dock-field {
+	border: var(--ww-dock-field-border-width) solid var(--ww-dock-field-border);
+}
+
+:where(.ww-suggestions[data-layout="single-row"]) {
+	max-height: calc(1lh + 1.25rem);
+	overflow: hidden;
+}
+
+:where(.ww-suggestions[data-layout="single-row"] .ww-suggestion) {
+	flex-shrink: 0;
+	white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	:where(.ww-suggestion) {
+		animation: ww-fade-in 0.2s ease-out both;
+	}
+}
+
+/* After the animation shorthand above, which would reset it. */
+:where(.ww-suggestion) {
+	animation-delay: calc(var(--ww-suggestion-stagger) * var(--ww-index, 0));
 }
 
 /* Opt-in assistant bubble. Off by default (assistant messages are plain
@@ -249,6 +379,7 @@
 	--ww-color-card-header: var(--ww-header-bg, #1e1e1e);
 	--ww-color-card-header-foreground: var(--ww-header-text, #ececec);
 	--ww-color-status: var(--ww-status, #22c55e);
+	--ww-color-destructive: var(--ww-destructive, #f87171);
 	--ww-color-tool-card: var(--ww-tool-card, #262626);
 	--ww-color-user-bubble-text: var(--ww-user-bubble-text, #ffffff);
 	--ww-color-assistant-bubble-text: var(--ww-assistant-bubble-text, var(--ww-color-foreground));
@@ -276,6 +407,7 @@
 		--ww-color-card-header: var(--ww-header-bg, #1e1e1e);
 		--ww-color-card-header-foreground: var(--ww-header-text, #ececec);
 		--ww-color-status: var(--ww-status, #22c55e);
+		--ww-color-destructive: var(--ww-destructive, #f87171);
 		--ww-color-tool-card: var(--ww-tool-card, #262626);
 		--ww-color-user-bubble-text: var(--ww-user-bubble-text, #ffffff);
 		--ww-color-assistant-bubble-text: var(--ww-assistant-bubble-text, var(--ww-color-foreground));
@@ -299,6 +431,9 @@
 	margin-bottom: 1rem;
 }
 
+/* The copy and download toolbar above a table. Streamdown gives it no stable class,
+   so this selector is the stable way to reach it; `showTableToolbar: false`
+   removes it. */
 [data-waniwani-chat] [data-streamdown="table-wrapper"] > div:first-child:has(button) {
 	display: flex;
 	align-items: center;
@@ -543,7 +678,7 @@
 	margin-top: 1.5rem;
 	margin-bottom: 0.5rem;
 	font-weight: 600;
-	font-size: 1.875rem;
+	font-size: var(--ww-heading-1);
 	line-height: 2.25rem;
 }
 
@@ -551,7 +686,7 @@
 	margin-top: 1.5rem;
 	margin-bottom: 0.5rem;
 	font-weight: 600;
-	font-size: 1.5rem;
+	font-size: var(--ww-heading-2);
 	line-height: 2rem;
 }
 
@@ -559,7 +694,7 @@
 	margin-top: 1.5rem;
 	margin-bottom: 0.5rem;
 	font-weight: 600;
-	font-size: 1.25rem;
+	font-size: var(--ww-heading-3);
 	line-height: 1.75rem;
 }
 

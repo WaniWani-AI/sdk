@@ -12,6 +12,7 @@ import {
 	useState,
 } from "react";
 import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "./reasoning";
 import { Shimmer } from "./shimmer";
 
@@ -131,8 +132,13 @@ export function ChainOfThought({
 	return (
 		<ChainContext.Provider value={contextValue}>
 			<div
-				className={cn("ww:mb-4 ww:flex ww:flex-col ww:gap-2", className)}
+				className={cn(
+					PARTS.reasoning,
+					"ww:mb-4 ww:flex ww:flex-col ww:gap-2",
+					className,
+				)}
 				data-state={isOpen ? "open" : "closed"}
+				data-streaming={isWorking ? "true" : undefined}
 				style={{ animation: "ww-fade-in 0.2s ease-out" }}
 				{...props}
 			>
@@ -210,6 +216,7 @@ export function ChainOfThoughtHeader({
 			onClick={() => setOpen(!open)}
 			aria-expanded={open}
 			className={cn(
+				PARTS.reasoningToggle,
 				"ww:flex ww:min-h-5 ww:w-full ww:items-center ww:gap-1.5 ww:text-sm ww:text-muted-foreground ww:transition-colors ww:hover:text-foreground",
 				className,
 			)}
@@ -240,6 +247,7 @@ export function ChainOfThoughtContent({
 	return (
 		<div
 			className={cn(
+				PARTS.reasoningSteps,
 				"ww:grid ww:transition-[grid-template-rows,opacity] ww:duration-200 ww:ease-out",
 				open
 					? "ww:grid-rows-[1fr] ww:opacity-100"
@@ -319,6 +327,11 @@ export function ChainOfThoughtStep({
 }: ChainOfThoughtStepProps) {
 	const isRunning = state === "input-available" || state === "input-streaming";
 	const isError = state === "output-error";
+	const status = isRunning
+		? "running"
+		: isError || state === "output-denied"
+			? "stopped"
+			: "done";
 	const expandable = children != null;
 	const [open, setOpen] = useState(false);
 	const label = title ?? "";
@@ -330,7 +343,11 @@ export function ChainOfThoughtStep({
 	);
 
 	return (
-		<div className={cn("ww:flex ww:gap-2", className)} {...props}>
+		<div
+			className={cn(PARTS.reasoningStep, "ww:flex ww:gap-2", className)}
+			data-status={status}
+			{...props}
+		>
 			<ChainOfThoughtRail
 				icon={Icon}
 				isLast={isLast}
@@ -403,7 +420,10 @@ export function ChainOfThoughtReasoning({
 	children,
 }: ChainOfThoughtReasoningProps) {
 	return (
-		<div className="ww:flex ww:gap-2">
+		<div
+			className={cn(PARTS.reasoningStep, "ww:flex ww:gap-2")}
+			data-status={isStreaming ? "running" : "done"}
+		>
 			<ChainOfThoughtRail
 				icon={ClockIcon}
 				isLast={isLast}

@@ -50,6 +50,34 @@ function isPlaceholder(value: string): boolean {
 export const HOST_TEXT_RESET =
 	":host{font-weight:400;font-style:normal;font-variant:normal;letter-spacing:normal;word-spacing:normal;text-transform:none;text-indent:0;text-align:start;text-shadow:none}";
 
+export const TAILWIND_PROPERTIES_STYLE_ID = "waniwani-tw-properties";
+
+const PROPERTY_RULE = /@property\s+--[\w-]+\s*\{[^}]*\}/g;
+
+export function extractPropertyRules(css: string): string {
+	return (css.match(PROPERTY_RULE) ?? []).join("");
+}
+
+/**
+ * Chrome ignores `@property` rules inside a shadow tree, and Tailwind v4's
+ * border, translate, shadow and ring utilities read registered `--tw-*`
+ * defaults. Registrations are document-global, so the head copy serves every
+ * shadow root.
+ */
+function registerTailwindProperties(css: string): void {
+	if (document.getElementById(TAILWIND_PROPERTIES_STYLE_ID)) {
+		return;
+	}
+	const rules = extractPropertyRules(css);
+	if (!rules) {
+		return;
+	}
+	const style = document.createElement("style");
+	style.id = TAILWIND_PROPERTIES_STYLE_ID;
+	style.textContent = rules;
+	document.head.appendChild(style);
+}
+
 /**
  * Append the compiled stylesheet to a shadow root, after the text reset.
  *
@@ -58,15 +86,19 @@ export const HOST_TEXT_RESET =
  * the host page to import, so there is nothing to inline. The reset is always
  * appended — it is what isolates the root, whatever else loads into it.
  */
-export function injectEmbedCss(shadowRoot: ShadowRoot): void {
+export function injectEmbedCss(
+	shadowRoot: ShadowRoot,
+	css: string = EMBED_CSS,
+): void {
 	const reset = document.createElement("style");
 	reset.textContent = HOST_TEXT_RESET;
 	shadowRoot.appendChild(reset);
 
-	if (!EMBED_CSS || isPlaceholder(EMBED_CSS)) {
+	if (!css || isPlaceholder(css)) {
 		return;
 	}
+	registerTailwindProperties(css);
 	const style = document.createElement("style");
-	style.textContent = EMBED_CSS;
+	style.textContent = css;
 	shadowRoot.appendChild(style);
 }
