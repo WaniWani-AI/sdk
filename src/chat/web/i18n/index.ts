@@ -1,4 +1,11 @@
-export { I18nProvider, type MessageOverrides, useTranslation } from "./context";
+export {
+	I18nProvider,
+	type LocaleMessageOverrides,
+	type MessageOverrides,
+	mergeOverrideSources,
+	resolveMessageOverrides,
+	useTranslation,
+} from "./context";
 export { detectLocale } from "./detect";
 export { formatRelativeTime } from "./format";
 export type { Messages } from "./locales/en";

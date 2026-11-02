@@ -2,18 +2,25 @@
 // Chat Theme
 // ============================================================================
 
-import type { ChatAppearance, ShowToolCalls } from "./embed/config";
-import type { MessageOverrides } from "./i18n";
+import type {
+	AvatarSlot,
+	ChatAppearance,
+	MenuAction,
+	ShowToolCalls,
+} from "./embed/config";
+import type { LocaleMessageOverrides, MessageOverrides } from "./i18n";
 import type { PreChatSuggestions } from "./lib/resolve-suggestions";
 import type { VisitorIdInput } from "./lib/visitor-context";
 
 export type {
+	AvatarSlot,
 	ChatAppearance,
+	MenuAction,
 	ShowToolCalls,
 	ThemePreset,
 } from "./embed/config";
 export type { Locale } from "./i18n";
-export type { MessageOverrides };
+export type { LocaleMessageOverrides, MessageOverrides };
 export type { VisitorIdInput };
 
 export interface ChatTheme {
@@ -49,7 +56,10 @@ export interface ChatTheme {
 	headerBackgroundColor?: string;
 	/** Header text color. Falls back to textColor. */
 	headerTextColor?: string;
-	/** Status dot color. Defaults to green (#22c55e). */
+	/**
+	 * Status dot color. Defaults to green (#22c55e).
+	 * @deprecated Nothing renders a status dot, so this has no visible effect.
+	 */
 	statusColor?: string;
 	/** Tool call JSON section background. Defaults to light gray / #262626 in dark. */
 	toolCardColor?: string;
@@ -80,13 +90,33 @@ export interface ChatTheme {
 // Welcome Screen
 // ============================================================================
 
+/**
+ * An animated image (GIF, animated WebP, APNG) shown in place of the avatar
+ * once per slot and page load, for `durationMs` after it loads, then replaced
+ * by the still avatar. Skipped under `prefers-reduced-motion: reduce` and in
+ * the `message` slot.
+ */
+export interface AvatarIntro {
+	src: string;
+	durationMs: number;
+}
+
 export interface WelcomeConfig {
-	/** Icon displayed above the title. Accepts any React node (e.g. an SVG or img). */
-	icon?: React.ReactNode;
+	/**
+	 * Icon displayed above the title. Any React node (e.g. an SVG), or a
+	 * string: one that reads as a URL or path (`http:`, `https:`, `data:`,
+	 * `blob:`, or containing `/`) renders as the welcome avatar image, any
+	 * other string (`"👋"`) renders as text, and `""` renders nothing.
+	 */
+	icon?: React.ReactNode | string;
 	/** Title text shown prominently in the welcome screen. */
 	title: string;
 	/** Description text shown below the title. */
 	description?: string;
+	/** Subtitles shown in place of `description`, rotating when there are several. */
+	subtitles?: string[];
+	/** Milliseconds between subtitle swaps. Unset or `0` keeps the first one. */
+	subtitleRotateMs?: number;
 	/** Suggestion cards shown in the welcome screen. Disappear after the first message. */
 	suggestions?: string[];
 }
@@ -164,6 +194,18 @@ export interface ChatBaseProps {
 	 * Takes precedence over `welcomeMessage` when provided.
 	 */
 	welcome?: WelcomeConfig;
+	/**
+	 * Assistant avatar image, the places it appears, and an optional intro
+	 * animation that plays once per slot before the image takes over.
+	 */
+	avatar?: { src: string; slots: AvatarSlot[]; intro?: AvatarIntro };
+	/**
+	 * Header menu entries, in order. When set, one menu replaces the New chat
+	 * and thread history buttons; unset keeps them.
+	 */
+	menu?: MenuAction[];
+	/** Ask before the menu's `restart` clears the conversation. */
+	restartConfirm?: boolean;
 	/**
 	 * Theme preset (`light`/`dark`/`auto`) plus per-property overrides.
 	 * See `ChatAppearance` for the shape.
@@ -297,12 +339,14 @@ export interface ChatBaseProps {
 	/**
 	 * Per-key overrides on top of the resolved locale catalog. Use this to
 	 * tweak individual built-in strings without contributing a new locale.
+	 * Flat (applies to every locale) or keyed by locale.
 	 *
 	 * ```tsx
 	 * messages={{ promptInput: { placeholder: "Ask the agent…" } }}
+	 * messages={{ fr: { menu: { restart: "Recommencer" } } }}
 	 * ```
 	 */
-	messages?: MessageOverrides;
+	messages?: MessageOverrides | LocaleMessageOverrides;
 }
 
 // ============================================================================
@@ -412,6 +456,34 @@ export interface ChatEmbedProps
 	 * Defaults to `true`; standalone `ChatEmbed` callers should leave it unset.
 	 */
 	onScreen?: boolean;
+	/**
+	 * @internal
+	 * The script embed surface hosting the chat, rendered as `data-mode` on
+	 * `.ww-root`. Set by the IIFE embed; unset on the React path.
+	 */
+	mode?: "inline" | "floating" | "composer";
+	/**
+	 * @internal
+	 * `"pills"` is the script embed's structured welcome: it shows the
+	 * pre-chat pill row as its chips (the row above the input hides while it
+	 * shows), takes the avatar's `welcome` slot as its icon, and falls back to
+	 * `messages.welcome` when `welcome` is unset. Defaults to `"cards"`.
+	 */
+	welcomeVariant?: "cards" | "pills";
+	/** `"single-row"` clips the suggestion row to one line. Defaults to `"wrap"`. */
+	suggestionsLayout?: "wrap" | "single-row";
+	/**
+	 * `"after-message"` shows the suggestion row under the last assistant
+	 * message instead of above the input. Defaults to `"above-input"`.
+	 */
+	suggestionsPosition?: "above-input" | "after-message";
+	/** Arrow on the send button. Defaults to `"up"`. */
+	sendIcon?: "up" | "right";
+	/**
+	 * `false` hides the copy and download toolbar above tables in answers.
+	 * Defaults to `true`.
+	 */
+	showTableToolbar?: boolean;
 }
 
 // `ChatCardProps` moved to `src/legacy/chat/web/chat-card.tsx` alongside the
@@ -432,6 +504,16 @@ export interface ChatHandle {
 	sendMessageAndWait: (text: string) => Promise<unknown>;
 	/** Clear all messages and start a fresh conversation */
 	reset: () => void;
+	/**
+	 * Clear the conversation without asking, and emit
+	 * `conversation.restarted`.
+	 */
+	restart: () => void;
+	/**
+	 * Copy the conversation as plain text to the clipboard. Resolves `false`
+	 * when the browser refuses; emits `conversation.copied` on success.
+	 */
+	copyConversation: () => Promise<boolean>;
 	/** Scroll to the chat input, focus it, and show a highlight glow */
 	focus: () => void;
 	/** Current chat messages */

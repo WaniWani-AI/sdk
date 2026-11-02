@@ -68,6 +68,16 @@ declare global {
 				sendMessageAndWait: (text: string) => Promise<UIMessage | undefined>;
 				/** Clear all messages and start a fresh conversation. */
 				reset: () => void;
+				/**
+				 * Clear the conversation without the confirmation dialog and emit
+				 * `conversation.restarted`.
+				 */
+				restart: () => void;
+				/**
+				 * Copy the conversation as plain text. Resolves `false` when the
+				 * browser refuses or the embed has not mounted.
+				 */
+				copyConversation: () => Promise<boolean>;
 				/** Focus the chat input. */
 				focus: () => void;
 				/** Snapshot of the current chat messages. Empty until mounted. */
@@ -116,6 +126,8 @@ interface EmbedInstance {
 	sendMessage: (text: string) => void;
 	sendMessageAndWait: (text: string) => Promise<UIMessage | undefined>;
 	reset: () => void;
+	restart: () => void;
+	copyConversation: () => Promise<boolean>;
 	focus: () => void;
 	getMessages: () => UIMessage[];
 	getSessionId: () => string | undefined;
@@ -177,7 +189,7 @@ const SIZING_DEFAULTS_CSS = `:where([data-waniwani-embed]){height:${DEFAULT_EMBE
 // via `--ww-color-background`, which switches with the active preset
 // (light/dark/auto). Setting a light background here would show through
 // any rounded-corner gap in dark mode.
-const STRUCTURAL_DEFAULTS_CSS = `:where([data-waniwani-embed]){border-radius:16px;overflow:hidden}`;
+const STRUCTURAL_DEFAULTS_CSS = `:where([data-waniwani-embed]){border-radius:var(--ww-radius,16px);overflow:hidden}`;
 
 // Chrome defaults (border, shadow). Always injected because the vars
 // default to no-op values — invisible until the customer passes
@@ -195,7 +207,7 @@ const CONTAINER_CHROME_CSS = `:where([data-waniwani-embed]){border-style:solid;b
 // so its (equal-specificity) `:where()` border/shadow win, while still using
 // the same `--ww-*` vars so customer `appearance.variables` override them.
 // `:where()` => any author rule targeting `[data-waniwani-embed]` still wins.
-const AUTO_CARD_CSS = `:where([data-waniwani-embed][data-waniwani-auto]){width:100%;max-width:28rem;margin-inline:auto;border-radius:16px;overflow:hidden;border-style:solid;border-width:var(--ww-border-width,1px);border-color:var(--ww-border,rgba(0,0,0,0.1));box-shadow:var(--ww-shadow,0 10px 30px rgba(0,0,0,0.08))}`;
+const AUTO_CARD_CSS = `:where([data-waniwani-embed][data-waniwani-auto]){width:100%;max-width:28rem;margin-inline:auto;border-radius:var(--ww-radius,16px);overflow:hidden;border-style:solid;border-width:var(--ww-border-width,1px);border-color:var(--ww-border,rgba(0,0,0,0.1));box-shadow:var(--ww-shadow,0 10px 30px rgba(0,0,0,0.08))}`;
 
 // Card defaults for a container we auto-create in `composer` mode. The
 // composer draws its own border, radius and shadow, so this only bounds and
@@ -216,7 +228,7 @@ function ensureStyle(id: string, css: string): void {
 
 // Mirror the container-level appearance vars onto the customer's container
 // element. The chat root inside a shadow root can't push CSS vars back up to
-// light DOM, so border + shadow live on the container itself. Only the few
+// light DOM, so border, radius and shadow live on the container itself. Only the few
 // vars that actually affect the container are bridged — colors etc. stay
 // scoped to the chat root.
 function applyContainerAppearance(
@@ -229,6 +241,9 @@ function applyContainerAppearance(
 	}
 	if (typeof vars.borderWidth === "number") {
 		container.style.setProperty("--ww-border-width", `${vars.borderWidth}px`);
+	}
+	if (typeof vars.borderRadius === "number") {
+		container.style.setProperty("--ww-radius", `${vars.borderRadius}px`);
 	}
 	if (vars.borderColor) {
 		container.style.setProperty("--ww-border", vars.borderColor);
@@ -254,14 +269,14 @@ function injectStyles(shadowRoot: ShadowRoot, config: EmbedConfig): void {
 	//   - It lives in the shadow root only, so the React paths
 	//     (`<WaniwaniChat>`, `<ChatEmbed>`) still draw chrome on the chat
 	//     root (the React surfaces have no outer container to delegate to).
-	//   - It zeroes `border-width` / `box-shadow` directly. The chat root
+	//   - It zeroes `border-width` / `border-radius` / `box-shadow` directly. The chat root
 	//     has no inline `border-width` (only `--ww-border-width` as a
 	//     custom property), so a later same-specificity rule wins by
 	//     cascade order — no `!important` and no JS-side list of
 	//     "container vars" to keep in sync.
 	const chromeReset = document.createElement("style");
 	chromeReset.textContent =
-		"[data-waniwani-chat]{border-width:0;box-shadow:none}";
+		"[data-waniwani-chat]{border-width:0;border-radius:0;box-shadow:none}";
 	shadowRoot.appendChild(chromeReset);
 
 	if (config.css) {
@@ -511,6 +526,9 @@ function mountInline(
 			return (await chat.sendMessageAndWait(text)) as UIMessage | undefined;
 		},
 		reset: () => inlineRef.current?.chat?.reset(),
+		restart: () => inlineRef.current?.chat?.restart(),
+		copyConversation: async () =>
+			(await inlineRef.current?.chat?.copyConversation()) ?? false,
 		focus: () => inlineRef.current?.chat?.focus(),
 		getMessages: () => inlineRef.current?.chat?.messages ?? [],
 		getSessionId: () => inlineRef.current?.chat?.sessionId,
@@ -573,6 +591,9 @@ function mountFloating(
 			return floatingRef.current.sendMessageAndWait(text);
 		},
 		reset: () => floatingRef.current?.reset(),
+		restart: () => floatingRef.current?.restart(),
+		copyConversation: async () =>
+			(await floatingRef.current?.copyConversation()) ?? false,
 		focus: () => floatingRef.current?.focus(),
 		getMessages: () => floatingRef.current?.getMessages() ?? [],
 		getSessionId: () => floatingRef.current?.getSessionId(),
@@ -601,6 +622,8 @@ function mountOff(): MountedEmbed {
 		sendMessage: () => {},
 		sendMessageAndWait: async () => undefined,
 		reset: () => {},
+		restart: () => {},
+		copyConversation: async () => false,
 		focus: () => {},
 		getMessages: () => [],
 		getSessionId: () => undefined,
@@ -728,6 +751,9 @@ function mountComposer(
 			return composerRef.current.sendMessageAndWait(text);
 		},
 		reset: () => composerRef.current?.reset(),
+		restart: () => composerRef.current?.restart(),
+		copyConversation: async () =>
+			(await composerRef.current?.copyConversation()) ?? false,
 		focus: () => composerRef.current?.focus(),
 		getMessages: () => composerRef.current?.getMessages() ?? [],
 		getSessionId: () => composerRef.current?.getSessionId(),
@@ -873,6 +899,9 @@ window.WaniWani.chat = {
 		return currentInstance.sendMessageAndWait(text);
 	},
 	reset: () => currentInstance?.reset(),
+	restart: () => currentInstance?.restart(),
+	copyConversation: async () =>
+		(await currentInstance?.copyConversation()) ?? false,
 	focus: () => currentInstance?.focus(),
 	getMessages: () => currentInstance?.getMessages() ?? [],
 	getSessionId: () => currentInstance?.getSessionId(),

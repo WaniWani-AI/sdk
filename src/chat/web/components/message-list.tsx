@@ -7,8 +7,9 @@ import {
 	type LucideIcon,
 	WrenchIcon,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import type { ModelContextUpdate } from "../../../shared/model-context";
-import type { ShowToolCalls, WelcomeConfig } from "../@types";
+import type { AvatarIntro, ShowToolCalls, WelcomeConfig } from "../@types";
 import {
 	AttachedDocuments,
 	Attachments,
@@ -47,8 +48,10 @@ import {
 	shouldShowWorkingIndicator,
 	WorkingIndicator,
 } from "../ai-elements/working-indicator";
+import { HOOKS } from "../hooks-contract";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
+import { Avatar } from "./avatar";
 import type { McpAppDisplayMode } from "./mcp-app-frame";
 import { McpAppFrame } from "./mcp-app-frame";
 import { WelcomeScreen } from "./welcome-screen";
@@ -91,6 +94,13 @@ interface MessageListProps {
 	welcome?: WelcomeConfig;
 	/** Called when a welcome screen suggestion card is clicked. */
 	onSuggestionSelect?: (suggestion: string) => void;
+	welcomeVariant?: "cards" | "pills";
+	/** Whether the list is on screen; the welcome holds `data-appeared` until it is. */
+	welcomeAppeared?: boolean;
+	/** Avatar image shown left of each assistant text bubble. */
+	messageAvatar?: string;
+	/** Intro animation for the welcome screen's avatar slot. */
+	welcomeAvatarIntro?: AvatarIntro;
 	resourceEndpoint?: string;
 	chatSessionId?: string;
 	isDark?: boolean;
@@ -139,7 +149,13 @@ interface MessageListProps {
 		userBubble?: string;
 		assistantBubble?: string;
 	};
+	/** Rendered after the last assistant message once the turn has settled. */
+	trailing?: ReactNode;
+	/** `false` drops Streamdown's copy and download toolbar above tables. */
+	showTableToolbar?: boolean;
 }
+
+const TABLE_TOOLBAR_OFF = { table: false } as const;
 
 export function MessageList({
 	messages,
@@ -147,6 +163,10 @@ export function MessageList({
 	welcomeMessage,
 	welcome,
 	onSuggestionSelect,
+	welcomeVariant,
+	welcomeAppeared,
+	messageAvatar,
+	welcomeAvatarIntro,
 	resourceEndpoint,
 	chatSessionId,
 	isDark,
@@ -158,12 +178,19 @@ export function MessageList({
 	showToolCalls = true,
 	toolDefinitions,
 	messageClassNames,
+	trailing,
+	showTableToolbar = true,
 }: MessageListProps) {
 	const { t } = useTranslation();
 	const lastMessage = messages[messages.length - 1];
 	const hasMessages = messages.length > 0;
 
 	const isFullscreenActive = fullscreenToolCallId != null;
+	const welcomeBubble = (
+		<MessageContent>
+			<MessageResponse>{welcomeMessage}</MessageResponse>
+		</MessageContent>
+	);
 	const showWorking =
 		!isFullscreenActive &&
 		shouldShowWorkingIndicator(messages, status, {
@@ -175,13 +202,21 @@ export function MessageList({
 		<>
 			{!isFullscreenActive &&
 				(!hasMessages && welcome ? (
-					<WelcomeScreen {...welcome} onSuggestionSelect={onSuggestionSelect} />
+					<WelcomeScreen
+						{...welcome}
+						variant={welcomeVariant}
+						appeared={welcomeAppeared}
+						avatarIntro={welcomeAvatarIntro}
+						onSuggestionSelect={onSuggestionSelect}
+					/>
 				) : (
 					welcomeMessage && (
 						<Message from="assistant">
-							<MessageContent>
-								<MessageResponse>{welcomeMessage}</MessageResponse>
-							</MessageContent>
+							{messageAvatar ? (
+								<BubbleRow avatar={messageAvatar}>{welcomeBubble}</BubbleRow>
+							) : (
+								welcomeBubble
+							)}
 						</Message>
 					)
 				))}
@@ -267,6 +302,7 @@ export function MessageList({
 				return (
 					<Message
 						from={message.role}
+						streaming={isLastAssistant && status === "streaming"}
 						key={message.id}
 						className={messageClassNames?.message}
 					>
@@ -433,6 +469,8 @@ export function MessageList({
 							return (
 								<div
 									key={part.toolCallId}
+									className={HOOKS.widget}
+									data-display-mode={isFullscreen ? "fullscreen" : "inline"}
 									style={
 										isFullscreen
 											? {
@@ -522,7 +560,13 @@ export function MessageList({
 							<AttachedDocuments documents={attachedDocuments} />
 						)}
 						{!containsFullscreenTool && (
-							<div>
+							<BubbleRow
+								avatar={
+									message.role === "assistant" && hasTextContent
+										? messageAvatar
+										: undefined
+								}
+							>
 								<MessageContent
 									className={cn(
 										message.role === "user"
@@ -541,6 +585,9 @@ export function MessageList({
 													<MessageResponse
 														key={`${message.id}-${i}`}
 														isStreaming={isStreamingPart}
+														controls={
+															showTableToolbar ? undefined : TABLE_TOOLBAR_OFF
+														}
 													>
 														{part.type === "text" ? part.text : ""}
 													</MessageResponse>
@@ -548,12 +595,35 @@ export function MessageList({
 											})
 										: null}
 								</MessageContent>
-							</div>
+							</BubbleRow>
 						)}
 					</Message>
 				);
 			})}
 			{showWorking && <WorkingIndicator />}
+			{trailing &&
+				!isFullscreenActive &&
+				lastMessage?.role === "assistant" &&
+				status === "ready" &&
+				trailing}
 		</>
+	);
+}
+
+function BubbleRow({
+	avatar,
+	children,
+}: {
+	avatar?: string;
+	children: React.ReactNode;
+}) {
+	if (!avatar) {
+		return <div>{children}</div>;
+	}
+	return (
+		<div className="ww:flex ww:items-start ww:gap-2">
+			<Avatar src={avatar} slot="message" />
+			{children}
+		</div>
 	);
 }

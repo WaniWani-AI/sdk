@@ -43,6 +43,7 @@ import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useNarrowViewport } from "../hooks/use-narrow-viewport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
+import { HOOKS } from "../hooks-contract";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
@@ -50,7 +51,10 @@ import { useBootTiming } from "../lib/timing-context";
 import { cn } from "../lib/utils";
 import { themeToCSSProperties } from "../theme";
 import type { ComposerSize, EmbedConfig } from "./config";
+import { useEmbedWelcomeProps } from "./embed-welcome";
 import { useRemoteEmbedConfig } from "./remote-config";
+import { type EmbedMessages, useEmbedMessages } from "./use-messages-url";
+import { usePanelState } from "./use-panel-state";
 import { useVisibilityGate } from "./use-pathname";
 import { useSuggestions } from "./use-suggestions";
 import { createWidgetEventEmitter } from "./widget-events";
@@ -121,11 +125,15 @@ const SIZE_STYLES: Record<ComposerSize, SizeStyle> = {
 /** Box fill. */
 const BG = "var(--ww-composer-bg, var(--ww-color-input))";
 /** Border color and width, as a `border-*` pair so `0` flattens the box. */
-const BORDER_COLOR = "var(--ww-composer-border-color, var(--ww-color-border))";
-const BORDER_WIDTH = "var(--ww-composer-border-width, 1px)";
+const BORDER_COLOR =
+	"var(--ww-composer-border-color, var(--ww-input-border, var(--ww-color-border)))";
+const BORDER_WIDTH =
+	"var(--ww-composer-border-width, var(--ww-input-border-width, 1px))";
 /** Send button fill and glyph. */
-const SEND_BG = "var(--ww-composer-send-bg, var(--ww-color-foreground))";
-const SEND_FG = "var(--ww-composer-send-fg, var(--ww-color-background))";
+const SEND_BG =
+	"var(--ww-composer-send-bg, var(--ww-send-bg, var(--ww-color-foreground)))";
+const SEND_FG =
+	"var(--ww-composer-send-fg, var(--ww-send-fg, var(--ww-color-background)))";
 
 export interface ComposerChatProps {
 	config: EmbedConfig;
@@ -157,6 +165,8 @@ export interface ComposerChatHandle {
 	sendMessage: (text: string) => void;
 	sendMessageAndWait: (text: string) => Promise<UIMessage | undefined>;
 	reset: () => void;
+	restart: () => void;
+	copyConversation: () => Promise<boolean>;
 	focus: () => void;
 	getMessages: () => UIMessage[];
 	getSessionId: () => string | undefined;
@@ -164,15 +174,21 @@ export interface ComposerChatHandle {
 
 export const ComposerChat = forwardRef<ComposerChatHandle, ComposerChatProps>(
 	function ComposerChat(props, ref) {
+		const embedMessages = useEmbedMessages(props.config);
 		return (
-			<I18nProvider locale={props.config.locale}>
-				<ComposerChatInner {...props} ref={ref} />
+			<I18nProvider
+				locale={props.config.locale}
+				messages={embedMessages.messages}
+			>
+				<ComposerChatInner {...props} embedMessages={embedMessages} ref={ref} />
 			</I18nProvider>
 		);
 	},
 );
 
-const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
+type InnerProps = ComposerChatProps & { embedMessages: EmbedMessages };
+
+const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 	function ComposerChatInner(
 		{
 			config: initialConfig,
@@ -180,17 +196,19 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 			scriptConfig,
 			panelContainer,
 			onVisibilityChange,
+			embedMessages,
 		},
 		ref,
 	) {
 		const { t } = useTranslation();
 		// Resolve remote config here so the composer can show the dashboard's
 		// suggestions / placeholder; `ChatEmbed` below skips its own fetch.
-		const { config, ready } = useRemoteEmbedConfig(
+		const { config, ready: configReady } = useRemoteEmbedConfig(
 			initialConfig,
 			programmatic,
 			scriptConfig,
 		);
+		const ready = configReady && embedMessages.ready;
 
 		// Per-URL gating, same contract as the inline mount: report the decision
 		// up so `embed.ts` collapses the host container, rather than leaving a
@@ -232,6 +250,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 		// The `button` variant renders no textarea; `focus()` lands here instead.
 		const triggerRef = useRef<HTMLButtonElement>(null);
 		const [open, setOpen] = useState(false);
+		const panelRef = useRef<HTMLDivElement>(null);
 		const [composerText, setComposerText] = useState("");
 		// Bumped to request focusing the chat input once the panel has opened.
 		// A textarea inside a still-hidden panel can't take focus, and React
@@ -250,6 +269,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 		// attribution. Memoized inside the hook — the pill row keys an effect
 		// on this object's identity.
 		const suggestions = useSuggestions(config);
+		const welcomeProps = useEmbedWelcomeProps(config);
 		// The composer renders the same pre-chat row the panel would, resolved
 		// through the same hierarchy so its impression event carries the exact
 		// origin. No turn has happened yet, so the two turn-derived rungs are
@@ -411,6 +431,9 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 					return (await chat.sendMessageAndWait(text)) as UIMessage | undefined;
 				},
 				reset: () => chatRef.current?.reset(),
+				restart: () => chatRef.current?.restart(),
+				copyConversation: async () =>
+					(await chatRef.current?.copyConversation()) ?? false,
 				focus: () => {
 					// Docs contract: in composer mode `focus()` lands on the in-flow
 					// input while the panel is closed (that is the visible field), and
@@ -461,11 +484,16 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 				type="button"
 				onClick={() => setOpen(false)}
 				aria-label={t.launcher.close}
-				className="ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer"
+				className={cn(
+					HOOKS.close,
+					"ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer",
+				)}
 			>
 				<XIcon className="ww:size-4" />
 			</button>
 		);
+
+		const panelState = usePanelState(visible && open, panelRef);
 
 		const fieldRow = (
 			<div className={cn("ww:flex ww:items-end", size.row)}>
@@ -606,6 +634,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 				// browsers without `inert` support simply keep today's behavior.
 				inert={open}
 				className={cn(
+					HOOKS.composer,
 					"ww:w-full ww:font-[family-name:var(--ww-font-sans)]",
 					preset === "dark" && "dark",
 				)}
@@ -616,6 +645,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 				{showSuggestions && composerTexts.length > 0 && (
 					<Suggestions
 						suggestions={composerTexts}
+						origin={composerRow?.origin}
 						onSelect={(text) => {
 							widgetEvents.emit({
 								name: "suggestion.clicked",
@@ -654,22 +684,25 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 				style={cssVars}
 			>
 				<div
+					ref={panelRef}
 					role="dialog"
 					aria-label={config.title ?? composerPlaceholder}
 					data-waniwani-floating="panel"
-					data-state={visible && open ? "shown" : "hidden"}
+					data-state={panelState}
 					style={{ boxShadow: cardShadow }}
 					className={cn(
-						"ww:fixed ww:z-[2147483002] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
+						HOOKS.panel,
+						"ww:fixed ww:z-[var(--ww-z-index)] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
 						// Mobile: full-screen sheet.
 						"ww:inset-0 ww:w-full ww:rounded-none",
 						// Desktop: wide ChatGPT-style card, matching floating mode.
-						"ww:sm:inset-auto ww:sm:bottom-4 ww:sm:left-0 ww:sm:right-0 ww:sm:mx-auto ww:sm:h-[720px] ww:sm:max-h-[calc(100dvh-2rem)] ww:sm:w-[calc(100vw-2rem)] ww:sm:max-w-[1000px] ww:sm:rounded-2xl ww:sm:border ww:sm:border-border",
+						"ww:sm:inset-auto ww:sm:bottom-[var(--ww-panel-offset)] ww:sm:left-0 ww:sm:right-0 ww:sm:mx-auto ww:sm:h-[var(--ww-panel-height)] ww:sm:max-h-[calc(100dvh-var(--ww-panel-offset)*2)] ww:sm:w-[calc(100vw-var(--ww-panel-offset)*2)] ww:sm:max-w-[var(--ww-panel-width)] ww:sm:rounded-[var(--ww-panel-radius)] ww:sm:border ww:sm:border-border",
 					)}
 				>
 					<ChatEmbed
 						transport={transport}
 						ref={chatRef}
+						mode="composer"
 						api={config.api ?? ""}
 						headers={{ Authorization: `Bearer ${config.token}` }}
 						skipRemoteConfig
@@ -688,14 +721,22 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, ComposerChatProps>(
 						// announced.
 						onScreen={open}
 						welcomeMessage={config.welcomeMessage}
+						{...welcomeProps}
 						placeholder={config.placeholder}
 						suggestions={suggestions}
 						enableThreadHistory={config.enableThreadHistory}
 						documentUpload={config.documentUpload}
 						showToolCalls={config.showToolCalls}
 						disclaimer={config.disclaimer}
+						suggestionsLayout={config.suggestionsLayout}
+						suggestionsPosition={config.suggestionsPosition}
+						sendIcon={config.sendIcon}
+						showTableToolbar={config.showTableToolbar}
+						menu={config.menu}
+						restartConfirm={config.restartConfirm}
 						hidePoweredBy={config.hidePoweredBy}
 						locale={config.locale}
+						messages={embedMessages.messages}
 						initializing={!ready}
 					/>
 				</div>

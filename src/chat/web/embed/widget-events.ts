@@ -40,7 +40,9 @@ export type WidgetEventDetail =
 				| "chat.opened"
 				| "chat.closed"
 				| "message.sent"
-				| "message.received";
+				| "message.received"
+				| "conversation.copied"
+				| "conversation.restarted";
 	  }
 	| { name: "session.started"; properties: { sessionId: string } }
 	| { name: "thread.changed"; properties: { threadId: string } }

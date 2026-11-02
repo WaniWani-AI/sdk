@@ -4,8 +4,8 @@ import type { ComponentProps } from "react";
 import { cn } from "../lib/utils";
 
 export type ButtonProps = ComponentProps<"button"> & {
-	variant?: "default" | "outline" | "ghost";
-	size?: "default" | "sm" | "icon" | "icon-sm";
+	variant?: "default" | "outline" | "ghost" | "themed";
+	size?: "default" | "sm" | "icon" | "icon-sm" | "icon-themed";
 };
 
 export const Button = ({
@@ -18,7 +18,8 @@ export const Button = ({
 	<button
 		type={type}
 		className={cn(
-			"ww:inline-flex ww:cursor-pointer ww:items-center ww:justify-center ww:rounded-md ww:font-medium ww:transition-colors ww:disabled:pointer-events-none ww:disabled:opacity-50",
+			"ww:inline-flex ww:cursor-pointer ww:items-center ww:justify-center ww:rounded-md ww:font-medium ww:transition-colors ww:disabled:pointer-events-none",
+			variant !== "themed" && "ww:disabled:opacity-50",
 			variant === "default" &&
 				"ww:bg-primary ww:text-primary-foreground ww:hover:bg-primary/90",
 			variant === "outline" &&
@@ -29,6 +30,8 @@ export const Button = ({
 			size === "sm" && "ww:h-8 ww:px-3 ww:text-xs",
 			size === "icon" && "ww:size-9 ww:!rounded-full",
 			size === "icon-sm" && "ww:size-7 ww:!rounded-full",
+			size === "icon-themed" &&
+				"ww:size-[var(--ww-send-size)] ww:!rounded-[var(--ww-send-radius)]",
 			className,
 		)}
 		{...props}

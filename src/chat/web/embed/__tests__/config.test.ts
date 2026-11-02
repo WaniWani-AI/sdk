@@ -577,3 +577,148 @@ describe("parseConfigFromScript — data-suggestion-origins", () => {
 		expect("suggestionOrigins" in cfg).toBe(false);
 	});
 });
+
+describe("parseConfigFromScript — suggestion layout, position and send icon", () => {
+	test("the three attributes parse", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-suggestions-layout": "single-row",
+			"data-suggestions-position": "after-message",
+			"data-send-icon": "right",
+		});
+		expect(cfg.suggestionsLayout).toBe("single-row");
+		expect(cfg.suggestionsPosition).toBe("after-message");
+		expect(cfg.sendIcon).toBe("right");
+	});
+
+	test("unknown values are dropped", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-suggestions-layout": "grid",
+			"data-suggestions-position": "below",
+			"data-send-icon": "left",
+		});
+		expect("suggestionsLayout" in cfg).toBe(false);
+		expect("suggestionsPosition" in cfg).toBe(false);
+		expect("sendIcon" in cfg).toBe(false);
+	});
+});
+
+describe("parseConfigFromScript — menu and restart confirmation", () => {
+	test("data-menu keeps known actions in order and data-restart-confirm parses", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-menu": " Restart, copy-conversation,share,restart ",
+			"data-restart-confirm": "true",
+		});
+		expect(cfg.menu).toEqual(["restart", "copy-conversation"]);
+		expect(cfg.restartConfirm).toBe(true);
+	});
+
+	test("an empty or unknown data-menu leaves the menu unset", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-menu": "share,print",
+		});
+		expect("menu" in cfg).toBe(false);
+		expect("restartConfirm" in cfg).toBe(false);
+	});
+});
+
+describe("parseConfigFromScript — floating bar behaviours", () => {
+	test("the four dock attributes parse", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-chips-trigger": " Scroll ",
+			"data-dock-pointer-vars": "true",
+			"data-dock-glow": "false",
+			"data-dock-readonly-mobile": "false",
+		});
+		expect(cfg.dockChipsTrigger).toEqual(["scroll"]);
+		expect(cfg.dockPointerVars).toBe(true);
+		expect(cfg.dockGlow).toBe(false);
+		expect(cfg.dockReadonlyMobile).toBe(false);
+	});
+
+	test("unset attributes stay unset so the runtime defaults apply", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "wwp_test" });
+		expect("dockChipsTrigger" in cfg).toBe(false);
+		expect("dockPointerVars" in cfg).toBe(false);
+		expect("dockGlow" in cfg).toBe(false);
+		expect("dockReadonlyMobile" in cfg).toBe(false);
+	});
+
+	test("a comma-separated chips trigger list parses, deduped, unknowns dropped", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-chips-trigger": "hover, scroll,click,hover",
+		});
+		expect(cfg.dockChipsTrigger).toEqual(["hover", "scroll"]);
+	});
+
+	test("a bare hover chips trigger still parses", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-chips-trigger": "hover",
+		});
+		expect(cfg.dockChipsTrigger).toEqual(["hover"]);
+	});
+
+	test("a programmatic string chips trigger becomes a one-element list", () => {
+		const cfg = resolveConfig(
+			{ token: "wwp_test", dockChipsTrigger: "scroll" as never },
+			undefined,
+			{},
+		);
+		expect(cfg.dockChipsTrigger).toEqual(["scroll"]);
+	});
+
+	test("an unknown chips trigger is dropped", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-chips-trigger": "click",
+		});
+		expect("dockChipsTrigger" in cfg).toBe(false);
+	});
+});
+
+describe("parseConfigFromScript: dock click", () => {
+	test("data-dock-click parses expand and open", async () => {
+		const open = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-click": " Open ",
+		});
+		expect(open.dockClick).toBe("open");
+		const expand = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-click": "expand",
+		});
+		expect(expand.dockClick).toBe("expand");
+	});
+
+	test("an unset or unknown data-dock-click stays unset", async () => {
+		expect(
+			"dockClick" in (await parseWithAttrs({ "data-token": "wwp_test" })),
+		).toBe(false);
+		const unknown = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-click": "toggle",
+		});
+		expect("dockClick" in unknown).toBe(false);
+	});
+});
+
+describe("parseConfigFromScript: table toolbar", () => {
+	test("data-show-table-toolbar=false hides it", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-show-table-toolbar": "false",
+		});
+		expect(cfg.showTableToolbar).toBe(false);
+	});
+
+	test("unset stays unset so the toolbar shows by default", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "wwp_test" });
+		expect("showTableToolbar" in cfg).toBe(false);
+	});
+});
