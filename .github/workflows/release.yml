@@ -140,7 +140,7 @@ jobs:
           DIR: ${{ steps.pkg.outputs.dir }}
           PREFIX: ${{ steps.pkg.outputs.prefix }}
 
-      # Builds both packages: the SDK build copies the chat's embed.js.
+      # Builds both packages, the same command as CI.
       - run: bun run build
 
       - name: Determine release channel

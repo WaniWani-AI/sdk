@@ -13,8 +13,6 @@ const dist = resolve(import.meta.dirname, "../dist");
 
 // `mcp/react/skybridge` is left out: `skybridge` is an optional peer and is not
 // installed, so importing it here fails on the external, not on the bundle.
-// `chat/index.js` is left out too: it only re-exports `@waniwani/chat`, whose
-// own build runs this check.
 const ENTRIES = ["mcp/react.js"];
 
 const builtins = new Set([

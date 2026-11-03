@@ -32,7 +32,7 @@ Same SDK, hosted features added when the key is present.
 - `useWaniwani` from `@waniwani/sdk/mcp/react/skybridge` — the skybridge-host adapter. Reads skybridge's `useToolInfo().responseMetadata` and feeds it to the core hook, so skybridge-hosted widgets call `useWaniwani()` bare. `skybridge` is an optional peer dependency.
 - `WaniwaniChat` (hosted React chat — recommended), themes, `embed.js` (IIFE for non-React hosts), `styles.css` from `@waniwani/chat`. Both expose host-page tracking: `WaniWani.chat.track` / `.identify` on the embed global, `track` / `identify` on the `ChatHandle` ref.
 - `ChatEmbed` from `@waniwani/chat` — bare-bones bring-your-own-backend primitive (no `track`/`identify`). Exposed but **not** the recommended path for new code; reach for it only when self-hosting the chat backend.
-- `@waniwani/sdk/chat` is a `@deprecated` re-export of `@waniwani/chat` (an optional peer of the SDK), and `@waniwani/sdk/dist/chat/embed.js` is a copy of the embed for self-hosted pages. Both are removed in 0.28.0. Never use them in new code or docs.
+- `@waniwani/sdk` carries no chat code from 1.0.0: `@waniwani/sdk/chat` and `@waniwani/sdk/chat/styles.css` are gone, and the SDK has no dependency on `@waniwani/chat`. One file stays: `@waniwani/sdk/dist/chat/embed.js`, a 600-byte forwarder (`packages/sdk/src/chat/embed-forwarder.ts`) that loads `@waniwani/chat@1`'s embed for pages that still use the old CDN URL. 2.0.0 removes it. Never use it in new code or docs.
 
 Tracking is one client on four surfaces (server `waniwani()`, scoped client in handlers/flows, `useWaniwani()` in widgets, `chat.track` on chat host pages); all except the top-level server client attach session identity automatically. The scoped client exposes `sessionId`; identity accepted by ingest is `sessionId` OR `externalUserId` OR `visitorId`. `withWaniwani` injects the widget tracking config under `_meta["waniwani/widget"]`.
 
@@ -59,7 +59,7 @@ packages/
 │   │   ├── documents/        # Documents client (free tier)
 │   │   ├── internal/         # Private surface for app.waniwani.ai (replayScenario)
 │   │   ├── webmcp/           # widget-step: the server side of WebMCP
-│   │   ├── chat/             # Deprecated re-export of @waniwani/chat (removed in 0.28.0)
+│   │   ├── chat/             # dist/chat/embed.js forwarder to @waniwani/chat (removed in 2.0.0)
 │   │   └── mcp/
 │   │       ├── index.ts      # Public exports for @waniwani/sdk/mcp
 │   │       ├── server/
@@ -71,7 +71,7 @@ packages/
 │   │       │   └── scoped-client.ts
 │   │       └── react/        # useWaniwani (+ the skybridge adapter)
 │   ├── evals/flows/          # Live-model flow eval (release gate)
-│   └── scripts/              # Post-build: copy the chat embed, check the browser bundle
+│   └── scripts/              # Post-build: check the browser bundle
 ├── chat/                     # @waniwani/chat
 │   ├── src/                  # Free tier chat widget (WaniwaniChat, ChatEmbed, embed/ for embed.js)
 │   ├── scripts/              # Post-build: inline CSS into embed.js, check the browser bundle
@@ -110,7 +110,7 @@ const flow = createFlow({ /* …same… */ }).compile(); // hosted flow state, a
 
 All commands run from the repo root unless noted.
 
-- Build: `bun run build` (the chat first, then the SDK, which copies the chat's `embed.js`)
+- Build: `bun run build` (both packages)
 - Dev: `bun run --cwd packages/sdk dev`
 - Typecheck: `bun run typecheck` (root scripts, core, chat, SDK)
 - Lint: `bun run lint`
@@ -126,7 +126,7 @@ All commands run from the repo root unless noted.
 
 Each published package has its own version. To cut a release, run `bun run release:<patch|minor|major|beta|alpha>` in that package's folder (`bun run release` is a patch). `scripts/bump.ts` bumps `package.json`, refreshes `bun.lock`, commits, tags and pushes: `v<version>` for `@waniwani/sdk` (the tags it always had), `chat-v<version>` for `@waniwani/chat`. The tag push runs `.github/workflows/release.yml`, which publishes that one package (the flow eval gates the SDK). The workflow's manual dispatch takes the same package and bump choices. A release of one package never publishes the other.
 
-`@waniwani/sdk` is `0.x`, so **minor bumps may break the public API** — and every breaking change is a migration our users have to do. The rule: no user should have to figure out an upgrade by hand. Whenever a release contains a breaking change, ship the migration alongside it so an agent can auto-apply it in one pass.
+Both packages follow semver from 1.0.0: **a breaking change to the public API needs a major bump** (`release:major`), and every breaking change is a migration our users have to do. The rule: no user should have to figure out an upgrade by hand. Whenever a release contains a breaking change, ship the migration alongside it so an agent can auto-apply it in one pass.
 
 **Every breaking change in a version bump must ship all three:**
 

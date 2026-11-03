@@ -6,7 +6,7 @@ The Waniwani chat widget: the `WaniwaniChat` and `ChatEmbed` React components, t
 npm install @waniwani/chat
 ```
 
-`react`, `ai`, `@ai-sdk/react` and `zod` are peer dependencies. Until 0.26 the chat shipped inside `@waniwani/sdk` as `@waniwani/sdk/chat`. That import still works, re-exported from this package, until `@waniwani/sdk` 0.28.0.
+`react`, `ai`, `@ai-sdk/react` and `zod` are peer dependencies. Up to `@waniwani/sdk` 0.25 the chat shipped inside the SDK as `@waniwani/sdk/chat`. `@waniwani/sdk` 1.0 removes that path, and the `migrate-waniwani-sdk-0.25-to-1.0` skill moves a project to this package (`npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.25-to-1.0`).
 
 ## Usage
 

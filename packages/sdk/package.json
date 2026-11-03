@@ -24,12 +24,6 @@
       "import": "./dist/mcp/react/skybridge.js",
       "default": "./dist/mcp/react/skybridge.js"
     },
-    "./chat": {
-      "types": "./dist/chat/index.d.ts",
-      "import": "./dist/chat/index.js",
-      "default": "./dist/chat/index.js"
-    },
-    "./chat/styles.css": "./dist/chat/styles.css",
     "./chat/embed.js": "./dist/chat/embed.js",
     "./kb": {
       "types": "./dist/kb/index.d.ts",
@@ -51,8 +45,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && bun run typecheck && tsup && bun run build:chat-shim && bun run check:browser-bundles",
-    "build:chat-shim": "bun scripts/copy-chat-shim.ts",
+    "build": "rm -rf dist && bun run typecheck && tsup && bun run check:browser-bundles",
     "check:browser-bundles": "bun scripts/check-browser-bundles.ts",
     "dev": "tsx --watch src/index.ts",
     "test": "bun test",
@@ -68,7 +61,6 @@
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@waniwani/chat": ">=0.26.0",
     "react": ">=18.0.0",
     "zod": ">=4.0.0",
     "ai": ">=6.0.141",
@@ -76,9 +68,6 @@
   },
   "peerDependenciesMeta": {
     "@modelcontextprotocol/sdk": {
-      "optional": true
-    },
-    "@waniwani/chat": {
       "optional": true
     },
     "react": {
@@ -99,6 +88,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@types/react": "^19.0.0",
     "ai": "^6.0.141",
+    "happy-dom": "^20.7.0",
     "react": "^19.0.0",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",

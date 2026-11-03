@@ -86,23 +86,21 @@ export default defineConfig([
 			js: '"use client";',
 		},
 	},
-	// `@waniwani/sdk/chat`: the deprecated re-export of `@waniwani/chat`, an
-	// optional peer kept external. Removed in 0.28.0.
+	// `dist/chat/embed.js`: loads the `@waniwani/chat` embed for pages that
+	// still use the old CDN path (src/chat/embed-forwarder.ts). Removed in 2.0.0.
 	{
-		entry: { "chat/index": "src/chat/index.ts" },
-		format: ["esm"],
-		target: "es2022",
+		entry: { "chat/embed": "src/chat/embed.ts" },
+		format: ["iife"],
+		target: "es2020",
 		platform: "browser",
-		dts: true,
+		dts: false,
 		clean: false,
-		shims: false,
 		splitting: false,
-		sourcemap: true,
+		sourcemap: false,
 		minify: true,
 		outDir: "dist",
-		external: ["@waniwani/chat"],
-		banner: {
-			js: '"use client";',
+		outExtension() {
+			return { js: ".js" };
 		},
 	},
 	// Internal SDK surface (mounted at @waniwani/sdk/internal — not public).
