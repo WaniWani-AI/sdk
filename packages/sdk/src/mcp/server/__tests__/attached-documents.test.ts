@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { KbClient } from "@waniwani/protocol/kb/types";
-import type { TrackInput } from "@waniwani/protocol/tracking/@types";
+import type { KbClient } from "@waniwani/core/kb/types";
+import type { TrackInput } from "@waniwani/core/tracking/@types";
 import { z } from "zod";
 import { createScopedClient } from "../scoped-client.js";
 import { extractAttachedDocuments } from "../utils.js";

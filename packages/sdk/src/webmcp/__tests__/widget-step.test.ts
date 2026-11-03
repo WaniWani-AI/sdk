@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { WebMcpCallResult } from "@waniwani/protocol/webmcp/@types";
+import type { WebMcpCallResult } from "@waniwani/core/webmcp/@types";
 import { readWidgetStep, rewriteForAgent } from "../widget-step";
 
 /** A flow tool result, shaped the way the engine actually emits one. */

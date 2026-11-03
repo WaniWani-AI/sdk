@@ -2,7 +2,7 @@ import type {
 	ErrorCauseType,
 	SessionErrorCodeType,
 	SessionErrorProperties,
-} from "@waniwani/protocol/tracking/@types";
+} from "@waniwani/core/tracking/@types";
 import type { ScopedWaniWaniClient } from "../scoped-client.js";
 
 /** Fire-and-forget: never throws, so a failing caller keeps its own error. */

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ModelContextUpdate } from "@waniwani/protocol/shared/model-context";
+import type { ModelContextUpdate } from "@waniwani/core/shared/model-context";
 import type { ChatStatus, ReasoningUIPart, ToolUIPart, UIMessage } from "ai";
 import {
 	ClockIcon,

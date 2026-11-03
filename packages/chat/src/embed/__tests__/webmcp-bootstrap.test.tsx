@@ -44,7 +44,7 @@ const REAL_FETCH = globalThis.fetch;
 
 const { act } = await import("react");
 const { startWebMcp } = await import("../webmcp-bootstrap");
-const { createWebMcpBridge } = await import("@waniwani/protocol/webmcp");
+const { createWebMcpBridge } = await import("@waniwani/core/webmcp");
 const { saveCachedConfig } = await import("../remote-config");
 type EmbedConfig = import("../config").EmbedConfig;
 type WebMcpHandle = import("../webmcp-bootstrap").WebMcpHandle;

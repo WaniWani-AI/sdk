@@ -4,7 +4,7 @@
  * function's request-body cap.
  */
 
-import type { AttachedDocument } from "@waniwani/protocol/documents/types";
+import type { AttachedDocument } from "@waniwani/core/documents/types";
 import { platformEndpoint } from "./api-url";
 
 const DOCUMENTS_PATH = "/api/mcp/modules/documents";

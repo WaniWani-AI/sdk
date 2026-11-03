@@ -7,7 +7,7 @@ import type {
 	KbSearchOptions,
 	KbSource,
 	SearchResult,
-} from "@waniwani/protocol/kb/types";
+} from "@waniwani/core/kb/types";
 import { WaniWaniError } from "../error.js";
 import type { InternalConfig } from "../types.js";
 import { recordKbSearch } from "./retrieval-context.js";

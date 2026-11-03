@@ -1,4 +1,4 @@
-import { refusalMessage } from "@waniwani/protocol/shared/refusal";
+import { refusalMessage } from "@waniwani/core/shared/refusal";
 import { WaniWaniError } from "../error.js";
 import type { InternalConfig } from "../types.js";
 import type { EmailClient, EmailSendInput, EmailSendResult } from "./types.js";

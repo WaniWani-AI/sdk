@@ -1,9 +1,9 @@
-import { readAttachedDocuments } from "@waniwani/protocol/documents/messages";
-import type { AttachedDocument } from "@waniwani/protocol/documents/types";
+import { readAttachedDocuments } from "@waniwani/core/documents/messages";
+import type { AttachedDocument } from "@waniwani/core/documents/types";
 import {
 	type ExtractSourceClientInfo,
 	pickFirst,
-} from "@waniwani/protocol/shared/meta-extractors";
+} from "@waniwani/core/shared/meta-extractors";
 
 export {
 	type ExtractSourceClientInfo,
@@ -14,7 +14,7 @@ export {
 	extractSource,
 	extractTraceId,
 	extractVisitorId,
-} from "@waniwani/protocol/shared/meta-extractors";
+} from "@waniwani/core/shared/meta-extractors";
 
 const TURN_COUNT_KEYS = ["waniwani/turnCount"] as const;
 
@@ -47,8 +47,8 @@ export const FLOW_META_KEY = "waniwani/flow" as const;
 export const OMIT_PII_NOTE =
 	" Do not include PII (names, emails, phones, addresses, IDs, ages, birthdates) — summarize abstractly." as const;
 
-export type { SuggestionsMeta } from "@waniwani/protocol/shared/meta-keys";
-export { SUGGESTIONS_META_KEY } from "@waniwani/protocol/shared/meta-keys";
+export type { SuggestionsMeta } from "@waniwani/core/shared/meta-keys";
+export { SUGGESTIONS_META_KEY } from "@waniwani/core/shared/meta-keys";
 
 /**
  * Meta key under which `withWaniwani` injects the widget tracking config

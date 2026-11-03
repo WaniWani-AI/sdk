@@ -65,7 +65,7 @@ packages/chat/
 └── .storybook/               # Dev-only playground (bun run storybook)
 ```
 
-The chat imports nothing outside this package except `@waniwani/protocol`, the private wire contract it shares with `@waniwani/sdk` (tracking client, WebMCP bridge, document types). The build inlines it, code and types.
+The chat imports nothing outside this package except `@waniwani/core`, the private wire contract it shares with `@waniwani/sdk` (tracking client, WebMCP bridge, document types). The build inlines it, code and types.
 
 ## Theming
 

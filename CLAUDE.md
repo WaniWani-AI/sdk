@@ -6,7 +6,7 @@ The repo is a bun workspace with two published packages and one private package:
 
 - `packages/sdk` → `@waniwani/sdk`: flows, KV stores, tracking, KB, documents, `withWaniwani`, `useWaniwani`.
 - `packages/chat` → `@waniwani/chat`: the chat widget, React components and `embed.js` in one package.
-- `packages/protocol` → `@waniwani/protocol`, private and never published: the wire contract both sides share (`shared/*`, the WebMCP bridge and types, the tracking client and types, the document and KB types). tsup inlines it into both packages, code and `.d.ts`. `packages/chat` imports nothing outside itself except `@waniwani/protocol`; keep it that way.
+- `packages/core` → `@waniwani/core`, private and never published: the wire contract both sides share (`shared/*`, the WebMCP bridge and types, the tracking client and types, the document and KB types). tsup inlines it into both packages, code and `.d.ts`. `packages/chat` imports nothing outside itself except `@waniwani/core`; keep it that way.
 
 ## Public API tiers
 
@@ -76,11 +76,11 @@ packages/
 │   ├── src/                  # Free tier chat widget (WaniwaniChat, ChatEmbed, embed/ for embed.js)
 │   ├── scripts/              # Post-build: inline CSS into embed.js, check the browser bundle
 │   └── .storybook/
-└── protocol/                 # @waniwani/protocol (private): shared/, webmcp/, tracking/, documents/, kb/types
+└── core/                     # @waniwani/core (private): shared/, webmcp/, tracking/, documents/, kb/types
 scripts/bump.ts               # Version bump behind each package's `bun run release:*`
 ```
 
-Each package has its own `package.json`, `tsconfig.json` (extends `tsconfig.base.json`) and, for the published two, `tsup.config.ts`. One `biome.json`, one `lefthook.yml` and one `bun.lock` at the root. Import protocol modules as `@waniwani/protocol/<path>` (for example `@waniwani/protocol/tracking/frontend`), never by a relative path across packages.
+Each package has its own `package.json`, `tsconfig.json` (extends `tsconfig.base.json`) and, for the published two, `tsup.config.ts`. One `biome.json`, one `lefthook.yml` and one `bun.lock` at the root. Import core modules as `@waniwani/core/<path>` (for example `@waniwani/core/tracking/frontend`), never by a relative path across packages.
 
 ## Usage
 
@@ -112,7 +112,7 @@ All commands run from the repo root unless noted.
 
 - Build: `bun run build` (the chat first, then the SDK, which copies the chat's `embed.js`)
 - Dev: `bun run --cwd packages/sdk dev`
-- Typecheck: `bun run typecheck` (root scripts, protocol, chat, SDK)
+- Typecheck: `bun run typecheck` (root scripts, core, chat, SDK)
 - Lint: `bun run lint`
 - Test: `bun test` (every package)
 - Storybook: `bun run storybook`
@@ -158,7 +158,7 @@ Target SDK **users**, not SDK developers.
 | Source area | Docs page to update (`docs/docs/`) |
 |---|---|
 | `packages/sdk/src/mcp/server/flows/` | `sdk/flows/*.mdx`, `sdk/reference/flow-tool-contract.mdx` |
-| `packages/sdk/src/tracking/`, `packages/protocol/src/tracking/` + `packages/sdk/src/mcp/server/scoped-client.ts` | `sdk/tracking/*.mdx`, `sdk/reference/event-schema.mdx` |
+| `packages/sdk/src/tracking/`, `packages/core/src/tracking/` + `packages/sdk/src/mcp/server/scoped-client.ts` | `sdk/tracking/*.mdx`, `sdk/reference/event-schema.mdx` |
 | `packages/sdk/src/mcp/server/kv/` | `sdk/flows/kv-store.mdx`, `sdk/reference/kv-store-api.mdx` |
 | `packages/sdk/src/kb/` | `sdk/knowledge-base/overview.mdx` |
 | `packages/chat/src/` | `sdk/chat/embed.mdx`, `sdk/chat/react.mdx` |

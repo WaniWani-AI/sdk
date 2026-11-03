@@ -1,6 +1,6 @@
 "use client";
 
-import type { FrontendTrackingClient } from "@waniwani/protocol/tracking/frontend";
+import type { FrontendTrackingClient } from "@waniwani/core/tracking/frontend";
 import {
 	forwardRef,
 	useEffect,

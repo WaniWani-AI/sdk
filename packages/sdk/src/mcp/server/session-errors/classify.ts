@@ -1,4 +1,4 @@
-import type { ErrorCauseType } from "@waniwani/protocol/tracking/@types";
+import type { ErrorCauseType } from "@waniwani/core/tracking/@types";
 import { z } from "zod";
 
 const statusCarrierSchema = z.object({

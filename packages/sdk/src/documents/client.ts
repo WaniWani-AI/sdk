@@ -4,8 +4,8 @@ import type {
 	DocumentExtractStoredInput,
 	DocumentSchema,
 	DocumentsClient,
-} from "@waniwani/protocol/documents/types";
-import { refusalMessage } from "@waniwani/protocol/shared/refusal";
+} from "@waniwani/core/documents/types";
+import { refusalMessage } from "@waniwani/core/shared/refusal";
 import { WaniWaniError } from "../error.js";
 import type { InternalConfig } from "../types.js";
 

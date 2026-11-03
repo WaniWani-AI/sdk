@@ -1,6 +1,6 @@
 "use client";
 
-import type { ModelContextUpdate } from "@waniwani/protocol/shared/model-context";
+import type { ModelContextUpdate } from "@waniwani/core/shared/model-context";
 import { ArrowDownIcon } from "lucide-react";
 import {
 	forwardRef,

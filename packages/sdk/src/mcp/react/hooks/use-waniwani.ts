@@ -1,7 +1,7 @@
 "use client";
 
-import type { TrackFn } from "@waniwani/protocol/tracking/@types";
-import { createFrontendClient } from "@waniwani/protocol/tracking/frontend";
+import type { TrackFn } from "@waniwani/core/tracking/@types";
+import { createFrontendClient } from "@waniwani/core/tracking/frontend";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WIDGET_CONFIG_META_KEY } from "../../server/utils";
 

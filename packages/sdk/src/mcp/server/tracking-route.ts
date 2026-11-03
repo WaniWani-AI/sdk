@@ -21,8 +21,8 @@
  * ```
  */
 
-import type { EventType, TrackInput } from "@waniwani/protocol/tracking/@types";
-import type { V2EventEnvelope } from "@waniwani/protocol/tracking/v2-types";
+import type { EventType, TrackInput } from "@waniwani/core/tracking/@types";
+import type { V2EventEnvelope } from "@waniwani/core/tracking/v2-types";
 import type { WaniWaniConfig } from "../../types.js";
 import { waniwani } from "../../waniwani.js";
 

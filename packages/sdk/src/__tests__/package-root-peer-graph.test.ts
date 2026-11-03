@@ -19,10 +19,10 @@ function specifiers(source: string): string[] {
 	return out;
 }
 
-// The private protocol package is inlined into the build, so its modules are
+// The private core package is inlined into the build, so its modules are
 // part of the root graph too.
-const PROTOCOL = "@waniwani/protocol/";
-const PROTOCOL_SRC = resolve(import.meta.dir, "../../../protocol/src");
+const CORE = "@waniwani/core/";
+const CORE_SRC = resolve(import.meta.dir, "../../../core/src");
 
 function reachableFrom(entry: string): Map<string, string[]> {
 	const graph = new Map<string, string[]>();
@@ -43,8 +43,8 @@ function reachableFrom(entry: string): Map<string, string[]> {
 			let base: string;
 			if (spec.startsWith(".")) {
 				base = resolve(dirname(file), spec.replace(/\.js$/, ""));
-			} else if (spec.startsWith(PROTOCOL)) {
-				base = resolve(PROTOCOL_SRC, spec.slice(PROTOCOL.length));
+			} else if (spec.startsWith(CORE)) {
+				base = resolve(CORE_SRC, spec.slice(CORE.length));
 			} else {
 				continue;
 			}

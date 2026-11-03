@@ -1,4 +1,4 @@
-import { getOrCreateVisitorId } from "@waniwani/protocol/shared/visitor-id";
+import { getOrCreateVisitorId } from "@waniwani/core/shared/visitor-id";
 import { getOrCreateMemoryUserId } from "./memory-user-id";
 
 // ============================================================================
@@ -104,7 +104,7 @@ export {
 	getOrCreateVisitorId,
 	setVisitorId,
 	type VisitorIdInput,
-} from "@waniwani/protocol/shared/visitor-id";
+} from "@waniwani/core/shared/visitor-id";
 
 // ============================================================================
 // Main export

@@ -1,9 +1,9 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import type { AttachedDocument } from "@waniwani/protocol/documents/types";
-import type { ModelContextUpdate } from "@waniwani/protocol/shared/model-context";
-import { hasModelContext } from "@waniwani/protocol/shared/model-context";
+import type { AttachedDocument } from "@waniwani/core/documents/types";
+import type { ModelContextUpdate } from "@waniwani/core/shared/model-context";
+import { hasModelContext } from "@waniwani/core/shared/model-context";
 import type { ChatTransport, FileUIPart, UIMessage } from "ai";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";

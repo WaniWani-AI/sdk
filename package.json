@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "build": "bun run --cwd packages/chat build && bun run --cwd packages/sdk build",
-    "typecheck": "tsc --noEmit && bun run --cwd packages/protocol typecheck && bun run --cwd packages/chat typecheck && bun run --cwd packages/sdk typecheck",
+    "typecheck": "tsc --noEmit && bun run --cwd packages/core typecheck && bun run --cwd packages/chat typecheck && bun run --cwd packages/sdk typecheck",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "test": "bun test",

@@ -1,11 +1,11 @@
 "use client";
 
-import { autoHeightFromMeta } from "@waniwani/protocol/shared/view-uri";
+import { autoHeightFromMeta } from "@waniwani/core/shared/view-uri";
 import type {
 	WebMcpBridge,
 	WebMcpCallResponse,
 	WebMcpWidgetPayload,
-} from "@waniwani/protocol/webmcp";
+} from "@waniwani/core/webmcp";
 import { useCallback, useEffect, useState } from "react";
 import { McpAppFrame } from "../components/mcp-app-frame";
 import { cn } from "../lib/utils";

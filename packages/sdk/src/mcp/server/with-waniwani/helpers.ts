@@ -1,5 +1,5 @@
-import type { KbSearchTrace } from "@waniwani/protocol/kb/types";
-import type { ErrorCauseType } from "@waniwani/protocol/tracking/@types";
+import type { KbSearchTrace } from "@waniwani/core/kb/types";
+import type { ErrorCauseType } from "@waniwani/core/tracking/@types";
 import type {
 	CallableTrack,
 	ToolCalledProperties,

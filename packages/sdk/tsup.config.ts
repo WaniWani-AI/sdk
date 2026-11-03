@@ -1,8 +1,8 @@
 import { defineConfig } from "tsup";
 
-// `@waniwani/protocol` is a private workspace package that is never published,
+// `@waniwani/core` is a private workspace package that is never published,
 // so every entry inlines its code and its types (`noExternal` below).
-const protocol = ["@waniwani/protocol"];
+const core = ["@waniwani/core"];
 
 export default defineConfig([
 	// Core tracking SDK
@@ -17,7 +17,7 @@ export default defineConfig([
 		sourcemap: true,
 		minify: true,
 		outDir: "dist",
-		noExternal: protocol,
+		noExternal: core,
 	},
 	// MCP server-side (Node.js)
 	{
@@ -31,7 +31,7 @@ export default defineConfig([
 		sourcemap: true,
 		minify: true,
 		outDir: "dist",
-		noExternal: protocol,
+		noExternal: core,
 		external: [
 			"@modelcontextprotocol/sdk",
 			"zod",
@@ -51,7 +51,7 @@ export default defineConfig([
 		sourcemap: true,
 		minify: true,
 		outDir: "dist",
-		noExternal: protocol,
+		noExternal: core,
 		external: [
 			"react",
 			"@modelcontextprotocol/sdk",
@@ -75,7 +75,7 @@ export default defineConfig([
 		sourcemap: true,
 		minify: true,
 		outDir: "dist",
-		noExternal: protocol,
+		noExternal: core,
 		external: [
 			"react",
 			"skybridge",
@@ -118,7 +118,7 @@ export default defineConfig([
 		sourcemap: true,
 		minify: true,
 		outDir: "dist",
-		noExternal: protocol,
+		noExternal: core,
 		external: ["ai", "zod"],
 	},
 	// Knowledge Base (Node.js, server-side)
@@ -133,7 +133,7 @@ export default defineConfig([
 		sourcemap: true,
 		minify: true,
 		outDir: "dist",
-		noExternal: protocol,
+		noExternal: core,
 		external: ["ai"],
 	},
 	// Documents (Node.js, server-side). `zod` stays external: a caller reaches
@@ -149,7 +149,7 @@ export default defineConfig([
 		sourcemap: true,
 		minify: true,
 		outDir: "dist",
-		noExternal: protocol,
+		noExternal: core,
 		external: ["zod"],
 	},
 ]);

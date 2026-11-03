@@ -1,6 +1,6 @@
 "use client";
 
-import type { AttachedDocument } from "@waniwani/protocol/documents/types";
+import type { AttachedDocument } from "@waniwani/core/documents/types";
 import { useCallback, useEffect, useState } from "react";
 import type { DocumentUploadConfig } from "../@types";
 import type {

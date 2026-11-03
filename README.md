@@ -6,7 +6,7 @@ This repo holds the packages for [app.waniwani.ai](https://app.waniwani.ai). It 
 | --- | --- | --- |
 | [`packages/sdk`](packages/sdk) | [`@waniwani/sdk`](https://www.npmjs.com/package/@waniwani/sdk) | The open-source flow engine for MCP servers, plus the hosted tracking, knowledge base and documents clients. |
 | [`packages/chat`](packages/chat) | [`@waniwani/chat`](https://www.npmjs.com/package/@waniwani/chat) | The chat widget: the React components and `embed.js`. |
-| [`packages/protocol`](packages/protocol) | not published | The wire contract both packages share. Their builds inline it. |
+| [`packages/core`](packages/core) | not published | The wire contract both packages share. Their builds inline it. |
 
 Docs live at [docs.waniwani.ai](https://docs.waniwani.ai).
 

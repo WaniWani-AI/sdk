@@ -56,8 +56,8 @@
         "@modelcontextprotocol/sdk",
       ],
     },
-    "packages/protocol": {
-      "name": "@waniwani/protocol",
+    "packages/core": {
+      "name": "@waniwani/core",
       "version": "0.0.0",
       "devDependencies": {
         "@modelcontextprotocol/sdk": "^1.30.0",
@@ -573,7 +573,7 @@
 
     "@waniwani/chat": ["@waniwani/chat@workspace:packages/chat"],
 
-    "@waniwani/protocol": ["@waniwani/protocol@workspace:packages/protocol"],
+    "@waniwani/core": ["@waniwani/core@workspace:packages/core"],
 
     "@waniwani/sdk": ["@waniwani/sdk@workspace:packages/sdk"],
 

@@ -5,13 +5,13 @@
 // ----------------------------------------------------------------------------
 
 // Widget/view binding, shared with the chat surface — OSS
-export type { MetaCarrier } from "@waniwani/protocol/shared/view-uri";
+export type { MetaCarrier } from "@waniwani/core/shared/view-uri";
 export {
 	autoHeightFromMeta,
 	isDisplayTool,
 	resourceUriFromMeta,
 	viewUriFor,
-} from "@waniwani/protocol/shared/view-uri";
+} from "@waniwani/core/shared/view-uri";
 // WebMCP — the site's tools, callable by a browsing agent on the page. OSS.
 export type {
 	WebMcpBridge,
@@ -24,11 +24,11 @@ export type {
 	WebMcpRequest,
 	WebMcpTool,
 	WebMcpWidgetPayload,
-} from "@waniwani/protocol/webmcp";
+} from "@waniwani/core/webmcp";
 export {
 	createWebMcpBridge,
 	supportsWebMcp,
-} from "@waniwani/protocol/webmcp";
+} from "@waniwani/core/webmcp";
 export type { WidgetStep, WidgetStepStatus } from "../webmcp/widget-step";
 export { readWidgetStep, rewriteForAgent } from "../webmcp/widget-step";
 // Flow framework — OSS

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { KbSearchTrace } from "@waniwani/protocol/kb/types";
+import type { KbSearchTrace } from "@waniwani/core/kb/types";
 import type { InternalConfig } from "../types.js";
 import { createKbClient } from "./client.js";
 import { retrievalCollectorStore } from "./retrieval-context.js";

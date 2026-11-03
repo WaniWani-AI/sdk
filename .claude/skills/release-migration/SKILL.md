@@ -37,8 +37,8 @@ If the change is purely internal (no exported symbol, type, or documented behavi
 
 1. **Identify the breaking changes.** Diff the public surface against the last release:
    ```bash
-   git diff v<last-sdk-version>..HEAD -- packages/sdk/src packages/protocol/src | grep -E '^\-.*export'
-   git diff chat-v<last-chat-version>..HEAD -- packages/chat/src packages/protocol/src | grep -E '^\-.*export'
+   git diff v<last-sdk-version>..HEAD -- packages/sdk/src packages/core/src | grep -E '^\-.*export'
+   git diff chat-v<last-chat-version>..HEAD -- packages/chat/src packages/core/src | grep -E '^\-.*export'
    ```
    Cross-check against the tiers in [CLAUDE.md](../../../CLAUDE.md). A renamed/removed/re-typed export, a changed function signature, a moved entry point, or a changed default is breaking. A new optional export is not.
 

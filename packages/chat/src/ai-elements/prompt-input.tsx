@@ -1,6 +1,6 @@
 "use client";
 
-import type { AttachedDocument } from "@waniwani/protocol/documents/types";
+import type { AttachedDocument } from "@waniwani/core/documents/types";
 import type { ChatStatus, FileUIPart } from "ai";
 import {
 	ArrowRightIcon,

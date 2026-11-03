@@ -37,7 +37,7 @@ type Root = ReturnType<typeof createRoot>;
 const { AttachedDocuments, readAttachedDocuments } = await import(
 	"./attachments"
 );
-type Doc = import("@waniwani/protocol/documents/types").AttachedDocument;
+type Doc = import("@waniwani/core/documents/types").AttachedDocument;
 
 const PDF: Doc = {
 	documentId: "doc_pdf",

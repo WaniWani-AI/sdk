@@ -61,8 +61,7 @@ type PromptInputPropsType = import("./prompt-input").PromptInputProps;
 type MessageType = import("./prompt-input").PromptInputMessage;
 type ErrorType = import("./prompt-input").AttachmentError;
 type AttachmentsCtx = import("./prompt-input").AttachmentsContext;
-type UploadedDoc =
-	import("@waniwani/protocol/documents/types").AttachedDocument;
+type UploadedDoc = import("@waniwani/core/documents/types").AttachedDocument;
 
 function file(name: string, type: string, size = 8): File {
 	return new File(["x".repeat(size)], name, { type });

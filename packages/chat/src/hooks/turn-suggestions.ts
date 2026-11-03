@@ -1,4 +1,4 @@
-import { SUGGESTIONS_META_KEY } from "@waniwani/protocol/shared/meta-keys";
+import { SUGGESTIONS_META_KEY } from "@waniwani/core/shared/meta-keys";
 import type { UIMessage } from "ai";
 
 function isRecord(value: unknown): value is Record<string, unknown> {

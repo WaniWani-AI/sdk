@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { readAttachedDocuments } from "@waniwani/protocol/documents/messages";
+import { readAttachedDocuments } from "@waniwani/core/documents/messages";
 import {
 	DocumentUploadError,
 	uploadDocument,

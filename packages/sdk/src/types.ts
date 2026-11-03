@@ -1,11 +1,11 @@
 // Waniwani SDK - Core Types
 
-import type { DocumentsClient } from "@waniwani/protocol/documents/types";
-import type { KbClient } from "@waniwani/protocol/kb/types";
+import type { DocumentsClient } from "@waniwani/core/documents/types";
+import type { KbClient } from "@waniwani/core/kb/types";
 import type {
 	TrackingClient,
 	TrackingConfig,
-} from "@waniwani/protocol/tracking/@types";
+} from "@waniwani/core/tracking/@types";
 import type { EmailClient } from "./email/types.js";
 
 // ============================================================================

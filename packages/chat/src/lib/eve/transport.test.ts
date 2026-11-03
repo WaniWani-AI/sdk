@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import type { AttachedDocument } from "@waniwani/protocol/documents/types";
+import type { AttachedDocument } from "@waniwani/core/documents/types";
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import { Window } from "happy-dom";
 import type { ChatTransportContext } from "../../@types";

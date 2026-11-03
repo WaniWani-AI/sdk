@@ -1,4 +1,4 @@
-import type { AttachedDocument } from "@waniwani/protocol/documents/types";
+import type { AttachedDocument } from "@waniwani/core/documents/types";
 import type { UIMessageChunk } from "ai";
 import { EveAgentStore, type MessageStreamEvent } from "eve/client";
 import { installEveShims } from "./shims";

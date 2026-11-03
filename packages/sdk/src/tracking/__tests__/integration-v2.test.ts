@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { once } from "node:events";
 import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
-import type { V2BatchRequest } from "@waniwani/protocol/tracking/v2-types";
+import type { V2BatchRequest } from "@waniwani/core/tracking/v2-types";
 import { waniwani } from "../../waniwani.js";
 
 type CapturedRequest = {

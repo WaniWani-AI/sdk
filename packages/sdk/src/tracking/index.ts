@@ -5,10 +5,10 @@ import type {
 	TrackInput,
 	TrackingClient,
 	TrackingShutdownOptions,
-} from "@waniwani/protocol/tracking/@types";
-import { mapTrackEventToV2 } from "@waniwani/protocol/tracking/mapper";
-import { createRevenueApi } from "@waniwani/protocol/tracking/revenue";
-import { createV2BatchTransport } from "@waniwani/protocol/tracking/transport";
+} from "@waniwani/core/tracking/@types";
+import { mapTrackEventToV2 } from "@waniwani/core/tracking/mapper";
+import { createRevenueApi } from "@waniwani/core/tracking/revenue";
+import { createV2BatchTransport } from "@waniwani/core/tracking/transport";
 import type { InternalConfig } from "../types.js";
 
 // Re-export types
@@ -40,16 +40,16 @@ export type {
 	TrackingConfig,
 	TrackingShutdownOptions,
 	TrackingShutdownResult,
-} from "@waniwani/protocol/tracking/@types";
+} from "@waniwani/core/tracking/@types";
 export {
 	ERROR_CAUSES,
 	EVENT_TYPES,
 	SESSION_ERROR_CODES,
-} from "@waniwani/protocol/tracking/@types";
+} from "@waniwani/core/tracking/@types";
 export {
 	createEventId,
 	mapTrackEventToV2,
-} from "@waniwani/protocol/tracking/mapper";
+} from "@waniwani/core/tracking/mapper";
 export type {
 	V2BatchRejectedEvent,
 	V2BatchRequest,
@@ -57,7 +57,7 @@ export type {
 	V2CorrelationIds,
 	V2EnvelopeType,
 	V2EventEnvelope,
-} from "@waniwani/protocol/tracking/v2-types";
+} from "@waniwani/core/tracking/v2-types";
 
 export function createTrackingClient(config: InternalConfig): TrackingClient {
 	const { apiUrl, apiKey, tracking } = config;

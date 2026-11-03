@@ -1,6 +1,6 @@
 "use client";
 
-import type { AttachedDocument } from "@waniwani/protocol/documents/types";
+import type { AttachedDocument } from "@waniwani/core/documents/types";
 import type { FileUIPart } from "ai";
 import { FileIcon, FileTextIcon, ImageIcon } from "lucide-react";
 import { type HTMLAttributes, type ReactNode, useState } from "react";

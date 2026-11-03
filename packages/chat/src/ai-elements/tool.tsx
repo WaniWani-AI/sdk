@@ -4,7 +4,7 @@ import {
 	autoHeightFromMeta,
 	metaOf,
 	resourceUriFromMeta,
-} from "@waniwani/protocol/shared/view-uri";
+} from "@waniwani/core/shared/view-uri";
 import type { ToolUIPart } from "ai";
 import {
 	CheckIcon,

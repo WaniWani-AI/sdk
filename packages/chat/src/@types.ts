@@ -524,7 +524,7 @@ export interface ChatHandle {
 	 * Present on `WaniwaniChat` (hosted); absent on the bare `ChatEmbed`
 	 * primitive, which has no Waniwani credential to send events with.
 	 */
-	track?: import("@waniwani/protocol/tracking/@types").TrackFn;
+	track?: import("@waniwani/core/tracking/@types").TrackFn;
 	/**
 	 * Tie the visitor to a stable user id (emits `user.identified`).
 	 * Present on `WaniwaniChat` only, like `track`.
@@ -550,7 +550,7 @@ export interface ChatTransportContext {
 	hasMessages: () => boolean;
 	/** The documents attached to the message being sent, handed over once. */
 	takeTurnInput: () => {
-		documents?: import("@waniwani/protocol/documents/types").AttachedDocument[];
+		documents?: import("@waniwani/core/documents/types").AttachedDocument[];
 	};
 	onSession: (sessionId: string) => void;
 }

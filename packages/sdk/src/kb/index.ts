@@ -5,5 +5,5 @@ export type {
 	KbSearchOptions,
 	KbSource,
 	SearchResult,
-} from "@waniwani/protocol/kb/types";
+} from "@waniwani/core/kb/types";
 export { createKbClient } from "./client";

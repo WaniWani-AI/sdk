@@ -3,7 +3,7 @@
  * not collect it as a suite.
  */
 
-import type { TrackInput } from "@waniwani/protocol/tracking/@types";
+import type { TrackInput } from "@waniwani/core/tracking/@types";
 import { z } from "zod";
 import type { withWaniwani } from "../index.js";
 

@@ -33,7 +33,7 @@ const eveSharesZod: Plugin = {
 
 export default defineConfig([
 	// React components. platform "browser" keeps nanoid and streamdown → unified → vfile off their Node entries, which leak bare crypto/path/process/url imports.
-	// `@waniwani/protocol` is a private workspace package, so the code and the
+	// `@waniwani/core` is a private workspace package, so the code and the
 	// types are both inlined here.
 	{
 		entry: { index: "src/index.ts" },
@@ -48,7 +48,7 @@ export default defineConfig([
 		minify: true,
 		outDir: "dist",
 		external: ["react", "react-dom", "@ai-sdk/react", "ai"],
-		noExternal: ["@waniwani/protocol"],
+		noExternal: ["@waniwani/core"],
 		banner: {
 			js: '"use client";',
 		},

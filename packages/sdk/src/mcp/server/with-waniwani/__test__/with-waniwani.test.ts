@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { TrackInput } from "@waniwani/protocol/tracking/@types";
+import type { TrackInput } from "@waniwani/core/tracking/@types";
 import { z } from "zod";
 import { withWaniwani } from "../index.js";
 

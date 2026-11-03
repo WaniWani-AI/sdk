@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { KbSearchTrace } from "@waniwani/protocol/kb/types";
+import type { KbSearchTrace } from "@waniwani/core/kb/types";
 
 // Per-request bucket the tool wrapper opens; kb.search records into it.
 export interface RetrievalCollector {

@@ -3,7 +3,7 @@
 import {
 	type ModelContextUpdate,
 	mergeModelContext,
-} from "@waniwani/protocol/shared/model-context";
+} from "@waniwani/core/shared/model-context";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	resolveWidgetResourceUri,

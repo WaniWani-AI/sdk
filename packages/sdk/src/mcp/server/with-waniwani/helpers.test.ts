@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { KbSearchTrace } from "@waniwani/protocol/kb/types";
+import type { KbSearchTrace } from "@waniwani/core/kb/types";
 import { buildTrackInput } from "./helpers.js";
 
 const trace: KbSearchTrace[] = [

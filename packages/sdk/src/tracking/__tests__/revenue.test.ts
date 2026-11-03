@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import type {
 	V2BatchRequest,
 	V2EventEnvelope,
-} from "@waniwani/protocol/tracking/v2-types";
+} from "@waniwani/core/tracking/v2-types";
 import { waniwani } from "../../waniwani.js";
 
 async function captureBatch(

@@ -1,7 +1,7 @@
 // Waniwani SDK
 
 // Error
-export { readAttachedDocuments } from "@waniwani/protocol/documents/messages";
+export { readAttachedDocuments } from "@waniwani/core/documents/messages";
 export type {
 	AttachedDocument,
 	DocumentExtractInput,
@@ -10,7 +10,7 @@ export type {
 	DocumentExtractUrlInput,
 	DocumentSchema,
 	DocumentsClient,
-} from "@waniwani/protocol/documents/types";
+} from "@waniwani/core/documents/types";
 // Types - KB Client
 export type {
 	KbClient,
@@ -18,19 +18,19 @@ export type {
 	KbIngestResult,
 	KbSearchOptions,
 	KbSource,
-} from "@waniwani/protocol/kb/types";
+} from "@waniwani/core/kb/types";
 // Tracking
 export {
 	ERROR_CAUSES,
 	EVENT_TYPES,
 	SESSION_ERROR_CODES,
-} from "@waniwani/protocol/tracking/@types";
+} from "@waniwani/core/tracking/@types";
 export type {
 	FrontendClientOptions,
 	FrontendIdentity,
 	FrontendTrackingClient,
-} from "@waniwani/protocol/tracking/frontend";
-export { createFrontendClient } from "@waniwani/protocol/tracking/frontend";
+} from "@waniwani/core/tracking/frontend";
+export { createFrontendClient } from "@waniwani/core/tracking/frontend";
 export type {
 	EmailClient,
 	EmailSendInput,

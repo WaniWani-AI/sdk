@@ -1,7 +1,7 @@
 import {
 	createFrontendClient,
 	type FrontendTrackingClient,
-} from "@waniwani/protocol/tracking/frontend";
+} from "@waniwani/core/tracking/frontend";
 import { eventsEndpoint } from "./page-view";
 import { getOrCreateVisitorId } from "./visitor-context";
 

@@ -1,12 +1,12 @@
 "use client";
 
-import { getOrCreateVisitorId } from "@waniwani/protocol/shared/visitor-id";
+import { getOrCreateVisitorId } from "@waniwani/core/shared/visitor-id";
 import {
 	createWebMcpBridge,
 	supportsWebMcp,
 	type WebMcpBridge,
 	type WebMcpWidgetPayload,
-} from "@waniwani/protocol/webmcp";
+} from "@waniwani/core/webmcp";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { debugLog } from "../lib/debug";

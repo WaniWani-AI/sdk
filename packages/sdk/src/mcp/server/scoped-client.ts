@@ -2,15 +2,15 @@ import type {
 	DocumentExtractInput,
 	DocumentExtractResult,
 	DocumentsClient,
-} from "@waniwani/protocol/documents/types";
-import type { KbClient } from "@waniwani/protocol/kb/types";
+} from "@waniwani/core/documents/types";
+import type { KbClient } from "@waniwani/core/kb/types";
 import type {
 	CallableTrack,
 	TrackFn,
 	TrackInput,
 	TrackingClient,
-} from "@waniwani/protocol/tracking/@types";
-import { createRevenueApi } from "@waniwani/protocol/tracking/revenue";
+} from "@waniwani/core/tracking/@types";
+import { createRevenueApi } from "@waniwani/core/tracking/revenue";
 import { createDocumentsClient } from "../../documents/client.js";
 import { createEmailClient } from "../../email/client.js";
 import type {

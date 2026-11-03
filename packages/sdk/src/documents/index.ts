@@ -1,4 +1,4 @@
-export { readAttachedDocuments } from "@waniwani/protocol/documents/messages";
+export { readAttachedDocuments } from "@waniwani/core/documents/messages";
 export type {
 	AttachedDocument,
 	DocumentExtractInput,
@@ -7,5 +7,5 @@ export type {
 	DocumentExtractUrlInput,
 	DocumentSchema,
 	DocumentsClient,
-} from "@waniwani/protocol/documents/types";
+} from "@waniwani/core/documents/types";
 export { createDocumentsClient } from "./client";

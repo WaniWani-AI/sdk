@@ -14,7 +14,7 @@
  * visitor gets the calendar on the page they are already looking at.
  */
 
-import type { WebMcpCallResult } from "@waniwani/protocol/webmcp/@types";
+import type { WebMcpCallResult } from "@waniwani/core/webmcp/@types";
 import type { FlowWidgetContent } from "../mcp/server/flows/@types";
 
 export type WidgetStep = {

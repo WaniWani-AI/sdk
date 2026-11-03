@@ -44,7 +44,7 @@ type UseSuggestionRowOptions = Parameters<typeof useSuggestionRow>[0];
 type UseSuggestionRowReturn = ReturnType<typeof useSuggestionRow>;
 
 const { SUGGESTIONS_META_KEY } = await import(
-	"@waniwani/protocol/shared/meta-keys"
+	"@waniwani/core/shared/meta-keys"
 );
 
 // ---------------------------------------------------------------------------
