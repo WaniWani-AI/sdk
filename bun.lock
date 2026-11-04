@@ -14,7 +14,7 @@
     },
     "packages/chat": {
       "name": "@waniwani/chat",
-      "version": "0.25.4-beta.0",
+      "version": "1.0.0",
       "devDependencies": {
         "@ai-sdk/react": "^3.0.134",
         "@modelcontextprotocol/sdk": "^1.30.0",
