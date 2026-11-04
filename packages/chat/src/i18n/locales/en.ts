@@ -1,0 +1,247 @@
+/**
+ * English catalog. Source of truth — every other locale must mirror this
+ * shape exactly (the `Messages` type is inferred from here).
+ */
+
+export interface Messages {
+	promptInput: {
+		placeholder: string;
+		uploadFiles: string;
+		uploadFilesUpTo: string;
+		uploadFilesUpToWithPages: string;
+		stop: string;
+		submit: string;
+		removeAttachments: string;
+		removeAttachment: string;
+		uploading: string;
+		retry: string;
+		retryUpload: string;
+		uploadFailed: string;
+		dropToAttach: string;
+		errorAccept: string;
+		errorTooLarge: string;
+		errorTooMany: string;
+	};
+	workingIndicator: {
+		default: string;
+	};
+	reasoning: {
+		thinking: string;
+		thoughtBrief: string;
+		thoughtForSeconds: (count: number) => string;
+	};
+	/** Chain-of-thought header (no icon): a generic label per state. */
+	chainOfThought: {
+		working: string;
+		done: string;
+	};
+	tool: {
+		copy: string;
+		copied: string;
+		request: string;
+		response: string;
+		error: string;
+	};
+	attachments: {
+		attachmentFallback: string;
+		kindPdf: string;
+		kindImage: string;
+		kindFile: string;
+		fileFallback: string;
+	};
+	threadMenu: {
+		newChat: string;
+		threadHistory: string;
+		deleteThread: string;
+		noPreviousChats: string;
+		hiddenThreads: (count: number) => string;
+	};
+	chatQueue: {
+		attachmentFallback: string;
+		removeFromQueue: string;
+		queued: (count: number) => string;
+	};
+	thread: {
+		scrollToLatest: string;
+	};
+	poweredBy: {
+		label: string;
+		logoAlt: string;
+	};
+	aiDisclaimer: {
+		default: string;
+		/** Shown in place of `default` when the "powered by" logo is hidden, so the line still says it is an AI. */
+		standalone: string;
+	};
+	exportSession: {
+		saving: string;
+		saved: string;
+		error: string;
+		export: string;
+		tooltip: string;
+	};
+	widgetErrorBoundary: {
+		failedToLoad: string;
+		retry: string;
+	};
+	launcher: {
+		prompt: string;
+		open: string;
+		close: string;
+		minimize: string;
+	};
+	menu: {
+		newChat: string;
+		restart: string;
+		copyConversation: string;
+		copied: string;
+		copyFailed: string;
+		label: string;
+	};
+	dialog: {
+		restartTitle: string;
+		restartText: string;
+		clearWithoutCopy: string;
+		copyAndClear: string;
+		confirm: string;
+		cancel: string;
+		copyError: string;
+		close: string;
+	};
+	toast: {
+		conversationCopied: string;
+	};
+	transcript: {
+		header: (site: string, date: string) => string;
+		you: string;
+		assistant: string;
+	};
+	/** Empty by default: filled from the welcome knob. */
+	welcome: {
+		title: string;
+		subtitle: string;
+	};
+}
+
+export const en: Messages = {
+	promptInput: {
+		placeholder: "What would you like to know?",
+		uploadFiles: "Upload files",
+		uploadFilesUpTo: "Upload a document, up to {limit}",
+		uploadFilesUpToWithPages:
+			"Upload a document, up to {limit} and {pages} pages",
+		stop: "Stop",
+		submit: "Submit",
+		removeAttachments: "Remove all attachments",
+		removeAttachment: "Remove attachment",
+		uploading: "Uploading…",
+		retry: "Retry",
+		retryUpload: "Retry the upload",
+		uploadFailed: "The upload did not finish.",
+		dropToAttach: "Drop to attach",
+		errorAccept: "{name} is not a file type this chat accepts.",
+		errorTooLarge: "{name} is larger than {limit}.",
+		errorTooMany: "You can attach up to {limit} files.",
+	},
+	workingIndicator: {
+		default: "On it…",
+	},
+	reasoning: {
+		thinking: "Thinking…",
+		thoughtBrief: "Thought for a few seconds",
+		thoughtForSeconds: (count: number) =>
+			`Thought for ${count} second${count === 1 ? "" : "s"}`,
+	},
+	chainOfThought: {
+		working: "Working on it…",
+		done: "Thought process",
+	},
+	tool: {
+		copy: "Copy",
+		copied: "Copied",
+		request: "Request",
+		response: "Response",
+		error: "Error",
+	},
+	attachments: {
+		attachmentFallback: "attachment",
+		kindPdf: "PDF",
+		kindImage: "Image",
+		kindFile: "File",
+		fileFallback: "file",
+	},
+	threadMenu: {
+		newChat: "New chat",
+		threadHistory: "Thread history",
+		deleteThread: "Delete thread",
+		noPreviousChats: "No previous chats yet.",
+		hiddenThreads: (count: number) =>
+			`${count} older thread${count === 1 ? "" : "s"} hidden`,
+	},
+	chatQueue: {
+		attachmentFallback: "(attachment)",
+		removeFromQueue: "Remove from queue",
+		queued: (count: number) => `${count} queued`,
+	},
+	thread: {
+		scrollToLatest: "Scroll to latest",
+	},
+	poweredBy: {
+		label: "AI agent powered by",
+		logoAlt: "Waniwani",
+	},
+	aiDisclaimer: {
+		default: "can make mistakes",
+		standalone: "AI agent. It can make mistakes.",
+	},
+	exportSession: {
+		saving: "saving...",
+		saved: "saved",
+		error: "error",
+		export: "export",
+		tooltip: "Save scenario to Waniwani",
+	},
+	widgetErrorBoundary: {
+		failedToLoad: "Widget failed to load",
+		retry: "Retry",
+	},
+	launcher: {
+		prompt: "Ask anything…",
+		open: "Open chat",
+		close: "Close chat",
+		minimize: "Minimize",
+	},
+	menu: {
+		newChat: "New chat",
+		restart: "Restart the conversation",
+		copyConversation: "Copy the conversation",
+		copied: "Copied",
+		copyFailed: "Copy failed",
+		label: "More actions",
+	},
+	dialog: {
+		restartTitle: "Clear this conversation?",
+		restartText:
+			"It is not saved anywhere: once cleared, you cannot get it back.",
+		clearWithoutCopy: "Clear without copying",
+		copyAndClear: "Copy and clear",
+		confirm: "Clear",
+		cancel: "Cancel",
+		copyError:
+			"Copying did not work in this browser. You can clear without copying, or close to keep the conversation.",
+		close: "Close",
+	},
+	toast: {
+		conversationCopied: "Conversation copied",
+	},
+	transcript: {
+		header: (site: string, date: string) =>
+			`Conversation with the assistant · ${date} · ${site}`,
+		you: "You:",
+		assistant: "Assistant:",
+	},
+	welcome: {
+		title: "",
+		subtitle: "",
+	},
+};

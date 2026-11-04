@@ -1,0 +1,104 @@
+// KB Client — thin HTTP wrapper for knowledge base API
+
+import type {
+	KbClient,
+	KbIngestFile,
+	KbIngestResult,
+	KbSearchOptions,
+	KbSource,
+	SearchResult,
+} from "@waniwani/core/kb/types";
+import { WaniWaniError } from "../error.js";
+import type { InternalConfig } from "../types.js";
+import { createLogger } from "../utils/logger.js";
+import { recordKbSearch } from "./retrieval-context.js";
+
+const SDK_NAME = "@waniwani/sdk";
+
+const log = createLogger("kb");
+
+export function createKbClient(config: InternalConfig): KbClient {
+	const { apiUrl, apiKey } = config;
+
+	function requireApiKey(): string {
+		if (!apiKey) {
+			throw new Error("WANIWANI_API_KEY is not set");
+		}
+		return apiKey;
+	}
+
+	async function request<T>(
+		method: "GET" | "POST",
+		path: string,
+		body?: unknown,
+	): Promise<T> {
+		const key = requireApiKey();
+		const url = `${apiUrl.replace(/\/$/, "")}${path}`;
+
+		const headers: Record<string, string> = {
+			Authorization: `Bearer ${key}`,
+			"X-WaniWani-SDK": SDK_NAME,
+		};
+
+		const init: RequestInit = { method, headers };
+
+		if (body !== undefined) {
+			headers["Content-Type"] = "application/json";
+			init.body = JSON.stringify(body);
+		}
+
+		const startedAt = Date.now();
+		log(`${method} ${url}`);
+		const response = await fetch(url, init);
+		log(
+			`${method} ${url} -> ${response.status} in ${Date.now() - startedAt}ms`,
+		);
+
+		if (!response.ok) {
+			const text = await response.text().catch(() => "");
+			throw new WaniWaniError(
+				text || `KB API error: HTTP ${response.status}`,
+				response.status,
+			);
+		}
+
+		const json = (await response.json()) as { data: T };
+		return json.data;
+	}
+
+	return {
+		async ingest(files: KbIngestFile[]): Promise<KbIngestResult> {
+			return request<KbIngestResult>("POST", "/api/mcp/kb/ingest", {
+				files,
+			});
+		},
+
+		async search(
+			query: string,
+			options?: KbSearchOptions,
+		): Promise<SearchResult[]> {
+			const results = await request<SearchResult[]>(
+				"POST",
+				"/api/mcp/kb/search",
+				{
+					query,
+					...options,
+				},
+			);
+			recordKbSearch({
+				query,
+				resultCount: results.length,
+				results: results.map((r) => ({
+					source: r.source,
+					heading: r.heading,
+					score: r.score,
+				})),
+			});
+			return results;
+		},
+
+		async sources(): Promise<KbSource[]> {
+			return request<KbSource[]>("GET", "/api/mcp/kb/sources");
+		},
+	};
+}

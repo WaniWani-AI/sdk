@@ -1,0 +1,445 @@
+// ============================================================================
+// Remote embed config — fetched from `GET {api}/config` on mount.
+//
+// Only display-facing fields come over the wire. `systemPrompt` and
+// `maxSteps` are inference-time concerns and stay server-side.
+// ============================================================================
+
+import { useEffect, useState } from "react";
+import type { DocumentUploadConfig } from "../@types";
+import { buildApiUrl } from "../lib/api-url";
+import { debugLog } from "../lib/debug";
+import { firePageView } from "../lib/page-view";
+import { markBoot, markConfigSource, setTimingMetadata } from "../lib/timing";
+import type { EmbedConfig } from "./config";
+import { resolveConfig } from "./config";
+import { parsePageSuggestions } from "./use-suggestions";
+import type { VisibilityRules } from "./visibility";
+
+// ---------------------------------------------------------------------------
+// Session cache
+//
+// Keeps the last-seen remote config in `sessionStorage` so a second mount in
+// the same tab can render the fully-assembled chrome immediately, with the
+// background revalidation updating fields silently if anything changed.
+// Session scope auto-expires per tab and is origin-isolated, so we don't
+// need an explicit TTL.
+// ---------------------------------------------------------------------------
+
+const CACHE_PREFIX = "waniwani:config:";
+
+function cacheKey(
+	api: string,
+	token: string,
+	channelId: string | undefined,
+): string {
+	return `${CACHE_PREFIX}${api}|${token}|${channelId ?? ""}`;
+}
+
+export function loadCachedConfig(
+	api: string,
+	token: string,
+	channelId?: string,
+): Partial<EmbedConfig> | null {
+	if (typeof window === "undefined") {
+		return null;
+	}
+	try {
+		const raw = window.sessionStorage.getItem(cacheKey(api, token, channelId));
+		if (!raw) {
+			return null;
+		}
+		const parsed = JSON.parse(raw) as Partial<EmbedConfig>;
+		return parsed && typeof parsed === "object" ? parsed : null;
+	} catch {
+		return null;
+	}
+}
+
+export function saveCachedConfig(
+	api: string,
+	token: string,
+	channelId: string | undefined,
+	config: Partial<EmbedConfig>,
+): void {
+	if (typeof window === "undefined") {
+		return;
+	}
+	try {
+		window.sessionStorage.setItem(
+			cacheKey(api, token, channelId),
+			JSON.stringify(config),
+		);
+	} catch {
+		// sessionStorage can be disabled (private mode, quota) — silently skip.
+	}
+}
+
+/**
+ * Safety net so a stalled `/config` doesn't leave the chat surface blank
+ * forever. After this, render with whatever config we have (programmatic +
+ * defaults) even if the fetch is still in flight.
+ */
+export const READINESS_TIMEOUT_MS = 600;
+
+interface RemoteConfigResponse {
+	welcomeMessage: string | null;
+	title: string | null;
+	placeholder: string | null;
+	suggestions: string[] | null;
+	/**
+	 * Per-page starter prompt sets; present only while the channel has the
+	 * feature on. Absent on servers that predate the field.
+	 */
+	pageSuggestions?: unknown;
+	enableThreadHistory?: boolean | null;
+	/** Present when the org's chats talk to the agent runtime directly. */
+	sessionApi?: string | null;
+	/**
+	 * Channel-specific event source (e.g. the integration/source this channel
+	 * is attributed to). Stamped onto widget-originated events like
+	 * `page.viewed` so they attribute to the right source instead of a generic
+	 * `"widget"` literal.
+	 */
+	source?: string | null;
+	/**
+	 * Channel the server resolves from the bearer token. Lets a token-only
+	 * embed (no `data-channel-id` attr / `channelId` prop) attribute widget
+	 * events to its channel, so ingest doesn't drop them for lacking a
+	 * resolvable channel. Absent on servers that predate the field.
+	 */
+	channelId?: string | null;
+	/**
+	 * Tool-call rendering mode from the channel config. Mapped to the
+	 * `showToolCalls` embed config: `full` → `true`, `hidden` → `false`,
+	 * `titles-only` → `"titles-only"`.
+	 */
+	toolCallDisplay?: "full" | "titles-only" | "hidden" | null;
+	/**
+	 * Per-URL show/hide rules for the floating bar (WAN-516). Consumed by the
+	 * embed to gate the floating dock per `window.location.pathname`. `null`
+	 * (or absent) means show everywhere.
+	 */
+	visibility?: VisibilityRules | null;
+	/**
+	 * Hide the floating dock at the bottom of the page (WAN-1431). On by
+	 * default; `false` opts out, a number is a distance in px from the end of
+	 * the page. Absent on servers that predate the field.
+	 */
+	hideAtBottom?: boolean | number | null;
+	/**
+	 * Documents module state for the project behind this token. Absent on
+	 * servers that predate the field, which the widget reads as off. Every member
+	 * is `unknown` because this one decides whether the uploader exists and what
+	 * caps it enforces, so a half-filled payload must not become a half-configured
+	 * uploader.
+	 */
+	documentUpload?: RemoteDocumentUpload | null;
+	/**
+	 * The channel's WebMCP switch. Absent on servers that predate the field,
+	 * which reads as on: the surface needs no configuration to work, so the only
+	 * thing worth sending is a channel that has declined it.
+	 */
+	webmcp?: { enabled?: boolean | null } | null;
+	/** The channel's custom key:value pairs. Absent on servers that predate the field. */
+	metadata?: Record<string, string> | null;
+}
+
+interface RemoteDocumentUpload {
+	enabled?: unknown;
+	maxBytes?: unknown;
+	maxPdfPages?: unknown;
+	maxFiles?: unknown;
+	accept?: unknown;
+}
+
+function parseDocumentUpload(
+	raw: RemoteDocumentUpload | null | undefined,
+): DocumentUploadConfig | null {
+	if (typeof raw !== "object" || raw === null) {
+		return null;
+	}
+	if (typeof raw.enabled !== "boolean") {
+		return null;
+	}
+	const accept = Array.isArray(raw.accept)
+		? raw.accept.filter((entry): entry is string => typeof entry === "string")
+		: [];
+	const positive = (value: unknown): value is number =>
+		typeof value === "number" && Number.isFinite(value) && value > 0;
+
+	// A disabled module is the answer even when it carries no caps, and it has to
+	// survive: dropping it here would fall back to the `allowAttachments` prop and
+	// show the paperclip on a project the platform said no to.
+	if (!raw.enabled) {
+		return { enabled: false, maxBytes: 0, maxPdfPages: 0, maxFiles: 0, accept };
+	}
+	if (
+		!(
+			positive(raw.maxBytes) &&
+			positive(raw.maxPdfPages) &&
+			positive(raw.maxFiles) &&
+			accept.length > 0
+		)
+	) {
+		return null;
+	}
+	return {
+		enabled: true,
+		maxBytes: raw.maxBytes,
+		maxPdfPages: raw.maxPdfPages,
+		maxFiles: raw.maxFiles,
+		accept,
+	};
+}
+
+/**
+ * Fetch the server-side config for a public token. Returns a sparse
+ * `Partial<EmbedConfig>` (only keys the server populated) so callers can
+ * safely spread it into their config merge.
+ *
+ * Resolves to `{}` on any network or parse error — remote config is a
+ * convenience layer, never required for the widget to function.
+ */
+export async function fetchRemoteConfig(
+	api: string,
+	token: string,
+	signal?: AbortSignal,
+	channelId?: string,
+): Promise<Partial<EmbedConfig>> {
+	markBoot("configStart");
+	const remote = await requestRemoteConfig(api, token, signal, channelId);
+	markBoot("configEnd");
+	if (!signal?.aborted) {
+		setTimingMetadata(remote.metadata);
+	}
+	return remote;
+}
+
+async function requestRemoteConfig(
+	api: string,
+	token: string,
+	signal: AbortSignal | undefined,
+	channelId: string | undefined,
+): Promise<Partial<EmbedConfig>> {
+	try {
+		const url = buildApiUrl(
+			api,
+			"/config",
+			channelId ? { channel: channelId } : undefined,
+		);
+		const res = await fetch(url, {
+			method: "GET",
+			headers: { Authorization: `Bearer ${token}` },
+			signal,
+		});
+		if (!res.ok) {
+			return {};
+		}
+		// The Waniwani API wraps payloads in `{ success, message, data }`.
+		// Accept either shape so we stay compatible with raw endpoints too.
+		const raw = (await res.json()) as
+			| RemoteConfigResponse
+			| { success: boolean; data?: RemoteConfigResponse };
+		const data: RemoteConfigResponse | null =
+			raw && typeof raw === "object" && "data" in raw && raw.data
+				? raw.data
+				: (raw as RemoteConfigResponse);
+		if (!data) {
+			return {};
+		}
+		return remoteToConfigPartial(data);
+	} catch {
+		return {};
+	}
+}
+
+function remoteToConfigPartial(
+	data: RemoteConfigResponse,
+): Partial<EmbedConfig> {
+	const out: Partial<EmbedConfig> = {};
+	if (data.source != null) {
+		out.source = data.source;
+	}
+	if (data.channelId != null) {
+		out.channelId = data.channelId;
+	}
+	if (data.title != null) {
+		out.title = data.title;
+	}
+	if (data.welcomeMessage != null) {
+		out.welcomeMessage = data.welcomeMessage;
+	}
+	if (data.placeholder != null) {
+		out.placeholder = data.placeholder;
+	}
+	if (data.suggestions != null && data.suggestions.length > 0) {
+		out.suggestions = data.suggestions;
+	}
+	const pageSuggestions = parsePageSuggestions(data.pageSuggestions);
+	if (pageSuggestions.length > 0) {
+		out.pageSuggestions = pageSuggestions;
+	}
+	if (typeof data.enableThreadHistory === "boolean") {
+		out.enableThreadHistory = data.enableThreadHistory;
+	}
+	if (typeof data.sessionApi === "string" && data.sessionApi) {
+		out.sessionApi = data.sessionApi;
+	}
+	// WebMCP is on by default and derives its endpoints from the token, so the
+	// only thing a channel can say about it is that it declines.
+	if (typeof data.webmcp?.enabled === "boolean") {
+		out.webmcp = { enabled: data.webmcp.enabled };
+	}
+	if (data.toolCallDisplay === "full") {
+		out.showToolCalls = true;
+	} else if (data.toolCallDisplay === "titles-only") {
+		out.showToolCalls = "titles-only";
+	} else if (data.toolCallDisplay === "hidden") {
+		out.showToolCalls = false;
+	}
+	if (data.visibility) {
+		out.visibility = data.visibility;
+	}
+	if (
+		typeof data.hideAtBottom === "boolean" ||
+		(typeof data.hideAtBottom === "number" &&
+			Number.isFinite(data.hideAtBottom) &&
+			data.hideAtBottom >= 0)
+	) {
+		out.hideAtBottom = data.hideAtBottom;
+	}
+	const documentUpload = parseDocumentUpload(data.documentUpload);
+	if (documentUpload) {
+		out.documentUpload = documentUpload;
+	}
+	if (data.metadata && typeof data.metadata === "object") {
+		out.metadata = data.metadata;
+	}
+	return out;
+}
+
+/**
+ * Fetch the remote config on mount and return an `EmbedConfig` that
+ * re-resolves through the layered merge (defaults < remote < data-attrs <
+ * programmatic) once it arrives.
+ *
+ * Returns `{ config, ready }`. `ready` flips true when the chat surface can
+ * be revealed: immediately on a `sessionStorage` cache hit, otherwise after
+ * the fetch resolves or a {@link READINESS_TIMEOUT_MS} safety timer fires.
+ * Callers gate the first paint on `ready` so the chrome doesn't draw with
+ * stale defaults and then snap into the real content.
+ *
+ * `scriptConfig` must be the same `data-*` snapshot used for the initial
+ * resolve. Re-parsing post-fetch is unsafe: `document.currentScript` is
+ * null by then and the fallback heuristic can miss the embed script (CDN
+ * paths, renamed bundles), silently dropping `data-*` overrides.
+ */
+export function useRemoteEmbedConfig(
+	initialConfig: EmbedConfig,
+	programmatic: Partial<EmbedConfig> | undefined,
+	scriptConfig: Partial<EmbedConfig> | undefined,
+): { config: EmbedConfig; ready: boolean } {
+	// Initial state must match what would render on a server pass (no
+	// `window`). Reading `sessionStorage` in the initializer would cause a
+	// hydration mismatch on the cache-hit path. The cache is consulted in
+	// the `useEffect` below, which runs immediately after hydration; a hit
+	// flips state before the browser paints, so repeat visits still feel
+	// instant.
+	const [config, setConfig] = useState<EmbedConfig>(initialConfig);
+	const [ready, setReady] = useState<boolean>(false);
+
+	// Re-fetching on `programmatic` identity changes would be churn; the
+	// caller owns its lifetime — if props change meaningfully they should
+	// re-init the widget.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: fetch once per api+token
+	useEffect(() => {
+		const api = initialConfig.api;
+		const token = initialConfig.token;
+		const channelId = initialConfig.channelId;
+		if (!api || !token) {
+			setReady(true);
+			return;
+		}
+		// Top-of-funnel signal, fired once the channel's `/config` is in hand so
+		// the event carries the channel's source and — on token-only embeds —
+		// the server-resolved channel id (ingest drops events with no resolvable
+		// channel). Host-supplied channelId wins over the remote one, matching
+		// the `resolveConfig` merge order. Guarded once per page inside
+		// `firePageView`; skippable per surface via `disablePageView`.
+		const pageView = (remote: Partial<EmbedConfig>) => {
+			if (initialConfig.disablePageView) {
+				return;
+			}
+			void firePageView({
+				api,
+				token,
+				channelId: channelId ?? remote.channelId,
+				// `WidgetMode` names the surfaces that can be on screen, and
+				// `mode: "off"` mounts none — this hook only runs inside a mounted
+				// chat, so the branch is unreachable and reports no surface.
+				mode: initialConfig.mode === "off" ? undefined : initialConfig.mode,
+				source: remote.source,
+			});
+		};
+		const cached = loadCachedConfig(api, token, channelId);
+		if (cached) {
+			try {
+				const resolved = resolveConfig(programmatic, cached, scriptConfig);
+				setConfig(resolved);
+				markConfigSource("cache");
+				setTimingMetadata(cached.metadata);
+				setReady(true);
+				debugLog("config resolved (sessionStorage cache)", {
+					config: resolved,
+					visibility: resolved.visibility,
+				});
+				pageView(cached);
+			} catch {
+				// Fall through to the fetch path.
+			}
+		}
+		const controller = new AbortController();
+		const safety = setTimeout(() => {
+			markConfigSource("timeout");
+			setReady(true);
+		}, READINESS_TIMEOUT_MS);
+		void fetchRemoteConfig(api, token, controller.signal, channelId)
+			.then((remote) => {
+				if (controller.signal.aborted) {
+					return;
+				}
+				debugLog("remote /config response", remote);
+				if (Object.keys(remote).length > 0) {
+					saveCachedConfig(api, token, channelId, remote);
+					try {
+						const resolved = resolveConfig(programmatic, remote, scriptConfig);
+						setConfig(resolved);
+						debugLog("config resolved (remote)", {
+							config: resolved,
+							visibility: resolved.visibility,
+						});
+					} catch (err) {
+						// `resolveConfig` throws if token is missing. Shouldn't happen
+						// here (initial resolve already validated), but swallow so a
+						// late failure doesn't become an unhandled rejection.
+						console.error("[Waniwani] Failed to apply remote config:", err);
+					}
+				}
+				markConfigSource("remote");
+				setReady(true);
+				pageView(remote);
+			})
+			.catch((err) => {
+				console.error("[Waniwani] Remote config fetch failed:", err);
+				setReady(true);
+			})
+			.finally(() => clearTimeout(safety));
+		return () => {
+			controller.abort();
+			clearTimeout(safety);
+		};
+	}, [initialConfig.api, initialConfig.token, initialConfig.channelId]);
+
+	return { config, ready };
+}

@@ -1,0 +1,753 @@
+// ============================================================================
+// ComposerChat — the `mode: "composer"` embed surface.
+//
+// A single composer that sits **in the page flow** (inside the host's
+// `[data-waniwani-embed]` element), sized by the host's own CSS: a hero search
+// box, a card in a support page, a row under a pricing table. It renders the
+// input and the agent's suggestion pills, nothing else. As soon as the visitor
+// sends their first message (typed or a pill) the full chat panel opens over
+// the page and takes the conversation from there — the same panel `mode:
+// "floating"` opens, reusing its clip-path expand.
+//
+// Two mounts, one React tree. The composer renders where the host placed it;
+// the panel is portaled into a body-level overlay container (created by
+// `embed.ts`, passed in as `panelContainer`) because a `position: fixed` panel
+// rendered inside the host's own subtree would resolve against the nearest
+// ancestor with a `transform`/`filter`/`contain` and land in the wrong place.
+// A portal keeps the panel out of the host's containing-block chain while
+// leaving the composer and the panel in one component, sharing one `ChatEmbed`
+// and one event emitter.
+//
+// The chat itself (`ChatEmbed`) is mounted eagerly but kept hidden until the
+// panel opens, so the composer can hand off the first message to it and the
+// imperative API works before the panel is ever shown.
+// ============================================================================
+
+import type { UIMessage } from "ai";
+import { ArrowUp, XIcon } from "lucide-react";
+import {
+	type CSSProperties,
+	forwardRef,
+	useCallback,
+	useEffect,
+	useImperativeHandle,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import { createPortal } from "react-dom";
+import type { ChatHandle } from "../@types";
+import BorderGlow from "../components/border-glow";
+import { Suggestions } from "../components/suggestions";
+import { useDirectTransport } from "../hooks/use-direct-transport";
+import { useNarrowViewport } from "../hooks/use-narrow-viewport";
+import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
+import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
+import { I18nProvider, useTranslation } from "../i18n";
+import { ChatEmbed } from "../layouts/chat-embed";
+import { resolveSuggestions } from "../lib/resolve-suggestions";
+import { useBootTiming } from "../lib/timing-context";
+import { cn } from "../lib/utils";
+import { PARTS } from "../parts";
+import { themeToCSSProperties } from "../theme";
+import type { ComposerSize, EmbedConfig } from "./config";
+import { useEmbedWelcomeProps } from "./embed-welcome";
+import { useRemoteEmbedConfig } from "./remote-config";
+import { type EmbedMessages, useEmbedMessages } from "./use-messages-url";
+import { usePanelState } from "./use-panel-state";
+import { useVisibilityGate } from "./use-pathname";
+import { useSuggestions } from "./use-suggestions";
+import { createWidgetEventEmitter } from "./widget-events";
+import { WidgetEventsProvider } from "./widget-events-context";
+
+// ----------------------------------------------------------------------------
+// Presentation tables
+//
+// The composer is page content, dropped into designs the SDK never sees, so
+// its chrome is configurable (`config.composer`). Size and variant are kept as
+// data here rather than as branches in the JSX: every variant renders the same
+// row, only the shell around it and the spacing change.
+// ----------------------------------------------------------------------------
+
+interface SizeStyle {
+	/** Padding + gap on the row that holds icon, textarea and send button. */
+	row: string;
+	/** Vertical padding and type scale on the textarea itself. */
+	field: string;
+	/** Send button box. */
+	send: string;
+	/** Glyph inside the send button. */
+	sendIcon: string;
+	/** Corner radius in px, shared with BorderGlow (which takes a number). */
+	radius: number;
+}
+
+// `text-base` (16px) on mobile is load-bearing at every size: iOS Safari
+// auto-zooms a focused input under 16px. `sm:text-sm` restores the smaller
+// text where the zoom rule doesn't apply. Do not drop the 16px mobile size.
+const SIZE_STYLES: Record<ComposerSize, SizeStyle> = {
+	sm: {
+		row: "ww:gap-1 ww:pl-3 ww:pr-1 ww:py-1",
+		field: "ww:py-1 ww:text-base ww:sm:text-sm",
+		send: "ww:size-7",
+		sendIcon: "ww:size-3.5",
+		radius: 12,
+	},
+	md: {
+		row: "ww:gap-1 ww:pl-3.5 ww:pr-1.5 ww:py-1.5 ww:sm:pl-4 ww:sm:pr-2 ww:sm:py-2",
+		field: "ww:py-1.5 ww:text-base ww:sm:text-sm",
+		send: "ww:size-8",
+		sendIcon: "ww:size-4",
+		radius: 16,
+	},
+	lg: {
+		row: "ww:gap-2 ww:pl-5 ww:pr-2 ww:py-2.5 ww:sm:pl-6 ww:sm:pr-2.5 ww:sm:py-3",
+		field: "ww:py-2 ww:text-base",
+		send: "ww:size-10",
+		sendIcon: "ww:size-5",
+		radius: 20,
+	},
+};
+
+// ----------------------------------------------------------------------------
+// Restyling parts
+//
+// A variant is a starting point, not the ceiling. Every visual property of the
+// box reads from a `--ww-composer-*` custom property whose fallback is the
+// variant's own value, so a host restyles the composer from its own stylesheet
+// (`[data-waniwani-embed] { --ww-composer-bg: transparent; … }`) without the
+// SDK growing a variant per taste. Custom properties inherit through the
+// widget's shadow root, which is what makes this work at all.
+//
+// An untouched embed resolves every one of these to what it rendered before.
+// ----------------------------------------------------------------------------
+
+/** Box fill. */
+const BG = "var(--ww-composer-bg, var(--ww-color-input))";
+/** Border color and width, as a `border-*` pair so `0` flattens the box. */
+const BORDER_COLOR =
+	"var(--ww-composer-border-color, var(--ww-input-border, var(--ww-color-border)))";
+const BORDER_WIDTH =
+	"var(--ww-composer-border-width, var(--ww-input-border-width, 1px))";
+/** Send button fill and glyph. */
+const SEND_BG =
+	"var(--ww-composer-send-bg, var(--ww-send-bg, var(--ww-color-foreground)))";
+const SEND_FG =
+	"var(--ww-composer-send-fg, var(--ww-send-fg, var(--ww-color-background)))";
+
+export interface ComposerChatProps {
+	config: EmbedConfig;
+	programmatic?: Partial<EmbedConfig>;
+	/** Pre-parsed `data-*` snapshot. */
+	scriptConfig?: Partial<EmbedConfig>;
+	/**
+	 * Body-level node the chat panel portals into. Owned by `embed.ts` (its own
+	 * shadow root, styles injected), so the fixed panel escapes any transformed
+	 * ancestor in the host's markup.
+	 */
+	panelContainer: Element;
+	/**
+	 * Called whenever per-URL `visibility` gating flips. `embed.ts` uses it to
+	 * collapse the `[data-waniwani-embed]` container (which it owns, outside
+	 * React) so a gated page shows no empty box. The chat stays mounted while
+	 * hidden, so conversation state survives an SPA route change away and back.
+	 */
+	onVisibilityChange?: (visible: boolean) => void;
+}
+
+export interface ComposerChatHandle {
+	/** Open the full chat panel. */
+	open: () => void;
+	/** Close the panel, back to the in-flow composer. */
+	close: () => void;
+	/** Toggle the full chat panel. */
+	toggle: () => void;
+	sendMessage: (text: string) => void;
+	sendMessageAndWait: (text: string) => Promise<UIMessage | undefined>;
+	reset: () => void;
+	restart: () => void;
+	copyConversation: () => Promise<boolean>;
+	focus: () => void;
+	getMessages: () => UIMessage[];
+	getSessionId: () => string | undefined;
+}
+
+export const ComposerChat = forwardRef<ComposerChatHandle, ComposerChatProps>(
+	function ComposerChat(props, ref) {
+		const embedMessages = useEmbedMessages(props.config);
+		return (
+			<I18nProvider
+				locale={props.config.locale}
+				messages={embedMessages.messages}
+			>
+				<ComposerChatInner {...props} embedMessages={embedMessages} ref={ref} />
+			</I18nProvider>
+		);
+	},
+);
+
+type InnerProps = ComposerChatProps & { embedMessages: EmbedMessages };
+
+const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
+	function ComposerChatInner(
+		{
+			config: initialConfig,
+			programmatic,
+			scriptConfig,
+			panelContainer,
+			onVisibilityChange,
+			embedMessages,
+		},
+		ref,
+	) {
+		const { t } = useTranslation();
+		// Resolve remote config here so the composer can show the dashboard's
+		// suggestions / placeholder; `ChatEmbed` below skips its own fetch.
+		const { config, ready: configReady } = useRemoteEmbedConfig(
+			initialConfig,
+			programmatic,
+			scriptConfig,
+		);
+		const ready = configReady && embedMessages.ready;
+
+		// Per-URL gating, same contract as the inline mount: report the decision
+		// up so `embed.ts` collapses the host container, rather than leaving a
+		// composer on a page the channel's rules hide.
+		const visible = useVisibilityGate(config.visibility, ready);
+		useEffect(() => {
+			onVisibilityChange?.(visible);
+		}, [visible, onVisibilityChange]);
+
+		useBootTiming({
+			api: config.api,
+			token: config.token,
+			channelId: config.channelId,
+			mode: "composer",
+			paintMark: "chatVisible",
+			painted: ready,
+		});
+
+		const chatRef = useRef<ChatHandle>(null);
+		// One emitter per mount. The session id getter reads through the chat
+		// handle so events pick up the session id as soon as it exists.
+		const widgetEvents = useMemo(
+			() =>
+				createWidgetEventEmitter({
+					mode: "composer",
+					getSessionId: () => chatRef.current?.sessionId,
+				}),
+			[],
+		);
+		const onEvent = config.onEvent;
+		useEffect(() => {
+			if (!onEvent) {
+				return;
+			}
+			return widgetEvents.subscribe(onEvent);
+		}, [onEvent, widgetEvents]);
+
+		const textareaRef = useRef<HTMLTextAreaElement>(null);
+		// The `button` variant renders no textarea; `focus()` lands here instead.
+		const triggerRef = useRef<HTMLButtonElement>(null);
+		const [open, setOpen] = useState(false);
+		const panelRef = useRef<HTMLDivElement>(null);
+		const [composerText, setComposerText] = useState("");
+		// Bumped to request focusing the chat input once the panel has opened.
+		// A textarea inside a still-hidden panel can't take focus, and React
+		// commits the open state after our handlers return, so we focus from an
+		// effect (below) rather than synchronously / via rAF.
+		const [focusNonce, setFocusNonce] = useState(0);
+
+		const preset = config.appearance?.theme;
+		const userVars = config.appearance?.variables;
+		const cssVars = useMemo(
+			() => (userVars ? themeToCSSProperties(userVars) : {}),
+			[userVars],
+		);
+
+		// The page and channel rungs for this URL; ids ride along for click
+		// attribution. Memoized inside the hook — the pill row keys an effect
+		// on this object's identity.
+		const suggestions = useSuggestions(config);
+		const welcomeProps = useEmbedWelcomeProps(config);
+		// The composer renders the same pre-chat row the panel would, resolved
+		// through the same hierarchy so its impression event carries the exact
+		// origin. No turn has happened yet, so the two turn-derived rungs are
+		// absent by construction.
+		const composerRow = useMemo(
+			() => resolveSuggestions({ flow: null, followup: null, ...suggestions }),
+			[suggestions],
+		);
+		const composerTexts = useMemo(
+			() => composerRow?.suggestions.map((s) => s.text) ?? [],
+			[composerRow],
+		);
+
+		// Record every suggestion click and every rendered pill set server-side,
+		// attributed to the authored prompts involved. Covers both the composer's
+		// pills and the panel's own.
+		useSuggestionIngest({
+			widgetEvents,
+			api: config.api,
+			token: config.token,
+			channelId: config.channelId,
+			source: config.source,
+			mode: "composer",
+			pagePrompts: suggestions.page,
+			getSessionId: () => chatRef.current?.sessionId,
+		});
+
+		// One impression per rendered row, keyed on the resolved row's identity —
+		// a new fetch (SPA navigation) is a new object and counts again;
+		// re-renders of the same row don't. Unlike the floating dock there is no
+		// reveal gesture: the pills are on screen as soon as the row resolves.
+		const shownSuggestionsRef = useRef<typeof composerRow>(null);
+		useEffect(() => {
+			if (!visible || !composerRow) {
+				return;
+			}
+			if (shownSuggestionsRef.current === composerRow) {
+				return;
+			}
+			shownSuggestionsRef.current = composerRow;
+			widgetEvents.emit({
+				name: "suggestions.shown",
+				properties: { texts: composerTexts, origin: composerRow.origin },
+			});
+		}, [visible, composerRow, composerTexts, widgetEvents]);
+
+		// Presentation. Behavior is identical across variants: the first message
+		// (typed, pill, or a tap on a trigger) opens the panel.
+		const look = config.composer ?? {};
+		const variant = look.variant ?? "glow";
+		const size = SIZE_STYLES[look.size ?? "md"];
+		const showSuggestions = look.showSuggestions ?? true;
+		const centered = look.align === "center";
+
+		// Whether the box is a tap target rather than a live input. `trigger`
+		// asks for that at every width. On a phone it is the default anyway:
+		// typing into an in-page box there is the worse half of the handoff —
+		// the soft keyboard covers the composer, the first message opens a
+		// full-screen panel over it, and focus moves mid-sentence. A tap target
+		// skips straight to the panel, which is already the full-screen surface
+		// at that width.
+		const narrow = useNarrowViewport();
+		const asTrigger =
+			(look.trigger ?? false) || (narrow && (look.mobileTrigger ?? true));
+
+		// The composer is the chat's entry point, so it shows the configured input
+		// placeholder by default (`data-launcher-text` overrides it for an
+		// entry-specific prompt). Typed out like the in-chat input.
+		const composerPlaceholder =
+			config.launcherText ?? config.placeholder ?? t.launcher.prompt;
+		// A trigger shows the placeholder as a static label, so there is nothing
+		// for the animation to drive — skipping it keeps a phone off a timer
+		// that re-renders the tree every 80ms for no visible change.
+		const animatedPlaceholder = useTypingPlaceholder(
+			composerPlaceholder,
+			!asTrigger && composerText.length === 0,
+		);
+
+		// Card shadow shared by the composer and the panel — matches the inline
+		// embed's default (themeable via --ww-shadow).
+		const cardShadow = "var(--ww-shadow, 0 10px 30px rgba(0, 0, 0, 0.08))";
+
+		// Grow the textarea with its content, up to the max height set in CSS
+		// (past that it scrolls). Driven by the *value* only: measuring while
+		// empty would make a placeholder long enough to wrap grow and shrink the
+		// box on every frame of the typing animation, so an empty composer stays
+		// at its natural single row.
+		useEffect(() => {
+			const el = textareaRef.current;
+			if (!el) {
+				return;
+			}
+			if (!composerText) {
+				el.style.height = "";
+				return;
+			}
+			el.style.height = "auto";
+			el.style.height = `${el.scrollHeight}px`;
+		}, [composerText]);
+
+		// Focus the chat input after the panel has opened. Runs post-commit, so
+		// the panel's textarea is in layout and can take focus. Skipped on the
+		// initial render (`focusNonce === 0`).
+		useEffect(() => {
+			if (focusNonce > 0 && open) {
+				chatRef.current?.focus();
+			}
+		}, [focusNonce, open]);
+
+		// `chat.ready` once the remote config has resolved.
+		const readyEmittedRef = useRef(false);
+		useEffect(() => {
+			if (ready && !readyEmittedRef.current) {
+				readyEmittedRef.current = true;
+				widgetEvents.emit({ name: "chat.ready" });
+			}
+		}, [ready, widgetEvents]);
+
+		// Open/close transitions. `visible` folds the per-URL gate in, so a panel
+		// hidden by an SPA route change reports `chat.closed` — events reflect
+		// what is on screen. No event on mount.
+		const wasOpenRef = useRef(false);
+		useEffect(() => {
+			const isOpen = visible && open;
+			if (isOpen === wasOpenRef.current) {
+				return;
+			}
+			wasOpenRef.current = isOpen;
+			widgetEvents.emit({ name: isOpen ? "chat.opened" : "chat.closed" });
+		}, [visible, open, widgetEvents]);
+
+		const openWith = useCallback((text: string) => {
+			setOpen(true);
+			// Hand focus to the panel's own input. The in-flow composer is page
+			// content and stays visible behind the panel, so without this the
+			// caret sits in a box the visitor can no longer see and their next
+			// keystrokes land there. (The floating dock gets this for free: it
+			// goes `visibility: hidden` when the panel opens, which drops focus.)
+			setFocusNonce((n) => n + 1);
+			const trimmed = text.trim();
+			if (trimmed) {
+				chatRef.current?.sendMessage(trimmed);
+			}
+		}, []);
+
+		useImperativeHandle(
+			ref,
+			() => ({
+				open: () => setOpen(true),
+				close: () => setOpen(false),
+				toggle: () => setOpen((o) => !o),
+				sendMessage: (text: string) => openWith(text),
+				sendMessageAndWait: async (text: string) => {
+					setOpen(true);
+					const chat = chatRef.current;
+					if (!chat) {
+						return undefined;
+					}
+					return (await chat.sendMessageAndWait(text)) as UIMessage | undefined;
+				},
+				reset: () => chatRef.current?.reset(),
+				restart: () => chatRef.current?.restart(),
+				copyConversation: async () =>
+					(await chatRef.current?.copyConversation()) ?? false,
+				focus: () => {
+					// Docs contract: in composer mode `focus()` lands on the in-flow
+					// input while the panel is closed (that is the visible field), and
+					// on the chat input once it is open.
+					if (open) {
+						setFocusNonce((n) => n + 1);
+					} else {
+						(textareaRef.current ?? triggerRef.current)?.focus();
+					}
+				},
+				getMessages: () => chatRef.current?.messages ?? [],
+				getSessionId: () => chatRef.current?.sessionId,
+			}),
+			[openWith, open],
+		);
+
+		const submitComposer = useCallback(() => {
+			if (composerText.trim()) {
+				openWith(composerText);
+				setComposerText("");
+			}
+		}, [composerText, openWith]);
+
+		const onComposerFocus = useCallback(() => {
+			// Once a conversation exists, the visitor has history they can't see
+			// from the in-flow box — clicking back into it reopens the panel rather
+			// than starting a second, parallel composer. Focusing the chat input
+			// happens in the focus effect, once the panel is painted.
+			if ((chatRef.current?.messages.length ?? 0) > 0) {
+				setOpen(true);
+				setFocusNonce((n) => n + 1);
+			}
+		}, []);
+
+		// `mode` tags every chat request with the embed surface so server-logged
+		// chat events carry it in `properties.mode`, matching `page.viewed`.
+		const body: Record<string, unknown> = { mode: "composer" };
+		const transport = useDirectTransport(config.sessionApi);
+		if (config.mcpServerUrl) {
+			body.mcpServerUrl = config.mcpServerUrl;
+		}
+		if (config.channelId) {
+			body.channelId = config.channelId;
+		}
+
+		const closeButton = (
+			<button
+				type="button"
+				onClick={() => setOpen(false)}
+				aria-label={t.launcher.close}
+				className={cn(
+					PARTS.close,
+					"ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer",
+				)}
+			>
+				<XIcon className="ww:size-4" />
+			</button>
+		);
+
+		const panelState = usePanelState(visible && open, panelRef);
+
+		const fieldRow = (
+			<div className={cn("ww:flex ww:items-end", size.row)}>
+				<textarea
+					ref={textareaRef}
+					rows={1}
+					value={composerText}
+					placeholder={animatedPlaceholder}
+					onChange={(e) => setComposerText(e.target.value)}
+					onFocus={onComposerFocus}
+					onKeyDown={(e) => {
+						if (e.key === "Enter" && !e.shiftKey) {
+							e.preventDefault();
+							submitComposer();
+						}
+					}}
+					className={cn(
+						"ww:min-w-0 ww:flex-1 ww:resize-none ww:bg-transparent ww:max-h-36 ww:text-foreground ww:outline-none ww:placeholder:text-muted-foreground",
+						size.field,
+						// An empty composer is one row tall (the grow effect leaves it
+						// at its natural height), so a placeholder wider than the box
+						// wraps onto a second line with nowhere to go. Clamp the
+						// placeholder to one line and ellipsize it. Dropped as soon as
+						// there is a value, so typed text wraps and grows as before.
+						!composerText &&
+							"ww:overflow-hidden ww:whitespace-nowrap ww:text-ellipsis ww:placeholder:overflow-hidden ww:placeholder:text-ellipsis",
+					)}
+				/>
+				<button
+					type="button"
+					onClick={submitComposer}
+					disabled={!composerText.trim()}
+					aria-label={t.promptInput.submit}
+					className={cn(
+						"ww:relative ww:flex ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40",
+						size.send,
+					)}
+					style={{ background: SEND_BG, color: SEND_FG }}
+				>
+					<ArrowUp className={size.sendIcon} />
+				</button>
+			</div>
+		);
+
+		// The whole box is one tap target. It carries no shell classes of its
+		// own: the shell below wraps it, so a trigger keeps whichever variant's
+		// chrome the host configured. The send circle is decorative here — there
+		// is nothing to send yet, and the button itself is the control.
+		const triggerRow = (
+			<button
+				ref={triggerRef}
+				type="button"
+				onClick={() => openWith("")}
+				className={cn(
+					"ww:flex ww:w-full ww:items-center ww:text-left ww:cursor-pointer",
+					size.row,
+					centered && "ww:justify-center",
+				)}
+			>
+				<span
+					className={cn(
+						"ww:min-w-0 ww:flex-1 ww:truncate ww:text-muted-foreground",
+						size.field,
+						centered && "ww:flex-none",
+					)}
+				>
+					{composerPlaceholder}
+				</span>
+				<span
+					aria-hidden
+					className={cn(
+						"ww:flex ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full",
+						size.send,
+						centered && "ww:ml-3",
+					)}
+					style={{ background: SEND_BG, color: SEND_FG }}
+				>
+					<ArrowUp className={size.sendIcon} />
+				</span>
+			</button>
+		);
+
+		const content = asTrigger ? triggerRow : fieldRow;
+
+		// The size scale's own values, which become the fallbacks the host's CSS
+		// overrides.
+		const radius = `var(--ww-composer-radius, ${size.radius}px)`;
+
+		const boxStyle = {
+			borderRadius: radius,
+			background: BG,
+			borderColor: BORDER_COLOR,
+			borderWidth: BORDER_WIDTH,
+			borderStyle: "solid",
+			boxShadow: `var(--ww-composer-shadow, ${cardShadow})`,
+		} satisfies CSSProperties;
+
+		// The box around the content. `glow` renders through BorderGlow for its
+		// one-off sweep; `boxStyle` spreads over BorderGlow's own background and
+		// radius, so both paths land on the same custom properties.
+		const box =
+			variant === "glow" ? (
+				<BorderGlow
+					animated={ready}
+					backgroundColor={BG}
+					borderRadius={radius}
+					edgeSensitivity={30}
+					coneSpread={25}
+					colors={["#c084fc", "#f472b6", "#38bdf8"]}
+					style={boxStyle}
+				>
+					{content}
+				</BorderGlow>
+			) : (
+				<div
+					className={cn(
+						asTrigger && "ww:transition-colors hover:ww:border-primary/40",
+					)}
+					style={boxStyle}
+				>
+					{content}
+				</div>
+			);
+
+		// The in-flow composer. Fills the host's container so the host's own CSS
+		// decides how wide it is; height is content-driven (no `data-height`).
+		const composer = (
+			<div
+				data-waniwani-chat=""
+				data-color-scheme={preset === "auto" ? "auto" : undefined}
+				data-waniwani-composer="input"
+				data-composer-variant={variant}
+				// While the panel is open the composer is content behind an
+				// overlay: keep it in layout (removing it would shift the page)
+				// but inert, so tabbing inside the panel can't walk into the box
+				// underneath it and screen readers don't announce it. One
+				// attribute covers focus, pointer events and the a11y tree;
+				// browsers without `inert` support simply keep today's behavior.
+				inert={open}
+				className={cn(
+					PARTS.composer,
+					"ww:w-full ww:font-[family-name:var(--ww-font-sans)]",
+					preset === "dark" && "dark",
+				)}
+				style={cssVars}
+			>
+				{box}
+
+				{showSuggestions && composerTexts.length > 0 && (
+					<Suggestions
+						suggestions={composerTexts}
+						origin={composerRow?.origin}
+						onSelect={(text) => {
+							widgetEvents.emit({
+								name: "suggestion.clicked",
+								properties: {
+									text,
+									index: composerTexts.indexOf(text),
+									origin: composerRow?.origin ?? "channel",
+								},
+							});
+							openWith(text);
+						}}
+						// In-flow pills sit under the box, so they only need the
+						// horizontal alignment of the input's own padding.
+						align={centered ? "center" : "start"}
+						className="ww:px-0.5 ww:pt-2.5 ww:pb-0"
+					/>
+				)}
+			</div>
+		);
+
+		// The panel, portaled to the body-level overlay. It carries its own theme
+		// wrapper: CSS vars are set on the composer's wrapper above, which is not
+		// an ancestor of the portal target, so they cannot inherit across.
+		//
+		// `data-waniwani-floating="panel"` is deliberate — the presentation and
+		// the clip-path expand are the floating panel's, and sharing the attribute
+		// keeps one animation to maintain instead of a near-copy per surface.
+		const panel = (
+			<div
+				data-waniwani-chat=""
+				data-color-scheme={preset === "auto" ? "auto" : undefined}
+				className={cn(
+					"ww:contents ww:font-[family-name:var(--ww-font-sans)]",
+					preset === "dark" && "dark",
+				)}
+				style={cssVars}
+			>
+				<div
+					ref={panelRef}
+					role="dialog"
+					aria-label={config.title ?? composerPlaceholder}
+					data-waniwani-floating="panel"
+					data-state={panelState}
+					style={{ boxShadow: cardShadow }}
+					className={cn(
+						PARTS.panel,
+						"ww:fixed ww:z-[var(--ww-z-index)] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
+						// Mobile: full-screen sheet.
+						"ww:inset-0 ww:w-full ww:rounded-none",
+						// Desktop: wide ChatGPT-style card, matching floating mode.
+						"ww:sm:inset-auto ww:sm:bottom-[var(--ww-panel-offset)] ww:sm:left-0 ww:sm:right-0 ww:sm:mx-auto ww:sm:h-[var(--ww-panel-height)] ww:sm:max-h-[calc(100dvh-var(--ww-panel-offset)*2)] ww:sm:w-[calc(100vw-var(--ww-panel-offset)*2)] ww:sm:max-w-[var(--ww-panel-width)] ww:sm:rounded-[var(--ww-panel-radius)] ww:sm:border ww:sm:border-border",
+					)}
+				>
+					<ChatEmbed
+						transport={transport}
+						ref={chatRef}
+						mode="composer"
+						api={config.api ?? ""}
+						headers={{ Authorization: `Bearer ${config.token}` }}
+						skipRemoteConfig
+						body={body}
+						appearance={config.appearance}
+						title={config.title}
+						headerActions={closeButton}
+						// Force the header on: the close control lives in
+						// `headerActions`, so honoring `hideHeader` would leave an
+						// opened (full-screen on mobile) panel with no way back to the
+						// page. The panel is its own chrome anyway.
+						hideHeader={false}
+						// Mounted eagerly behind the page, so without this the panel's
+						// own pill row reports impressions for pills no visitor has
+						// seen, and double-counts the pre-chat row the composer already
+						// announced.
+						onScreen={open}
+						welcomeMessage={config.welcomeMessage}
+						{...welcomeProps}
+						placeholder={config.placeholder}
+						suggestions={suggestions}
+						enableThreadHistory={config.enableThreadHistory}
+						documentUpload={config.documentUpload}
+						showToolCalls={config.showToolCalls}
+						disclaimer={config.disclaimer}
+						suggestionsLayout={config.suggestionsLayout}
+						suggestionsPosition={config.suggestionsPosition}
+						sendIcon={config.sendIcon}
+						showTableToolbar={config.showTableToolbar}
+						menu={config.menu}
+						restartConfirm={config.restartConfirm}
+						hidePoweredBy={config.hidePoweredBy}
+						locale={config.locale}
+						messages={embedMessages.messages}
+						initializing={!ready}
+					/>
+				</div>
+			</div>
+		);
+
+		return (
+			<WidgetEventsProvider value={widgetEvents}>
+				{composer}
+				{createPortal(panel, panelContainer)}
+			</WidgetEventsProvider>
+		);
+	},
+);

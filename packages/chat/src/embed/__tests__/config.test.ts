@@ -1,0 +1,727 @@
+import { describe, expect, test } from "bun:test";
+
+// biome-ignore lint/suspicious/noExplicitAny: test setup
+const g = globalThis as any;
+g.HTMLScriptElement = class HTMLScriptElement {};
+g.document = {
+	currentScript: null,
+	querySelector: () => null,
+	querySelectorAll: () => [],
+};
+
+import { resolveConfig } from "../config";
+
+describe("resolveConfig — programmatic", () => {
+	test("token-only config uses default api", () => {
+		const config = resolveConfig({ token: "wwp_test" });
+
+		expect(config.api).toBe("https://app.waniwani.ai/api/mcp/chat");
+		expect(config.token).toBe("wwp_test");
+	});
+
+	test("custom api overrides default", () => {
+		const config = resolveConfig({
+			api: "https://custom.app/api/chat",
+			token: "wwp_test",
+		});
+
+		expect(config.api).toBe("https://custom.app/api/chat");
+	});
+
+	test("title undefined by default — chat renders headerless", () => {
+		const config = resolveConfig({ token: "tok" });
+
+		expect(config.title).toBeUndefined();
+	});
+
+	test("programmatic title is applied", () => {
+		const config = resolveConfig({
+			token: "tok",
+			title: "Support",
+		});
+
+		expect(config.title).toBe("Support");
+	});
+
+	test("preserves optional string fields", () => {
+		const config = resolveConfig({
+			token: "tok",
+			welcomeMessage: "Hello!",
+			placeholder: "Type here...",
+			css: "https://example.com/custom.css",
+		});
+
+		expect(config.welcomeMessage).toBe("Hello!");
+		expect(config.placeholder).toBe("Type here...");
+		expect(config.css).toBe("https://example.com/custom.css");
+	});
+
+	test("appearance.variables merges correctly", () => {
+		const config = resolveConfig({
+			token: "tok",
+			appearance: {
+				variables: { primaryColor: "#ff0000", fontFamily: "monospace" },
+			},
+		});
+
+		expect(config.appearance?.variables?.primaryColor).toBe("#ff0000");
+		expect(config.appearance?.variables?.fontFamily).toBe("monospace");
+	});
+
+	test("appearance.theme preset is preserved", () => {
+		const config = resolveConfig({
+			token: "tok",
+			appearance: { theme: "dark" },
+		});
+		expect(config.appearance?.theme).toBe("dark");
+	});
+
+	test("no appearance set when unused", () => {
+		const config = resolveConfig({ token: "tok" });
+		expect(config.appearance).toBeUndefined();
+	});
+});
+
+describe("resolveConfig — enableThreadHistory", () => {
+	test("programmatic false disables thread history", () => {
+		const config = resolveConfig({ token: "tok", enableThreadHistory: false });
+		expect(config.enableThreadHistory).toBe(false);
+	});
+
+	test("programmatic true enables thread history", () => {
+		const config = resolveConfig({ token: "tok", enableThreadHistory: true });
+		expect(config.enableThreadHistory).toBe(true);
+	});
+
+	test("undefined when unspecified — consumers default to enabled", () => {
+		const config = resolveConfig({ token: "tok" });
+		expect(config.enableThreadHistory).toBeUndefined();
+	});
+
+	test("data-enable-thread-history attribute parses 'false' as false", async () => {
+		const { parseConfigFromScript } = await import(
+			`../config?t=${Date.now()}-${Math.random()}`
+		);
+		const fakeScript = {
+			getAttribute(name: string) {
+				if (name === "data-token") {
+					return "tok";
+				}
+				if (name === "data-enable-thread-history") {
+					return "false";
+				}
+				return null;
+			},
+		};
+		const prevDocument = g.document;
+		const prevHtmlScriptElement = g.HTMLScriptElement;
+		g.HTMLScriptElement = class {};
+		Object.setPrototypeOf(fakeScript, g.HTMLScriptElement.prototype);
+		g.document = {
+			currentScript: fakeScript,
+			querySelectorAll: () => [],
+		};
+		try {
+			const cfg = parseConfigFromScript();
+			expect(cfg.enableThreadHistory).toBe(false);
+		} finally {
+			g.document = prevDocument;
+			g.HTMLScriptElement = prevHtmlScriptElement;
+		}
+	});
+});
+
+describe("resolveConfig — render mode", () => {
+	test("mode defaults to undefined (inline at consumption)", () => {
+		const config = resolveConfig({ token: "tok" });
+		expect(config.mode).toBeUndefined();
+	});
+
+	test("programmatic floating mode is preserved", () => {
+		const config = resolveConfig({ token: "tok", mode: "floating" });
+		expect(config.mode).toBe("floating");
+	});
+
+	test("launcherText passes through", () => {
+		const config = resolveConfig({
+			token: "tok",
+			mode: "floating",
+			launcherText: "Chat with us",
+		});
+		expect(config.launcherText).toBe("Chat with us");
+	});
+
+	test("height passes through", () => {
+		const config = resolveConfig({ token: "tok", height: "80vh" });
+		expect(config.height).toBe("80vh");
+	});
+});
+
+describe("resolveConfig — onEvent", () => {
+	test("programmatic onEvent survives the layered merge", () => {
+		const onEvent = () => {};
+		const config = resolveConfig(
+			{ token: "tok", onEvent },
+			{ title: "Remote" },
+			{},
+		);
+		expect(config.onEvent).toBe(onEvent);
+		expect(config.title).toBe("Remote");
+	});
+
+	test("onEvent is undefined by default", () => {
+		const config = resolveConfig({ token: "tok" });
+		expect(config.onEvent).toBeUndefined();
+	});
+});
+
+async function parseWithAttrs(
+	attrs: Record<string, string>,
+): Promise<Record<string, unknown>> {
+	const { parseConfigFromScript } = await import(
+		`../config?t=${Date.now()}-${Math.random()}`
+	);
+	const fakeScript = {
+		getAttribute(name: string) {
+			return name in attrs ? attrs[name] : null;
+		},
+	};
+	const prevDocument = g.document;
+	const prevHtmlScriptElement = g.HTMLScriptElement;
+	g.HTMLScriptElement = class {};
+	Object.setPrototypeOf(fakeScript, g.HTMLScriptElement.prototype);
+	g.document = { currentScript: fakeScript, querySelectorAll: () => [] };
+	try {
+		return parseConfigFromScript();
+	} finally {
+		g.document = prevDocument;
+		g.HTMLScriptElement = prevHtmlScriptElement;
+	}
+}
+
+describe("parseConfigFromScript — render mode attrs", () => {
+	test("data-mode=floating parses", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-mode": "floating",
+		});
+		expect(cfg.mode).toBe("floating");
+	});
+
+	test("data-mode=composer parses", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-mode": "composer",
+		});
+		expect(cfg.mode).toBe("composer");
+	});
+
+	test("data-mode=off parses", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-mode": "off",
+		});
+		expect(cfg.mode).toBe("off");
+	});
+
+	test("invalid data-mode is ignored", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-mode": "popover",
+		});
+		expect(cfg.mode).toBeUndefined();
+	});
+
+	test("data-height, data-launcher-text, data-appear-delay parse", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-height": "500px",
+			"data-launcher-text": "Need help?",
+			"data-appear-delay": "1500",
+		});
+		expect(cfg.height).toBe("500px");
+		expect(cfg.launcherText).toBe("Need help?");
+		expect(cfg.appearDelay).toBe(1500);
+	});
+
+	test("data-hide-at-bottom accepts a flag or a pixel distance", async () => {
+		const on = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-at-bottom": "true",
+		});
+		expect(on.hideAtBottom).toBe(true);
+		const bare = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-at-bottom": "",
+		});
+		expect(bare.hideAtBottom).toBe(true);
+		const px = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-at-bottom": " 240 ",
+		});
+		expect(px.hideAtBottom).toBe(240);
+		const off = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-at-bottom": "false",
+		});
+		expect(off.hideAtBottom).toBe(false);
+		const junk = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-at-bottom": "footer",
+		});
+		expect(junk.hideAtBottom).toBeUndefined();
+		const unset = await parseWithAttrs({ "data-token": "tok" });
+		expect(unset.hideAtBottom).toBeUndefined();
+	});
+});
+
+describe("parseConfigFromScript — data-visitor-id", () => {
+	test("parses a host-supplied visitor id", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-visitor-id": "posthog-distinct-123",
+		});
+		expect(cfg.visitorId).toBe("posthog-distinct-123");
+	});
+
+	test("absent when the attribute is not set", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "tok" });
+		expect(cfg.visitorId).toBeUndefined();
+	});
+});
+
+describe("parseConfigFromScript — data-disable-page-view", () => {
+	test("undefined when unspecified — page view fires by default", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "tok" });
+		expect(cfg.disablePageView).toBeUndefined();
+	});
+
+	test("'true' opts out of the page view", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-disable-page-view": "true",
+		});
+		expect(cfg.disablePageView).toBe(true);
+	});
+
+	test("bare attribute (empty value) opts out", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-disable-page-view": "",
+		});
+		expect(cfg.disablePageView).toBe(true);
+	});
+
+	test("'false' keeps the page view", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-disable-page-view": "false",
+		});
+		expect(cfg.disablePageView).toBe(false);
+	});
+});
+
+describe("parseConfigFromScript — data-hide-powered-by", () => {
+	test("undefined when unspecified, so the logo shows by default", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "tok" });
+		expect(cfg.hidePoweredBy).toBeUndefined();
+	});
+
+	test("'true' hides the logo and keeps the disclaimer text", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-powered-by": "true",
+			"data-disclaimer": "Asistente de IA. Verifique la información.",
+		});
+		expect(cfg.hidePoweredBy).toBe(true);
+		expect(cfg.disclaimer).toBe("Asistente de IA. Verifique la información.");
+	});
+
+	test("'false' keeps the logo", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-hide-powered-by": "false",
+		});
+		expect(cfg.hidePoweredBy).toBe(false);
+	});
+});
+
+describe("parseConfigFromScript — data-show-tool-calls", () => {
+	test("undefined when unspecified — consumers default to full panels", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "tok" });
+		expect(cfg.showToolCalls).toBeUndefined();
+	});
+
+	test("'true' parses as true", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-show-tool-calls": "true",
+		});
+		expect(cfg.showToolCalls).toBe(true);
+	});
+
+	test("'false' parses as false", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-show-tool-calls": "false",
+		});
+		expect(cfg.showToolCalls).toBe(false);
+	});
+
+	test("'titles-only' parses as titles-only", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-show-tool-calls": "titles-only",
+		});
+		expect(cfg.showToolCalls).toBe("titles-only");
+	});
+
+	test("'titles-only' is case- and whitespace-insensitive", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-show-tool-calls": " Titles-Only ",
+		});
+		expect(cfg.showToolCalls).toBe("titles-only");
+	});
+
+	test("unrecognized value is ignored", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-show-tool-calls": "maybe",
+		});
+		expect(cfg.showToolCalls).toBeUndefined();
+	});
+});
+
+describe("findScriptTag — loader scenario", () => {
+	test("returns document.currentScript when present (sync execution)", async () => {
+		const { findScriptTag } = await import(
+			`../config?t=${Date.now()}-${Math.random()}`
+		);
+		const prev = g.document;
+		const prevH = g.HTMLScriptElement;
+		g.HTMLScriptElement = class {};
+		const cur = {};
+		Object.setPrototypeOf(cur, g.HTMLScriptElement.prototype);
+		g.document = {
+			currentScript: cur,
+			querySelector: () => null,
+			querySelectorAll: () => [],
+		};
+		try {
+			expect(findScriptTag()).toBe(cur);
+		} finally {
+			g.document = prev;
+			g.HTMLScriptElement = prevH;
+		}
+	});
+
+	test("async: prefers the script carrying data-token (the injected bundle)", async () => {
+		const { findScriptTag } = await import(
+			`../config?t=${Date.now()}-${Math.random()}`
+		);
+		const prev = g.document;
+		const prevH = g.HTMLScriptElement;
+		g.HTMLScriptElement = class {};
+		// The loader has stripped its own data-token; only the bundle carries it.
+		const bundle = {
+			src: "https://cdn.jsdelivr.net/npm/@waniwani/sdk@0.14.11/dist/chat/embed.js",
+			getAttribute: (n: string) => (n === "data-token" ? "wwp_x" : null),
+		};
+		Object.setPrototypeOf(bundle, g.HTMLScriptElement.prototype);
+		g.document = {
+			currentScript: null,
+			querySelector: (sel: string) =>
+				sel === "script[src][data-token]" ? bundle : null,
+			querySelectorAll: () => [],
+		};
+		try {
+			expect(findScriptTag()).toBe(bundle);
+		} finally {
+			g.document = prev;
+			g.HTMLScriptElement = prevH;
+		}
+	});
+
+	test("async, no data-token anywhere: falls back to /embed/ src match", async () => {
+		const { findScriptTag } = await import(
+			`../config?t=${Date.now()}-${Math.random()}`
+		);
+		const prev = g.document;
+		const prevH = g.HTMLScriptElement;
+		g.HTMLScriptElement = class {};
+		const other = {
+			src: "https://example.com/analytics.js",
+			getAttribute: () => null,
+		};
+		const embed = {
+			src: "https://app.waniwani.ai/embed.js",
+			getAttribute: () => null,
+		};
+		Object.setPrototypeOf(other, g.HTMLScriptElement.prototype);
+		Object.setPrototypeOf(embed, g.HTMLScriptElement.prototype);
+		g.document = {
+			currentScript: null,
+			querySelector: () => null,
+			querySelectorAll: () => [other, embed],
+		};
+		try {
+			expect(findScriptTag()).toBe(embed);
+		} finally {
+			g.document = prev;
+			g.HTMLScriptElement = prevH;
+		}
+	});
+});
+
+describe("resolveConfig — validation", () => {
+	test("throws when token missing", () => {
+		expect(() => resolveConfig({})).toThrow("Missing required config: `token`");
+	});
+
+	test("throws with no args", () => {
+		expect(() => resolveConfig()).toThrow("Missing required config: `token`");
+	});
+
+	test("token empty string treated as missing", () => {
+		expect(() => resolveConfig({ token: "" })).toThrow(
+			"Missing required config: `token`",
+		);
+	});
+});
+
+describe("resolveConfig — assistantBubble", () => {
+	test("carries appearance.assistantBubble through", () => {
+		const config = resolveConfig({
+			token: "tok",
+			appearance: { theme: "light", assistantBubble: true },
+		});
+		expect(config.appearance?.assistantBubble).toBe(true);
+	});
+});
+
+describe("parseConfigFromScript — data-assistant-bubble", () => {
+	test("'true' opts in", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-assistant-bubble": "true",
+		});
+		expect(cfg.appearance).toEqual({ assistantBubble: true });
+	});
+
+	test("'1' and bare attribute opt in like sibling boolean attrs", async () => {
+		const one = await parseWithAttrs({
+			"data-token": "tok",
+			"data-assistant-bubble": "1",
+		});
+		expect(one.appearance).toEqual({ assistantBubble: true });
+
+		const bare = await parseWithAttrs({
+			"data-token": "tok",
+			"data-assistant-bubble": "",
+		});
+		expect(bare.appearance).toEqual({ assistantBubble: true });
+	});
+
+	test("'false' parses to an explicit false", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "tok",
+			"data-assistant-bubble": "false",
+		});
+		expect(cfg.appearance).toEqual({ assistantBubble: false });
+	});
+
+	test("unspecified leaves appearance untouched", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "tok" });
+		expect(cfg.appearance).toBeUndefined();
+	});
+});
+
+describe("resolveConfig — assistantBubble precedence", () => {
+	test("script-tag false overrides remote true", () => {
+		const config = resolveConfig(
+			{ token: "tok" },
+			{ appearance: { assistantBubble: true } },
+			{ appearance: { assistantBubble: false } },
+		);
+		expect(config.appearance?.assistantBubble).toBe(false);
+	});
+});
+
+describe("resolveConfig — channelId precedence", () => {
+	test("remote channelId fills in on a token-only config", () => {
+		const config = resolveConfig({ token: "tok" }, { channelId: "chan_srv" });
+		expect(config.channelId).toBe("chan_srv");
+	});
+
+	test("host-supplied channelId wins over remote", () => {
+		const config = resolveConfig(
+			{ token: "tok", channelId: "chan_host" },
+			{ channelId: "chan_srv" },
+		);
+		expect(config.channelId).toBe("chan_host");
+	});
+
+	test("channelId stays unset when neither layer supplies one", () => {
+		const config = resolveConfig({ token: "tok" }, {});
+		expect(config.channelId).toBeUndefined();
+	});
+});
+
+describe("parseConfigFromScript — data-suggestion-origins", () => {
+	test("data-suggestion-origins is ignored like any unknown attribute", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-suggestion-origins": "channel,flow",
+		});
+		expect("suggestionOrigins" in cfg).toBe(false);
+	});
+});
+
+describe("parseConfigFromScript — suggestion layout, position and send icon", () => {
+	test("the three attributes parse", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-suggestions-layout": "single-row",
+			"data-suggestions-position": "after-message",
+			"data-send-icon": "right",
+		});
+		expect(cfg.suggestionsLayout).toBe("single-row");
+		expect(cfg.suggestionsPosition).toBe("after-message");
+		expect(cfg.sendIcon).toBe("right");
+	});
+
+	test("unknown values are dropped", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-suggestions-layout": "grid",
+			"data-suggestions-position": "below",
+			"data-send-icon": "left",
+		});
+		expect("suggestionsLayout" in cfg).toBe(false);
+		expect("suggestionsPosition" in cfg).toBe(false);
+		expect("sendIcon" in cfg).toBe(false);
+	});
+});
+
+describe("parseConfigFromScript — menu and restart confirmation", () => {
+	test("data-menu keeps known actions in order and data-restart-confirm parses", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-menu": " Restart, copy-conversation,share,restart ",
+			"data-restart-confirm": "true",
+		});
+		expect(cfg.menu).toEqual(["restart", "copy-conversation"]);
+		expect(cfg.restartConfirm).toBe(true);
+	});
+
+	test("an empty or unknown data-menu leaves the menu unset", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-menu": "share,print",
+		});
+		expect("menu" in cfg).toBe(false);
+		expect("restartConfirm" in cfg).toBe(false);
+	});
+});
+
+describe("parseConfigFromScript — floating bar behaviours", () => {
+	test("the five dock and panel attributes parse", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-chips-trigger": " Scroll ",
+			"data-dock-pointer-vars": "true",
+			"data-dock-glow": "false",
+			"data-dock-readonly-mobile": "true",
+			"data-panel-history": "true",
+		});
+		expect(cfg.dockChipsTrigger).toEqual(["scroll"]);
+		expect(cfg.dockPointerVars).toBe(true);
+		expect(cfg.dockGlow).toBe(false);
+		expect(cfg.dockReadonlyMobile).toBe(true);
+		expect(cfg.panelHistory).toBe(true);
+	});
+
+	test("unset attributes stay unset so the runtime defaults apply", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "wwp_test" });
+		expect("dockChipsTrigger" in cfg).toBe(false);
+		expect("dockPointerVars" in cfg).toBe(false);
+		expect("dockGlow" in cfg).toBe(false);
+		expect("dockReadonlyMobile" in cfg).toBe(false);
+		expect("panelHistory" in cfg).toBe(false);
+	});
+
+	test("a comma-separated chips trigger list parses, deduped, unknowns dropped", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-chips-trigger": "hover, scroll,click,hover",
+		});
+		expect(cfg.dockChipsTrigger).toEqual(["hover", "scroll"]);
+	});
+
+	test("a bare hover chips trigger still parses", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-chips-trigger": "hover",
+		});
+		expect(cfg.dockChipsTrigger).toEqual(["hover"]);
+	});
+
+	test("a programmatic string chips trigger becomes a one-element list", () => {
+		const cfg = resolveConfig(
+			{ token: "wwp_test", dockChipsTrigger: "scroll" as never },
+			undefined,
+			{},
+		);
+		expect(cfg.dockChipsTrigger).toEqual(["scroll"]);
+	});
+
+	test("an unknown chips trigger is dropped", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-chips-trigger": "click",
+		});
+		expect("dockChipsTrigger" in cfg).toBe(false);
+	});
+});
+
+describe("parseConfigFromScript: dock click", () => {
+	test("data-dock-click parses expand and open", async () => {
+		const open = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-click": " Open ",
+		});
+		expect(open.dockClick).toBe("open");
+		const expand = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-click": "expand",
+		});
+		expect(expand.dockClick).toBe("expand");
+	});
+
+	test("an unset or unknown data-dock-click stays unset", async () => {
+		expect(
+			"dockClick" in (await parseWithAttrs({ "data-token": "wwp_test" })),
+		).toBe(false);
+		const unknown = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-dock-click": "toggle",
+		});
+		expect("dockClick" in unknown).toBe(false);
+	});
+});
+
+describe("parseConfigFromScript: table toolbar", () => {
+	test("data-show-table-toolbar=false hides it", async () => {
+		const cfg = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-show-table-toolbar": "false",
+		});
+		expect(cfg.showTableToolbar).toBe(false);
+	});
+
+	test("unset stays unset so the toolbar shows by default", async () => {
+		const cfg = await parseWithAttrs({ "data-token": "wwp_test" });
+		expect("showTableToolbar" in cfg).toBe(false);
+	});
+});
