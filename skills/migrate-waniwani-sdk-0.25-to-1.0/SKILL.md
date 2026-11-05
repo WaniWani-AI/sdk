@@ -64,7 +64,8 @@ Not breaking:
    | `@waniwani/sdk/chat/embed.js` | `@waniwani/chat/embed.js` |
    | `@waniwani/sdk/dist/chat/embed.js`, for example in a copy step or a static route | `@waniwani/chat/dist/embed.js` (the `chat/` folder is gone from the path) |
    | `"@waniwani/sdk"` in `transpilePackages`, `optimizePackageImports`, `serverExternalPackages`, a Jest `moduleNameMapper` or a `tsconfig` `paths` entry that exists for the chat | Add `"@waniwani/chat"` next to it. Keep `"@waniwani/sdk"` when other code still imports it |
-   | A `<script src>` with `cdn.jsdelivr.net/npm/@waniwani/sdk@…/dist/chat/embed.js` | `https://app.waniwani.ai/embed.js`, or `https://eu.app.waniwani.ai/embed.js` for an EU project. Keep every `data-*` attribute as it is |
+   | A `<script src>` with `cdn.jsdelivr.net/npm/@waniwani/sdk@…/dist/chat/embed.js` and a `data-token` | `https://app.waniwani.ai/embed.js`, or `https://eu.app.waniwani.ai/embed.js` for an EU project. Keep every `data-*` attribute as it is |
+   | The same tag with no `data-token`, which the page starts with `window.WaniWani.chat.init()` | `https://cdn.jsdelivr.net/npm/@waniwani/chat@1/dist/embed.js`. Keep every `data-*` attribute as it is |
 
    Named imports stay the same. Do not rename `WaniwaniChat`, `ChatEmbed`, `ChatHandle`, `ChatTheme` or any other symbol.
 
@@ -112,6 +113,7 @@ Not breaking:
 - **Keeping `chat/` in a `dist` path.** The embed sits at `@waniwani/chat/dist/embed.js`, not `@waniwani/chat/dist/chat/embed.js`.
 - **Copying the forwarder.** A copy step that still reads `@waniwani/sdk/dist/chat/embed.js` now copies a 600-byte forwarder, which loads the chat from jsDelivr. A page whose Content Security Policy blocks `cdn.jsdelivr.net` then shows no chat. Copy `@waniwani/chat/dist/embed.js`.
 - **Leaving script tags on the old CDN path.** They keep working through the forwarder in every 1.x release, and 2.0.0 removes it. Move them to the dashboard snippet now.
+- **Moving an `init()` tag to the loader.** `app.waniwani.ai/embed.js` adds the chat's script tag at run time, and that script can run after `DOMContentLoaded`. A page that calls `window.WaniWani.chat.init()` on `DOMContentLoaded` then finds no `window.WaniWani`. Load `@waniwani/chat@1` straight from jsDelivr for a tag without `data-token`.
 - **Pinning the embed to a CDN version.** A pinned `cdn.jsdelivr.net` URL never gets fixes. The dashboard snippet loads the current release through `app.waniwani.ai/embed.js`.
 - **Removing `@waniwani/sdk` while server code still imports it.** Flows, tracking, `withWaniwani` and `useWaniwani` stay in `@waniwani/sdk`. Remove it only when step 5 finds no import left.
 - **Skipping the verify step.** A clean `bun run typecheck` plus green `bun test` is the definition of done, and a web app also needs a green build.

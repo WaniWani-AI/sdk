@@ -43,7 +43,7 @@ it is the complete page index, always current, and cheap to read.
 | Check a typed event payload | [/sdk/reference/event-schema](https://docs.waniwani.ai/sdk/reference/event-schema) |
 | Add knowledge-base search | [/sdk/knowledge-base/overview](https://docs.waniwani.ai/sdk/knowledge-base/overview) |
 | Send an email from a tool or flow node | [/sdk/modules/email](https://docs.waniwani.ai/sdk/modules/email) |
-| Embed the chat widget | [/sdk/chat/embed](https://docs.waniwani.ai/sdk/chat/embed) (script tag), [/sdk/chat/react](https://docs.waniwani.ai/sdk/chat/react) |
+| Embed the chat widget (`@waniwani/chat`) | [/sdk/chat/embed](https://docs.waniwani.ai/sdk/chat/embed) (script tag), [/sdk/chat/react](https://docs.waniwani.ai/sdk/chat/react) |
 | Read the exact tool contract a flow compiles to | [/sdk/reference/flow-tool-contract](https://docs.waniwani.ai/sdk/reference/flow-tool-contract) |
 | Tunnel a dev server for remote testing | [/sdk/guides/tunnel](https://docs.waniwani.ai/sdk/guides/tunnel) |
 | Use the CLI | [/sdk/cli/overview](https://docs.waniwani.ai/sdk/cli/overview) |
@@ -59,7 +59,8 @@ Dashboard and free API key: [app.waniwani.ai](https://app.waniwani.ai).
   funnel analytics, knowledge base, email, chat widget, and the dashboard playground.
 
 Default to the OSS path. Reach for the free tier when the user asks for tracking, analytics, hosted
-state, KB, or chat, and say plainly that it needs a key.
+state, KB, or chat, and say plainly that it needs a key. The chat widget ships in its own package,
+`@waniwani/chat`, and `@waniwani/sdk` does not depend on it.
 
 Minimal shape, enough to orient yourself before you fetch the flow docs:
 
@@ -90,6 +91,11 @@ With neither a store nor a key, `.compile()` throws and tells you how to fix it.
 fallback.
 
 ## Removed surfaces
+
+Moved in 1.0.0: the chat widget left `@waniwani/sdk`. `@waniwani/sdk/chat` and
+`@waniwani/sdk/chat/styles.css` no longer exist. Import `@waniwani/chat` and
+`@waniwani/chat/styles.css`, which export the same names. `npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.25-to-1.0`
+applies the migration.
 
 Changed in 0.24.0: a flow's tool listing no longer names state fields under `stateUpdates`, and
 `flow.config._meta` no longer types or sends `_flowGraph` (read `flow.flowGraph`). In 0.24.0 to
@@ -128,9 +134,10 @@ applies the whole migration.
 
 ## Upgrading
 
-`@waniwani/sdk` is `0.x`, so minor bumps can break the public API. Whenever you raise the version in
-a project, whether by editing `package.json`, running `bun add @waniwani/sdk@latest`, or chasing a
-build that started failing, do not treat it as a drop-in.
+From 1.0.0, `@waniwani/sdk` and `@waniwani/chat` follow semver, and only a major bump breaks the
+public API. Up to 0.25, a minor bump could. Whenever you raise the version in a project across a major,
+or from any 0.x version, whether by editing `package.json`, running `bun add @waniwani/sdk@latest`, or
+chasing a build that started failing, do not treat it as a drop-in.
 
 1. Read [the changelog](https://docs.waniwani.ai/sdk/changelog), starting at the **Breaking changes
    at a glance** table, then every `## <version>:` section above your old version and at or below
@@ -143,7 +150,7 @@ Every version hop also ships a self-contained migration skill you can invoke dir
 `migrate-waniwani-sdk-<from>-to-<to>`. For the latest release:
 
 ```bash
-npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.24-to-0.25
+npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-0.25-to-1.0
 ```
 
 ## Guided playbooks
@@ -170,7 +177,7 @@ npx skills add Waniwani-AI/sdk -s audit-tracking        # read-only audit of an 
   for dev, set `WANIWANI_API_KEY` for the hosted store, or pass your own KV adapter.
 - **Creating multiple clients**: create one `waniwani()` in `lib/waniwani.ts` and import it everywhere.
 - **Wrong import paths**: flow primitives and KV come from `@waniwani/sdk/mcp`, `useWaniwani` from
-  `@waniwani/sdk/mcp/react`, the chat widget from `@waniwani/sdk/chat`.
+  `@waniwani/sdk/mcp/react`, the chat widget from its own package, `@waniwani/chat`.
 - **Forgetting `START` / `END` edges**: every flow needs `addEdge(START, firstNode)` and
   `addEdge(lastNode, END)`.
 - **Adding a first node just to greet the user or state a GDPR notice**: an opening node is
