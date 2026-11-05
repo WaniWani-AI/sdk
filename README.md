@@ -20,9 +20,10 @@ bun run lint
 bun test
 ```
 
-Each published package has its own version and release. To cut one, run the release script in that package's folder. It bumps the version, commits, tags and pushes, and the tag push publishes the package to npm:
+Each published package has its own version, and [Changesets](https://changesets.dev) releases them. A PR that changes a package adds a changeset, which names the package, the semver bump and the changelog line:
 
 ```bash
-cd packages/sdk && bun run release:minor    # tag v0.26.0
-cd packages/chat && bun run release:patch   # tag chat-v0.26.1
+bun changeset
 ```
+
+Changesets on `main` collect in one "version packages" PR. Merging it publishes the bumped packages to npm. [`.changeset/README.md`](.changeset/README.md) covers the details, including beta snapshots.
