@@ -51,13 +51,7 @@
     "test": "bun test",
     "eval:flows": "bun evals/flows/run.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p evals",
-    "prepublishOnly": "bun run build",
-    "release": "bun run release:patch",
-    "release:patch": "bun ../../scripts/bump.ts patch",
-    "release:minor": "bun ../../scripts/bump.ts minor",
-    "release:major": "bun ../../scripts/bump.ts major",
-    "release:beta": "bun ../../scripts/bump.ts beta",
-    "release:alpha": "bun ../../scripts/bump.ts alpha"
+    "prepublishOnly": "bun run build"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

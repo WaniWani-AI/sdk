@@ -24,13 +24,7 @@
     "typecheck": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "prepublishOnly": "bun run build",
-    "release": "bun run release:patch",
-    "release:patch": "bun ../../scripts/bump.ts patch",
-    "release:minor": "bun ../../scripts/bump.ts minor",
-    "release:major": "bun ../../scripts/bump.ts major",
-    "release:beta": "bun ../../scripts/bump.ts beta",
-    "release:alpha": "bun ../../scripts/bump.ts alpha"
+    "prepublishOnly": "bun run build"
   },
   "peerDependencies": {
     "@ai-sdk/react": ">=1.0.0",

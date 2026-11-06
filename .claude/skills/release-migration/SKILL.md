@@ -14,7 +14,7 @@ The repo publishes two packages, each with its own version: `@waniwani/sdk` (`pa
 
 ## When to run
 
-- Bumping the version of `packages/sdk` or `packages/chat`
+- Adding a `major` changeset for `@waniwani/sdk` or `@waniwani/chat`, or releasing a Version Packages PR that carries one
 - Landing any change to the **public API tiers** (see [CLAUDE.md](../../../CLAUDE.md) — OSS / Free tier / Legacy surfaces)
 - Preparing changelog / release notes
 - Deprecating or removing an exported symbol
@@ -37,9 +37,10 @@ If the change is purely internal (no exported symbol, type, or documented behavi
 
 1. **Identify the breaking changes.** Diff the public surface against the last release:
    ```bash
-   git diff v<last-sdk-version>..HEAD -- packages/sdk/src packages/core/src | grep -E '^\-.*export'
-   git diff chat-v<last-chat-version>..HEAD -- packages/chat/src packages/core/src | grep -E '^\-.*export'
+   git diff @waniwani/sdk@<last-sdk-version>..HEAD -- packages/sdk/src packages/core/src | grep -E '^\-.*export'
+   git diff @waniwani/chat@<last-chat-version>..HEAD -- packages/chat/src packages/core/src | grep -E '^\-.*export'
    ```
+   Releases up to 1.0.0 carry the older tags `v<version>` (SDK) and `chat-v<version>` (chat).
    Cross-check against the tiers in [CLAUDE.md](../../../CLAUDE.md). A renamed/removed/re-typed export, a changed function signature, a moved entry point, or a changed default is breaking. A new optional export is not.
 
 2. **For each breaking change, write the migration.** Prefer a codemod recipe precise enough to auto-apply: what to match, what to rewrite it to, and how the type checker confirms success. The newest `skills/migrate-waniwani-sdk-*/SKILL.md` sets the quality bar: it tells an agent exactly what to collect and where to insert it.
@@ -52,12 +53,11 @@ If the change is purely internal (no exported symbol, type, or documented behavi
 
 4. **Write the changelog section and the migration skill** (deliverables 1 and 2). Keep them in sync: the skill is the applyable form of what the changelog describes.
 
-5. **Bump and publish** from the package folder, never by editing `version` by hand:
+5. **Release through a changeset**, never by editing `version` by hand. In the PR that carries the breaking change, add a `major` changeset whose summary links the migration skill:
    ```bash
-   cd packages/sdk && bun run release:major    # a breaking change; otherwise release:minor | patch | beta | alpha
-   cd packages/chat && bun run release:major
+   bun changeset --major @waniwani/sdk -m "Removes oldName. Migrate with \`npx skills add Waniwani-AI/sdk -s migrate-waniwani-sdk-<from>-to-<to>\`."
    ```
-   `scripts/bump.ts` bumps `package.json`, refreshes `bun.lock`, commits, tags (`v<version>` for the SDK, `chat-v<version>` for the chat) and pushes. The tag push runs the release workflow for that package only. When a change needs both packages, release `@waniwani/chat` first: the SDK's `dist/chat/embed.js` forwarder loads `@waniwani/chat@1` from jsDelivr.
+   Use `--major @waniwani/chat` for the chat, and `--minor` or `--patch` for changes that break nothing. Once the PR merges, the Version Packages PR shows the new version. Land the changelog entry and the migration skill before you merge that PR, because merging it publishes (after the flow eval passes). One Version Packages PR publishes both packages in the same run, so a change that spans both needs no release order. To test a beta first, see "Betas" in `.changeset/README.md`.
 
 6. **Verify.** The migration must survive its own checks:
    ```bash
@@ -71,6 +71,7 @@ If the change is purely internal (no exported symbol, type, or documented behavi
 
 ## Definition of done
 
+- [ ] A `major` changeset names each package that breaks, and its summary links the migration skill
 - [ ] Every breaking change has a changelog `## <version>:` section with before/after + codemod recipe
 - [ ] Changelog section links its `migrate-waniwani-sdk-<from>-to-<to>` skill in a `<Tip>`
 - [ ] "Breaking changes at a glance" table updated

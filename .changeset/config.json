@@ -1,0 +1,6 @@
+{
+	"$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
+	"changelog": ["@changesets/changelog-github", { "repo": "WaniWani-AI/sdk" }],
+	"access": "public",
+	"snapshot": { "useCalculatedVersion": true }
+}

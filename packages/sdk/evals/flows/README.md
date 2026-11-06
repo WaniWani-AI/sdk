@@ -2,7 +2,7 @@
 
 Runs real models against real flows over MCP and counts what a user would notice: questions about things they already said, turns that end in silence, and values that land in the wrong field.
 
-It calls models through the AI Gateway, so every run costs tokens. It stays out of `bun test` for that reason. The release workflow runs it on every release: it compares the tagged commit with the previous release and stops the publish on a regression. A change outside `src/mcp/server/flows/` (the KV store, `withWaniwani`, a zod or MCP SDK upgrade) can still break a flow, so no release skips it. The workflow reads the key from the `AI_GATEWAY_API_KEY` org secret.
+It calls models through the AI Gateway, so every run costs tokens. It stays out of `bun test` for that reason. The release workflow runs it before every publish that contains `@waniwani/sdk`: the `flow-eval` job in `release.yml` compares the commit with the SDK version on npm, and a regression stops the publish. A change outside `src/mcp/server/flows/` (the KV store, `withWaniwani`, a zod or MCP SDK upgrade) can still break a flow, so no SDK release skips it. The job reads the key from the `AI_GATEWAY_API_KEY` org secret.
 
 ## Setup
 

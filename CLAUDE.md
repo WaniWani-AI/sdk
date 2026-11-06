@@ -77,7 +77,7 @@ packages/
 │   ├── scripts/              # Post-build: inline CSS into embed.js, check the browser bundle
 │   └── .storybook/
 └── core/                     # @waniwani/core (private): shared/, webmcp/, tracking/, documents/, kb/types
-scripts/bump.ts               # Version bump behind each package's `bun run release:*`
+.changeset/                   # Changesets config and pending changesets (see its README.md)
 ```
 
 Each package has its own `package.json`, `tsconfig.json` (extends `tsconfig.base.json`) and, for the published two, `tsup.config.ts`. One `biome.json`, one `lefthook.yml` and one `bun.lock` at the root. Import core modules as `@waniwani/core/<path>` (for example `@waniwani/core/tracking/frontend`), never by a relative path across packages.
@@ -112,21 +112,23 @@ All commands run from the repo root unless noted.
 
 - Build: `bun run build` (both packages)
 - Dev: `bun run --cwd packages/sdk dev`
-- Typecheck: `bun run typecheck` (root scripts, core, chat, SDK)
+- Typecheck: `bun run typecheck` (core, chat, SDK)
 - Lint: `bun run lint`
 - Test: `bun test` (every package)
 - Storybook: `bun run storybook`
-- Flow eval (live models through the AI Gateway, costs tokens): `bun run eval:flows`. The release workflow runs it with `--sdk local,<last release> --fail-on-regression` on every `@waniwani/sdk` release, and does not publish on a regression. See `packages/sdk/evals/flows/README.md`.
-- Release: `bun run release:<patch|minor|major|beta|alpha>` inside `packages/sdk` or `packages/chat` (see below)
+- Flow eval (live models through the AI Gateway, costs tokens): `bun run eval:flows`. The `flow-eval` job in `release.yml` runs it with `--sdk local,<version on npm> --fail-on-regression` before every publish that contains `@waniwani/sdk`, and a regression stops the publish. See `packages/sdk/evals/flows/README.md`.
+- Changeset: `bun changeset` in any PR that changes a published package (see below)
 - Pre-commit: always run `bun biome check . --fix`
 
 ## Releasing (version bumps)
 
-**A feature/fix branch or PR must NEVER bump the version.** Leave `package.json`'s `version` untouched in any branch that changes code, and do not add a changelog `## <version>:` section for a version that has not been cut. The version bump is always its own separate branch and PR, cut once the code changes have landed. If a task asks for a change and a release in one go, do the code change first, then cut the bump separately — never in the same PR.
+**A feature/fix PR must NEVER bump a version.** It adds a changeset instead: run `bun changeset` and commit the `.changeset/*.md` file it writes, which names each package the PR releases, its semver bump, and a changelog line written for someone upgrading. Never edit a `version` field or a package's `CHANGELOG.md` by hand, and never add a docs changelog `## <version>:` section before the Version Packages PR proposes that version. Tests, CI and repo docs need no changeset. `packages/core` is never released on its own: tsup inlines it into both packages, so a change there names `@waniwani/sdk`, `@waniwani/chat`, or both.
 
-Each published package has its own version. To cut a release, run `bun run release:<patch|minor|major|beta|alpha>` in that package's folder (`bun run release` is a patch). `scripts/bump.ts` bumps `package.json`, refreshes `bun.lock`, commits, tags and pushes: `v<version>` for `@waniwani/sdk` (the tags it always had), `chat-v<version>` for `@waniwani/chat`. The tag push runs `.github/workflows/release.yml`, which publishes that one package (the flow eval gates the SDK). The workflow's manual dispatch takes the same package and bump choices. A release of one package never publishes the other.
+Changesets does the bump (`.changeset/config.json`, `.github/workflows/release.yml`). Each push to `main` that carries changesets updates one PR, `chore(release): version packages`, on the `changeset-release/main` branch. That PR bumps each package by its highest pending bump, writes each package's `CHANGELOG.md` and refreshes `bun.lock`. Merging it is the release. When the release contains `@waniwani/sdk`, the `flow-eval` job runs the flow eval against the version on npm first, and a regression publishes nothing. Then the workflow publishes each bumped package to npm through trusted publishing, tags it (`@waniwani/sdk@<version>`, `@waniwani/chat@<version>`; releases up to 1.0.0 used `v<version>` and `chat-v<version>`) and creates its GitHub release. One Version Packages PR can release both packages.
 
-Both packages follow semver from 1.0.0: **a breaking change to the public API needs a major bump** (`release:major`), and every breaking change is a migration our users have to do. The rule: no user should have to figure out an upgrade by hand. Whenever a release contains a breaking change, ship the migration alongside it so an agent can auto-apply it in one pass.
+For a beta line, use the `beta` branch in Changesets pre mode: its releases count up (`1.3.0-beta.0`, `1.3.0-beta.1`) under the `beta` dist-tag, through the same Version Packages PR flow. `.changeset/README.md` has the steps to enter and exit pre mode. For a one-off build of any branch, run the Release workflow by hand on a branch that has a changeset and pick `beta` or `alpha`: it publishes a snapshot such as `1.3.0-beta-20261105101500` under that dist-tag and leaves `latest` alone. Only admins can run it.
+
+Both packages follow semver from 1.0.0: **a breaking change to the public API needs a major bump** (a `major` changeset), and every breaking change is a migration our users have to do. The rule: no user should have to figure out an upgrade by hand. Whenever a release contains a breaking change, ship the migration alongside it so an agent can auto-apply it in one pass.
 
 **Every breaking change in a version bump must ship all three:**
 
@@ -134,7 +136,7 @@ Both packages follow semver from 1.0.0: **a breaking change to the public API ne
 2. **A version-specific migration skill** — `skills/migrate-waniwani-sdk-<from>-to-<to>/SKILL.md`, self-contained to that one hop (the Vercel `migrate-*`-per-major pattern), ending on `bun run typecheck && bun test`. Copy the newest existing one as the template and link it from `skills/waniwani-sdk/SKILL.md`. This is the offline, applyable form of the changelog entry: a user's agent must be able to migrate from it alone, with no network fetch.
 3. **A `@deprecated` shim where feasible** — keep the old shape working with a `@deprecated` notice naming the removal version, so the bump isn't a hard cliff. Not always possible (a surface that never worked is deleted outright).
 
-This is a standing obligation, not a per-release decision: the `.claude/skills/release-migration/` skill walks through cutting a release this way, and the user-facing upgrade path is the hosted changelog plus the per-hop migration skills. If you bump the version and touch the public API, you are not done until the changelog entry and the `migrate-waniwani-sdk-<from>-to-<to>` skill both exist and cross-link. The same discipline applies at every future version (0.15, 1.0, 15.0): a version bump always ships its migration, and the changelog always points at the skill that applies it.
+This is a standing obligation, not a per-release decision: the `.claude/skills/release-migration/` skill walks through cutting a release this way, and the user-facing upgrade path is the hosted changelog plus the per-hop migration skills. If you add a `major` changeset, you are not done until the changelog entry and the `migrate-waniwani-sdk-<from>-to-<to>` skill both exist and cross-link, and the changeset summary links the skill. Both land before anyone merges the Version Packages PR that carries the major. The same discipline applies at every future version (0.15, 1.0, 15.0): a version bump always ships its migration, and the changelog always points at the skill that applies it.
 
 ## Skills (kept in sync with source)
 
