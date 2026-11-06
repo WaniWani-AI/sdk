@@ -1,0 +1,64 @@
+# Goes in WaniWani-AI/mcp-distribution-template as
+# .github/workflows/template-contract.yml
+#
+# The generator consumes that repo as-is, so a change to its layout can break
+# every app built from it. This builds a real app against the pull request's
+# version of the template and fails if it does not come out working.
+#
+# Effect: the template stays the raw, cloneable showcase it is, and the contract
+# it has with the generator is checked where the change happens, ahead of any
+# release.
+#
+# This copy is the source. It is a few lines of checkout around
+# `scripts/template-contract.ts`, which lives in the kit and holds every
+# assertion. Both this workflow and the kit's own CI run that one script, so the
+# two directions of drift cannot check different things and both report green.
+# Editing the assertions means editing the script, and this file does not change.
+
+name: template contract
+
+# `main` is the template's trunk and the branch the kit pins from, so both
+# filters name it. A layout change reaches a released app only through a pin
+# bump in the kit, and this is the run that happens first.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  generates-a-working-app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the template
+        uses: actions/checkout@v6
+        with:
+          path: template
+
+      # `main` of the kit, which is the released generator. A template change
+      # that needs a generator change fails here, and that is the intended
+      # reading: it has to land in the kit first.
+      - name: Check out the kit
+        uses: actions/checkout@v6
+        with:
+          repository: WaniWani-AI/kit
+          path: kit
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install
+        working-directory: kit
+        run: bun install
+
+      # `--template ../template`, so the assertions run against this pull
+      # request rather than the commit the kit pins. The script builds the kit,
+      # generates and builds the example app, checks the emitted CSS carries the
+      # template's Tailwind utilities, serves the result and calls every tool,
+      # then ejects and builds again with no Waniwani tooling in the tree.
+      - name: Check the contract
+        working-directory: kit
+        run: bun scripts/template-contract.ts --template ../template
