@@ -12,7 +12,7 @@ around it. What comes out imports `@waniwani/kit` and `@waniwani/sdk` and nothin
 else: no `McpServer` construction, no transport, no `vite.config.ts`, no
 `Dockerfile`, no `vercel.json`, no `api/index.ts` entry.
 
-Read the kit's [README](../../../README.md) for the convention itself. This skill
+Read the kit's [README](../../../packages/kit/README.md) for the convention itself. This skill
 covers the transfer: what maps where, what has no home, and the five failures
 that cost time the first time round.
 

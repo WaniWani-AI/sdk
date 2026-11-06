@@ -2,8 +2,8 @@
 /**
  * Propose the three bumps nothing else proposes.
  *
- *   bun scripts/bump-deps.ts            # report what has moved
- *   bun scripts/bump-deps.ts --write     # rewrite the pins
+ *   bun packages/kit/scripts/bump-deps.ts            # report what has moved
+ *   bun packages/kit/scripts/bump-deps.ts --write     # rewrite the pins
  *
  * Dependabot covers the npm half of `packages/kit/package.json` and cannot
  * cover any of this. The template is a commit in `cli/template-pin.ts`, which
@@ -26,14 +26,14 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { bold, dim, green, yellow } from "../packages/kit/cli/log.js";
-import { compareVersions, floorVersion } from "../packages/kit/cli/peers.js";
-import { TEMPLATE_PIN } from "../packages/kit/cli/template-pin.js";
-import type { DependencyField, PackageManifest } from "../packages/kit/cli/types.js";
+import { bold, dim, green, yellow } from "../cli/log.js";
+import { compareVersions, floorVersion } from "../cli/peers.js";
+import { TEMPLATE_PIN } from "../cli/template-pin.js";
+import type { DependencyField, PackageManifest } from "../cli/types.js";
 
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const MANIFEST = join(REPO_ROOT, "packages/kit/package.json");
-const PIN_MODULE = join(REPO_ROOT, "packages/kit/cli/template-pin.ts");
+const KIT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
+const MANIFEST = join(KIT_DIR, "package.json");
+const PIN_MODULE = join(KIT_DIR, "cli/template-pin.ts");
 
 /**
  * Every manifest field this script writes into.
@@ -292,9 +292,7 @@ if (!write) {
 	// verbatim into a pull request body, where advice on which flag to pass next
 	// is noise addressed to nobody.
 	if (process.stdout.isTTY) {
-		console.log(
-			`\n${dim("run with --write to apply, then scripts/template-contract.ts to prove it")}`,
-		);
+		console.log(`\n${dim("run with --write to apply, then `bun run contract` to prove it")}`);
 	}
 	process.exit(0);
 }
@@ -323,6 +321,6 @@ console.log(`\n${green("✓ written")}`);
 console.log(
 	yellow(
 		"the lockfile still describes the old tree — run `bun install`, then " +
-			"`bun scripts/template-contract.ts` before committing",
+			"`bun run contract` before committing",
 	),
 );

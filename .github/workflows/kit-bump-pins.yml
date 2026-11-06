@@ -1,6 +1,7 @@
 # Proposes the bumps Dependabot cannot: the pinned template commit in
-# `cli/template-pin.ts`, and the framework and SDK versions this package declares
-# on every generated app's behalf. See `scripts/bump-deps.ts` for why those
+# `packages/kit/cli/template-pin.ts`, and the framework and SDK versions the kit
+# declares on every generated app's behalf. See `packages/kit/scripts/bump-deps.ts`
+# for why those
 # three are a category of their own.
 #
 # The output is one pull request against a fixed branch, force-pushed, so a
@@ -9,8 +10,11 @@
 # goes in the body: a red bump is still worth seeing, because "the template has
 # moved somewhere the generator cannot follow" is the thing a maintainer needs to
 # know, and the pin holding in the meantime is the point of it.
+#
+# The PR carries a `@waniwani/kit` patch changeset, because a pin bump changes
+# what `waniwani init` scaffolds and reaches apps only through a kit release.
 
-name: bump pins
+name: kit bump pins
 
 on:
   schedule:
@@ -46,7 +50,7 @@ jobs:
       - name: Look for movement
         id: survey
         run: |
-          report=$(bun scripts/bump-deps.ts)
+          report=$(bun packages/kit/scripts/bump-deps.ts)
           echo "$report"
           if echo "$report" | grep -q "every pin is current"; then
             echo "behind=false" >> "$GITHUB_OUTPUT"
@@ -62,7 +66,7 @@ jobs:
       - name: Apply
         if: steps.survey.outputs.behind == 'true'
         run: |
-          bun scripts/bump-deps.ts --write
+          bun packages/kit/scripts/bump-deps.ts --write
           # The lockfile still describes the old tree, and the contract installs
           # from it. Not --frozen-lockfile: rewriting it is the point.
           bun install
@@ -75,7 +79,7 @@ jobs:
         id: contract
         if: steps.survey.outputs.behind == 'true'
         continue-on-error: true
-        run: bun scripts/template-contract.ts
+        run: bun run contract
 
       - name: Open or update the pull request
         if: steps.survey.outputs.behind == 'true'
@@ -90,8 +94,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B "$BRANCH"
-          git add packages/kit/package.json packages/kit/cli/template-pin.ts bun.lock
-          git commit -m "build: bump the pinned template and framework versions"
+          printf '%s\n' '---' '"@waniwani/kit": patch' '---' '' 'Scaffold new apps from the newer pinned template, framework and SDK versions.' > .changeset/kit-bump-pins.md
+          git add packages/kit/package.json packages/kit/cli/template-pin.ts bun.lock .changeset/kit-bump-pins.md
+          git commit -m "build(kit): bump the pinned template and framework versions"
           git push --force origin "$BRANCH"
 
           if [[ "$VERDICT" == "success" ]]; then
@@ -110,7 +115,7 @@ jobs:
             cat <<'BODY'
           ## Summary
 
-          Moves the pins that `scripts/bump-deps.ts` owns: the template commit in `cli/template-pin.ts`, and the framework and SDK versions `packages/kit/package.json` declares for every generated app.
+          Moves the pins that `packages/kit/scripts/bump-deps.ts` owns: the template commit in `packages/kit/cli/template-pin.ts`, and the framework and SDK versions `packages/kit/package.json` declares for every generated app.
 
           ```
           BODY
@@ -124,7 +129,7 @@ jobs:
 
           ## How to see it working
 
-          `bun scripts/template-contract.ts` generates the example app against the pins in this branch, builds it, serves it, calls every tool, then ejects and builds the result with no Waniwani tooling. The run is in this workflow's log.
+          `bun run contract` generates the example app against the pins in this branch, builds it, serves it, calls every tool, then ejects and builds the result with no Waniwani tooling. The run is in this workflow's log.
 
           ## Review focus
 
@@ -136,6 +141,6 @@ jobs:
             gh pr edit "$BRANCH" --body-file "$RUNNER_TEMP/pr-body.md"
           else
             gh pr create --base main --head "$BRANCH" \
-              --title "build: bump the pinned template and framework versions" \
+              --title "build(kit): bump the pinned template and framework versions" \
               --body-file "$RUNNER_TEMP/pr-body.md"
           fi

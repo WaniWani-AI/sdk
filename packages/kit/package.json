@@ -27,15 +27,13 @@
     "src",
     "templates"
   ],
-  "//README.md": "Written by `scripts/sync-readme.ts` from the repo root README, which is this package's documentation, and gitignored. npm packs any README.md it finds next to the manifest whatever `files` says.",
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.cli.json && node -e \"require('node:fs').chmodSync('dist/cli/index.js', 0o755)\"",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.cli.json --noEmit && tsc -p tsconfig.templates.json",
-    "prepack": "npm run build",
-    "prepare": "npm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.cli.json --noEmit && tsc -p tsconfig.scripts.json && tsc -p tsconfig.templates.json",
+    "prepublishOnly": "bun run build",
     "watch": "tsc -p tsconfig.json --watch --preserveWatchOutput & tsc -p tsconfig.cli.json --watch --preserveWatchOutput"
   },
   "dependencies": {
@@ -69,7 +67,7 @@
   "//repository": "`directory` is not decoration: `npm publish --provenance` reads this field to bind the published tarball to the workflow run that built it, and the attestation is rejected if it does not resolve.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/WaniWani-AI/kit.git",
+    "url": "git+https://github.com/WaniWani-AI/sdk.git",
     "directory": "packages/kit"
   },
   "keywords": [

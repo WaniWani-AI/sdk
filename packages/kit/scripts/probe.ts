@@ -3,7 +3,7 @@
  * Poke a running MCP server: initialize, list the tools, call one, and read a
  * widget resource. Checks a build end to end without a chat client.
  *
- *   bun scripts/probe.ts http://localhost:3000/mcp
+ *   bun packages/kit/scripts/probe.ts http://localhost:3000/mcp
  *
  * Calls the example's tools by name, so it needs a build that serves all of them.
  */

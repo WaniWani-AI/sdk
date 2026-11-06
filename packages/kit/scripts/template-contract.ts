@@ -8,14 +8,14 @@
  * tooling in the tree. What it asserts is what a customer would otherwise
  * discover:
  *
- *   bun scripts/template-contract.ts                    # the pinned template
- *   bun scripts/template-contract.ts --template ../t    # a local checkout
- *   bun scripts/template-contract.ts --template github:WaniWani-AI/mcp-distribution-template#main
+ *   bun run contract                                    # the pinned template
+ *   bun run contract --template ../t                    # a local checkout
+ *   bun run contract --template github:WaniWani-AI/mcp-distribution-template#main
  *
  * It is one script rather than two workflows because both directions of drift
  * ask the same question. `.github/workflows/ci.yml` runs it against the commit
- * this repo pins, which is what makes a bump reviewable; the copy of
- * `ci/template-contract.yml` that lives in the template repo runs it against a
+ * the kit pins, which is what makes a bump reviewable; the copy of
+ * `packages/kit/ci/template-contract.yml` that lives in the template repo runs it against a
  * pull request into that repo's `main`, which catches a layout change where it
  * happens, ahead of any release. A single script means the two cannot check
  * different things and both report green.
@@ -33,11 +33,13 @@ import { fileURLToPath } from "node:url";
 // in exactly one place in this repo (see the note in packages/kit/cli/log.ts).
 // The source, not `dist/`: the first step below is what builds `dist/`, and an
 // import is evaluated long before it runs.
-import { bold, dim, green, red } from "../packages/kit/cli/log.js";
+import { bold, dim, green, red } from "../cli/log.js";
 import { createClient } from "./mcp.js";
 
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const KIT_DIR = join(REPO_ROOT, "packages/kit");
+/** The workspace SDK, which the kit compiles against through its built types. */
+const SDK_DIR = join(REPO_ROOT, "packages/sdk");
 /** The compiled bin, which step one produces. */
 const CLI = join(KIT_DIR, "dist/cli/index.js");
 
@@ -253,7 +255,10 @@ console.log(`app       ${app}`);
 // It is also what produces `CLI`. Every step below shells out to the compiled
 // bin rather than the TypeScript behind it, which is deliberate: the thing a
 // customer installs is the compiled tree, so that is the thing this asserts on.
-heading("Build the kit");
+// The kit resolves `@waniwani/sdk` to the workspace package, whose types are
+// its `dist/`, so the SDK builds first. A fresh checkout has no `dist/` at all.
+heading("Build the SDK and the kit");
+run("bun", ["run", "build"], { cwd: SDK_DIR, reason: "the SDK does not build" });
 run("npm", ["run", "build"], { cwd: KIT_DIR, reason: "the kit does not compile" });
 
 heading("Generate and build the example app against the template");
@@ -369,7 +374,7 @@ async function readDocs() {
 heading("Serve it and call every tool");
 let served = await serve({ OPENAI_APPS_CHALLENGE_TOKEN: CHALLENGE_TOKEN });
 
-run("bun", [join(REPO_ROOT, "scripts/probe.ts"), url], {
+run("bun", [join(KIT_DIR, "scripts/probe.ts"), url], {
 	reason: "the served app does not answer the MCP calls a client makes",
 });
 

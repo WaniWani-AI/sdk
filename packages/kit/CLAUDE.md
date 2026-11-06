@@ -1,4 +1,7 @@
-# Working in this repo
+# Working in packages/kit
+
+The kit lives in the WaniWani-AI/sdk monorepo. The root `CLAUDE.md` covers the
+workspace, the release flow and the other packages; this file covers the kit.
 
 ## Never write source code as a string literal
 
@@ -33,12 +36,21 @@ the reason it holds.
 
 ## Checks before calling something done
 
+From the repo root:
+
 ```bash
-bun run build       # tsc over src/ and cli/
-bun run typecheck   # adds templates/, against the dist/ build just produced
+bun run build       # every package; the kit's tsc over src/ and cli/ runs last
+bun run typecheck   # adds the kit's scripts/ and templates/, against the dist/ builds above
 bun run lint        # biome, formatting included
-bun run contract    # generates, builds, serves and ejects examples/oney — slow
+bun run contract    # builds the SDK and the kit, then generates, serves and ejects examples/oney (slow)
 ```
 
 `lint` failing on formatting is normal after an edit. `bun run lint:fix` writes
 it, and the result is the convention, not a suggestion.
+
+## Releasing
+
+A change that reaches users of `@waniwani/kit` adds a changeset with
+`bun changeset` (see `.changeset/README.md`). The kit has `@waniwani/sdk` as a
+peer and compiles against the workspace SDK, so an SDK change that breaks the
+kit fails CI in the same pull request.

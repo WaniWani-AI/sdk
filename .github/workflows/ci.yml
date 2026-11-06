@@ -20,4 +20,37 @@ jobs:
 
       - run: bun run build
 
+      # After `build`: the kit type-checks against the SDK's built types, and its
+      # starter template against the kit's own `dist/`.
+      - run: bun run typecheck
+
+      # The type-checker reads the kit's starter as TypeScript. This reads it as
+      # an app, which catches a file renamed out from under the `TOOL` and
+      # `WIDGET` names in `packages/kit/cli/init.ts`.
+      - run: node packages/kit/dist/cli/index.js check packages/kit/templates/starter
+
       - run: bun test
+
+  # `tsc` cannot notice that the kit's pinned template moved, that the framework
+  # changed under a version bump, or that the generator stopped emitting
+  # something the template reads. Each of those shows up only once an app has
+  # been generated, built and served, which is what the contract does: it builds
+  # the SDK and the kit, generates examples/oney against the pinned template,
+  # serves it, calls every tool, then ejects it and installs the result with
+  # plain `npm install`. See packages/kit/scripts/template-contract.ts.
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # The framework imports `globSync` from `node:fs`, and the generated
+      # project declares a Node floor of its own.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run contract

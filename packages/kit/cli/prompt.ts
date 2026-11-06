@@ -110,13 +110,18 @@ export function fail(line: string): void {
  * interrupted program, so a wrapper can tell it apart from a scaffold that
  * failed. Nothing has been written at this point, so there is nothing to undo
  * and nothing to report beyond the word.
+ *
+ * A prompt resolves to a symbol only when it is cancelled, so whatever passes
+ * `isCancel` is the answer. The return type strips every symbol rather than
+ * naming the cancel one: @clack/prompts 1.7 types the cancel value as `symbol`
+ * and 1.8 as the unique `CANCEL_SYMBOL`, and `^1.7.0` admits both.
  */
-function answered<T>(value: T | symbol): T {
+function answered<T>(value: T): Exclude<T, symbol> {
 	if (isCancel(value)) {
 		cancel("cancelled", { output: process.stderr });
 		process.exit(130);
 	}
-	return value;
+	return value as Exclude<T, symbol>;
 }
 
 /** One line of text, with `fallback` shown as the placeholder and taken on Enter. */

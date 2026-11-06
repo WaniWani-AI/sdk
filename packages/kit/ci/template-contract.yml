@@ -10,8 +10,9 @@
 # release.
 #
 # This copy is the source. It is a few lines of checkout around
-# `scripts/template-contract.ts`, which lives in the kit and holds every
-# assertion. Both this workflow and the kit's own CI run that one script, so the
+# `packages/kit/scripts/template-contract.ts`, which lives in WaniWani-AI/sdk
+# with the kit and holds every assertion. Both this workflow and the SDK repo's
+# CI run that one script, so the
 # two directions of drift cannot check different things and both report green.
 # Editing the assertions means editing the script, and this file does not change.
 
@@ -35,14 +36,14 @@ jobs:
         with:
           path: template
 
-      # `main` of the kit, which is the released generator. A template change
+      # `main` of the SDK repo, where the kit lives: the released generator. A template change
       # that needs a generator change fails here, and that is the intended
       # reading: it has to land in the kit first.
       - name: Check out the kit
         uses: actions/checkout@v6
         with:
-          repository: WaniWani-AI/kit
-          path: kit
+          repository: WaniWani-AI/sdk
+          path: sdk
 
       - uses: actions/setup-node@v5
         with:
@@ -51,14 +52,14 @@ jobs:
       - uses: oven-sh/setup-bun@v2
 
       - name: Install
-        working-directory: kit
-        run: bun install
+        working-directory: sdk
+        run: bun install --frozen-lockfile
 
       # `--template ../template`, so the assertions run against this pull
-      # request rather than the commit the kit pins. The script builds the kit,
+      # request rather than the commit the kit pins. The script builds the SDK and the kit,
       # generates and builds the example app, checks the emitted CSS carries the
       # template's Tailwind utilities, serves the result and calls every tool,
       # then ejects and builds again with no Waniwani tooling in the tree.
       - name: Check the contract
-        working-directory: kit
-        run: bun scripts/template-contract.ts --template ../template
+        working-directory: sdk
+        run: bun run contract --template ../template
