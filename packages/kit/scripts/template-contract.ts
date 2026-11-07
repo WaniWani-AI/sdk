@@ -87,7 +87,7 @@ for (let i = 0; i < argv.length; i++) {
 	flags[name] = takesValue ? (inline ?? argv[++i]) : true;
 }
 
-const app = resolve(REPO_ROOT, (flags.app as string | undefined) ?? "examples/oney");
+const app = resolve(REPO_ROOT, (flags.app as string | undefined) ?? "packages/kit/examples/oney");
 const port = Number(flags.port ?? 4000);
 
 /**

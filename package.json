@@ -4,7 +4,7 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "examples/*"
+    "packages/kit/examples/*"
   ],
   "scripts": {
     "build": "bun run --cwd packages/chat build && bun run --cwd packages/sdk build && bun run --cwd packages/kit build",

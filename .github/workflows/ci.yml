@@ -35,9 +35,9 @@ jobs:
   # changed under a version bump, or that the generator stopped emitting
   # something the template reads. Each of those shows up only once an app has
   # been generated, built and served, which is what the contract does: it builds
-  # the SDK and the kit, generates examples/oney against the pinned template,
-  # serves it, calls every tool, then ejects it and installs the result with
-  # plain `npm install`. See packages/kit/scripts/template-contract.ts.
+  # the SDK and the kit, generates packages/kit/examples/oney against the pinned
+  # template, serves it, calls every tool, then ejects it and installs the
+  # result with plain `npm install`. See packages/kit/scripts/template-contract.ts.
   contract:
     runs-on: ubuntu-latest
     steps:

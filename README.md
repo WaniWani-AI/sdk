@@ -8,7 +8,7 @@ This repo holds the packages for [app.waniwani.ai](https://app.waniwani.ai). It 
 | [`packages/chat`](packages/chat) | [`@waniwani/chat`](https://www.npmjs.com/package/@waniwani/chat) | The chat widget: the React components and `embed.js`. |
 | [`packages/kit`](packages/kit) | [`@waniwani/kit`](https://www.npmjs.com/package/@waniwani/kit) | The `waniwani` CLI and server runtime: an MCP app built from a folder of tools, widgets and flows. |
 | [`packages/core`](packages/core) | not published | The wire contract the SDK and the chat share. Their builds inline it. |
-| [`examples/oney`](examples/oney) | not published | An example app on the kit. CI generates, serves and ejects it. |
+| [`packages/kit/examples/oney`](packages/kit/examples/oney) | not published | An example app on the kit. CI generates, serves and ejects it. |
 
 Docs live at [docs.waniwani.ai](https://docs.waniwani.ai).
 

@@ -7,7 +7,7 @@
 			"packages/sdk/evals/**",
 			"packages/kit/cli/**",
 			"packages/kit/templates/**",
-			"examples/*/**",
+			"packages/kit/examples/**",
 			"!packages/chat/src/tailwind.css",
 			"!!**/.waniwani",
 			"!!**/dist",
@@ -32,7 +32,7 @@
 	},
 	"overrides": [
 		{
-			"includes": ["packages/kit/**", "examples/**"],
+			"includes": ["packages/kit/**"],
 			"linter": {
 				"rules": {
 					"style": {

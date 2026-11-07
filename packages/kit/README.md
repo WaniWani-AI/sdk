@@ -114,7 +114,7 @@ as both: a name of its own creates `./<name>/`, while the offered default, your
 current folder's name, scaffolds in place.
 
 The rest of this section is what those files hold, written out by hand.
-[examples/oney](../../examples/oney) is the same app finished, if you would rather read
+[examples/oney](examples/oney) is the same app finished, if you would rather read
 it than type it.
 
 ```bash

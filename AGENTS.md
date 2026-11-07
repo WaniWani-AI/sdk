@@ -8,7 +8,7 @@ The repo is a bun workspace with three published packages, one private package a
 - `packages/chat` → `@waniwani/chat`: the chat widget, React components and `embed.js` in one package.
 - `packages/kit` → `@waniwani/kit`: the `waniwani` CLI and the shared server runtime that build an MCP app from a folder of tools, widgets and flows. It has `@waniwani/sdk` as a peer and compiles against the workspace SDK. Its own conventions are in `packages/kit/CLAUDE.md`.
 - `packages/core` → `@waniwani/core`, private and never published: the wire contract both sides share (`shared/*`, the WebMCP bridge and types, the tracking client and types, the document and KB types). tsup inlines it into both packages, code and `.d.ts`. `packages/chat` imports nothing outside itself except `@waniwani/core`; keep it that way.
-- `examples/oney`: a private example app built with the kit. The kit's template contract generates, serves and ejects it.
+- `packages/kit/examples/oney`: a private example app built with the kit. The kit's template contract generates, serves and ejects it.
 
 ## Public API tiers
 
@@ -81,13 +81,13 @@ packages/
 ├── core/                     # @waniwani/core (private): shared/, webmcp/, tracking/, documents/, kb/types
 └── kit/                      # @waniwani/kit: the `waniwani` CLI (cli/) and server runtime (src/)
     ├── templates/starter/    # The app `waniwani init` copies out
+    ├── examples/oney/        # Private example app on the kit, built by the contract
     ├── scripts/              # Template contract, pin bumps, MCP probe
     └── ci/                   # The contract workflow that runs in mcp-distribution-template
-examples/oney/                # Private example app on the kit, built by the contract
 .changeset/                   # Changesets config and pending changesets (see its README.md)
 ```
 
-Each package has its own `package.json`, `tsconfig.json` (extends `tsconfig.base.json`) and, for the published two, `tsup.config.ts`. One `biome.json`, one `lefthook.yml` and one `bun.lock` at the root. Import core modules as `@waniwani/core/<path>` (for example `@waniwani/core/tracking/frontend`), never by a relative path across packages. The kit and `examples/` keep their own Biome style (100 columns, no `useBlockStatements`) through an override in `biome.json`, and the kit compiles with the TypeScript 6 in its own dependencies.
+Each package has its own `package.json`, `tsconfig.json` (extends `tsconfig.base.json`) and, for the published two, `tsup.config.ts`. One `biome.json`, one `lefthook.yml` and one `bun.lock` at the root. Import core modules as `@waniwani/core/<path>` (for example `@waniwani/core/tracking/frontend`), never by a relative path across packages. The kit, its example app included, keeps its own Biome style (100 columns, no `useBlockStatements`) through an override in `biome.json`, and the kit compiles with the TypeScript 6 in its own dependencies.
 
 ## Usage
 
@@ -124,7 +124,7 @@ All commands run from the repo root unless noted.
 - Test: `bun test` (every package)
 - Storybook: `bun run storybook`
 - Flow eval (live models through the AI Gateway, costs tokens): `bun run eval:flows`. The `flow-eval` job in `release.yml` runs it with `--sdk local,<version on npm> --fail-on-regression` before every publish that contains `@waniwani/sdk`, and a regression stops the publish. See `packages/sdk/evals/flows/README.md`.
-- Kit template contract (slow): `bun run contract`. It builds the SDK and the kit, generates `examples/oney` against the pinned template, serves it, calls every tool, then ejects it and installs the result with plain npm. CI runs it on every PR.
+- Kit template contract (slow): `bun run contract`. It builds the SDK and the kit, generates `packages/kit/examples/oney` against the pinned template, serves it, calls every tool, then ejects it and installs the result with plain npm. CI runs it on every PR.
 - Changeset: `bun changeset` in any PR that changes a published package (see below)
 - Pre-commit: always run `bun biome check . --fix`
 

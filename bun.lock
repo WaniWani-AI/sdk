@@ -14,16 +14,6 @@
         "typescript": "^5.7.3",
       },
     },
-    "examples/oney": {
-      "name": "oney",
-      "dependencies": {
-        "@waniwani/kit": "workspace:*",
-        "@waniwani/sdk": "^1.0.0",
-        "react": "^19.2.4",
-        "react-dom": "^19.2.4",
-        "zod": "^4.3.6",
-      },
-    },
     "packages/chat": {
       "name": "@waniwani/chat",
       "version": "1.0.0",
@@ -109,6 +99,16 @@
         "react": ">=19",
         "react-dom": ">=19",
         "zod": "^4",
+      },
+    },
+    "packages/kit/examples/oney": {
+      "name": "oney",
+      "dependencies": {
+        "@waniwani/kit": "workspace:*",
+        "@waniwani/sdk": "^1.0.0",
+        "react": "^19.2.4",
+        "react-dom": "^19.2.4",
+        "zod": "^4.3.6",
       },
     },
     "packages/sdk": {
@@ -1349,7 +1349,7 @@
 
     "onetime": ["onetime@5.1.2", "", { "dependencies": { "mimic-fn": "^2.1.0" } }, "sha512-kbpaSSGJTWdAY5KPVeMOKXSrPtr8C8C7wodJbcsd51jRnmD+GZu8Y0VoU6Dm5Z4vWr0Ig/1NKuWRKf7j5aaYSg=="],
 
-    "oney": ["oney@workspace:examples/oney"],
+    "oney": ["oney@workspace:packages/kit/examples/oney"],
 
     "oniguruma-parser": ["oniguruma-parser@0.12.1", "", {}, "sha512-8Unqkvk1RYc6yq2WBYRj4hdnsAxVze8i7iPfQr8e4uSP3tRv0rpZcbGUDvxfQQcdwHt/e9PrMvGCsa8OqG9X3w=="],
 
