@@ -3,11 +3,13 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "packages/kit/examples/*"
   ],
   "scripts": {
-    "build": "bun run --cwd packages/chat build && bun run --cwd packages/sdk build",
-    "typecheck": "bun run --cwd packages/core typecheck && bun run --cwd packages/chat typecheck && bun run --cwd packages/sdk typecheck",
+    "build": "bun run --cwd packages/chat build && bun run --cwd packages/sdk build && bun run --cwd packages/kit build",
+    "typecheck": "bun run --cwd packages/core typecheck && bun run --cwd packages/chat typecheck && bun run --cwd packages/sdk typecheck && bun run --cwd packages/kit typecheck",
+    "contract": "bun packages/kit/scripts/template-contract.ts",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "test": "bun test",

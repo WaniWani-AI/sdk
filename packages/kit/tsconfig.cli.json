@@ -1,0 +1,36 @@
+{
+	// Emits `dist/cli/` — the `waniwani` binary and the modules behind it. A
+	// separate project from `tsconfig.json` because the two halves of this
+	// package are compiled for different consumers: `src/` is a library other
+	// code imports and ships types for, `cli/` is a program Node runs once.
+	//
+	// The published `bin` cannot be TypeScript. Node strips types, but not under
+	// `node_modules/`, so the tarball has to carry JavaScript however this repo
+	// prefers to write it.
+	//
+	// File-for-file `tsc` rather than a bundler: this CLI reaches the framework's
+	// build-step module by absolute path (see `cli/framework.ts`), and a stack
+	// trace out of a customer's failing build is worth more than a smaller
+	// install. `declaration` is off because nothing imports this as a library.
+	"compilerOptions": {
+		"target": "ES2023",
+		"lib": ["ES2023"],
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"types": ["node"],
+
+		"rootDir": "cli",
+		"outDir": "dist/cli",
+		"declaration": false,
+		"sourceMap": true,
+
+		"strict": true,
+		"skipLibCheck": true,
+		"verbatimModuleSyntax": true,
+		"isolatedModules": true,
+		"forceConsistentCasingInFileNames": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true
+	},
+	"include": ["cli"]
+}

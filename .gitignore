@@ -32,3 +32,4 @@ storybook-static/
 # Flow eval: published SDK installs and run transcripts
 packages/sdk/evals/.cache/
 packages/sdk/evals/flows/results/
+*.tsbuildinfo

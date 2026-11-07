@@ -1,0 +1,26 @@
+{
+	// Emits `dist/` — the JavaScript and the types an installed copy of this
+	// package is consumed through. The `src/` it compiles is still shipped, but
+	// only so `waniwani eject` has readable source to vendor; nothing resolves
+	// through it, because Node refuses to strip types under `node_modules/`.
+	"compilerOptions": {
+		"target": "ES2022",
+		"lib": ["ES2023", "DOM", "DOM.Iterable"],
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"jsx": "react-jsx",
+
+		"rootDir": "src",
+		"outDir": "dist",
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+
+		"strict": true,
+		"skipLibCheck": true,
+		"verbatimModuleSyntax": true,
+		"isolatedModules": true,
+		"forceConsistentCasingInFileNames": true
+	},
+	"include": ["src"]
+}
