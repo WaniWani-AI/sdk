@@ -105,8 +105,14 @@ function migrateLegacy(root: string): void {
 	const source = legacyFile(root);
 	if (existsSync(target) || !existsSync(source)) return;
 	try {
-		mkdirSync(settingsDir(), { recursive: true, mode: DIR_MODE });
-		writeFileSync(target, readFileSync(source, "utf8"), { mode: FILE_MODE });
+		// The file sits in a repo, and a cloned repo can carry one it wrote itself.
+		// Moving it makes its instance this machine's default for every repo, so
+		// only a file for a Waniwani instance moves, and only the fields this
+		// module knows. Any other file stays where it is, and the next login
+		// starts clean.
+		const legacy = parse(readFileSync(source, "utf8"));
+		if (!Object.values(REGIONS).some((region) => region.apiUrl === legacy.apiUrl)) return;
+		writeSettings(legacy);
 		rmSync(source, { force: true });
 		console.error(dim(`moved credentials to ${target}`));
 	} catch {

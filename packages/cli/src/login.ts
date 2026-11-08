@@ -102,14 +102,20 @@ function waitForCode(expectedState: string): Promise<string> {
 				return;
 			}
 			res.setHeader("Content-Type", "text/html; charset=utf-8");
+			// A request without this login's state did not come from its redirect.
+			// It gets an error page and the login keeps waiting, so another process
+			// on the machine cannot end it by calling the port.
+			if (url.searchParams.get("state") !== expectedState) {
+				res.statusCode = 400;
+				res.end(page("Not this login", "This page does not belong to a login in progress."));
+				return;
+			}
 			const code = url.searchParams.get("code");
 			const failure = url.searchParams.get("error")
 				? "the authorization was refused"
-				: url.searchParams.get("state") !== expectedState
-					? "the response did not match this login"
-					: !code
-						? "no authorization code came back"
-						: null;
+				: !code
+					? "no authorization code came back"
+					: null;
 			if (failure) {
 				res.statusCode = 400;
 				res.end(page("Login failed", "Run waniwani login again from your terminal."));
@@ -133,7 +139,9 @@ function waitForCode(expectedState: string): Promise<string> {
 					: error,
 			);
 		});
-		server.listen(CALLBACK_PORT);
+		// Loopback only. The redirect says `localhost`, which browsers try on
+		// 127.0.0.1 too; on every interface, the port would answer the network.
+		server.listen(CALLBACK_PORT, "127.0.0.1");
 	});
 }
 

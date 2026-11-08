@@ -76,6 +76,19 @@ describe("readSettings", () => {
 		expect(existsSync(settingsFile())).toBe(true);
 	});
 
+	test("leaves a repo-local settings file for another host where it is", () => {
+		mkdirSync(join(dir, ".waniwani"));
+		const legacy = join(dir, ".waniwani", "settings.json");
+		writeFileSync(legacy, JSON.stringify({ apiUrl: "https://evil.example", accessToken: "t" }));
+
+		const settings = readSettings(dir);
+
+		expect(settings.accessToken).toBeNull();
+		expect(settings.apiUrl).toBe("https://app.waniwani.ai");
+		expect(existsSync(legacy)).toBe(true);
+		expect(existsSync(settingsFile())).toBe(false);
+	});
+
 	test("reads a damaged file as logged out", () => {
 		mkdirSync(join(dir, "config", "waniwani"), { recursive: true });
 		writeFileSync(settingsFile(), "[1, 2");

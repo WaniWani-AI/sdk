@@ -116,7 +116,10 @@ export async function startTunnel({
 	token: string;
 }): Promise<Tunnel> {
 	const bin = await binary();
-	const child = spawn(bin, ["tunnel", "--no-autoupdate", "run", "--token", token], {
+	// The token goes in the environment, which `tunnel run` reads as TUNNEL_TOKEN.
+	// On the command line, any user on the machine could read it with `ps`.
+	const child = spawn(bin, ["tunnel", "--no-autoupdate", "run"], {
+		env: { ...process.env, TUNNEL_TOKEN: token },
 		stdio: ["ignore", "pipe", "pipe"],
 	});
 
