@@ -58,6 +58,21 @@
         "@modelcontextprotocol/sdk",
       ],
     },
+    "packages/cli": {
+      "name": "@waniwani/cli",
+      "version": "0.1.15",
+      "bin": {
+        "waniwani": "dist/index.js",
+      },
+      "dependencies": {
+        "@clack/prompts": "^1.7.0",
+        "dotenv": "^17.4.1",
+      },
+      "devDependencies": {
+        "@types/node": "^22.10.0",
+        "typescript": "^5.7.3",
+      },
+    },
     "packages/core": {
       "name": "@waniwani/core",
       "version": "0.0.0",
@@ -82,6 +97,7 @@
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^6.0.3",
+        "@waniwani/cli": "^0.1.15",
         "cors": "^2.8.6",
         "dotenv": "^17.4.1",
         "express": "^5.2.1",
@@ -718,6 +734,8 @@
     "@vitest/utils": ["@vitest/utils@3.2.4", "", { "dependencies": { "@vitest/pretty-format": "3.2.4", "loupe": "^3.1.4", "tinyrainbow": "^2.0.0" } }, "sha512-fB2V0JFrQSMsCo9HiSq3Ezpdv4iYaXRG1Sx8edX3MwxfyNn83mKiGzOcH+Fkxt4MHxr3y42fQi1oeAInqgX2QA=="],
 
     "@waniwani/chat": ["@waniwani/chat@workspace:packages/chat"],
+
+    "@waniwani/cli": ["@waniwani/cli@workspace:packages/cli"],
 
     "@waniwani/core": ["@waniwani/core@workspace:packages/core"],
 

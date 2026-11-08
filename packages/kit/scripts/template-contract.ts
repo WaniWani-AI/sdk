@@ -38,6 +38,7 @@ import { createClient } from "./mcp.js";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const KIT_DIR = join(REPO_ROOT, "packages/kit");
+const CLI_DIR = join(REPO_ROOT, "packages/cli");
 /** The workspace SDK, which the kit compiles against through its built types. */
 const SDK_DIR = join(REPO_ROOT, "packages/sdk");
 /** The compiled bin, which step one produces. */
@@ -255,10 +256,12 @@ console.log(`app       ${app}`);
 // It is also what produces `CLI`. Every step below shells out to the compiled
 // bin rather than the TypeScript behind it, which is deliberate: the thing a
 // customer installs is the compiled tree, so that is the thing this asserts on.
-// The kit resolves `@waniwani/sdk` to the workspace package, whose types are
-// its `dist/`, so the SDK builds first. A fresh checkout has no `dist/` at all.
-heading("Build the SDK and the kit");
+// The kit resolves `@waniwani/sdk` and `@waniwani/cli` to the workspace
+// packages, whose types are their `dist/`, so both build first. A fresh checkout
+// has no `dist/` at all.
+heading("Build the SDK, the CLI and the kit");
 run("bun", ["run", "build"], { cwd: SDK_DIR, reason: "the SDK does not build" });
+run("bun", ["run", "build"], { cwd: CLI_DIR, reason: "the CLI does not build" });
 run("npm", ["run", "build"], { cwd: KIT_DIR, reason: "the kit does not compile" });
 
 heading("Generate and build the example app against the template");

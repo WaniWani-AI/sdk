@@ -183,10 +183,13 @@ normal outcome, not a sign the migration was skipped.
 
 ## 3. The failures worth knowing in advance
 
-**`.waniwani/settings.json` is `@waniwani/cli`'s login state.** The build output
-now owns that directory. Check for the file before the first build and warn the
-user: clearing the output directory takes their tokens with it, and
-`waniwani login` is the way back.
+**`.waniwani/settings.json` is an older `@waniwani/cli`'s login state.** The
+build output owns that directory, and the CLI never reads that file: a cloned
+repo could carry someone else's session in it. When the file is there, tell the
+user to run `npx waniwani login` once (the session goes to
+`~/.config/waniwani/settings.json`) and delete the old file. A direct
+`@waniwani/cli` dependency can stay or go: the kit depends on it, and both
+packages' `waniwani` binaries answer the same commands.
 
 **A module that reads `process.env` at import time.** The kit loads the app's
 `.env` before it spawns anything, so this works from 0.1.4 on. Below that, or

@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.7.0",
+    "@waniwani/cli": "^0.1.15",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/cors": "^2.8.19",

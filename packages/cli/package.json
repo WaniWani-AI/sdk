@@ -1,0 +1,54 @@
+{
+  "name": "@waniwani/cli",
+  "version": "0.1.15",
+  "description": "Log in to Waniwani, link a repo to an agent, and try any local MCP server in the hosted playground.",
+  "type": "module",
+  "bin": {
+    "waniwani": "dist/index.js"
+  },
+  "main": "./dist/lib.js",
+  "types": "./dist/lib.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/lib.d.ts",
+      "default": "./dist/lib.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json && node -e \"require('node:fs').chmodSync('dist/index.js', 0o755)\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.7.0",
+    "dotenv": "^17.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WaniWani-AI/sdk.git",
+    "directory": "packages/cli"
+  },
+  "keywords": [
+    "cli",
+    "mcp",
+    "waniwani",
+    "mcp-server",
+    "playground",
+    "tunnel"
+  ],
+  "author": "Waniwani",
+  "license": "MIT"
+}

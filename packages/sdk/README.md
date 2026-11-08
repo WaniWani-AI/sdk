@@ -119,13 +119,13 @@ git clone https://github.com/WaniWani-AI/mcp-distribution-template.git my-mcp-se
 
 ## CLI
 
-The companion [`@waniwani/cli`](https://www.npmjs.com/package/@waniwani/cli) wires a local repo to a Waniwani agent and runs your MCP server against the hosted playground in one command. Optional — the SDK works without it.
+The companion [`@waniwani/cli`](https://www.npmjs.com/package/@waniwani/cli) links a local repo to a Waniwani agent and runs your MCP server against the hosted playground. It is optional: the SDK works without it. `waniwani dev` runs the repo's own `dev` script with the port in `PORT`, behind the agent's tunnel.
 
 ```bash
-bun add -g @waniwani/cli
+npm i -g @waniwani/cli
 waniwani login     # browser-based OAuth2 PKCE
-waniwani connect   # pick an org + agent, writes waniwani.config.ts
-waniwani dev       # run local MCP, open playground bridged to localhost
+waniwani connect   # pick an org and an agent, writes waniwani.json
+waniwani dev       # run the local MCP server behind the agent's tunnel, open the playground
 ```
 
 See the [CLI docs](https://docs.waniwani.ai/sdk/cli/overview) for the full command reference.
