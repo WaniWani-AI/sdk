@@ -54,6 +54,48 @@ const z: any = new Proxy(noop, {
 	},
 });
 
+interface PassthroughResult {
+	success: true;
+	data: unknown;
+}
+
+// `ai` 7, its gateway and `@ai-sdk/provider-utils` 5 import zod's builders and
+// parse functions by name, so each one is a named export here.
+export const safeParse = (
+	_schema: unknown,
+	value: unknown,
+): PassthroughResult => ({
+	success: true,
+	data: value,
+});
+export const safeParseAsync = async (
+	_schema: unknown,
+	value: unknown,
+): Promise<PassthroughResult> => ({ success: true, data: value });
+export const parse = (_schema: unknown, value: unknown): unknown => value;
+export const parseAsync = async (
+	_schema: unknown,
+	value: unknown,
+): Promise<unknown> => value;
+export const toJSONSchema = (): Record<string, never> => ({});
+export const any = noop;
+export const array = noop;
+export const boolean = noop;
+export const custom = noop;
+export const discriminatedUnion = noop;
+export const json = noop;
+export const lazy = noop;
+export const literal = noop;
+export const looseObject = noop;
+export const never = noop;
+export const number = noop;
+export const object = noop;
+export const record = noop;
+export const string = noop;
+export const union = noop;
+export const unknown = noop;
+export { noop as enum, noop as instanceof, noop as null };
+
 export { z, ZodError };
 export const ZodFirstPartyTypeKind = {};
 export const ZodType = class {};

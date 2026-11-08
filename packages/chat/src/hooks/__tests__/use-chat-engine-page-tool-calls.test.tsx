@@ -147,19 +147,38 @@ function sseResponse(reply: Reply, signal?: AbortSignal | null): Response {
 		});
 		return new Response(stream, { headers });
 	}
+	// Like a real server, writes after the browser hung up go nowhere; the
+	// chat aborts its request on unmount from `@ai-sdk/react` 4 on.
+	let open = true;
 	const stream = new ReadableStream<Uint8Array>({
 		start(controller) {
 			signal?.addEventListener("abort", () => {
+				open = false;
 				controller.error(new DOMException("aborted", "AbortError"));
 			});
 			reply.onOpen({
-				push: (chunk) => controller.enqueue(line(chunk)),
-				close: () => {
-					controller.enqueue(line("[DONE]"));
-					controller.close();
+				push: (chunk) => {
+					if (open) {
+						controller.enqueue(line(chunk));
+					}
 				},
-				fail: (error) => controller.error(error),
+				close: () => {
+					if (open) {
+						open = false;
+						controller.enqueue(line("[DONE]"));
+						controller.close();
+					}
+				},
+				fail: (error) => {
+					if (open) {
+						open = false;
+						controller.error(error);
+					}
+				},
 			});
+		},
+		cancel() {
+			open = false;
 		},
 	});
 	return new Response(stream, { headers });
@@ -744,6 +763,23 @@ describe("onToolCall set: a failing handler never leaves the chat hanging", () =
 		expect(typeof part.errorText).toBe("string");
 		expect(String(part.errorText).length).toBeGreaterThan(0);
 		expect(engine().isLoading).toBe(false);
+	});
+
+	test("a result with a function inside is sent as an error result, not with the function dropped", async () => {
+		mount({ onToolCall: () => ({ title: "Pricing", onClick: () => {} }) });
+		await settle();
+		replies.push(
+			answerWithCalls([{ id: "c1", name: "get_page_title", input: {} }]),
+			textAnswer("sorry"),
+		);
+
+		send("go");
+		await until("follow-up POST", () => chatPosts.length === 2);
+		await until("chat idle", () => engine().status === "ready");
+
+		const part = postPart(1, "c1");
+		expect(part.state).toBe("output-error");
+		expect(part.output).toBeUndefined();
 	});
 
 	test("a synchronous throw answers an error result with the error's message", async () => {

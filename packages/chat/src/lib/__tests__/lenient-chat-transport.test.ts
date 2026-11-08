@@ -8,7 +8,6 @@ const { LenientChatTransport }: typeof import("../lenient-chat-transport") =
 	await import(realTransportPath);
 
 // The page can only answer tool calls whose pieces survive the transport.
-// AI SDK 7's toolMetadata strip is tracked separately in WAN-1338.
 
 function sse(lines: string[]): Response {
 	const body = `${lines.map((l) => `data: ${l}`).join("\n\n")}\n\ndata: [DONE]\n\n`;
@@ -82,5 +81,149 @@ describe("LenientChatTransport keeps the tool-call pieces the page answers", () 
 		const out = await chunksThrough([JSON.stringify(output)]);
 
 		expect(out).toEqual([output]);
+	});
+});
+
+// One stream as an AI SDK 7 server writes it, read by the chunk schema of each
+// `ai` major the chat runs on: npm users on AI SDK 6 get this build too.
+const { lenientChunkStream }: typeof import("../lenient-chat-transport") =
+	await import(realTransportPath);
+const { uiMessageChunkSchema: v6ChunkSchema } = await import("ai-v6");
+const { uiMessageChunkSchema: v7ChunkSchema } = await import("ai");
+
+const TOOL_METADATA = {
+	clientName: "acme-mcp",
+	toolName: "show_card",
+	title: "Show card",
+	app: {
+		resourceUri: "ui://acme/card.html",
+		mimeType: "text/html;profile=mcp-app",
+	},
+};
+
+const V7_STREAM: Record<string, unknown>[] = [
+	{ type: "start", messageId: "msg_1" },
+	{ type: "start-step" },
+	{ type: "custom", kind: "anthropic.message_start" },
+	{
+		type: "tool-input-start",
+		toolCallId: "call_1",
+		toolName: "show_card",
+		inputEncoding: "json",
+		toolMetadata: TOOL_METADATA,
+	},
+	{
+		type: "tool-input-available",
+		toolCallId: "call_1",
+		toolName: "show_card",
+		input: { city: "Paris" },
+		toolMetadata: TOOL_METADATA,
+	},
+	{
+		type: "tool-output-available",
+		toolCallId: "call_1",
+		output: { _meta: { ui: { resourceUri: "ui://acme/card.html" } } },
+		toolMetadata: TOOL_METADATA,
+	},
+	{ type: "reset-step" },
+	{ type: "text-start", id: "t1" },
+	{ type: "text-delta", id: "t1", delta: "Bonjour é" },
+	{ type: "text-end", id: "t1", citations: [] },
+	{
+		type: "reasoning-file",
+		mediaType: "image/png",
+		url: "data:image/png;base64,AA==",
+	},
+	{
+		type: "steering-message",
+		id: "s1",
+		parts: [{ type: "text", text: "faster" }],
+	},
+	{ type: "a-chunk-type-from-the-future", x: 1 },
+	{ type: "finish-step" },
+	{ type: "finish", finishReason: "interrupted" },
+];
+
+/** The SSE body of `chunks`, cut into reads of `size` bytes so a line and a character can span two reads. */
+function sseBytes(
+	chunks: Record<string, unknown>[],
+	size: number,
+): ReadableStream<Uint8Array> {
+	const bytes = new TextEncoder().encode(
+		`${chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join("")}data: [DONE]\n\n`,
+	);
+	let offset = 0;
+	return new ReadableStream({
+		pull(controller) {
+			if (offset >= bytes.length) {
+				controller.close();
+				return;
+			}
+			controller.enqueue(bytes.slice(offset, offset + size));
+			offset += size;
+		},
+	});
+}
+
+async function readAll<CHUNK>(stream: ReadableStream<CHUNK>): Promise<CHUNK[]> {
+	const out: CHUNK[] = [];
+	for (const reader = stream.getReader(); ; ) {
+		const { done, value } = await reader.read();
+		if (done) {
+			return out;
+		}
+		out.push(value);
+	}
+}
+
+/** The schema's own `validate`, which both majors always set on `uiMessageChunkSchema()`. */
+function validatorOf<SCHEMA extends { validate?: unknown }>(
+	schema: SCHEMA,
+): NonNullable<SCHEMA["validate"]> {
+	if (!schema.validate) {
+		throw new Error("uiMessageChunkSchema() has no validate");
+	}
+	return schema.validate;
+}
+
+describe("an AI SDK 7 stream read by an AI SDK 6 chat", () => {
+	test("keeps every chunk AI SDK 6 knows, minus the fields it rejects", async () => {
+		const out = await readAll(
+			lenientChunkStream(sseBytes(V7_STREAM, 7), validatorOf(v6ChunkSchema())),
+		);
+
+		expect(out).toEqual([
+			{ type: "start", messageId: "msg_1" },
+			{ type: "start-step" },
+			{ type: "tool-input-start", toolCallId: "call_1", toolName: "show_card" },
+			{
+				type: "tool-input-available",
+				toolCallId: "call_1",
+				toolName: "show_card",
+				input: { city: "Paris" },
+			},
+			{
+				type: "tool-output-available",
+				toolCallId: "call_1",
+				output: { _meta: { ui: { resourceUri: "ui://acme/card.html" } } },
+			},
+			{ type: "text-start", id: "t1" },
+			{ type: "text-delta", id: "t1", delta: "Bonjour é" },
+			{ type: "text-end", id: "t1" },
+			{ type: "finish-step" },
+			{ type: "finish" },
+		]);
+	});
+});
+
+describe("an AI SDK 7 stream read by an AI SDK 7 chat", () => {
+	test("keeps every chunk AI SDK 7 knows as sent, and skips only the unknown type", async () => {
+		const out = await readAll(
+			lenientChunkStream(sseBytes(V7_STREAM, 7), validatorOf(v7ChunkSchema())),
+		);
+
+		expect(out).toEqual(
+			V7_STREAM.filter((c) => c.type !== "a-chunk-type-from-the-future"),
+		);
 	});
 });

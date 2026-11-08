@@ -39,7 +39,7 @@
     }
   },
   "devDependencies": {
-    "@ai-sdk/react": "^3.0.134",
+    "@ai-sdk/react": "^4.0.169",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@storybook/react-vite": "^10.4.6",
     "@streamdown/cjk": "^1.0.1",
@@ -50,7 +50,8 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
-    "ai": "^6.0.141",
+    "ai": "^7.0.165",
+    "ai-v6": "npm:ai@6.0.141",
     "clsx": "^2.1.1",
     "eve": "0.68.0",
     "fake-indexeddb": "^6.2.5",

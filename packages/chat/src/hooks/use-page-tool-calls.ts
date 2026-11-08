@@ -31,6 +31,21 @@ function errorTextOf(error: unknown): string {
 	return FAILED_ERROR_TEXT;
 }
 
+/**
+ * Throws on a result the chat can neither send nor keep: what JSON cannot
+ * carry (a BigInt, a cycle, a bare function) and what the thread store cannot
+ * clone (a function anywhere inside). `@ai-sdk/react` 3 rejected these on its
+ * own, through `structuredClone`; version 4 copies parts without cloning them.
+ */
+function assertStorable(value: unknown): void {
+	if (JSON.stringify(value) === undefined) {
+		throw new TypeError("The result is not JSON.");
+	}
+	if (typeof structuredClone === "function") {
+		structuredClone(value);
+	}
+}
+
 // The AI SDK's `onToolCall` also fires for server-run tools, so calls are read once the stream ends;
 // `sendMessage()` carries on so the message queue never sees an idle chat in between.
 
@@ -72,8 +87,7 @@ export function usePageToolCalls(onToolCall: PageToolCallHandler | undefined) {
 			}
 			try {
 				if (output.state === "output-available") {
-					// Throws on what the request body can't carry, such as a BigInt or a cycle.
-					JSON.stringify(output.output);
+					assertStorable(output.output);
 					await chat.addToolOutput({
 						tool,
 						toolCallId,

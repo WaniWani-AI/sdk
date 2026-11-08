@@ -104,6 +104,7 @@ export default defineConfig([
 				zod: "./src/embed/shims/zod.ts",
 				"zod/v4": "./src/embed/shims/zod.ts",
 				"zod/v3": "./src/embed/shims/zod.ts",
+				"zod/v4/core": "./src/embed/shims/zod.ts",
 			};
 		},
 	},
