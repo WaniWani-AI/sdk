@@ -1,0 +1,26 @@
+{
+	// Type-checks `scripts/`, which is the kit's repo tooling and is never published.
+	// Nothing is emitted: these run under bun, which strips types as it loads
+	// them, so the only thing a compiler is wanted for here is the checking.
+	//
+	// They import out of `cli/`: the colour helpers and the peer parser, so an
+	// ESC byte and a version comparison each exist once in the kit.
+	// `NodeNext` is what resolves those `./log.js` specifiers to the `.ts` files
+	// behind them, the same way bun does at runtime.
+	"compilerOptions": {
+		"target": "ES2023",
+		"lib": ["ES2023"],
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"types": ["node"],
+
+		"noEmit": true,
+
+		"strict": true,
+		"skipLibCheck": true,
+		"verbatimModuleSyntax": true,
+		"isolatedModules": true,
+		"forceConsistentCasingInFileNames": true
+	},
+	"include": ["scripts"]
+}

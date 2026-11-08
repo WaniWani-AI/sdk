@@ -5,7 +5,13 @@
 			"packages/*/src/**",
 			"packages/*/scripts/**",
 			"packages/sdk/evals/**",
-			"!packages/chat/src/tailwind.css"
+			"packages/kit/cli/**",
+			"packages/kit/templates/**",
+			"packages/kit/examples/**",
+			"!packages/chat/src/tailwind.css",
+			"!!**/.waniwani",
+			"!!**/dist",
+			"!!**/node_modules"
 		]
 	},
 	"linter": {
@@ -24,6 +30,26 @@
 		"enabled": true,
 		"indentStyle": "tab"
 	},
+	"overrides": [
+		{
+			"includes": ["packages/kit/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"useBlockStatements": "off"
+					}
+				}
+			},
+			"formatter": {
+				"lineWidth": 100
+			},
+			"json": {
+				"parser": {
+					"allowComments": true
+				}
+			}
+		}
+	],
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",

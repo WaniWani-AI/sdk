@@ -1,0 +1,35 @@
+{
+	// Type-checks `templates/starter/`, which is the app `waniwani init` copies
+	// out. Nothing is emitted: the files ship as source and are copied byte for
+	// byte, so the only question this answers is whether the scaffold still
+	// compiles against the kit in this workspace.
+	//
+	// That is the whole reason the starter is files rather than strings. A
+	// template literal in `cli/init.ts` compiles no matter what it says, and the
+	// first person to find out that `useWidget` changed shape is whoever ran
+	// `waniwani init` after the release.
+	//
+	// `@waniwani/kit` resolves through the workspace symlink to `dist/`, so this
+	// project checks against the built types a customer installs rather than
+	// against `src/`. Run it after `build`.
+	"compilerOptions": {
+		"target": "ES2022",
+		"lib": [
+			"ES2023",
+			"DOM",
+			"DOM.Iterable"
+		],
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"jsx": "react-jsx",
+		"noEmit": true,
+		"strict": true,
+		"skipLibCheck": true,
+		"verbatimModuleSyntax": true,
+		"isolatedModules": true,
+		"forceConsistentCasingInFileNames": true
+	},
+	"include": [
+		"templates"
+	]
+}

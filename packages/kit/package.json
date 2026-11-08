@@ -1,0 +1,88 @@
+{
+  "name": "@waniwani/kit",
+  "version": "0.8.0",
+  "description": "Build an MCP app as a folder: tools, widgets and flows, with one CLI and one shared server runtime.",
+  "type": "module",
+  "bin": {
+    "waniwani": "dist/cli/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./web": {
+      "types": "./dist/web.d.ts",
+      "default": "./dist/web.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "templates"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.cli.json && node -e \"require('node:fs').chmodSync('dist/cli/index.js', 0o755)\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.cli.json --noEmit && tsc -p tsconfig.scripts.json && tsc -p tsconfig.templates.json",
+    "prepublishOnly": "bun run build",
+    "watch": "tsc -p tsconfig.json --watch --preserveWatchOutput & tsc -p tsconfig.cli.json --watch --preserveWatchOutput"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.7.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.12.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.1",
+    "express": "^5.2.1",
+    "skybridge": "1.4.1",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.20.6",
+    "typescript": "^6.0.2",
+    "vite": "^8.1.5"
+  },
+  "devDependencies": {
+    "@skybridge/devtools": "1.4.1"
+  },
+  "peerDependencies": {
+    "@waniwani/sdk": ">=0.25.0",
+    "react": ">=19",
+    "react-dom": ">=19",
+    "zod": "^4"
+  },
+  "//repository": "`directory` is not decoration: `npm publish --provenance` reads this field to bind the published tarball to the workflow run that built it, and the attestation is rejected if it does not resolve.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WaniWani-AI/sdk.git",
+    "directory": "packages/kit"
+  },
+  "keywords": [
+    "mcp",
+    "waniwani",
+    "mcp-server",
+    "mcp-app",
+    "framework",
+    "cli",
+    "widgets",
+    "tools",
+    "flows",
+    "skybridge"
+  ],
+  "author": "Waniwani",
+  "license": "MIT",
+  "//files": "`src` ships so `waniwani eject` has readable runtime source to vendor; nothing resolves through it. `templates` is the starter app `waniwani init` copies out, so it ships as source too. `cli` does not: it is compiled into `dist/cli`."
+}

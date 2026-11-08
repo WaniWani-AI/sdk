@@ -1,6 +1,6 @@
 # Changesets
 
-A changeset is a small Markdown file in this folder. It names the packages a PR releases, the semver bump for each, and the line that goes into each package's `CHANGELOG.md`. Add one in any PR that changes what users of `@waniwani/sdk` or `@waniwani/chat` get:
+A changeset is a small Markdown file in this folder. It names the packages a PR releases, the semver bump for each, and the line that goes into each package's `CHANGELOG.md`. Add one in any PR that changes what users of `@waniwani/sdk`, `@waniwani/chat` or `@waniwani/kit` get:
 
 ```bash
 bun changeset
@@ -14,7 +14,7 @@ Write the summary for someone upgrading: what changed for them, and what they ha
 
 ## Releasing
 
-Every changeset that lands on `main` updates one PR, "chore(release): version packages". Merging it is the release. The release workflow builds and packs each bumped package, runs the flow eval when the release contains the SDK, then publishes to npm, tags each package (`@waniwani/sdk@1.2.3`) and creates its GitHub release. A flow eval regression publishes nothing, the chat included.
+Every changeset that lands on `main` updates one PR, "chore(release): version packages". Merging it is the release. The release workflow builds and packs each bumped package, runs the flow eval when the release contains the SDK, then publishes to npm, tags each package (`@waniwani/sdk@1.2.3`) and creates its GitHub release. A flow eval regression publishes nothing, the other packages included.
 
 ## Betas
 
