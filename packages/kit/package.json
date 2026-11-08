@@ -1,6 +1,6 @@
 {
   "name": "@waniwani/kit",
-  "version": "0.8.0",
+  "version": "1.0.0",
   "description": "Build an MCP app as a folder: tools, widgets and flows, with one CLI and one shared server runtime.",
   "type": "module",
   "bin": {
@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.7.0",
-    "@waniwani/cli": "^0.1.15",
+    "@waniwani/cli": "^0.2.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/cors": "^2.8.19",

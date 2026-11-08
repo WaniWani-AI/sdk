@@ -1,6 +1,6 @@
 {
   "name": "@waniwani/chat",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Waniwani chat widget: the WaniwaniChat and ChatEmbed React components, their themes, and embed.js, the script tag for any website.",
   "type": "module",
   "exports": {
