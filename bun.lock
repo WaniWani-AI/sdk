@@ -16,7 +16,7 @@
     },
     "packages/chat": {
       "name": "@waniwani/chat",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "devDependencies": {
         "@ai-sdk/react": "^4.0.169",
         "@modelcontextprotocol/sdk": "^1.30.0",
@@ -61,7 +61,7 @@
     },
     "packages/cli": {
       "name": "@waniwani/cli",
-      "version": "0.1.15",
+      "version": "0.2.0",
       "bin": {
         "waniwani": "dist/index.js",
       },
@@ -84,7 +84,7 @@
     },
     "packages/kit": {
       "name": "@waniwani/kit",
-      "version": "0.8.0",
+      "version": "1.0.0",
       "bin": {
         "waniwani": "dist/cli/index.js",
       },
@@ -98,7 +98,7 @@
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^6.0.3",
-        "@waniwani/cli": "^0.1.15",
+        "@waniwani/cli": "^0.2.0",
         "cors": "^2.8.6",
         "dotenv": "^17.4.1",
         "express": "^5.2.1",

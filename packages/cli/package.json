@@ -1,6 +1,6 @@
 {
   "name": "@waniwani/cli",
-  "version": "0.1.15",
+  "version": "0.2.0",
   "description": "Log in to Waniwani, link a repo to an agent, and try any local MCP server in the hosted playground.",
   "type": "module",
   "bin": {
