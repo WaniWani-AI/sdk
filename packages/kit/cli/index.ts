@@ -9,14 +9,34 @@
  *   waniwani start    run the production build
  *   waniwani eject    write the plumbing into the repo and hand it over
  *
- * Every command scans the app folder, validates it, and generates a complete
- * framework project under `.waniwani/`. The app repo owns content; this CLI and
- * the runtime own everything else.
+ *   waniwani login    log in to the Waniwani platform
+ *   waniwani logout   forget the session
+ *   waniwani switch   pick the organization the CLI acts in
+ *   waniwani connect  link the folder to an agent, in waniwani.json
+ *
+ * Every app command scans the app folder, validates it, and generates a
+ * complete framework project under `.waniwani/`. The app repo owns content; this
+ * CLI and the runtime own everything else.
+ *
+ * The platform commands come from `@waniwani/cli`, which installs a `waniwani`
+ * binary of its own for servers that are not kit apps. Each binary answers the
+ * other's commands, so it does not matter which one a shell finds. A folder
+ * linked by `connect` gets more from `dev`: the agent's tunnel and the
+ * platform's playground pointed at the local server.
  */
 
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, watch } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import {
+	devScript,
+	PLATFORM_COMMANDS,
+	Platform,
+	PlatformError,
+	plan,
+	runPlatform,
+	serve,
+} from "@waniwani/cli";
 import { existingPlumbing, generate } from "./codegen.js";
 import { loadAppEnv } from "./env.js";
 import {
@@ -53,7 +73,7 @@ interface Prepared {
 }
 
 /** The commands a human sits and watches. `check` and `eject` are often scripted. */
-const BANNERED = new Set(["init", "dev", "build", "start"]);
+const BANNERED = new Set(["init", "dev", "build", "start", "login"]);
 
 /**
  * Diagnostics about this CLI's own machinery — which template was resolved, how
@@ -77,6 +97,9 @@ function binPath(from: string): string {
 	}
 	return [...dirs, process.env.PATH].join(":");
 }
+
+/** Children `run()` started that have not closed, so a shutdown can end them. */
+const running = new Set<ChildProcess>();
 
 /**
  * Spawn a child under this CLI's PATH and environment.
@@ -112,6 +135,8 @@ function run(
 			// emitted before the command reports its exit code.
 			child.on("close", filter.flush);
 		}
+		running.add(child);
+		child.on("close", () => running.delete(child));
 		child.on("close", (code) => resolvePromise(code ?? 1));
 		child.on("error", (error) => {
 			console.error(red(`failed to run ${command}: ${error.message}`));
@@ -335,15 +360,14 @@ function watchApp(appRoot: string, template: Template): void {
  * the framework's auto-open of its own DevTools page in the browser; the URL is
  * printed instead.
  */
-function devServer(outDir: string): Promise<number> {
-	return run("node", [frameworkBin(), "dev", "--plain"], {
-		cwd: outDir,
-		stderrFilter: devFilter(),
-	});
+function devServer(outDir: string, port?: number): Promise<number> {
+	const args = [frameworkBin(), "dev", "--plain"];
+	if (port !== undefined) args.push("--port", String(port));
+	return run("node", args, { cwd: outDir, stderrFilter: devFilter() });
 }
 
 /** Flags that take a value; everything else is a boolean switch. */
-const VALUE_FLAGS = new Set(["out", "template", "name", "host"]);
+const VALUE_FLAGS = new Set(["out", "template", "name", "host", "port", "region"]);
 
 /**
  * `--out dir` / `--template=github:o/r#ref` alongside a positional app directory.
@@ -399,11 +423,29 @@ async function main(): Promise<void> {
 		process.exit(report.ok ? 0 : 1);
 	}
 
+	if (PLATFORM_COMMANDS.has(command)) {
+		process.exit(await runPlatform(process.argv.slice(2)));
+	}
+
 	if (command === "dev") {
+		// Not a kit app: `@waniwani/cli` runs the folder's own `dev` script, linked.
+		if (!scanApp(appRoot).configFile && devScript(appRoot)) {
+			process.exit(await runPlatform(["dev", ...rest]));
+		}
+
+		// Questions first, so none of them lands in the middle of the build check.
+		const platform = new Platform(appRoot);
+		const link = await plan(platform, flags, { required: false });
 		const prepared = await prepare(appRoot, flags);
 		if (!prepared) process.exit(1);
 		watchApp(appRoot, prepared.template);
-		process.exit(await devServer(prepared.outDir));
+		process.exit(
+			await serve(devServer(prepared.outDir, link?.port), platform, link, {
+				stopChildren: () => {
+					for (const child of running) child.kill("SIGTERM");
+				},
+			}),
+		);
 	}
 
 	if (command === "build") {
@@ -432,6 +474,8 @@ async function main(): Promise<void> {
 
 	console.error(red(`unknown command: ${command}`));
 	console.error(dim("usage: waniwani <init|check|dev|build|start|eject> [dir]"));
+	console.error(dim("       waniwani <login|logout|connect> [dir]"));
+	console.error(dim("       waniwani switch [org]"));
 	process.exit(1);
 }
 
@@ -443,7 +487,8 @@ try {
 	console.error(`\n${red("✗")} ${error instanceof Error ? error.message : String(error)}`);
 	if (DEBUG) {
 		console.error(error);
-	} else {
+	} else if (!(error instanceof PlatformError)) {
+		// A PlatformError already says what to do; its stack says nothing more.
 		console.error(dim("set WANIWANI_DEBUG=1 for the stack trace"));
 	}
 	process.exit(1);

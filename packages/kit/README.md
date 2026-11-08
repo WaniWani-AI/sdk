@@ -27,9 +27,13 @@ kit and the SDK, so start there.
 
 | | what it is | you use it when |
 |---|---|---|
-| **`@waniwani/sdk`** | A **library**. Flows (typed state graphs that compile to one MCP tool), event tracking, knowledge base, chat widget. You supply the `McpServer`, the transport and the build. | You already have an MCP server, or you want one you control down to the last line, and you want funnels, tracking or KB inside it. |
+| **`@waniwani/sdk`** | A **library**. Flows (typed state graphs that compile to one MCP tool), event tracking, knowledge base. You supply the `McpServer`, the transport and the build. | You already have an MCP server, or you want one you control down to the last line, and you want funnels, tracking or KB inside it. |
 | **`@waniwani/kit`** | A **framework**. Folder convention, build CLI, shared server runtime. It owns the server, the transport, the bundler and the deploy files, so your repo can hold none of them. | You want to ship an MCP app and own no plumbing. |
-| **`@waniwani/cli`** | The **platform CLI**. `login`, `logout`, `switch`, `connect`. OAuth into WaniWani, bind a repo to a hosted agent, run against the hosted playground. | You want your local server wired to app.waniwani.ai. |
+| **`@waniwani/cli`** | The **platform CLI**, small enough to install anywhere. `login`, `logout`, `switch`, `connect`, and a `dev` that runs any server behind the agent's tunnel. | Your MCP server is built on something else, and you want to try it in the hosted playground. |
+
+The kit depends on `@waniwani/cli`, and both install a `waniwani` binary that
+answers the same commands. A kit app needs only the kit. See
+[Linking to the platform](#linking-to-the-platform).
 
 ### Kit against SDK, in code
 
@@ -70,11 +74,6 @@ The dependency arrow points one way. The kit depends on the SDK, and the SDK
 knows nothing about the kit. Inside a kit app, `createFlow(...)` comes from the
 SDK, while `defineApp`, `defineTool`, `defineWidget` and the server that
 registers them come from the kit.
-
-> **Bin collision, today.** `@waniwani/cli@0.1.15` also claims the `waniwani`
-> binary on npm, so installing both conflicts. The plan is to absorb `login`,
-> `logout`, `switch` and `connect` into this package and deprecate the other.
-> See [Status](#status).
 
 ## Quickstart
 
@@ -630,6 +629,11 @@ waniwani dev        # generate + dev server + regenerate on change
 waniwani build      # generate + production build
 waniwani start      # run the production build
 waniwani eject [--out dir]   # hand the plumbing over and step out
+
+waniwani login      # log in to app.waniwani.ai (optional, see below)
+waniwani logout     # forget the session
+waniwani switch [org]        # pick the organization the CLI acts in
+waniwani connect    # link the folder to an agent, in waniwani.json
 ```
 
 `init` writes files and stops there. Every other command runs the same four
@@ -681,6 +685,58 @@ flowchart LR
    output rewritten in WaniWani's voice.
 
 `.waniwani/` is disposable and safe to delete.
+
+### Linking to the platform
+
+None of the commands above needs an account. The platform commands add the
+hosted side: the playground on app.waniwani.ai, a public URL for the local
+server, and agents that Waniwani hosts for you. They come from
+[`@waniwani/cli`](../cli/README.md), which the kit depends on, so they are
+already installed.
+
+```bash
+waniwani login      # browser OAuth (PKCE); asks US or EU on first run
+waniwani connect    # pick an org, pick or create an agent, write waniwani.json
+waniwani dev        # same dev server, now behind the agent's tunnel
+```
+
+`connect` writes the link next to `waniwani.config.ts`:
+
+```json
+{
+  "$schema": "https://docs.waniwani.ai/waniwani.json",
+  "orgId": "org_…",
+  "projectId": "proj_…"
+}
+```
+
+It holds IDs and nothing secret, so commit it and a teammate who clones the repo
+gets the same link. Once it is there, `dev` does three more things. It opens the
+agent's Cloudflare tunnel (a stable `<slug>.waniwani.dev` hostname) on the dev
+server's port, registers a dev session that routes your playground chats to
+the tunnel for as long as it lives, and opens the playground in the browser.
+Ctrl-C ends the session, and the playground goes back to the deployed agent.
+
+| flag | effect |
+|---|---|
+| `--no-connect` | run `dev` unlinked even though `waniwani.json` names an agent |
+| `--connect` | link a folder that has no `waniwani.json` yet, running `connect` first |
+| `--port <n>` | serve on this port; without it `dev` takes the first free one from `devPort` in `waniwani.json`, or 3000 |
+| `--region us\|eu` | pick the instance without the first-run question |
+
+`WANIWANI_API_URL` exported in your shell overrides the instance for one run.
+A repo can pin the US or the EU instance, with `apiUrl` in `waniwani.json` or
+`WANIWANI_API_URL` in the app's `.env`. Any other host from a repo file is
+ignored with a warning: a cloned repo should not choose where you log in or
+where your local server is exposed.
+
+The session lives in `~/.config/waniwani/settings.json` (or under
+`XDG_CONFIG_HOME`), one login for every repo on the machine. A
+`.waniwani/settings.json` that an older `@waniwani/cli` left in a repo is moved
+there the first time a platform command reads it, so the next `waniwani build`
+cannot delete it with the rest of `.waniwani/`. The tunnel, `cloudflared`, and a
+`dev` for servers that are not kit apps are covered in the
+[`@waniwani/cli` README](../cli/README.md).
 
 ### Deploying is a git push
 
@@ -938,8 +994,6 @@ What an ejected repo gives up is the generator, and with it:
 
 `@waniwani/kit@0.0.1`, unpublished. What bites an app author today:
 
-- **`@waniwani/cli` owns the `waniwani` bin on npm**, so installing both
-  collides.
 - **`waniwani init` scaffolds one shape of app**, a tool with the widget that
   displays it. A flow is not among the files it writes.
 - **Deploying is manual.** A build leaves a tree `vercel deploy --prebuilt`

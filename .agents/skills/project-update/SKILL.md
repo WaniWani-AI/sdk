@@ -43,9 +43,8 @@ When matching project work to git, activity is read entirely through `gh` agains
 | GitHub repo | What it is |
 | --- | --- |
 | [WaniWani-AI/app](https://github.com/WaniWani-AI/app) | Main application |
-| [WaniWani-AI/sdk](https://github.com/WaniWani-AI/sdk) | `@waniwani/sdk` |
+| [WaniWani-AI/sdk](https://github.com/WaniWani-AI/sdk) | `@waniwani/sdk`, `@waniwani/chat`, `@waniwani/kit`, `@waniwani/cli` |
 | [WaniWani-AI/website](https://github.com/WaniWani-AI/website) | Marketing site |
-| [WaniWani-AI/cli](https://github.com/WaniWani-AI/cli) | `@waniwani/cli` |
 
 Linear is the source of truth for which projects exist; the org has other repos (demos, templates, experiments, archived) that aren't core product work. When a project's work lives outside these repos, rely on Linear plus the user's context.
 
@@ -85,7 +84,7 @@ Pay attention to:
 ME=$(gh api user --jq .login)
 SINCE=$(date -v-7d '+%Y-%m-%dT00:00:00%z')   # Linux: date -d '7 days ago 00:00' '+%Y-%m-%dT%H:%M:%S%z'
 SINCE_DAY=$(date -v-7d +%Y-%m-%d)             # Linux: date -d '7 days ago' +%Y-%m-%d
-for repo in WaniWani-AI/app WaniWani-AI/sdk WaniWani-AI/website WaniWani-AI/cli; do
+for repo in WaniWani-AI/app WaniWani-AI/sdk WaniWani-AI/website; do
   commits=$(gh api "repos/$repo/commits?author=$ME&since=$SINCE" --jq '.[] | .commit.message | split("\n")[0]' 2>/dev/null)
   [ -n "$commits" ] && { echo "=== $repo commits ==="; echo "$commits"; }
   prs=$(gh pr list --repo "$repo" --author @me --state all --search "updated:>=$SINCE_DAY" --json title,state,url --limit 20 2>/dev/null)

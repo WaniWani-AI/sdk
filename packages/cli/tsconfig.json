@@ -1,0 +1,30 @@
+{
+	// Emits `dist/`: the `waniwani` binary (index.js) and the library the kit
+	// imports (lib.js, with types). File-for-file `tsc`, no bundler, so a stack
+	// trace out of a failed login points at a real line.
+	"compilerOptions": {
+		"target": "ES2022",
+		"lib": ["ES2023"],
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"types": ["node"],
+
+		"rootDir": "src",
+		"outDir": "dist",
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+
+		"strict": true,
+		"skipLibCheck": true,
+		"verbatimModuleSyntax": true,
+		"isolatedModules": true,
+		"forceConsistentCasingInFileNames": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true
+	},
+	"include": ["src"],
+	// Tests run under `bun test`, which reads them as TypeScript itself. Compiled,
+	// they would need bun's types and would ship in `dist/`.
+	"exclude": ["src/**/*.test.ts"]
+}

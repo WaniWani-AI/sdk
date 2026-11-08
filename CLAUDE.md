@@ -2,11 +2,12 @@
 
 SDK for [app.waniwani.ai](https://app.waniwani.ai) — open-source flow engine plus optional hosted tier for tracking, KB, and chat.
 
-The repo is a bun workspace with three published packages, one private package and one example app:
+The repo is a bun workspace with four published packages, one private package and one example app:
 
 - `packages/sdk` → `@waniwani/sdk`: flows, KV stores, tracking, KB, documents, `withWaniwani`, `useWaniwani`.
 - `packages/chat` → `@waniwani/chat`: the chat widget, React components and `embed.js` in one package.
 - `packages/kit` → `@waniwani/kit`: the `waniwani` CLI and the shared server runtime that build an MCP app from a folder of tools, widgets and flows. It has `@waniwani/sdk` as a peer and compiles against the workspace SDK. Its own conventions are in `packages/kit/CLAUDE.md`.
+- `packages/cli` → `@waniwani/cli`: the platform commands (`login`, `logout`, `switch`, `connect`, and a `dev` that runs any MCP server behind the agent's tunnel and opens the hosted playground), for servers that are not kit apps. Its only dependencies are `@clack/prompts` and `dotenv`; keep it small. The kit depends on it: both packages install a `waniwani` binary, the kit hands the platform commands to `runPlatform`, and the cli hands the kit's commands (and `dev` in a kit app) to the kit the app installed (`packages/cli/src/kit.ts`). It follows the kit's code style and Biome override.
 - `packages/core` → `@waniwani/core`, private and never published: the wire contract both sides share (`shared/*`, the WebMCP bridge and types, the tracking client and types, the document and KB types). tsup inlines it into both packages, code and `.d.ts`. `packages/chat` imports nothing outside itself except `@waniwani/core`; keep it that way.
 - `packages/kit/examples/oney`: a private example app built with the kit. The kit's template contract generates, serves and ejects it.
 
@@ -79,6 +80,7 @@ packages/
 │   ├── scripts/              # Post-build: inline CSS into embed.js, check the browser bundle
 │   └── .storybook/
 ├── core/                     # @waniwani/core (private): shared/, webmcp/, tracking/, documents/, kb/types
+├── cli/                      # @waniwani/cli: platform commands, and the library the kit imports (src/lib.ts)
 └── kit/                      # @waniwani/kit: the `waniwani` CLI (cli/) and server runtime (src/)
     ├── templates/starter/    # The app `waniwani init` copies out
     ├── examples/oney/        # Private example app on the kit, built by the contract
@@ -117,7 +119,7 @@ const flow = createFlow({ /* …same… */ }).compile(); // hosted flow state, a
 
 All commands run from the repo root unless noted.
 
-- Build: `bun run build` (both packages)
+- Build: `bun run build` (every published package, in dependency order: chat, sdk, cli, kit)
 - Dev: `bun run --cwd packages/sdk dev`
 - Typecheck: `bun run typecheck` (core, chat, SDK, kit). Run it after `bun run build`: the kit reads the SDK's built types, and its starter template reads the kit's.
 - Lint: `bun run lint`
@@ -132,7 +134,7 @@ All commands run from the repo root unless noted.
 
 **A feature/fix PR must NEVER bump a version.** It adds a changeset instead: run `bun changeset` and commit the `.changeset/*.md` file it writes, which names each package the PR releases, its semver bump, and a changelog line written for someone upgrading. Never edit a `version` field or a package's `CHANGELOG.md` by hand, and never add a docs changelog `## <version>:` section before the Version Packages PR proposes that version. Tests, CI and repo docs need no changeset. `packages/core` is never released on its own: tsup inlines it into both packages, so a change there names `@waniwani/sdk`, `@waniwani/chat`, or both.
 
-Changesets does the bump (`.changeset/config.json`, `.github/workflows/release.yml`). Each push to `main` that carries changesets updates one PR, `chore(release): version packages`, on the `changeset-release/main` branch. That PR bumps each package by its highest pending bump, writes each package's `CHANGELOG.md` and refreshes `bun.lock`. Merging it is the release. When the release contains `@waniwani/sdk`, the `flow-eval` job runs the flow eval against the version on npm first, and a regression publishes nothing. Then the workflow publishes each bumped package to npm through trusted publishing, tags it (`@waniwani/sdk@<version>`, `@waniwani/chat@<version>`, `@waniwani/kit@<version>`) and creates its GitHub release. SDK and chat releases up to 1.0.0 carry the older tags `v<version>` and `chat-v<version>`; kit releases up to 0.8.0 were tagged in the archived WaniWani-AI/kit repo. One Version Packages PR can release several packages. An SDK release does not bump the kit on its own: the kit's peer range (`>=0.25.0`) still covers it, and `onlyUpdatePeerDependentsWhenOutOfRange` in `.changeset/config.json` keeps Changesets from bumping a peer dependent whose range still holds.
+Changesets does the bump (`.changeset/config.json`, `.github/workflows/release.yml`). Each push to `main` that carries changesets updates one PR, `chore(release): version packages`, on the `changeset-release/main` branch. That PR bumps each package by its highest pending bump, writes each package's `CHANGELOG.md` and refreshes `bun.lock`. Merging it is the release. When the release contains `@waniwani/sdk`, the `flow-eval` job runs the flow eval against the version on npm first, and a regression publishes nothing. Then the workflow publishes each bumped package to npm through trusted publishing, tags it (`@waniwani/sdk@<version>`, `@waniwani/chat@<version>`, `@waniwani/kit@<version>`, `@waniwani/cli@<version>`) and creates its GitHub release. SDK and chat releases up to 1.0.0 carry the older tags `v<version>` and `chat-v<version>`; kit releases up to 0.8.0 were tagged in the archived WaniWani-AI/kit repo, and cli releases up to 0.1.15 in WaniWani-AI/cli. One Version Packages PR can release several packages. An SDK release does not bump the kit on its own: the kit's peer range (`>=0.25.0`) still covers it, and `onlyUpdatePeerDependentsWhenOutOfRange` in `.changeset/config.json` keeps Changesets from bumping a peer dependent whose range still holds.
 
 For a beta line, use the `beta` branch in Changesets pre mode: its releases count up (`1.3.0-beta.0`, `1.3.0-beta.1`) under the `beta` dist-tag, through the same Version Packages PR flow. `.changeset/README.md` has the steps to enter and exit pre mode. For a one-off build of any branch, run the Release workflow by hand on a branch that has a changeset and pick `beta` or `alpha`: it publishes a snapshot such as `1.3.0-beta-20261105101500` under that dist-tag and leaves `latest` alone. Only admins can run it.
 

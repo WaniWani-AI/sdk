@@ -32,7 +32,7 @@
 	},
 	"overrides": [
 		{
-			"includes": ["packages/kit/**"],
+			"includes": ["packages/kit/**", "packages/cli/**"],
 			"linter": {
 				"rules": {
 					"style": {
