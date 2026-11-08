@@ -183,12 +183,11 @@ normal outcome, not a sign the migration was skipped.
 
 ## 3. The failures worth knowing in advance
 
-**`.waniwani/settings.json` is `@waniwani/cli`'s login state.** The build output
-owns that directory. The platform commands (`login`, `connect`, linked `dev`)
-move the file to `~/.config/waniwani/settings.json` the first time they read
-it, but `build` does not read it. When the file is there, run
-`npx waniwani login` from the repo root before the first build: it moves the
-file and reports the session it finds, without a new login. A direct
+**`.waniwani/settings.json` is an older `@waniwani/cli`'s login state.** The
+build output owns that directory, and the CLI never reads that file: a cloned
+repo could carry someone else's session in it. When the file is there, tell the
+user to run `npx waniwani login` once (the session goes to
+`~/.config/waniwani/settings.json`) and delete the old file. A direct
 `@waniwani/cli` dependency can stay or go: the kit depends on it, and both
 packages' `waniwani` binaries answer the same commands.
 

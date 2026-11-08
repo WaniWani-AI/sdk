@@ -12,7 +12,7 @@
  * in its `waniwani.json` (see ./project.ts).
  */
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { dim } from "./ui.js";
@@ -61,9 +61,8 @@ export function settingsFile(): string {
 }
 
 /**
- * Where `@waniwani/cli` kept the same file: inside the repo it ran from. Read
- * once, moved to the config directory, and deleted, because it holds a refresh
- * token in a directory the kit treats as disposable output.
+ * Where older `@waniwani/cli` versions kept the same file: inside the repo they
+ * ran from. Never read; see `noticeLegacy`.
  */
 function legacyFile(root: string): string {
 	return join(root, ".waniwani", "settings.json");
@@ -93,35 +92,29 @@ function parse(source: string): Settings {
 	};
 }
 
+let legacyNoticed = false;
+
 /**
- * Move a repo-local settings file into the config directory, once.
+ * Point at a repo-local settings file, once per run, without reading it.
  *
- * The source is deleted rather than copied, so the token ends up in one place.
- * A failure leaves it where it is and the next command tries again; the cost of
- * that is a login prompt, never a crash.
+ * Its tokens are never taken. The file sits in a repo, and a cloned repo can
+ * commit one holding a session of its author's choosing: taken, it would make
+ * every later command act in that account, so `connect` would create agents in
+ * someone else's org and `dev` would expose the local server through their
+ * tunnel. Logging in again is the safe cost of an older `@waniwani/cli` setup.
  */
-function migrateLegacy(root: string): void {
-	const target = settingsFile();
-	const source = legacyFile(root);
-	if (existsSync(target) || !existsSync(source)) return;
-	try {
-		// The file sits in a repo, and a cloned repo can carry one it wrote itself.
-		// Moving it makes its instance this machine's default for every repo, so
-		// only a file for a Waniwani instance moves, and only the fields this
-		// module knows. Any other file stays where it is, and the next login
-		// starts clean.
-		const legacy = parse(readFileSync(source, "utf8"));
-		if (!Object.values(REGIONS).some((region) => region.apiUrl === legacy.apiUrl)) return;
-		writeSettings(legacy);
-		rmSync(source, { force: true });
-		console.error(dim(`moved credentials to ${target}`));
-	} catch {
-		// Left in place.
-	}
+function noticeLegacy(root: string): void {
+	if (legacyNoticed || !existsSync(legacyFile(root))) return;
+	legacyNoticed = true;
+	console.error(
+		dim(
+			`.waniwani/settings.json is ignored: logins live in ${settingsFile()}. Run \`waniwani login\`, then delete the old file.`,
+		),
+	);
 }
 
 export function readSettings(root: string): Settings {
-	migrateLegacy(root);
+	noticeLegacy(root);
 	try {
 		return parse(readFileSync(settingsFile(), "utf8"));
 	} catch {

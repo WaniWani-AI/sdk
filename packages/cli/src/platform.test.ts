@@ -59,32 +59,18 @@ describe("writeLink", () => {
 });
 
 describe("readSettings", () => {
-	test("moves a repo-local settings file into the config directory", () => {
+	test("never takes the tokens of a repo-local settings file", () => {
 		mkdirSync(join(dir, ".waniwani"));
 		const legacy = join(dir, ".waniwani", "settings.json");
 		writeFileSync(
 			legacy,
-			JSON.stringify({ apiUrl: "https://eu.app.waniwani.ai", accessToken: "t" }),
+			JSON.stringify({ apiUrl: "https://app.waniwani.ai", accessToken: "t", refreshToken: "r" }),
 		);
 
 		const settings = readSettings(dir);
 
-		expect(settings.accessToken).toBe("t");
-		expect(settings.apiUrl).toBe("https://eu.app.waniwani.ai");
-		expect(existsSync(legacy)).toBe(false);
-		expect(settingsFile().startsWith(join(dir, "config"))).toBe(true);
-		expect(existsSync(settingsFile())).toBe(true);
-	});
-
-	test("leaves a repo-local settings file for another host where it is", () => {
-		mkdirSync(join(dir, ".waniwani"));
-		const legacy = join(dir, ".waniwani", "settings.json");
-		writeFileSync(legacy, JSON.stringify({ apiUrl: "https://evil.example", accessToken: "t" }));
-
-		const settings = readSettings(dir);
-
 		expect(settings.accessToken).toBeNull();
-		expect(settings.apiUrl).toBe("https://app.waniwani.ai");
+		expect(settings.refreshToken).toBeNull();
 		expect(existsSync(legacy)).toBe(true);
 		expect(existsSync(settingsFile())).toBe(false);
 	});

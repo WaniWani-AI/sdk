@@ -4,7 +4,7 @@
 
 `@waniwani/cli` lives in the WaniWani-AI/sdk repository, under `packages/cli`, and publishes from there. It keeps its commands and its `waniwani.json`, with these changes:
 
-- Your login moves to `~/.config/waniwani/settings.json` (or under `XDG_CONFIG_HOME`), one login for every repo. A `.waniwani/settings.json` in a repo is moved there the first time a command reads it, so nobody has to log in again.
+- The login lives in `~/.config/waniwani/settings.json` (or under `XDG_CONFIG_HOME`), one login for every repo. A `.waniwani/settings.json` left in a repo is ignored, because a cloned repo could carry someone else's session in one: run `waniwani login` once, then delete the old file.
 - In a `@waniwani/kit` app, `dev` and the kit's commands (`init`, `check`, `build`, `start`, `eject`) run through the kit the app installed.
 - `connect` writes only `waniwani.json`. It does not delete `waniwani.config.ts`, and no command reads that file for a link: in a kit app it is the app's own config.
 - A repo file chooses only `https://app.waniwani.ai` or `https://eu.app.waniwani.ai`: that covers `apiUrl` in `waniwani.json` and `WANIWANI_API_URL` in `.env` or `.env.local`. For another instance (staging, local), export `WANIWANI_API_URL` in your shell.

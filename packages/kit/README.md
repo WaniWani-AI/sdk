@@ -732,9 +732,9 @@ where your local server is exposed.
 
 The session lives in `~/.config/waniwani/settings.json` (or under
 `XDG_CONFIG_HOME`), one login for every repo on the machine. A
-`.waniwani/settings.json` that an older `@waniwani/cli` left in a repo is moved
-there the first time a platform command reads it, so the next `waniwani build`
-cannot delete it with the rest of `.waniwani/`. The tunnel, `cloudflared`, and a
+`.waniwani/settings.json` that an older `@waniwani/cli` left in a repo is
+ignored, because a cloned repo could carry someone else's session in one: run
+`waniwani login` once, then delete the old file. The tunnel, `cloudflared`, and a
 `dev` for servers that are not kit apps are covered in the
 [`@waniwani/cli` README](../cli/README.md).
 
