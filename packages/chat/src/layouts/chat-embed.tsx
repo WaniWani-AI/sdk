@@ -732,6 +732,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 								trailing={rowAfterMessage ? suggestionRow : undefined}
 								onSuggestionSelect={handleSuggestionSelect}
 								resourceEndpoint={resourceEndpoint}
+								sandboxUrl={mcp?.sandboxUrl}
 								chatSessionId={engine.sessionId}
 								isDark={isDark}
 								onFollowUp={handleWidgetMessage}

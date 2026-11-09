@@ -43,6 +43,25 @@ Object.assign(win, { SyntaxError });
 
 const REAL_FETCH = globalThis.fetch;
 
+// happy-dom gives a frame no window that can receive `postMessage`. Each frame
+// gets a plain object as its window before it mounts, because the widget
+// renderer keeps the window it finds on mount.
+const frameWindows = new WeakMap<
+	object,
+	{ postMessage: (msg: unknown) => void }
+>();
+Object.defineProperty(win.HTMLIFrameElement.prototype, "contentWindow", {
+	configurable: true,
+	get() {
+		let view = frameWindows.get(this);
+		if (!view) {
+			view = { postMessage: () => {} };
+			frameWindows.set(this, view);
+		}
+		return view;
+	},
+});
+
 const { act, createElement } = await import("react");
 const { createRoot } = await import("react-dom/client");
 const { startWebMcp } = await import("../webmcp-bootstrap");
@@ -114,11 +133,22 @@ function field(body: unknown, key: string): unknown {
 		: undefined;
 }
 
+// The widget renderer fetches the view's HTML from the resource endpoint.
+function isResourceRequest(url: string) {
+	return url.includes("/resource?");
+}
+const VIEW_HTML = new Response("<p>view</p>", {
+	headers: { "content-type": "text/html" },
+});
+
 function installFetch(answer: (request: Seen) => Response | Promise<Response>) {
 	const seen: Seen[] = [];
 	globalThis.fetch = Object.assign(
 		async (input: string | URL | Request, init?: RequestInit) => {
 			const request = describeRequest(input, init);
+			if (isResourceRequest(request.url)) {
+				return VIEW_HTML.clone();
+			}
 			seen.push(request);
 			return answer(request);
 		},
@@ -178,22 +208,22 @@ function iframes(): HTMLIFrameElement[] {
 }
 
 function iframeSources(): string[] {
-	return iframes().map((frame) => frame.getAttribute("src") ?? "");
+	return iframes().map((frame) => frame.getAttribute("aria-label") ?? "");
 }
 
+/** The renderer labels its frame with the view's URI. */
 function encodedUri(viewUri: string) {
-	return `uri=${encodeURIComponent(viewUri)}`;
+	return viewUri;
 }
 
-// happy-dom's frame window neither delivers `postMessage` nor accepts a patched
-// one, so a plain object stands in as the view's window and `event.source`.
+// The frame's stand-in window collects what is posted to the view, and is the
+// `event.source` of what the view posts back.
 function attachFakeView(iframe: HTMLIFrameElement) {
 	const replies: unknown[] = [];
-	const view = { postMessage: (msg: unknown) => replies.push(msg) };
-	Object.defineProperty(iframe, "contentWindow", {
-		configurable: true,
-		get: () => view,
-	});
+	const view = iframe.contentWindow as unknown as {
+		postMessage: (msg: unknown) => void;
+	};
+	view.postMessage = (msg: unknown) => replies.push(msg);
 	const post = (data: unknown) => {
 		win.dispatchEvent(
 			// biome-ignore lint/suspicious/noExplicitAny: fake message source
@@ -273,6 +303,15 @@ async function viewCall(
 
 beforeEach(() => {
 	win.sessionStorage.clear();
+	// A test that renders the overlay without a server of its own still gets
+	// the view's HTML.
+	globalThis.fetch = Object.assign(
+		async (input: string | URL | Request, init?: RequestInit) =>
+			isResourceRequest(String(input))
+				? VIEW_HTML.clone()
+				: REAL_FETCH(input, init),
+		{ preconnect: REAL_FETCH.preconnect },
+	);
 	win.localStorage.clear();
 	Reflect.deleteProperty(document, "modelContext");
 	Reflect.deleteProperty(navigator, "modelContext");
@@ -484,7 +523,7 @@ describe("startWebMcp: a mounted view's own tools/call", () => {
 		const reply = await viewCall(view, 9, { name: "pick_slot", arguments: {} });
 
 		expect(field(reply, "result")).toBeUndefined();
-		expect(field(field(reply, "error"), "code")).toBe(-32000);
+		expect(field(field(reply, "error"), "code")).toBe(-32603);
 		expect(seen.some((r) => field(r.body, "name") === "pick_slot")).toBe(false);
 		expect(iframeSources()).toHaveLength(1);
 		expect(iframeSources()[0]).toContain(encodedUri(STEP_ONE.viewUri));
@@ -508,6 +547,7 @@ describe("WebMcpOverlay: a view's tools/call", () => {
 				}),
 			);
 		});
+		await waitFor(() => iframes().length > 0);
 		const frame = iframes()[0];
 		if (!frame) {
 			throw new Error("no iframe");
@@ -589,7 +629,7 @@ describe("WebMcpOverlay: a view's tools/call", () => {
 			});
 
 			expect(field(reply, "result")).toBeUndefined();
-			expect(field(field(reply, "error"), "code")).toBe(-32000);
+			expect(field(field(reply, "error"), "code")).toBe(-32603);
 
 			await act(async () => root.unmount());
 		});
@@ -602,7 +642,7 @@ describe("WebMcpOverlay: a view's tools/call", () => {
 		const reply = await viewCall(view, "c", { name: "quote", arguments: {} });
 
 		expect(field(reply, "result")).toBeUndefined();
-		expect(field(field(reply, "error"), "code")).toBe(-32000);
+		expect(field(field(reply, "error"), "code")).toBe(-32603);
 		expect(seen.filter((r) => r.method === "POST")).toEqual([]);
 
 		await act(async () => root.unmount());
@@ -616,7 +656,7 @@ describe("WebMcpOverlay: a view's tools/call", () => {
 
 		const reply = await viewCall(view, "d", { name: "quote", arguments: {} });
 
-		expect(field(field(reply, "error"), "code")).toBe(-32000);
+		expect(field(field(reply, "error"), "code")).toBe(-32603);
 		expect(seen.filter((r) => r.method === "POST")).toEqual([]);
 
 		await act(async () => root.unmount());

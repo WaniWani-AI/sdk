@@ -102,6 +102,8 @@ interface MessageListProps {
 	/** Intro animation for the welcome screen's avatar slot. */
 	welcomeAvatarIntro?: AvatarIntro;
 	resourceEndpoint?: string;
+	/** Sandbox proxy page for widgets; see `ChatEmbedMcpConfig.sandboxUrl`. */
+	sandboxUrl?: string;
 	chatSessionId?: string;
 	isDark?: boolean;
 	onFollowUp?: (message: {
@@ -168,6 +170,7 @@ export function MessageList({
 	messageAvatar,
 	welcomeAvatarIntro,
 	resourceEndpoint,
+	sandboxUrl,
 	chatSessionId,
 	isDark,
 	onFollowUp,
@@ -513,6 +516,7 @@ export function MessageList({
 														| undefined,
 												}}
 												resourceEndpoint={resourceEndpoint}
+												sandboxUrl={sandboxUrl}
 												chatSessionId={chatSessionId}
 												isDark={isDark}
 												autoHeight={autoHeight}

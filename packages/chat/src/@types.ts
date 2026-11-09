@@ -361,8 +361,20 @@ export interface ChatBaseProps {
  * render with collapsible input/output — just no iframe widgets.
  */
 export interface ChatEmbedMcpConfig {
-	/** Endpoint that serves MCP app resources (HTML widgets). Called as `GET ${resourceEndpoint}?uri=...`. */
+	/**
+	 * Endpoint that serves MCP app resources (HTML widgets). Called as
+	 * `GET ${resourceEndpoint}?uri=...`. It can answer with the HTML, or with
+	 * JSON `{ uri, html, meta }` when `meta` carries the resource's CSP and
+	 * permissions.
+	 */
 	resourceEndpoint: string;
+	/**
+	 * URL of the sandbox proxy page widgets load behind, served from an origin
+	 * that is not your app's own. Optional: without it, the chat uses a
+	 * built-in proxy page as a `data:` URL, so a page with a strict CSP must
+	 * allow `data:` in `frame-src`.
+	 */
+	sandboxUrl?: string;
 	/**
 	 * Handler for MCP tool calls triggered by widgets via `callServerTool`.
 	 * If not provided, widget-initiated tool calls will be ignored.
