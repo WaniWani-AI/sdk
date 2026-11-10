@@ -8,6 +8,7 @@ import { type StoredThread, VISIBLE_THREAD_LIMIT } from "../lib/thread-store";
 import { cn } from "../lib/utils";
 import { PARTS } from "../parts";
 import { ConfirmDialog } from "./confirm-dialog";
+import { HEADER_ICON_BUTTON } from "./header-icon-button";
 import { readToastTiming, Toast } from "./toast";
 
 interface ChatMenuProps {
@@ -207,17 +208,13 @@ export function ChatMenu({
 					ref={buttonRef}
 					type="button"
 					onClick={() => (open ? closeMenu() : setOpen(true))}
-					title={t.menu.label}
 					aria-label={t.menu.label}
 					aria-haspopup="menu"
 					aria-expanded={open}
 					data-state={open ? "open" : "closed"}
-					className={cn(
-						PARTS.menuButton,
-						"ww:p-1.5 ww:rounded-md ww:text-muted-foreground ww:transition-colors ww:cursor-pointer ww:hover:bg-foreground/5 ww:hover:text-foreground",
-					)}
+					className={cn(PARTS.menuButton, HEADER_ICON_BUTTON)}
 				>
-					<EllipsisIcon className="ww:size-4" aria-hidden />
+					<EllipsisIcon className="ww:size-4" strokeWidth={1.75} aria-hidden />
 				</button>
 				{open && (
 					<div

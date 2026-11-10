@@ -3,6 +3,7 @@
 import type { FrontendTrackingClient } from "@waniwani/core/tracking/frontend";
 import {
 	forwardRef,
+	type ReactNode,
 	useEffect,
 	useImperativeHandle,
 	useMemo,
@@ -64,6 +65,12 @@ export interface WaniwaniChatOverrides {
 	 * its own chrome and a header would be redundant.
 	 */
 	hideHeader?: boolean;
+	/**
+	 * Controls rendered at the right end of the sticky header, after the New
+	 * chat and history buttons, sharing their row and alignment. Shows the
+	 * header when set, unless `hideHeader` is true.
+	 */
+	headerActions?: ReactNode;
 	/** Greeting shown before the first user message. */
 	welcomeMessage?: string;
 	/** Rich welcome screen (icon, title, suggestion cards). Takes precedence over `welcomeMessage`. */
@@ -517,6 +524,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					classNames={overrides?.classNames}
 					title={config.title}
 					hideHeader={config.hideHeader}
+					headerActions={overrides?.headerActions}
 					welcomeMessage={config.welcomeMessage}
 					welcome={overrides?.welcome}
 					placeholder={config.placeholder}
