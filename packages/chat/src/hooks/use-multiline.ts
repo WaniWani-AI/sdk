@@ -25,7 +25,11 @@ export function useMultiline(
 	const [multiline, setMultiline] = useState(false);
 	useEffect(() => {
 		const field = container.current?.querySelector("textarea") ?? null;
-		setMultiline(spansMultipleLines(field, text));
-	}, [container, text]);
+		const next = spansMultipleLines(field, text);
+		// A setState on every keystroke trips React's update depth limit when a tool types fast.
+		if (next !== multiline) {
+			setMultiline(next);
+		}
+	}, [container, text, multiline]);
 	return multiline;
 }
