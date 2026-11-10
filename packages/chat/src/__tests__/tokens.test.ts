@@ -55,6 +55,7 @@ const DEFAULTS: Record<string, string> = {
 	"--ww-panel-offset": "1rem",
 	"--ww-panel-open-duration": "440ms",
 	"--ww-panel-close-duration": "260ms",
+	"--ww-sidebar-width": "440px",
 	"--ww-dock-width": "440px",
 	"--ww-dock-width-expanded": "720px",
 	"--ww-dock-radius": "20px",
@@ -137,18 +138,31 @@ describe("embed tokens", () => {
 		expect(open).toContain("visibility 0s;");
 	});
 
+	test("the desktop sidebar slides over the panel tokens", () => {
+		const slide = blockStartingWith(
+			"@media (min-width: 640px) and (prefers-reduced-motion: no-preference)",
+		);
+		expect(slide).toContain(
+			"transition: transform var(--ww-panel-close-duration) cubic-bezier(0.22, 1, 0.36, 1),",
+		);
+		expect(slide).toContain(
+			"transition: transform var(--ww-panel-open-duration) cubic-bezier(0.22, 1, 0.36, 1),",
+		);
+		expect(css).toContain("transform: translateX(100%);");
+	});
+
 	test("send button, content column and panel consume their tokens", () => {
 		expect(css).toContain(".ww-send");
 		expect(css).toContain("background-color: var(--ww-send-bg)");
 		expect(source("layouts/chat-embed.tsx")).toContain(
 			"var(--ww-content-max-width)",
 		);
-		expect(source("embed/floating-chat.tsx")).toContain(
-			"var(--ww-panel-width)",
+		expect(source("embed/panel-layout.ts")).toContain("var(--ww-panel-width)");
+		expect(source("embed/panel-layout.ts")).toContain(
+			"var(--ww-sidebar-width)",
 		);
-		expect(source("embed/composer-chat.tsx")).toContain(
-			"var(--ww-panel-width)",
-		);
+		expect(source("embed/floating-chat.tsx")).toContain("panelClassName(");
+		expect(source("embed/composer-chat.tsx")).toContain("panelClassName(");
 		expect(source("ui/button.tsx")).toContain("var(--ww-send-size)");
 	});
 

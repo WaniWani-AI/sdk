@@ -137,6 +137,13 @@ export type DockChipsTrigger = (typeof DOCK_CHIPS_TRIGGERS)[number];
 
 export type DockClick = "expand" | "open";
 
+/**
+ * Shape of the chat panel that the floating bar and the composer open.
+ * `modal` is a centered card; `sidebar` is a full-height column on the right
+ * edge that covers the page. Phones show a full-screen sheet for both.
+ */
+export type PanelLayout = "modal" | "sidebar";
+
 export const MENU_ACTIONS = [
 	"new-chat",
 	"restart",
@@ -403,6 +410,15 @@ export interface EmbedConfig {
 	 * `data-dock-click`.
 	 */
 	dockClick?: DockClick;
+	/**
+	 * Shape of the panel that opens when the visitor sends from the floating
+	 * bar or the composer. `modal` (default) is a centered card; `sidebar` is
+	 * a full-height column on the right edge, `--ww-sidebar-width` wide, that
+	 * slides in over the page. Phones show a full-screen sheet either way.
+	 * Only applies when `mode` is `"floating"` or `"composer"`. Surfaced as
+	 * `data-panel-layout`.
+	 */
+	panelLayout?: PanelLayout;
 	/**
 	 * `false` hides the copy and download toolbar above tables in answers.
 	 * Shown by default. Surfaced as `data-show-table-toolbar`.
@@ -945,6 +961,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const dockClick = str("data-dock-click")?.trim().toLowerCase();
 	if (dockClick === "expand" || dockClick === "open") {
 		config.dockClick = dockClick;
+	}
+
+	const panelLayout = str("data-panel-layout")?.trim().toLowerCase();
+	if (panelLayout === "modal" || panelLayout === "sidebar") {
+		config.panelLayout = panelLayout;
 	}
 
 	const showTableToolbar = bool("data-show-table-toolbar");

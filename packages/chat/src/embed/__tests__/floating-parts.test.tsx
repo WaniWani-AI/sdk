@@ -707,6 +707,47 @@ describe("composer box parts", () => {
 	});
 });
 
+describe("panel layout", () => {
+	const layoutOf = (root: ParentNode) =>
+		root.querySelector(".ww-panel")?.getAttribute("data-layout");
+
+	test("the floating panel is a modal by default", async () => {
+		await renderSettled(createElement(FloatingChat, { config: CONFIG }));
+		expect(layoutOf(container)).toBe("modal");
+	});
+
+	test("panelLayout sidebar pins the floating panel to the right edge", async () => {
+		const ref = createRef<FloatingChatHandle>();
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: { ...CONFIG, panelLayout: "sidebar" },
+				ref,
+			}),
+		);
+		const panel = container.querySelector(".ww-panel");
+		expect(panel?.getAttribute("data-layout")).toBe("sidebar");
+		expect(panel?.className).toContain("ww:sm:w-[var(--ww-sidebar-width)]");
+		expect(panel?.className).not.toContain("var(--ww-panel-width)");
+		await act(async () => {
+			ref.current?.open();
+		});
+		expect(panel?.getAttribute("data-state")).toBe("opening");
+	});
+
+	test("panelLayout sidebar applies to the composer panel", async () => {
+		const panelContainer = document.createElement("div");
+		document.body.appendChild(panelContainer);
+		portalTargets.push(panelContainer);
+		await renderSettled(
+			createElement(ComposerChat, {
+				config: { ...CONFIG, mode: "composer", panelLayout: "sidebar" },
+				panelContainer,
+			}),
+		);
+		expect(layoutOf(panelContainer)).toBe("sidebar");
+	});
+});
+
 describe("panel input multiline", () => {
 	test("flags the form once the text spans more than one line", async () => {
 		await act(async () => {

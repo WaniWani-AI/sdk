@@ -143,6 +143,22 @@
 	}
 }
 
+/* Desktop sidebar (`data-layout="sidebar"`): the panel slides in from the
+   right edge instead of growing out of the input. Phones keep the sheet
+   reveal above. The extra attribute outranks the modal rules. */
+@media (min-width: 640px) {
+	[data-waniwani-floating="panel"][data-layout="sidebar"][data-state="opening"],
+	[data-waniwani-floating="panel"][data-layout="sidebar"][data-state="shown"] {
+		clip-path: none;
+		transform: translateX(0);
+	}
+	[data-waniwani-floating="panel"][data-layout="sidebar"][data-state="closing"],
+	[data-waniwani-floating="panel"][data-layout="sidebar"][data-state="hidden"] {
+		clip-path: none;
+		transform: translateX(100%);
+	}
+}
+
 @media (prefers-reduced-motion: no-preference) {
 	[data-waniwani-floating="dock"] {
 		transition: opacity 0.32s ease,
@@ -163,6 +179,19 @@
 	[data-waniwani-floating="panel"][data-state="opening"],
 	[data-waniwani-floating="panel"][data-state="shown"] {
 		transition: clip-path var(--ww-panel-open-duration) cubic-bezier(0.22, 1, 0.36, 1),
+			opacity var(--ww-panel-close-duration) ease, visibility 0s;
+	}
+}
+
+@media (min-width: 640px) and (prefers-reduced-motion: no-preference) {
+	[data-waniwani-floating="panel"][data-layout="sidebar"] {
+		transition: transform var(--ww-panel-close-duration) cubic-bezier(0.22, 1, 0.36, 1),
+			opacity var(--ww-panel-close-duration) ease,
+			visibility 0s linear var(--ww-panel-close-duration);
+	}
+	[data-waniwani-floating="panel"][data-layout="sidebar"][data-state="opening"],
+	[data-waniwani-floating="panel"][data-layout="sidebar"][data-state="shown"] {
+		transition: transform var(--ww-panel-open-duration) cubic-bezier(0.22, 1, 0.36, 1),
 			opacity var(--ww-panel-close-duration) ease, visibility 0s;
 	}
 }
@@ -249,6 +278,7 @@
 	--ww-panel-offset: 1rem;
 	--ww-panel-open-duration: 440ms;
 	--ww-panel-close-duration: 260ms;
+	--ww-sidebar-width: 440px;
 	--ww-dock-width: 440px;
 	--ww-dock-width-expanded: 720px;
 	--ww-dock-radius: 20px;

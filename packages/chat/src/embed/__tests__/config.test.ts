@@ -711,6 +711,32 @@ describe("parseConfigFromScript: dock click", () => {
 	});
 });
 
+describe("parseConfigFromScript: panel layout", () => {
+	test("data-panel-layout parses modal and sidebar", async () => {
+		const sidebar = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-panel-layout": " Sidebar ",
+		});
+		expect(sidebar.panelLayout).toBe("sidebar");
+		const modal = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-panel-layout": "modal",
+		});
+		expect(modal.panelLayout).toBe("modal");
+	});
+
+	test("an unset or unknown data-panel-layout stays unset", async () => {
+		expect(
+			"panelLayout" in (await parseWithAttrs({ "data-token": "wwp_test" })),
+		).toBe(false);
+		const unknown = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-panel-layout": "drawer",
+		});
+		expect("panelLayout" in unknown).toBe(false);
+	});
+});
+
 describe("parseConfigFromScript: table toolbar", () => {
 	test("data-show-table-toolbar=false hides it", async () => {
 		const cfg = await parseWithAttrs({

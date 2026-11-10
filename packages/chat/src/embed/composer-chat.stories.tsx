@@ -121,6 +121,7 @@ interface ComposerArgs {
 	align: NonNullable<ComposerAppearance["align"]>;
 	trigger: boolean;
 	mobileTrigger: boolean;
+	panelLayout: NonNullable<EmbedConfig["panelLayout"]>;
 }
 
 function buildConfig(args: ComposerArgs): EmbedConfig {
@@ -141,6 +142,7 @@ function buildConfig(args: ComposerArgs): EmbedConfig {
 			trigger: args.trigger,
 			mobileTrigger: args.mobileTrigger,
 		},
+		panelLayout: args.panelLayout,
 	};
 }
 
@@ -222,6 +224,7 @@ const meta: Meta<ComposerArgs> = {
 		align: "start",
 		trigger: false,
 		mobileTrigger: true,
+		panelLayout: "modal",
 	},
 	argTypes: {
 		theme: {
@@ -234,6 +237,7 @@ const meta: Meta<ComposerArgs> = {
 		},
 		size: { control: "inline-radio", options: ["sm", "md", "lg"] },
 		align: { control: "inline-radio", options: ["start", "center"] },
+		panelLayout: { control: "inline-radio", options: ["modal", "sidebar"] },
 	},
 	// `bare` lets the story own the full canvas (it renders its own host page)
 	// instead of the shared centered card.
@@ -259,6 +263,11 @@ export const Default: Story = {
 		placeholder:
 			"Hi! Ask me anything about the product.Hi! Ask me anything about the product.Hi! Ask me anything about the product.Hi! Ask me anything about the product.",
 	},
+};
+
+/** Send from the box and the chat opens in a sidebar on the right edge. */
+export const Sidebar: Story = {
+	args: { panelLayout: "sidebar" },
 };
 
 /** Dark theme. */

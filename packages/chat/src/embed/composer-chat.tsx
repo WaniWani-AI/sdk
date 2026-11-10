@@ -52,6 +52,7 @@ import { PARTS } from "../parts";
 import { themeToCSSProperties } from "../theme";
 import type { ComposerSize, EmbedConfig } from "./config";
 import { useEmbedWelcomeProps } from "./embed-welcome";
+import { panelClassName, panelLayoutOf } from "./panel-layout";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { type EmbedMessages, useEmbedMessages } from "./use-messages-url";
 import { usePanelState } from "./use-panel-state";
@@ -494,6 +495,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 		);
 
 		const panelState = usePanelState(visible && open, panelRef);
+		const panelLayout = panelLayoutOf(config.panelLayout);
 
 		const fieldRow = (
 			<div className={cn("ww:flex ww:items-end", size.row)}>
@@ -688,16 +690,10 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 					role="dialog"
 					aria-label={config.title ?? composerPlaceholder}
 					data-waniwani-floating="panel"
+					data-layout={panelLayout}
 					data-state={panelState}
 					style={{ boxShadow: cardShadow }}
-					className={cn(
-						PARTS.panel,
-						"ww:fixed ww:z-[var(--ww-z-index)] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
-						// Mobile: full-screen sheet.
-						"ww:inset-0 ww:w-full ww:rounded-none",
-						// Desktop: wide ChatGPT-style card, matching floating mode.
-						"ww:sm:inset-auto ww:sm:bottom-[var(--ww-panel-offset)] ww:sm:left-0 ww:sm:right-0 ww:sm:mx-auto ww:sm:h-[var(--ww-panel-height)] ww:sm:max-h-[calc(100dvh-var(--ww-panel-offset)*2)] ww:sm:w-[calc(100vw-var(--ww-panel-offset)*2)] ww:sm:max-w-[var(--ww-panel-width)] ww:sm:rounded-[var(--ww-panel-radius)] ww:sm:border ww:sm:border-border",
-					)}
+					className={cn(PARTS.panel, panelClassName(panelLayout))}
 				>
 					<ChatEmbed
 						transport={transport}
