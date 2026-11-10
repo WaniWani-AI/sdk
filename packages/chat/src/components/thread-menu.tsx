@@ -1,10 +1,12 @@
 "use client";
 
+import { HistoryIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { formatRelativeTime, useTranslation } from "../i18n";
 import { type StoredThread, VISIBLE_THREAD_LIMIT } from "../lib/thread-store";
 import { cn } from "../lib/utils";
 import { PARTS } from "../parts";
+import { HEADER_ICON_BUTTON } from "./header-icon-button";
 import { NewThreadButton } from "./new-thread-button";
 
 interface ThreadMenuProps {
@@ -13,30 +15,6 @@ interface ThreadMenuProps {
 	onNewThread: () => void;
 	onSelectThread: (threadId: string) => void;
 	onDeleteThread: (threadId: string) => void;
-}
-
-function HistoryIcon({ label }: { label: string }) {
-	return (
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			width="16"
-			height="16"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="2"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			role="img"
-			aria-label={label}
-		>
-			<title>{label}</title>
-			<path d="M3 12a9 9 0 1 0 3-6.7" />
-			<polyline points="3 4 3 9 8 9" />
-			<line x1="12" y1="7" x2="12" y2="12" />
-			<line x1="12" y1="12" x2="15" y2="14" />
-		</svg>
-	);
 }
 
 function TrashIcon({ label }: { label: string }) {
@@ -104,22 +82,18 @@ export function ThreadMenu({
 	return (
 		<div
 			ref={containerRef}
-			className="ww:relative ww:flex ww:items-center ww:gap-1"
+			className="ww:relative ww:flex ww:items-center ww:gap-0.5"
 		>
 			<NewThreadButton onClick={onNewThread} />
 			<button
 				type="button"
 				onClick={() => setOpen((v) => !v)}
-				title={t.threadMenu.threadHistory}
 				aria-label={t.threadMenu.threadHistory}
 				aria-expanded={open}
 				data-state={open ? "open" : "closed"}
-				className={cn(
-					PARTS.menuButton,
-					"ww:p-1.5 ww:rounded-md ww:text-muted-foreground hover:ww:text-foreground hover:ww:bg-foreground/5 ww:transition-colors ww:cursor-pointer",
-				)}
+				className={cn(PARTS.menuButton, HEADER_ICON_BUTTON)}
 			>
-				<HistoryIcon label={t.threadMenu.threadHistory} />
+				<HistoryIcon className="ww:size-4" strokeWidth={1.75} aria-hidden />
 			</button>
 			{open && (
 				<div

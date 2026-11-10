@@ -1,30 +1,10 @@
 "use client";
 
+import { SquarePenIcon } from "lucide-react";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
 import { PARTS } from "../parts";
-
-function PlusIcon({ label }: { label: string }) {
-	return (
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			width="16"
-			height="16"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="2"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			role="img"
-			aria-label={label}
-		>
-			<title>{label}</title>
-			<line x1="12" y1="5" x2="12" y2="19" />
-			<line x1="5" y1="12" x2="19" y2="12" />
-		</svg>
-	);
-}
+import { HEADER_ICON_BUTTON } from "./header-icon-button";
 
 export function NewThreadButton({ onClick }: { onClick: () => void }) {
 	const { t } = useTranslation();
@@ -32,14 +12,10 @@ export function NewThreadButton({ onClick }: { onClick: () => void }) {
 		<button
 			type="button"
 			onClick={onClick}
-			title={t.threadMenu.newChat}
 			aria-label={t.threadMenu.newChat}
-			className={cn(
-				PARTS.newChat,
-				"ww:p-1.5 ww:rounded-md ww:text-muted-foreground hover:ww:text-foreground hover:ww:bg-foreground/5 ww:transition-colors ww:cursor-pointer",
-			)}
+			className={cn(PARTS.newChat, HEADER_ICON_BUTTON)}
 		>
-			<PlusIcon label={t.threadMenu.newChat} />
+			<SquarePenIcon className="ww:size-4" strokeWidth={1.75} aria-hidden />
 		</button>
 	);
 }
