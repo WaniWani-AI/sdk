@@ -783,8 +783,8 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 								role="dialog"
 								aria-label={config.title ?? dockPlaceholder}
 								data-waniwani-floating="panel"
-								data-layout={panelLayout}
 								data-state={panelState}
+								data-layout={panelLayout}
 								style={{ boxShadow: cardShadow }}
 								className={cn(PARTS.panel, panelClassName(panelLayout))}
 							>

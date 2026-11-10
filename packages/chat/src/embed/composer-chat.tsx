@@ -690,8 +690,8 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 					role="dialog"
 					aria-label={config.title ?? composerPlaceholder}
 					data-waniwani-floating="panel"
-					data-layout={panelLayout}
 					data-state={panelState}
+					data-layout={panelLayout}
 					style={{ boxShadow: cardShadow }}
 					className={cn(PARTS.panel, panelClassName(panelLayout))}
 				>
