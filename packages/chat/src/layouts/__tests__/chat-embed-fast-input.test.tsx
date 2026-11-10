@@ -173,6 +173,27 @@ describe("ChatEmbed composer under fast input", () => {
 		expect(field.placeholder).toBe("");
 	});
 
+	test("keeps 300 characters typed in one task when the multi-line layout widens the field", async () => {
+		const field = await renderComposer();
+		field.style.lineHeight = "20px";
+		field.style.padding = "0";
+		Object.defineProperty(field, "scrollHeight", {
+			configurable: true,
+			get() {
+				const columns =
+					field.closest("form")?.dataset.multiline === "true" ? 100 : 45;
+				return 20 * Math.ceil(field.value.length / columns);
+			},
+		});
+
+		const errors = typeInOneTask(field, 300);
+
+		expect(errors).toEqual([]);
+		expect(field.value).toBe("a".repeat(300));
+		await sleep(50);
+		expect(field.value).toBe("a".repeat(300));
+	});
+
 	test("keeps 300 characters typed in one task while a reply streams", async () => {
 		chat = {
 			status: "streaming",

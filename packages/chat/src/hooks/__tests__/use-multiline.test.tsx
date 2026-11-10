@@ -32,13 +32,6 @@ for (const key of [
 	Reflect.set(globalThis, key, Reflect.get(win, key));
 }
 
-Object.defineProperty(win.HTMLTextAreaElement.prototype, "scrollHeight", {
-	configurable: true,
-	get(this: HTMLTextAreaElement) {
-		return this.parentElement?.dataset.multiline === "true" ? 20 : 40;
-	},
-});
-
 const { createElement, useRef } = await import("react");
 const { flushSync } = await import("react-dom");
 const { createRoot } = await import("react-dom/client");
@@ -65,6 +58,17 @@ function Harness({ text }: { text: string }) {
 		"div",
 		{ ref: row, "data-multiline": String(multiline) },
 		createElement("textarea", {
+			ref: (field: HTMLTextAreaElement | null) => {
+				if (!field) {
+					return;
+				}
+				Object.defineProperty(field, "scrollHeight", {
+					configurable: true,
+					get() {
+						return field.parentElement?.dataset.multiline === "true" ? 20 : 40;
+					},
+				});
+			},
 			value: text,
 			readOnly: true,
 			style: { lineHeight: "20px" },
