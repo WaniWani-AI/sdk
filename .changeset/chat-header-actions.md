@@ -1,5 +1,5 @@
 ---
-"@waniwani/chat": minor
+"@waniwani/chat": patch
 ---
 
 `WaniwaniChat` accepts `overrides.headerActions`: React nodes placed at the right end of the sticky header, in the same row and alignment as the New chat and history buttons. Setting it shows the header; `hideHeader` still hides it.
