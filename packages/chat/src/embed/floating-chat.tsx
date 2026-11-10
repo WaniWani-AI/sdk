@@ -44,6 +44,7 @@ import { PARTS } from "../parts";
 import { themeToCSSProperties } from "../theme";
 import type { DockChipsTrigger, EmbedConfig } from "./config";
 import { useEmbedWelcomeProps } from "./embed-welcome";
+import { panelClassName, panelLayoutOf } from "./panel-layout";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { type EmbedMessages, useEmbedMessages } from "./use-messages-url";
 import { useNearPageBottom } from "./use-near-page-bottom";
@@ -554,6 +555,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 		const dockShown = appeared && !(nearBottom && composerText.length === 0);
 
 		const panelState = usePanelState(phase === "open", panelRef);
+		const panelLayout = panelLayoutOf(config.panelLayout);
 
 		const dockComposerRow = (
 			<div className="ww:flex ww:items-center ww:gap-1 ww:pl-3.5 ww:pr-1.5 ww:py-1.5 ww:sm:pl-4 ww:sm:pr-2 ww:sm:py-2">
@@ -782,18 +784,9 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 								aria-label={config.title ?? dockPlaceholder}
 								data-waniwani-floating="panel"
 								data-state={panelState}
+								data-layout={panelLayout}
 								style={{ boxShadow: cardShadow }}
-								className={cn(
-									PARTS.panel,
-									"ww:fixed ww:z-[var(--ww-z-index)] ww:flex ww:flex-col ww:overflow-hidden ww:bg-background",
-									// Mobile: full-screen sheet.
-									"ww:inset-0 ww:w-full ww:rounded-none",
-									// Desktop: wide ChatGPT-style card. Message content + input both
-									// stay capped at max-w-3xl and centered, so they share one
-									// column (good input/text ratio) and the extra panel width
-									// reads as balanced side padding — not a narrow Intercom panel.
-									"ww:sm:inset-auto ww:sm:bottom-[var(--ww-panel-offset)] ww:sm:left-0 ww:sm:right-0 ww:sm:mx-auto ww:sm:h-[var(--ww-panel-height)] ww:sm:max-h-[calc(100dvh-var(--ww-panel-offset)*2)] ww:sm:w-[calc(100vw-var(--ww-panel-offset)*2)] ww:sm:max-w-[var(--ww-panel-width)] ww:sm:rounded-[var(--ww-panel-radius)] ww:sm:border ww:sm:border-border",
-								)}
+								className={cn(PARTS.panel, panelClassName(panelLayout))}
 							>
 								<ChatEmbed
 									transport={transport}

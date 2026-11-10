@@ -104,6 +104,7 @@ interface FloatingArgs {
 	suggestions: string[];
 	appearDelay: number;
 	theme: NonNullable<NonNullable<EmbedConfig["appearance"]>["theme"]>;
+	panelLayout: NonNullable<EmbedConfig["panelLayout"]>;
 }
 
 function buildConfig(args: FloatingArgs): EmbedConfig {
@@ -117,6 +118,7 @@ function buildConfig(args: FloatingArgs): EmbedConfig {
 		suggestions: args.suggestions,
 		appearDelay: args.appearDelay,
 		appearance: { theme: args.theme },
+		panelLayout: args.panelLayout,
 	};
 }
 
@@ -236,11 +238,16 @@ const meta: Meta<FloatingArgs> = {
 		suggestions: ["What can you do?", "How much does it cost?", "Book a demo"],
 		appearDelay: 2000,
 		theme: "light",
+		panelLayout: "modal",
 	},
 	argTypes: {
 		theme: {
 			control: "inline-radio",
 			options: ["light", "dark", "auto"],
+		},
+		panelLayout: {
+			control: "inline-radio",
+			options: ["modal", "sidebar"],
 		},
 		appearDelay: {
 			control: { type: "number", min: 0, step: 250 },
@@ -265,6 +272,11 @@ export const Default: Story = {
 	args: {
 		placeholder: "WASSUP",
 	},
+};
+
+/** Send from the bar and the chat opens in a sidebar on the right edge. */
+export const Sidebar: Story = {
+	args: { appearDelay: 0, panelLayout: "sidebar" },
 };
 
 /** No delay — the bar is present from first paint (still fades in). */
