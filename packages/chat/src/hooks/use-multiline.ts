@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useState } from "react";
+import { type RefObject, useLayoutEffect, useRef, useState } from "react";
 
 function spansMultipleLines(field: HTMLTextAreaElement | null, text: string) {
 	if (text.includes("\n")) {
@@ -23,9 +23,14 @@ export function useMultiline(
 	text: string,
 ): boolean {
 	const [multiline, setMultiline] = useState(false);
-	useEffect(() => {
+	const lastMeasured = useRef(false);
+	useLayoutEffect(() => {
 		const field = container.current?.querySelector("textarea") ?? null;
-		setMultiline(spansMultipleLines(field, text));
+		const next = spansMultipleLines(field, text);
+		if (next !== lastMeasured.current) {
+			lastMeasured.current = next;
+			setMultiline(next);
+		}
 	}, [container, text]);
 	return multiline;
 }
