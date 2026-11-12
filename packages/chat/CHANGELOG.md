@@ -1,5 +1,15 @@
 # @waniwani/chat
 
+## 1.3.0
+
+### Minor Changes
+
+- [#194](https://github.com/WaniWani-AI/sdk/pull/194) [`07663fa`](https://github.com/WaniWani-AI/sdk/commit/07663fa2d5f4cdc0852072d59be7f45de944fe9a) Thanks [@pancakeInDev](https://github.com/pancakeInDev)! - The AI disclaimer under the input can carry a link. Write it as `[label](https://…)` in `data-disclaimer` (script tag) or in the `disclaimer` prop (React), for example `data-disclaimer="AI agent. It can make mistakes. [Learn more](https://example.com/ai-notice)"`. The label renders as a link that opens in a new tab, with the part class `ww-disclaimer-link` for your `data-css` stylesheet. Only `http` and `https` URLs become links; any other text stays as it is. Wordings without a link are unchanged.
+
+### Patch Changes
+
+- [#190](https://github.com/WaniWani-AI/sdk/pull/190) [`1697c92`](https://github.com/WaniWani-AI/sdk/commit/1697c92b06abc742348ef182eb90f39dae120268) Thanks [@andrewdw](https://github.com/andrewdw)! - Fix the `Maximum update depth exceeded` error (React error 185) in the composer when a tool types into it fast, for example a dictation tool or an automation agent. The error also lost some of the typed characters. You do not have to change your code.
+
 ## 1.2.1
 
 ### Patch Changes
