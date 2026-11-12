@@ -345,9 +345,10 @@ export interface EmbedConfig {
 	pageSuggestions?: PageSuggestionsEntry[];
 	/**
 	 * AI transparency notice rendered under the input (EU AI Act compliance).
-	 * String overrides the default wording; `false` hides it. Surfaced as
-	 * `data-disclaimer` on the embed script tag (use `data-disclaimer="false"`
-	 * to hide).
+	 * String overrides the default wording; `false` hides it. A
+	 * `[label](https://…)` in the string renders as a link opening in a new
+	 * tab. Surfaced as `data-disclaimer` on the embed script tag (use
+	 * `data-disclaimer="false"` to hide).
 	 */
 	disclaimer?: string | false;
 	/** Surfaced as `data-suggestions-layout`: `wrap` (default) or `single-row`. */

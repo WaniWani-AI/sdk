@@ -325,6 +325,8 @@ export interface ChatBaseProps {
 	 * AI transparency notice rendered under the input (EU AI Act compliance).
 	 * Defaults to `"AI can make mistakes. Verify important information."`.
 	 * Pass a string to override the wording, or `false` to hide it entirely.
+	 * A `[label](https://…)` in the string renders as a link opening in a
+	 * new tab.
 	 */
 	disclaimer?: string | false;
 	/** @internal Enterprise only: hides the "powered by Waniwani" logo. */

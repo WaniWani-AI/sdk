@@ -19,6 +19,7 @@ export const PARTS = {
 	attach: "ww-attach",
 	footer: "ww-footer",
 	disclaimer: "ww-disclaimer",
+	disclaimerLink: "ww-disclaimer-link",
 	poweredBy: "ww-powered-by",
 	error: "ww-error",
 	message: "ww-message",

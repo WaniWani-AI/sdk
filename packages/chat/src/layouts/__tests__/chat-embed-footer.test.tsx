@@ -156,4 +156,32 @@ describe("ChatEmbed footer", () => {
 		expect(logo(el)).toBeNull();
 		expect(el.textContent).toBe("Asistente virtual con IA de BPI.");
 	});
+
+	test("a [label](url) in the disclaimer renders a link that opens in a new tab", async () => {
+		const el = await renderEmbed({
+			hidePoweredBy: true,
+			disclaimer:
+				"You are talking to an AI agent. It can make mistakes. [Learn more](https://example.com/ai-notice)",
+		});
+		const link = el.querySelector(
+			"a.ww-disclaimer-link",
+		) as HTMLAnchorElement | null;
+		expect(link).not.toBeNull();
+		expect(link?.textContent).toBe("Learn more");
+		expect(link?.getAttribute("href")).toBe("https://example.com/ai-notice");
+		expect(link?.getAttribute("target")).toBe("_blank");
+		expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+		expect(el.querySelector(".ww-disclaimer")?.textContent).toBe(
+			"You are talking to an AI agent. It can make mistakes. Learn more",
+		);
+	});
+
+	test("a link that is not http(s) stays plain text", async () => {
+		const el = await renderEmbed({
+			hidePoweredBy: true,
+			disclaimer: "AI agent. [Read more](javascript:alert(1))",
+		});
+		expect(el.querySelector("a")).toBeNull();
+		expect(el.textContent).toBe("AI agent. [Read more](javascript:alert(1))");
+	});
 });
