@@ -72,6 +72,7 @@ const CHROME_PARTS = [
 	"ww-send",
 	"ww-footer",
 	"ww-disclaimer",
+	"ww-disclaimer-link",
 	"ww-powered-by",
 ];
 
@@ -94,7 +95,7 @@ describe("chat chrome parts", () => {
 					api: "https://brand.mock/api/chat",
 					skipRemoteConfig: true,
 					title: "Assistant",
-					disclaimer: "x",
+					disclaimer: "x [more](https://brand.mock/about)",
 					enableThreadHistory: false,
 					headerActions: createElement("span", { id: "action" }),
 					initialMessages: SEEDED_MESSAGES,
