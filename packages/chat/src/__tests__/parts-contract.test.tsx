@@ -95,7 +95,7 @@ describe("chat chrome parts", () => {
 					api: "https://brand.mock/api/chat",
 					skipRemoteConfig: true,
 					title: "Assistant",
-					disclaimer: "x [more](https://brand.mock/about)",
+					disclaimer: "AI agent. [Learn more](https://brand.mock/about)",
 					enableThreadHistory: false,
 					headerActions: createElement("span", { id: "action" }),
 					initialMessages: SEEDED_MESSAGES,
