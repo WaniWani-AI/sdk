@@ -8,12 +8,15 @@
  * does the same thing.
  *
  * The kit is resolved from the app folder, never from this package, so an app
- * runs the kit version its own lockfile pins.
+ * runs the kit version its own lockfile pins. `init` is the exception: there is
+ * no app yet, and `npx @waniwani/kit init` links this binary with the kit
+ * installed beside it.
  */
 
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PlatformError } from "./client.js";
 
 /** The commands only the kit has. `dev` goes to the kit too, in a kit app. */
@@ -57,10 +60,11 @@ export function findKitBin(root: string): string | null {
 }
 
 /** Run a child with this terminal, leaving Ctrl-C to it, and return its exit code. */
-function inherit(command: string, args: string[]): Promise<number> {
+function inherit(command: string, args: string[], env?: NodeJS.ProcessEnv): Promise<number> {
 	return new Promise((resolveExit) => {
 		const child = spawn(command, args, {
 			stdio: "inherit",
+			env,
 			shell: process.platform === "win32" && command !== process.execPath,
 		});
 		// The child reads Ctrl-C from the same terminal and exits on it; this
@@ -78,15 +82,33 @@ function inherit(command: string, args: string[]): Promise<number> {
 	});
 }
 
+/** Set on the `npx` child, so an `init` that lands back here stops instead of spawning again. */
+const VIA_NPX = "WANIWANI_INIT_VIA_NPX";
+
 /**
  * Run a kit command through the app's own kit. `init` has no app yet, so it
- * runs the latest kit from the registry instead.
+ * runs the kit installed beside this package, or else the latest from the
+ * registry.
  */
-export function runKit(root: string, argv: string[]): Promise<number> {
+export function runKit(
+	root: string,
+	argv: string[],
+	self: string = dirname(fileURLToPath(import.meta.url)),
+): Promise<number> {
 	const bin = findKitBin(root);
 	if (bin) return inherit(process.execPath, [bin, ...argv]);
 	if (argv[0] === "init") {
-		return inherit("npx", ["--yes", "@waniwani/kit@latest", ...argv]);
+		const beside = findKitBin(self);
+		if (beside) return inherit(process.execPath, [beside, ...argv]);
+		if (process.env[VIA_NPX]) {
+			throw new PlatformError(
+				"`waniwani init` could not find @waniwani/kit after fetching it — run `npm install -D @waniwani/kit`, then `npx waniwani init`",
+			);
+		}
+		return inherit("npx", ["--yes", "@waniwani/kit@latest", ...argv], {
+			...process.env,
+			[VIA_NPX]: "1",
+		});
 	}
 	throw new PlatformError(
 		`\`waniwani ${argv[0]}\` comes from @waniwani/kit, which this folder does not install — run \`npm install -D @waniwani/kit\``,
