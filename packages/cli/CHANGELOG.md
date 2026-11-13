@@ -1,5 +1,11 @@
 # @waniwani/cli
 
+## 0.2.1
+
+### Patch Changes
+
+- [#195](https://github.com/WaniWani-AI/sdk/pull/195) [`b18cd1b`](https://github.com/WaniWani-AI/sdk/commit/b18cd1b9cb4ade881365fc3051f5b6cde892964f) Thanks [@reztin](https://github.com/reztin)! - `npx @waniwani/kit init` in an empty folder no longer runs forever. npx links this package's `waniwani` binary, whose `init` fetched the kit through npx again; it now runs the kit installed beside it, and stops with an error if npx ever leads back to it.
+
 ## 0.2.0
 
 ### Minor Changes
