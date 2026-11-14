@@ -121,18 +121,28 @@ describe("context.waniwani.email.verify", () => {
 		expect(calls[0]?.body).toEqual({ email: "sam@gmail.com" });
 	});
 
-	test("resolves with the platform's verification", async () => {
+	test("resolves with the platform's result and reason", async () => {
+		captureCalls({ result: "unknown", reason: "dns_error" });
+
+		await expect(scoped({}).email.verify("sam@example.com")).resolves.toEqual({
+			result: "unknown",
+			reason: "dns_error",
+		});
+	});
+
+	test("drops a suggestion and any other key outside the contract", async () => {
 		captureCalls({
 			result: "invalid",
-			reason: "domain_typo",
+			reason: "syntax",
 			suggestion: "sam@gmail.com",
+			score: 0.1,
 		});
 
-		await expect(scoped({}).email.verify("sam@gmial.com")).resolves.toEqual({
-			result: "invalid",
-			reason: "domain_typo",
-			suggestion: "sam@gmail.com",
-		});
+		const verification = await scoped({}).email.verify("sam@gmial.com");
+
+		expect(verification).toEqual({ result: "invalid", reason: "syntax" });
+		expect(verification).not.toHaveProperty("suggestion");
+		expect(Object.keys(verification).sort()).toEqual(["reason", "result"]);
 	});
 
 	test("a trailing slash on the resolved API URL gives one slash", async () => {

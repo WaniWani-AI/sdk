@@ -50,7 +50,6 @@ export type EmailVerificationResult = "valid" | "invalid" | "risky" | "unknown";
  * - `disposable`: a temporary inbox service
  * - `no_mail_server`: the domain does not exist or refuses all mail
  * - `no_mx_record`: the domain has a website but no mail server record
- * - `domain_typo`: the domain looks like a typo of a common provider, see `suggestion`
  * - `dns_error`: the DNS lookup failed
  */
 export type EmailVerificationReason =
@@ -59,15 +58,12 @@ export type EmailVerificationReason =
 	| "disposable"
 	| "no_mail_server"
 	| "no_mx_record"
-	| "domain_typo"
 	| "dns_error";
 
 export interface EmailVerification {
 	result: EmailVerificationResult;
 	/** Why the address is not `valid`. Absent when it is. */
 	reason?: EmailVerificationReason;
-	/** The corrected address when the domain looks like a typo, for example `sam@gmail.com` for `sam@gmial.com` */
-	suggestion?: string;
 }
 
 export interface EmailClient {

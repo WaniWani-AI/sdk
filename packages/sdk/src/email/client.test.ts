@@ -358,20 +358,20 @@ describe("email.verify: the answer", () => {
 		expect(Object.keys(verification).sort()).toEqual(["reason", "result"]);
 	});
 
-	test("a domain typo resolves with result, reason and the suggestion", async () => {
+	test("a suggestion an older platform still sends never reaches the caller", async () => {
 		stubFetch(() =>
 			envelope({
 				result: "invalid",
-				reason: "domain_typo",
+				reason: "syntax",
 				suggestion: "sam@gmail.com",
 			}),
 		);
 
-		await expect(client().verify("sam@gmial.com")).resolves.toEqual({
-			result: "invalid",
-			reason: "domain_typo",
-			suggestion: "sam@gmail.com",
-		});
+		const verification = await client().verify("sam@gmial.com");
+
+		expect(verification).toEqual({ result: "invalid", reason: "syntax" });
+		expect(verification).not.toHaveProperty("suggestion");
+		expect(Object.keys(verification).sort()).toEqual(["reason", "result"]);
 	});
 
 	test("a risky address resolves with its reason", async () => {
@@ -383,7 +383,7 @@ describe("email.verify: the answer", () => {
 		});
 	});
 
-	test("an unknown result keeps both a reason and a suggestion when both came back", async () => {
+	test("an unknown result keeps its dns_error reason and drops a suggestion sent beside it", async () => {
 		stubFetch(() =>
 			envelope({
 				result: "unknown",
@@ -395,35 +395,83 @@ describe("email.verify: the answer", () => {
 		await expect(client().verify("sam@outlok.com")).resolves.toEqual({
 			result: "unknown",
 			reason: "dns_error",
-			suggestion: "sam@outlook.com",
 		});
 	});
 
-	test("a suggestion without a reason is kept and no reason key appears", async () => {
+	test("a suggestion without a reason leaves result alone, with no reason or suggestion key", async () => {
 		stubFetch(() => envelope({ result: "risky", suggestion: "sam@gmail.com" }));
 
 		const verification = await client().verify("sam@gmial.com");
 
-		expect(verification).toEqual({
-			result: "risky",
-			suggestion: "sam@gmail.com",
-		});
-		expect(Object.keys(verification).sort()).toEqual(["result", "suggestion"]);
+		expect(verification).toEqual({ result: "risky" });
+		expect(Object.keys(verification)).toEqual(["result"]);
 	});
 
-	test("an empty-string suggestion the platform sent is kept", async () => {
+	test("an empty-string suggestion is dropped too", async () => {
 		stubFetch(() =>
-			envelope({ result: "invalid", reason: "domain_typo", suggestion: "" }),
+			envelope({ result: "invalid", reason: "placeholder", suggestion: "" }),
 		);
 
-		const verification = await client().verify("sam@gmial.com");
+		const verification = await client().verify("test@test.com");
 
-		expect(verification).toEqual({
-			result: "invalid",
-			reason: "domain_typo",
-			suggestion: "",
-		});
+		expect(verification).toEqual({ result: "invalid", reason: "placeholder" });
+		expect(verification).not.toHaveProperty("suggestion");
 	});
+
+	test("a null suggestion is dropped too", async () => {
+		stubFetch(() => envelope({ result: "valid", suggestion: null }));
+
+		const verification = await client().verify("sam@gmail.com");
+
+		expect(Object.keys(verification)).toEqual(["result"]);
+	});
+
+	test("keys outside the contract in the platform's data never reach the caller", async () => {
+		stubFetch(() =>
+			envelope({
+				result: "risky",
+				reason: "disposable",
+				suggestion: "sam@gmail.com",
+				score: 0.42,
+				domain: "mailinator.com",
+				mx: ["mx1.mailinator.com"],
+			}),
+		);
+
+		const verification = await client().verify("sam@mailinator.com");
+
+		expect(verification).toEqual({ result: "risky", reason: "disposable" });
+		expect(Object.keys(verification).sort()).toEqual(["reason", "result"]);
+	});
+
+	for (const [result, reason] of [
+		["invalid", "syntax"],
+		["invalid", "placeholder"],
+		["risky", "disposable"],
+		["invalid", "no_mail_server"],
+		["risky", "no_mx_record"],
+		["unknown", "dns_error"],
+	]) {
+		test(`a ${result} result with reason ${reason} passes both through unchanged`, async () => {
+			stubFetch(() => envelope({ result, reason }));
+
+			const verification = await client().verify("sam@example.com");
+
+			expect(verification).toEqual({ result, reason });
+			expect(Object.keys(verification).sort()).toEqual(["reason", "result"]);
+		});
+	}
+
+	for (const result of ["valid", "invalid", "risky", "unknown"]) {
+		test(`a ${result} result the platform sent without a reason resolves with result alone`, async () => {
+			stubFetch(() => envelope({ result }));
+
+			const verification = await client().verify("sam@example.com");
+
+			expect(verification).toEqual({ result });
+			expect(Object.keys(verification)).toEqual(["result"]);
+		});
+	}
 
 	test("the envelope's success and message never leak into the result", async () => {
 		stubFetch(() => envelope({ result: "valid" }));

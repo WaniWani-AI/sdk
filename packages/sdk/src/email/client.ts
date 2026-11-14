@@ -64,7 +64,6 @@ export function createEmailClient(
 			return {
 				result: data.result,
 				...(data.reason !== undefined && { reason: data.reason }),
-				...(data.suggestion !== undefined && { suggestion: data.suggestion }),
 			};
 		},
 	};
