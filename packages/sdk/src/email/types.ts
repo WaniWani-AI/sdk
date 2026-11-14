@@ -36,7 +36,39 @@ export interface EmailSendResult {
 	id: string;
 }
 
+/**
+ * - `valid`: keep the address.
+ * - `invalid`: the address cannot receive mail. Ask the user for another one.
+ * - `risky`: the address may be wrong. Ask the user to confirm it, and keep it if they do.
+ * - `unknown`: the check could not finish. Keep the address.
+ */
+export type EmailVerificationResult = "valid" | "invalid" | "risky" | "unknown";
+
+/**
+ * - `syntax`: not a well-formed address, or a Gmail username Gmail does not allow
+ * - `placeholder`: `test@` or `example@`
+ * - `disposable`: a temporary inbox service
+ * - `no_mail_server`: the domain does not exist or refuses all mail
+ * - `no_mx_record`: the domain has a website but no mail server record
+ * - `dns_error`: the DNS lookup failed
+ */
+export type EmailVerificationReason =
+	| "syntax"
+	| "placeholder"
+	| "disposable"
+	| "no_mail_server"
+	| "no_mx_record"
+	| "dns_error";
+
+export interface EmailVerification {
+	result: EmailVerificationResult;
+	/** Why the address is not `valid`. Absent when it is. */
+	reason?: EmailVerificationReason;
+}
+
 export interface EmailClient {
 	/** Send one email from the agent behind your API key, as `"Agent name" <agent-name@notifications.waniwani.run>`. */
 	send(input: EmailSendInput): Promise<EmailSendResult>;
+	/** Check that an address a user typed can receive mail, before your agent keeps it. Sends no email. */
+	verify(email: string): Promise<EmailVerification>;
 }

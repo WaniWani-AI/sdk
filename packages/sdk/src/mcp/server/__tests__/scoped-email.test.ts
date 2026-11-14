@@ -14,7 +14,7 @@ interface CapturedCall {
 	body: Record<string, unknown>;
 }
 
-function captureCalls(): CapturedCall[] {
+function captureCalls(data: unknown = { id: "log_1" }): CapturedCall[] {
 	const calls: CapturedCall[] = [];
 	globalThis.fetch = Object.assign(
 		async (input: unknown, init?: RequestInit) => {
@@ -24,7 +24,7 @@ function captureCalls(): CapturedCall[] {
 				body: typeof init?.body === "string" ? JSON.parse(init.body) : {},
 			});
 			return new Response(
-				JSON.stringify({ success: true, message: "ok", data: { id: "log_1" } }),
+				JSON.stringify({ success: true, message: "ok", data }),
 				{ status: 200, headers: { "content-type": "application/json" } },
 			);
 		},
@@ -33,7 +33,13 @@ function captureCalls(): CapturedCall[] {
 	return calls;
 }
 
-function scoped(meta: Record<string, unknown>) {
+function scoped(
+	meta: Record<string, unknown>,
+	config: { apiUrl?: string; apiKey?: string } = {
+		apiUrl: "https://example.test",
+		apiKey: "wwk_test",
+	},
+) {
 	return createScopedClient(
 		{
 			track: async (_event: TrackInput) => ({ eventId: "evt" }),
@@ -41,7 +47,7 @@ function scoped(meta: Record<string, unknown>) {
 			kb: {} as KbClient,
 		},
 		meta,
-		{ apiUrl: "https://example.test", apiKey: "wwk_test" },
+		config,
 	);
 }
 
@@ -89,5 +95,90 @@ describe("context.waniwani.email", () => {
 		);
 		expect(calls[0]?.authorization).toBe("Bearer wwk_test");
 		expect(result).toEqual({ id: "log_1" });
+	});
+});
+
+describe("context.waniwani.email.verify", () => {
+	test("reaches the verify route with the resolved API URL and key", async () => {
+		const calls = captureCalls({ result: "valid" });
+
+		await scoped({}).email.verify("sam@gmail.com");
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0]?.url).toBe(
+			"https://example.test/api/mcp/modules/email/verify",
+		);
+		expect(calls[0]?.authorization).toBe("Bearer wwk_test");
+	});
+
+	test("posts the address alone, with no sessionId even when the request has one", async () => {
+		const calls = captureCalls({ result: "valid" });
+
+		await scoped({ "waniwani/sessionId": "sess-9" }).email.verify(
+			"sam@gmail.com",
+		);
+
+		expect(calls[0]?.body).toEqual({ email: "sam@gmail.com" });
+	});
+
+	test("resolves with the platform's result and reason", async () => {
+		captureCalls({ result: "unknown", reason: "dns_error" });
+
+		await expect(scoped({}).email.verify("sam@example.com")).resolves.toEqual({
+			result: "unknown",
+			reason: "dns_error",
+		});
+	});
+
+	test("drops a suggestion and any other key outside the contract", async () => {
+		captureCalls({
+			result: "invalid",
+			reason: "syntax",
+			suggestion: "sam@gmail.com",
+			score: 0.1,
+		});
+
+		const verification = await scoped({}).email.verify("sam@gmial.com");
+
+		expect(verification).toEqual({ result: "invalid", reason: "syntax" });
+		expect(verification).not.toHaveProperty("suggestion");
+		expect(Object.keys(verification).sort()).toEqual(["reason", "result"]);
+	});
+
+	test("a trailing slash on the resolved API URL gives one slash", async () => {
+		const calls = captureCalls({ result: "valid" });
+
+		await scoped(
+			{},
+			{ apiUrl: "https://example.test/", apiKey: "wwk_test" },
+		).email.verify("sam@gmail.com");
+
+		expect(calls[0]?.url).toBe(
+			"https://example.test/api/mcp/modules/email/verify",
+		);
+	});
+
+	test("throws before any request when withWaniwani resolved no key", async () => {
+		const calls = captureCalls({ result: "valid" });
+
+		await expect(
+			scoped({}, { apiUrl: "https://example.test" }).email.verify(
+				"sam@gmail.com",
+			),
+		).rejects.toThrow("WANIWANI_API_KEY is not set");
+		expect(calls).toHaveLength(0);
+	});
+
+	test("works when pulled off the scoped client, as a bare function", async () => {
+		const calls = captureCalls({ result: "risky", reason: "no_mx_record" });
+		const { verify } = scoped({}).email;
+
+		await expect(verify("sam@site-only.fr")).resolves.toEqual({
+			result: "risky",
+			reason: "no_mx_record",
+		});
+		expect(calls[0]?.url).toBe(
+			"https://example.test/api/mcp/modules/email/verify",
+		);
 	});
 });
