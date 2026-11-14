@@ -35,6 +35,9 @@ export type {
 	EmailClient,
 	EmailSendInput,
 	EmailSendResult,
+	EmailVerification,
+	EmailVerificationReason,
+	EmailVerificationResult,
 } from "./email/types.js";
 export { WaniWaniError } from "./error.js";
 export type { WaniWaniProjectConfig } from "./project-config.js";

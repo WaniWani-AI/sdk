@@ -162,6 +162,9 @@ export function createScopedClient(
 					sessionId: input.sessionId ?? sessionId,
 				});
 			},
+			verify(address: string) {
+				return email.verify(address);
+			},
 		},
 		_config: config,
 	};
