@@ -46,10 +46,10 @@ const VIEWPORT_MARGIN = 32;
  * Three things would be worth telling it on this surface, and none of them are
  * worth touching a component every customer's chat renders:
  *
- * - It advertises a `message` capability in its handshake, which is how a view
- *   pushes a follow-up into the conversation. There is no channel back to a
- *   browsing agent, so a view that uses it is ignored. The panel's own content
- *   still works; only the agent's narration is lost.
+ * - It accepts `ui/message`, which is how a view pushes a follow-up into the
+ *   conversation. There is no channel back to a browsing agent and no
+ *   `onFollowUp` here, so a view that sends one is ignored. The panel's own
+ *   content still works; only the agent's narration is lost.
  * - Its `hostInfo` says "Waniwani Chat". A view reading it is told the wrong
  *   host, and nothing in ours reads it.
  * - It clamps its own height. The panel below sets `maxHeight` and scrolls, so
@@ -199,8 +199,8 @@ export function WebMcpOverlay({
 				style={{ width, maxHeight }}
 			>
 				<McpAppFrame
-					// Remount on a new view so the frame's handshake, retry counter and
-					// size latch all start clean rather than carrying the last widget's.
+					// Remount on a new view so the frame's bridge and size state start
+					// clean rather than carrying the last widget's.
 					key={`${resourceEndpoint}|${widget.viewUri}`}
 					resourceUri={widget.viewUri}
 					resourceEndpoint={resourceEndpoint}

@@ -4,25 +4,85 @@ import {
 	type ModelContextUpdate,
 	mergeModelContext,
 } from "@waniwani/core/shared/model-context";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+// `ai-sdk-react-mcp-apps` is `@ai-sdk/react` pinned to one exact version and
+// inlined at build time (see tsup.config.ts). The chat's own `@ai-sdk/react`
+// peer can stay on any major, because only this renderer comes from the pin.
+import { MCPAppRenderer } from "ai-sdk-react-mcp-apps";
+import {
+	type ComponentProps,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import {
 	resolveWidgetResourceUri,
 	type ToolDefinitionsMap,
 } from "../ai-elements/tool";
+import { MCP_APP_SANDBOX_PROXY_URL } from "../lib/mcp-app-sandbox-proxy";
 import { startWidget, type WidgetTimer } from "../lib/timing";
 import { useWidgetTimingSink } from "../lib/timing-context";
 import { cn } from "../lib/utils";
 
+type RendererProps = ComponentProps<typeof MCPAppRenderer>;
+type RendererHandlers = NonNullable<RendererProps["handlers"]>;
+type McpAppResource = NonNullable<RendererProps["resource"]>;
+
 const DEFAULT_RESOURCE_ENDPOINT = "/api/mcp/resource";
+const MCP_APP_MIME_TYPE = "text/html;profile=mcp-app";
 const MAX_HEIGHT = 500;
-const DEFAULT_HEIGHT = 0;
+const MIN_HEIGHT = 50;
 const AUTOHEIGHT_PADDING = 16;
-const PROTOCOL_VERSION = "2026-01-26";
-const RESIZE_ANIMATION_MS = 300;
-const HANDSHAKE_TIMEOUT_MS = 3000;
-const MAX_RETRIES = 3;
 /** How long a frame that says it is initialized may take to report a size before we report what we have. */
 const SIZE_REPORT_TIMEOUT_MS = 2000;
+/** How long a tool result's text waits for a `ui/message` to join before it is sent on its own. */
+const TOOL_RESULT_MESSAGE_DELAY_MS = 500;
+
+// Module-level so its identity never changes: the renderer rebuilds its bridge
+// whenever `hostInfo` changes.
+const HOST_INFO = { name: "Waniwani Chat", version: "1.0.0" };
+
+/**
+ * The outer frame holds the sandbox proxy, the inner frame holds the widget.
+ * A nested frame can never have more than its parent, so the popup flags (a
+ * widget opening a link in a new tab) have to be on both. The inner frame has
+ * no `allow-same-origin`: the widget gets an opaque origin wherever the proxy
+ * is served from.
+ */
+const PROXY_FRAME_SANDBOX =
+	"allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox";
+const WIDGET_FRAME_SANDBOX =
+	"allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox";
+
+/**
+ * Stands in for an `allowedTools` list when the chat has no tool catalog to
+ * build one from (`ChatEmbed` without remote config, the WebMCP overlay). The
+ * renderer only ever calls `includes` on the list, and the caller's own
+ * `onCallTool` still decides what each call does.
+ */
+const ANY_TOOL: string[] = Object.assign([], { includes: () => true });
+
+let warnedProxyBlocked = false;
+
+/**
+ * The built-in proxy page is a `data:` URL, which a strict `frame-src` blocks.
+ * The widget then stays empty with nothing in the console that names the
+ * cause, so the first such violation says what to change.
+ */
+function warnIfProxyBlocked(event: SecurityPolicyViolationEvent): void {
+	if (
+		warnedProxyBlocked ||
+		!event.blockedURI.startsWith("data") ||
+		!/^(frame|child|default)-src/.test(event.effectiveDirective)
+	) {
+		return;
+	}
+	warnedProxyBlocked = true;
+	console.warn(
+		"[Waniwani] This page's Content-Security-Policy blocks the widget sandbox, a data: URL. Allow data: in frame-src, or pass mcp.sandboxUrl.",
+	);
+}
 
 function normalizeString(value: unknown): string | undefined {
 	if (typeof value !== "string") {
@@ -30,6 +90,10 @@ function normalizeString(value: unknown): string | undefined {
 	}
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function resultProducesWidget(result: {
@@ -78,6 +142,81 @@ function shouldAutoInjectToolResultText(
 	return result._meta?.["waniwani/autoInjectResultText"] !== false;
 }
 
+/**
+ * The tools a widget may call with `tools/call`. MCP Apps marks a tool the
+ * view must not call with `_meta.ui.visibility` that leaves out `"app"`; a
+ * tool without a `visibility` is visible to both the model and the view.
+ */
+export function appCallableTools(
+	toolDefinitions: ToolDefinitionsMap | undefined,
+): string[] {
+	const names = toolDefinitions ? Object.keys(toolDefinitions) : [];
+	if (!toolDefinitions || names.length === 0) {
+		return ANY_TOOL;
+	}
+	return names.filter((name) => {
+		const ui = toolDefinitions[name]?._meta?.ui;
+		const visibility = isRecord(ui) ? ui.visibility : undefined;
+		return !Array.isArray(visibility) || visibility.includes("app");
+	});
+}
+
+/**
+ * Fetch a widget's HTML from the chat's resource endpoint. The endpoint can
+ * answer with the MCP App resource as JSON (`{ uri, html, meta }`, where
+ * `meta` carries the CSP and permissions) or with the HTML itself.
+ */
+export async function fetchMcpAppResource(
+	resourceEndpoint: string,
+	uri: string,
+	fetchImpl: typeof fetch = fetch,
+): Promise<McpAppResource> {
+	// String concatenation, not `new URL`, so a relative endpoint resolves
+	// against the document. Callers may put query params on the endpoint (the
+	// embed appends a `token`), hence the separator check.
+	const separator = resourceEndpoint.includes("?") ? "&" : "?";
+	const response = await fetchImpl(
+		`${resourceEndpoint}${separator}uri=${encodeURIComponent(uri)}`,
+		{ headers: { Accept: "application/json, text/html;q=0.9" } },
+	);
+	if (!response.ok) {
+		throw new Error(
+			`Widget resource ${uri} failed to load (HTTP ${response.status})`,
+		);
+	}
+	const contentType = response.headers.get("content-type") ?? "";
+	if (contentType.includes("application/json")) {
+		const body: unknown = await response.json();
+		if (!isRecord(body) || typeof body.html !== "string") {
+			throw new Error(`Widget resource ${uri} came back without HTML`);
+		}
+		return {
+			uri: typeof body.uri === "string" ? body.uri : uri,
+			mimeType: MCP_APP_MIME_TYPE,
+			html: body.html,
+			...(isRecord(body.meta)
+				? { meta: body.meta as McpAppResource["meta"] }
+				: {}),
+		};
+	}
+	return { uri, mimeType: MCP_APP_MIME_TYPE, html: await response.text() };
+}
+
+/**
+ * Keeps one identity for a value while its JSON stays the same. Callers build
+ * `toolInput` and `toolResult` inline on every render, and the renderer
+ * re-sends the tool input or result to the widget each time either identity
+ * changes.
+ */
+function useStableJson<T>(value: T): T {
+	const ref = useRef<{ key: string; value: T } | null>(null);
+	const key = JSON.stringify(value) ?? "";
+	if (ref.current === null || ref.current.key !== key) {
+		ref.current = { key, value };
+	}
+	return ref.current.value;
+}
+
 export type McpAppDisplayMode = "inline" | "pip" | "fullscreen";
 
 export interface McpAppFrameProps {
@@ -89,6 +228,12 @@ export interface McpAppFrameProps {
 		_meta?: Record<string, unknown>;
 	};
 	resourceEndpoint?: string;
+	/**
+	 * URL of the sandbox proxy page the widget loads behind. Serve it from an
+	 * origin that is not your app's own. Without it, the chat uses a built-in
+	 * proxy page as a `data:` URL.
+	 */
+	sandboxUrl?: string;
 	chatSessionId?: string;
 	isDark?: boolean;
 	className?: string;
@@ -116,19 +261,27 @@ export interface McpAppFrameProps {
 	/** When true, the iframe fills its container (fullscreen mode). */
 	isFullscreen?: boolean;
 	/**
-	 * Cached tool catalog keyed by tool name. Passed through so that
-	 * follow-up `tools/call` requests from the widget iframe can be
-	 * correctly classified as widget-producing (spec-canonical definition
-	 * lookup) vs. plain (result text auto-injected).
+	 * Cached tool catalog keyed by tool name. Decides which tools the widget
+	 * may call, and whether a tool it calls produces a widget of its own
+	 * (spec-canonical definition lookup) or plain text that becomes a
+	 * follow-up message.
 	 */
 	toolDefinitions?: ToolDefinitionsMap;
 }
 
+/**
+ * Renders an MCP App widget with the AI SDK's `MCPAppRenderer`. This wrapper
+ * adds what is Waniwani's own: the chat session id in the tool result's
+ * `_meta.waniwani`, the text of a widget's own tool call becoming a user
+ * message, model context that rides on the next message, the 500px height
+ * limit, and the widget timing marks.
+ */
 export function McpAppFrame({
 	resourceUri,
 	toolInput,
 	toolResult,
 	resourceEndpoint = DEFAULT_RESOURCE_ENDPOINT,
+	sandboxUrl,
 	chatSessionId,
 	isDark = false,
 	className,
@@ -140,56 +293,46 @@ export function McpAppFrame({
 	isFullscreen = false,
 	toolDefinitions,
 }: McpAppFrameProps) {
-	const iframeRef = useRef<HTMLIFrameElement>(null);
-	const toolInputRef = useRef(toolInput);
-	const toolResultRef = useRef(toolResult);
-	const lastSizeRef = useRef({ width: 0, height: 0 });
-	const animationRef = useRef<Animation | null>(null);
-	const initializedRef = useRef(false);
-	const retryCountRef = useRef(0);
-	const displayModeRef = useRef<McpAppDisplayMode>("inline");
-	const [height, setHeight] = useState(DEFAULT_HEIGHT);
+	const [height, setHeight] = useState(0);
 	const [width, setWidth] = useState<number | undefined>(undefined);
-	const onOpenLinkRef = useRef(onOpenLink);
-	const onFollowUpRef = useRef(onFollowUp);
-	const onCallToolRef = useRef(onCallTool);
-	const onDisplayModeChangeRef = useRef(onDisplayModeChange);
-	const chatSessionIdRef = useRef(chatSessionId);
-	const toolDefinitionsRef = useRef(toolDefinitions);
+	const [displayMode, setDisplayMode] = useState<McpAppDisplayMode>("inline");
 
-	toolInputRef.current = toolInput;
-	toolResultRef.current = toolResult;
-	onOpenLinkRef.current = onOpenLink;
-	onFollowUpRef.current = onFollowUp;
-	onCallToolRef.current = onCallTool;
-	onDisplayModeChangeRef.current = onDisplayModeChange;
-	chatSessionIdRef.current = chatSessionId;
-	toolDefinitionsRef.current = toolDefinitions;
+	// Read through refs so the handlers object keeps one identity: the
+	// renderer swaps its handlers when that identity changes.
+	const callbacksRef = useRef({
+		onOpenLink,
+		onFollowUp,
+		onCallTool,
+		onDisplayModeChange,
+		toolDefinitions,
+	});
+	callbacksRef.current = {
+		onOpenLink,
+		onFollowUp,
+		onCallTool,
+		onDisplayModeChange,
+		toolDefinitions,
+	};
+	const autoHeightRef = useRef(autoHeight);
+	autoHeightRef.current = autoHeight;
+	// In fullscreen the frame fills its container. The widget still reports
+	// its content size, and applying that would shrink the frame, which the
+	// widget measures and reports again: a resize loop. So sizes are not
+	// applied while fullscreen, and the last inline height comes back on exit.
+	const isFullscreenRef = useRef(isFullscreen);
+	isFullscreenRef.current = isFullscreen;
 
-	const clampHeight = useCallback(
-		(h: number) => {
-			if (autoHeight) {
-				return Math.max(h + AUTOHEIGHT_PADDING, 0);
-			}
-			return Math.min(Math.max(h, 50), MAX_HEIGHT);
-		},
-		[autoHeight],
-	);
-
-	// Build the iframe src URL via string concatenation so the value is
-	// stable across SSR and CSR — `new URL(..., window.location.href)`
-	// would produce an absolute URL that differs between server (falling
-	// back to a stub origin) and client, causing a hydration mismatch
-	// and a wasted iframe load against the stub origin before hydration
-	// corrects it. The browser resolves relative URLs against the
-	// document itself, so this works for both absolute and relative
-	// `resourceEndpoint` values. Callers may pre-populate query params on
-	// `resourceEndpoint` (e.g. the embed appends a `token` so the
-	// cross-origin GET carries auth) — the separator check handles that.
-	const iframeSrc = useMemo(() => {
-		const separator = resourceEndpoint.includes("?") ? "&" : "?";
-		return `${resourceEndpoint}${separator}uri=${encodeURIComponent(resourceUri)}`;
-	}, [resourceEndpoint, resourceUri]);
+	useEffect(() => {
+		if (sandboxUrl || typeof document === "undefined") {
+			return;
+		}
+		document.addEventListener("securitypolicyviolation", warnIfProxyBlocked);
+		return () =>
+			document.removeEventListener(
+				"securitypolicyviolation",
+				warnIfProxyBlocked,
+			);
+	}, [sandboxUrl]);
 
 	const timingSink = useWidgetTimingSink();
 	const timingRef = useRef<WidgetTimer | null>(null);
@@ -202,469 +345,264 @@ export function McpAppFrame({
 		return () => {
 			clearTimeout(sizeTimerRef.current);
 			if (!timer.has("initialized")) {
-				timer.report("timeout", retryCountRef.current);
+				timer.report("timeout", 0);
 			}
 			timingRef.current = null;
 		};
 	}, [resourceUri, timingSink]);
 
-	const isDarkRef = useRef(isDark);
-	isDarkRef.current = isDark;
+	// A widget's tool call result waits here for the widget's own `ui/message`,
+	// and model context waits for the next message of either kind.
+	const pendingModelContextRef = useRef<ModelContextUpdate | null>(null);
+	const pendingToolResultRef = useRef<{
+		text: string;
+		timer: ReturnType<typeof setTimeout>;
+	} | null>(null);
+	useEffect(
+		() => () => {
+			if (pendingToolResultRef.current) {
+				clearTimeout(pendingToolResultRef.current.timer);
+				pendingToolResultRef.current = null;
+			}
+		},
+		[],
+	);
 
-	// Mirror `isFullscreen` into a ref so the long-lived postMessage handler
-	// reads the current value (it isn't in that effect's dep list). The size
-	// handler only runs on async postMessages, always after this effect has
-	// committed, so syncing the ref here is timely.
-	//
-	// In fullscreen the iframe fills its container (`height: 100%`). A widget
-	// still emits `size-changed` for its content, and applying that (via the
-	// `fill: "forwards"` height animation, which overrides the inline `100%`)
-	// would shrink the frame to the reported/clamped height; the widget then
-	// re-measures the smaller frame and reports again — an endless resize loop.
-	// So height reports are ignored while fullscreen (see the size-changed
-	// handler). On toggle, cancel any in-flight animation and invalidate the
-	// dedup cache so the first report in the new mode is always applied.
-	const isFullscreenRef = useRef(isFullscreen);
-	useEffect(() => {
-		isFullscreenRef.current = isFullscreen;
-		lastSizeRef.current.height = -1;
-		if (animationRef.current) {
-			animationRef.current.cancel();
-			animationRef.current = null;
-		}
-	}, [isFullscreen]);
+	const takeModelContext = useCallback(() => {
+		const modelContext = pendingModelContextRef.current;
+		pendingModelContextRef.current = null;
+		return modelContext ? { modelContext } : {};
+	}, []);
 
-	// Send theme changes to the iframe (only after handshake is complete)
-	useEffect(() => {
-		if (!initializedRef.current) {
-			return;
-		}
-		const iframe = iframeRef.current;
-		if (!iframe?.contentWindow) {
-			return;
-		}
+	const allowedTools = useMemo(
+		() => appCallableTools(toolDefinitions),
+		[toolDefinitions],
+	);
 
-		iframe.contentWindow.postMessage(
-			{
-				jsonrpc: "2.0",
-				method: "ui/notifications/host-context-changed",
-				params: {
-					theme: isDark ? "dark" : "light",
-				},
+	const handlers = useMemo<RendererHandlers>(
+		() => ({
+			allowedTools,
+			callTool: async ({ name, arguments: args }) => {
+				const handler = callbacksRef.current.onCallTool;
+				if (!handler) {
+					throw new Error("tools/call not supported");
+				}
+				const result = await handler({ name, arguments: args ?? {} });
+				// Plain tools may still return structuredContent, so its presence
+				// alone does not decide whether the text becomes a message.
+				const text = result.content
+					?.map((c) => c.text ?? "")
+					.join("")
+					.trim();
+				if (
+					text &&
+					shouldAutoInjectToolResultText(
+						name,
+						result,
+						callbacksRef.current.toolDefinitions,
+					)
+				) {
+					if (pendingToolResultRef.current) {
+						clearTimeout(pendingToolResultRef.current.timer);
+					}
+					pendingToolResultRef.current = {
+						text,
+						timer: setTimeout(() => {
+							pendingToolResultRef.current = null;
+							callbacksRef.current.onFollowUp?.({
+								role: "user",
+								content: [{ type: "text", text }],
+								...takeModelContext(),
+							});
+						}, TOOL_RESULT_MESSAGE_DELAY_MS),
+					};
+				}
+				return result;
 			},
-			"*",
-		);
-	}, [isDark]);
-
-	// Synchronous postMessage protocol handler — no async imports, no timing issues.
-	// Handles the MCP UI protocol (ui/initialize, notifications, etc.) directly.
-	useEffect(() => {
-		const iframe = iframeRef.current;
-		if (!iframe) {
-			return;
-		}
-
-		let disposed = false;
-		let handshakeReceived = false;
-		let pendingModelContext: ModelContextUpdate | null = null;
-		let pendingToolResult: {
-			text: string;
-			timer: ReturnType<typeof setTimeout>;
-		} | null = null;
-
-		// Retry: reload iframe if handshake doesn't arrive in time
-		const handshakeTimer = setTimeout(() => {
-			if (disposed || handshakeReceived) {
-				return;
-			}
-			if (retryCountRef.current >= MAX_RETRIES) {
-				return;
-			}
-			retryCountRef.current += 1;
-			// Force reload with a cache-busting param
-			const url = new URL(iframe.src);
-			url.searchParams.set("_retry", String(retryCountRef.current));
-			iframe.src = url.toString();
-		}, HANDSHAKE_TIMEOUT_MS);
-
-		const postToIframe = (msg: Record<string, unknown>) => {
-			iframe.contentWindow?.postMessage(msg, "*");
-		};
-
-		const handleMessage = (event: MessageEvent) => {
-			if (disposed) {
-				return;
-			}
-			if (event.source !== iframe.contentWindow) {
-				return;
-			}
-
-			const data = event.data;
-
-			if (!data || typeof data !== "object" || data.jsonrpc !== "2.0") {
-				return;
-			}
-
-			const method: string | undefined = data.method;
-			const id: number | string | undefined = data.id;
-
-			// ui/initialize — widget requests handshake
-			if (method === "ui/initialize" && id != null) {
-				handshakeReceived = true;
-				timingRef.current?.mark("initialize");
-				clearTimeout(handshakeTimer);
-				postToIframe({
-					jsonrpc: "2.0",
-					id,
-					result: {
-						protocolVersion: data.params?.protocolVersion ?? PROTOCOL_VERSION,
-						hostInfo: { name: "Waniwani Chat", version: "1.0.0" },
-						hostCapabilities: {
-							openLinks: {},
-							message: {
-								text: {},
-							},
-							tools: {},
-							updateModelContext: {
-								text: {},
-								structuredContent: {},
-							},
-						},
-						hostContext: {
-							theme: isDarkRef.current ? "dark" : "light",
-							displayMode: displayModeRef.current,
-						},
-					},
-				});
-				return;
-			}
-
-			// ui/notifications/initialized — widget confirms init, we send tool data
-			if (method === "ui/notifications/initialized") {
-				initializedRef.current = true;
+			sendMessage: (params) => {
+				const onFollowUpNow = callbacksRef.current.onFollowUp;
+				if (!onFollowUpNow || !isRecord(params)) {
+					return {};
+				}
+				let message = params as {
+					role: string;
+					content: Array<{ type: string; text?: string }>;
+				};
+				// A tool result still waiting joins the widget's own message.
+				const pending = pendingToolResultRef.current;
+				if (pending) {
+					clearTimeout(pending.timer);
+					pendingToolResultRef.current = null;
+					const existingText = (message.content ?? [])
+						.map((c) => c.text ?? "")
+						.join("")
+						.trim();
+					message = {
+						...message,
+						content: [
+							{ type: "text", text: `${existingText}\n\n${pending.text}` },
+						],
+					};
+				}
+				onFollowUpNow({ ...message, ...takeModelContext() });
+				return {};
+			},
+			updateModelContext: (params) => {
+				pendingModelContextRef.current = mergeModelContext(
+					pendingModelContextRef.current,
+					params as ModelContextUpdate,
+				);
+				return {};
+			},
+			openLink: ({ url }) => {
+				const open = callbacksRef.current.onOpenLink;
+				if (open) {
+					open(url);
+				} else {
+					window.open(url, "_blank", "noopener,noreferrer");
+				}
+				return {};
+			},
+			requestDisplayMode: ({ mode }) => {
+				const granted: McpAppDisplayMode =
+					mode === "fullscreen" || mode === "pip" ? mode : "inline";
+				setDisplayMode(granted);
+				callbacksRef.current.onDisplayModeChange?.(granted);
+				return { mode: granted };
+			},
+			onInitialized: () => {
 				timingRef.current?.mark("initialized");
 				sizeTimerRef.current = setTimeout(
-					() => timingRef.current?.report("ok", retryCountRef.current),
+					() => timingRef.current?.report("ok", 0),
 					SIZE_REPORT_TIMEOUT_MS,
 				);
-				const input = toolInputRef.current;
-				const result = toolResultRef.current;
-				const resultMeta =
-					result._meta && typeof result._meta === "object"
-						? result._meta
-						: null;
-				const normalizedChatSessionId = normalizeString(
-					chatSessionIdRef.current,
-				);
-				const waniwaniMeta =
-					resultMeta &&
-					typeof resultMeta.waniwani === "object" &&
-					resultMeta.waniwani !== null
-						? (resultMeta.waniwani as Record<string, unknown>)
-						: null;
-				const forwardedWaniwaniMeta =
-					waniwaniMeta || normalizedChatSessionId
-						? {
-								...(waniwaniMeta ?? {}),
-								...(normalizedChatSessionId
-									? { sessionId: normalizedChatSessionId }
-									: {}),
-							}
-						: undefined;
-				const forwardedMeta =
-					resultMeta || forwardedWaniwaniMeta
-						? {
-								...(resultMeta ?? {}),
-								...(forwardedWaniwaniMeta
-									? { waniwani: forwardedWaniwaniMeta }
-									: {}),
-							}
-						: undefined;
-
-				postToIframe({
-					jsonrpc: "2.0",
-					method: "ui/notifications/tool-input",
-					params: { arguments: input },
-				});
-
-				const content = result.content ?? [
-					{ type: "text", text: JSON.stringify(result) },
-				];
-				postToIframe({
-					jsonrpc: "2.0",
-					method: "ui/notifications/tool-result",
-					params: {
-						content,
-						structuredContent: result.structuredContent,
-						_meta: forwardedMeta,
-						// Compatibility: some clients inspect `meta` instead of `_meta`.
-						meta: forwardedMeta,
-					},
-				});
-				return;
-			}
-
-			// ui/notifications/size-changed — widget reports content size
-			if (method === "ui/notifications/size-changed") {
+			},
+			onSizeChange: ({ width: reportedWidth, height: reportedHeight }) => {
 				clearTimeout(sizeTimerRef.current);
 				timingRef.current?.mark("firstSize");
-				timingRef.current?.report("ok", retryCountRef.current);
-				const params = data.params;
-				const newHeight =
-					typeof params?.height === "number" ? params.height : undefined;
-				const newWidth =
-					typeof params?.width === "number" ? params.width : undefined;
-
-				// Deduplicate — only update if values actually changed (prevents feedback loops)
-				const last = lastSizeRef.current;
-				const heightChanged =
-					newHeight !== undefined && newHeight !== last.height;
-				const widthChanged = newWidth !== undefined && newWidth !== last.width;
-
-				if (!heightChanged && !widthChanged) {
-					return;
+				timingRef.current?.report("ok", 0);
+				if (typeof reportedHeight === "number" && !isFullscreenRef.current) {
+					setHeight(
+						autoHeightRef.current
+							? Math.max(reportedHeight + AUTOHEIGHT_PADDING, 0)
+							: Math.min(Math.max(reportedHeight, MIN_HEIGHT), MAX_HEIGHT),
+					);
 				}
-
-				if (heightChanged && newHeight !== undefined) {
-					last.height = newHeight;
-					// While fullscreen, the iframe must stay at `height: 100%`; applying
-					// the reported content height here would override that and trigger a
-					// resize feedback loop with the widget (see the toggle effect above).
-					if (isFullscreenRef.current) {
-						return;
-					}
-					const clamped = clampHeight(newHeight);
-
-					// Get current visual height before canceling the old animation
-					const from = iframe.getBoundingClientRect().height;
-
-					// Cancel previous animation so its fill: "forwards" stops overriding inline style
-					if (animationRef.current) {
-						animationRef.current.cancel();
-						animationRef.current = null;
-					}
-
-					// Set the target height in React state (takes effect once no animation overrides it)
-					setHeight(clamped);
-
-					// Animate the height transition
-					if (iframe.animate && Math.abs(from - clamped) > 2) {
-						const anim = iframe.animate(
-							[{ height: `${from}px` }, { height: `${clamped}px` }],
-							{
-								duration: RESIZE_ANIMATION_MS,
-								easing: "ease-out",
-								fill: "forwards",
-							},
-						);
-						animationRef.current = anim;
-						// Once done, remove the animation so the inline style is the source of truth
-						anim.onfinish = () => {
-							if (animationRef.current === anim) {
-								anim.cancel();
-								animationRef.current = null;
-							}
-						};
-					}
+				if (typeof reportedWidth === "number" && autoHeightRef.current) {
+					setWidth(reportedWidth);
 				}
+			},
+		}),
+		[allowedTools, takeModelContext],
+	);
 
-				if (widthChanged && autoHeight && newWidth !== undefined) {
-					last.width = newWidth;
-					setWidth(newWidth);
-				}
-				return;
-			}
-
-			// ui/open-link — widget requests to open a URL
-			if (method === "ui/open-link" && id != null) {
-				const url = data.params?.url;
-				if (typeof url === "string") {
-					if (onOpenLinkRef.current) {
-						onOpenLinkRef.current(url);
-					} else {
-						window.open(url, "_blank", "noopener,noreferrer");
-					}
-				}
-				postToIframe({ jsonrpc: "2.0", id, result: {} });
-				return;
-			}
-
-			// ui/message — widget sends a chat message
-			if (method === "ui/message" && id != null) {
-				if (onFollowUpRef.current && data.params) {
-					let params = data.params;
-					const modelContext = pendingModelContext;
-					pendingModelContext = null;
-					// Merge pending tool result into the follow-up message
-					if (pendingToolResult) {
-						clearTimeout(pendingToolResult.timer);
-						const toolText = pendingToolResult.text;
-						pendingToolResult = null;
-						const existingText = (params.content ?? [])
-							.map((c: { text?: string }) => c.text ?? "")
-							.join("")
-							.trim();
-						params = {
-							...params,
-							content: [
-								{ type: "text", text: `${existingText}\n\n${toolText}` },
-							],
-						};
-					}
-					onFollowUpRef.current({
-						...params,
-						...(modelContext ? { modelContext } : {}),
-					});
-				}
-				postToIframe({ jsonrpc: "2.0", id, result: {} });
-				return;
-			}
-
-			// ui/update-model-context — widget updates hidden model context
-			if (method === "ui/update-model-context" && id != null) {
-				pendingModelContext = mergeModelContext(
-					pendingModelContext,
-					data.params as ModelContextUpdate,
+	const loadResource = useCallback(
+		async (app: { resourceUri: string }) => {
+			try {
+				const resource = await fetchMcpAppResource(
+					resourceEndpoint,
+					app.resourceUri,
 				);
-				postToIframe({ jsonrpc: "2.0", id, result: {} });
-				return;
+				timingRef.current?.mark("resource");
+				return resource;
+			} catch (error) {
+				timingRef.current?.report("error", 0);
+				throw error;
 			}
+		},
+		[resourceEndpoint],
+	);
 
-			// tools/call — widget calls a server tool (MCP Apps standard)
-			if (method === "tools/call" && id != null) {
-				const handler = onCallToolRef.current;
-				if (!handler) {
-					postToIframe({
-						jsonrpc: "2.0",
-						id,
-						error: { code: -32601, message: "tools/call not supported" },
-					});
-					return;
-				}
-				const calledToolName = data.params?.name;
-				handler({
-					name: calledToolName,
-					arguments: data.params?.arguments ?? {},
-				})
-					.then((result) => {
-						postToIframe({ jsonrpc: "2.0", id, result });
-
-						// Schedule auto-injection for non-widget tool results. Plain
-						// tools may still return structuredContent, so the presence of
-						// structuredContent alone is not enough to decide this.
-						const text = result.content
-							?.map((c) => c.text ?? "")
-							.join("")
-							.trim();
-						if (
-							text &&
-							shouldAutoInjectToolResultText(
-								calledToolName,
-								result,
-								toolDefinitionsRef.current,
-							)
-						) {
-							if (pendingToolResult) {
-								clearTimeout(pendingToolResult.timer);
-							}
-							pendingToolResult = {
-								text,
-								timer: setTimeout(() => {
-									if (disposed) {
-										return;
-									}
-									const modelContext = pendingModelContext;
-									pendingModelContext = null;
-									pendingToolResult = null;
-									onFollowUpRef.current?.({
-										role: "user",
-										content: [{ type: "text", text }],
-										...(modelContext ? { modelContext } : {}),
-									});
-								}, 500),
-							};
-						}
-					})
-					.catch((err: unknown) => {
-						const message =
-							err instanceof Error ? err.message : "Tool call failed";
-						postToIframe({
-							jsonrpc: "2.0",
-							id,
-							error: { code: -32000, message },
-						});
-					});
-				return;
-			}
-
-			// ui/request-display-mode — widget requests fullscreen/inline/pip
-			if (method === "ui/request-display-mode" && id != null) {
-				const requested = data.params?.mode;
-				const granted =
-					requested === "fullscreen" ||
-					requested === "inline" ||
-					requested === "pip"
-						? requested
-						: "inline";
-				displayModeRef.current = granted;
-				// Reply with the granted mode
-				postToIframe({
-					jsonrpc: "2.0",
-					id,
-					result: { mode: granted },
-				});
-				// Notify the widget of the context change
-				postToIframe({
-					jsonrpc: "2.0",
-					method: "ui/notifications/host-context-changed",
-					params: { displayMode: granted },
-				});
-				onDisplayModeChangeRef.current?.(granted);
-				return;
-			}
-
-			// ui/resource-teardown — graceful shutdown
-			if (method === "ui/resource-teardown" && id != null) {
-				postToIframe({ jsonrpc: "2.0", id, result: {} });
-				return;
-			}
-
-			// ping — keep-alive
-			if (method === "ping" && id != null) {
-				postToIframe({ jsonrpc: "2.0", id, result: {} });
-			}
+	const input = useStableJson(toolInput);
+	const result = useStableJson(toolResult);
+	const sessionId = normalizeString(chatSessionId);
+	// The widget reads the chat session id from `_meta.waniwani.sessionId` in
+	// the tool result, next to whatever the server put there.
+	const output = useMemo(() => {
+		const meta = isRecord(result._meta) ? result._meta : undefined;
+		const waniwani = isRecord(meta?.waniwani) ? meta.waniwani : undefined;
+		const forwardedWaniwani =
+			waniwani || sessionId
+				? { ...(waniwani ?? {}), ...(sessionId ? { sessionId } : {}) }
+				: undefined;
+		const forwardedMeta =
+			meta || forwardedWaniwani
+				? {
+						...(meta ?? {}),
+						...(forwardedWaniwani ? { waniwani: forwardedWaniwani } : {}),
+					}
+				: undefined;
+		return {
+			content: result.content ?? [
+				{ type: "text", text: JSON.stringify(result) },
+			],
+			structuredContent: result.structuredContent,
+			_meta: forwardedMeta,
+			// Compatibility: some clients inspect `meta` instead of `_meta`.
+			meta: forwardedMeta,
 		};
+	}, [result, sessionId]);
 
-		window.addEventListener("message", handleMessage);
+	// The renderer reads the widget's resource from `toolMetadata.app` on the
+	// tool part. The chat finds the resource from `_meta` instead (definition
+	// first, then result), so the part is built here and works with any server.
+	const part = useMemo(
+		() =>
+			({
+				type: "dynamic-tool",
+				toolName: "mcp-app",
+				toolCallId: resourceUri,
+				state: "output-available",
+				input,
+				output,
+				toolMetadata: {
+					app: { resourceUri, mimeType: MCP_APP_MIME_TYPE },
+				},
+			}) as unknown as RendererProps["part"],
+		[resourceUri, input, output],
+	);
 
-		return () => {
-			disposed = true;
-			clearTimeout(handshakeTimer);
-			if (pendingToolResult) {
-				clearTimeout(pendingToolResult.timer);
-			}
-			window.removeEventListener("message", handleMessage);
-		};
-	}, [autoHeight, clampHeight]);
+	const hostContext = useMemo(
+		() => ({
+			theme: isDark ? ("dark" as const) : ("light" as const),
+			displayMode,
+		}),
+		[isDark, displayMode],
+	);
 
-	return (
-		<iframe
-			ref={iframeRef}
-			src={iframeSrc}
-			onLoad={() => timingRef.current?.mark("iframeLoad")}
-			sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-			className={cn(
+	const sandbox = useMemo<RendererProps["sandbox"]>(
+		() => ({
+			url: sandboxUrl ?? MCP_APP_SANDBOX_PROXY_URL,
+			// A `data:` page has an opaque origin, which no message can target
+			// by name. The renderer still checks that each message comes from
+			// this frame's own window.
+			...(sandboxUrl ? {} : { targetOrigin: "*" }),
+			outerSandbox: PROXY_FRAME_SANDBOX,
+			innerSandbox: WIDGET_FRAME_SANDBOX,
+			className: cn(
 				!isFullscreen && "ww:rounded-md ww:border ww:border-border",
 				className,
-			)}
-			style={{
+			),
+			style: {
 				height: isFullscreen ? "100%" : height,
 				minWidth: isFullscreen || !width ? undefined : `min(${width}px, 100%)`,
 				width: "100%",
 				border: "none",
 				colorScheme: isDark ? "dark" : "auto",
-			}}
-			title="MCP App"
+			},
+		}),
+		[sandboxUrl, isFullscreen, className, height, width, isDark],
+	);
+
+	return (
+		<MCPAppRenderer
+			key={resourceUri}
+			part={part}
+			sandbox={sandbox}
+			loadResource={loadResource}
+			handlers={handlers}
+			hostInfo={HOST_INFO}
+			hostContext={hostContext}
 		/>
 	);
 }

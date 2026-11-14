@@ -38,6 +38,25 @@ for (const key of [
 // biome-ignore lint/suspicious/noExplicitAny: test setup
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
+// happy-dom gives a frame no window that can receive `postMessage`. Each frame
+// gets a plain object as its window before it mounts, because the widget
+// renderer keeps the window it finds on mount.
+const frameWindows = new WeakMap<
+	object,
+	{ postMessage: (msg: unknown) => void }
+>();
+Object.defineProperty(win.HTMLIFrameElement.prototype, "contentWindow", {
+	configurable: true,
+	get() {
+		let view = frameWindows.get(this);
+		if (!view) {
+			view = { postMessage: () => {} };
+			frameWindows.set(this, view);
+		}
+		return view;
+	},
+});
+
 const { act, createElement } = await import("react");
 const { createRoot } = await import("react-dom/client");
 const { startWebMcp } = await import("../webmcp-bootstrap");
@@ -76,10 +95,21 @@ function installModelContext() {
 	return registered;
 }
 
+// The widget renderer fetches the view's HTML from the resource endpoint.
+function isResourceRequest(url: string) {
+	return url.includes("/resource?");
+}
+const VIEW_HTML = new Response("<p>view</p>", {
+	headers: { "content-type": "text/html" },
+});
+
 function installFetch() {
 	const requests: Captured[] = [];
 	// biome-ignore lint/suspicious/noExplicitAny: test setup
 	(globalThis as any).fetch = async (input: unknown, init?: RequestInit) => {
+		if (isResourceRequest(String(input))) {
+			return VIEW_HTML.clone();
+		}
 		const body = JSON.parse(String(init?.body ?? "{}")) as Record<
 			string,
 			unknown
@@ -132,15 +162,14 @@ function findIframe(): HTMLIFrameElement | null {
 	return null;
 }
 
-// happy-dom's frame window neither delivers `postMessage` nor accepts a patched
-// one, so a plain object stands in as the view's window and `event.source`.
+// The frame's stand-in window collects what is posted to the view, and is the
+// `event.source` of what the view posts back.
 function attachFakeView(iframe: HTMLIFrameElement) {
 	const replies: unknown[] = [];
-	const view = { postMessage: (msg: unknown) => replies.push(msg) };
-	Object.defineProperty(iframe, "contentWindow", {
-		configurable: true,
-		get: () => view,
-	});
+	const view = iframe.contentWindow as unknown as {
+		postMessage: (msg: unknown) => void;
+	};
+	view.postMessage = (msg: unknown) => replies.push(msg);
 	const post = (data: unknown) => {
 		win.dispatchEvent(
 			// biome-ignore lint/suspicious/noExplicitAny: fake message source
@@ -152,6 +181,15 @@ function attachFakeView(iframe: HTMLIFrameElement) {
 
 beforeEach(() => {
 	win.sessionStorage.clear();
+	// A test that renders the overlay without a server of its own still gets
+	// the view's HTML.
+	globalThis.fetch = Object.assign(
+		async (input: string | URL | Request, init?: RequestInit) =>
+			isResourceRequest(String(input))
+				? VIEW_HTML.clone()
+				: REAL_FETCH(input, init),
+		{ preconnect: REAL_FETCH.preconnect },
+	);
 });
 
 afterEach(() => {
@@ -255,6 +293,7 @@ describe("WebMcpOverlay", () => {
 				}),
 			);
 		});
+		await flush();
 
 		const iframe = findIframe();
 		expect(iframe).not.toBeNull();
@@ -299,6 +338,7 @@ describe("WebMcpOverlay", () => {
 				}),
 			);
 		});
+		await flush();
 
 		const iframe = findIframe();
 		if (!iframe) {
@@ -319,7 +359,7 @@ describe("WebMcpOverlay", () => {
 		expect(replies).toContainEqual({
 			jsonrpc: "2.0",
 			id: 9,
-			error: { code: -32000, message: "webmcp call failed: 401" },
+			error: { code: -32603, message: "webmcp call failed: 401" },
 		});
 
 		await act(async () => root.unmount());

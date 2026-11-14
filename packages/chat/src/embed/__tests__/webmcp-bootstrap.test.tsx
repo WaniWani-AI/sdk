@@ -42,6 +42,25 @@ Object.assign(win, { SyntaxError });
 
 const REAL_FETCH = globalThis.fetch;
 
+// happy-dom gives a frame no window that can receive `postMessage`. Each frame
+// gets a plain object as its window before it mounts, because the widget
+// renderer keeps the window it finds on mount.
+const frameWindows = new WeakMap<
+	object,
+	{ postMessage: (msg: unknown) => void }
+>();
+Object.defineProperty(win.HTMLIFrameElement.prototype, "contentWindow", {
+	configurable: true,
+	get() {
+		let view = frameWindows.get(this);
+		if (!view) {
+			view = { postMessage: () => {} };
+			frameWindows.set(this, view);
+		}
+		return view;
+	},
+});
+
 const { act } = await import("react");
 const { startWebMcp } = await import("../webmcp-bootstrap");
 const { createWebMcpBridge } = await import("@waniwani/core/webmcp");
@@ -126,11 +145,22 @@ function actionOf(request: Seen): unknown {
 		: undefined;
 }
 
+// The widget renderer fetches the view's HTML from the resource endpoint.
+function isResourceRequest(url: string) {
+	return url.includes("/resource?");
+}
+const VIEW_HTML = new Response("<p>view</p>", {
+	headers: { "content-type": "text/html" },
+});
+
 function installFetch(answer: (request: Seen) => Response | Promise<Response>) {
 	const seen: Seen[] = [];
 	globalThis.fetch = Object.assign(
 		async (input: string | URL | Request, init?: RequestInit) => {
 			const request = describeRequest(input, init);
+			if (isResourceRequest(request.url)) {
+				return VIEW_HTML.clone();
+			}
 			seen.push(request);
 			return answer(request);
 		},
@@ -189,7 +219,7 @@ function hostElement() {
 function iframeSources(): string[] {
 	const root = hostElement()?.shadowRoot;
 	return [...(root?.querySelectorAll("iframe") ?? [])].map(
-		(frame) => frame.getAttribute("src") ?? "",
+		(frame) => frame.getAttribute("aria-label") ?? "",
 	);
 }
 
@@ -518,9 +548,7 @@ describe("startWebMcp", () => {
 			await waitFor(() => iframeSources().length > 0);
 
 			expect(iframeSources()).toHaveLength(1);
-			expect(iframeSources()[0]).toContain(
-				"uri=ui%3A%2F%2Fviews%2Fbook.html%3Fv%3D1",
-			);
+			expect(iframeSources()[0]).toContain("ui://views/book.html?v=1");
 			expect(
 				hostElement()?.shadowRoot?.querySelector('[role="dialog"]'),
 			).not.toBeNull();
@@ -544,9 +572,7 @@ describe("startWebMcp", () => {
 			await settle();
 
 			expect(iframeSources()).toHaveLength(1);
-			expect(iframeSources()[0]).toContain(
-				"uri=ui%3A%2F%2Fviews%2Fquote.html%3Fv%3D2",
-			);
+			expect(iframeSources()[0]).toContain("ui://views/quote.html?v=2");
 		});
 
 		test("a widget emitted after the overlay mounted is shown, and a second replaces it", async () => {
@@ -563,9 +589,7 @@ describe("startWebMcp", () => {
 			});
 			await waitFor(() => iframeSources().length > 0);
 			expect(iframeSources()).toHaveLength(1);
-			expect(iframeSources()[0]).toContain(
-				"uri=ui%3A%2F%2Fviews%2Fbook.html%3Fv%3D1",
-			);
+			expect(iframeSources()[0]).toContain("ui://views/book.html?v=1");
 
 			await act(async () => {
 				await registered[0]?.execute({});
@@ -574,9 +598,7 @@ describe("startWebMcp", () => {
 				iframeSources().some((src) => src.includes("quote.html")),
 			);
 			expect(iframeSources()).toHaveLength(1);
-			expect(iframeSources()[0]).toContain(
-				"uri=ui%3A%2F%2Fviews%2Fquote.html%3Fv%3D2",
-			);
+			expect(iframeSources()[0]).toContain("ui://views/quote.html?v=2");
 		});
 	});
 
