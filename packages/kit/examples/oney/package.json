@@ -10,7 +10,7 @@
 	},
 	"dependencies": {
 		"@waniwani/kit": "workspace:*",
-		"@waniwani/sdk": "^1.0.1",
+		"@waniwani/sdk": "^1.0.0",
 		"react": "^19.2.4",
 		"react-dom": "^19.2.4",
 		"zod": "^4.3.6"
