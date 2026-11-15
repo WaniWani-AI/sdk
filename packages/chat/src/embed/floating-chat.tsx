@@ -38,7 +38,6 @@ import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
-import { hapticTick } from "../lib/haptics";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
 import { useBootTiming } from "../lib/timing-context";
 import { cn } from "../lib/utils";
@@ -516,13 +515,10 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 
 		const submitComposer = useCallback(() => {
 			if (composerText.trim()) {
-				if (config.haptics !== false) {
-					hapticTick();
-				}
 				openWith(composerText);
 				setComposerText("");
 			}
-		}, [composerText, openWith, config.haptics]);
+		}, [composerText, openWith]);
 
 		const onComposerFocus = useCallback(() => {
 			// A read-only dock (phones) is a button in disguise: open the panel
@@ -845,7 +841,6 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 									locale={config.locale}
 									messages={embedMessages.messages}
 									initializing={!ready}
-									haptics={config.haptics}
 								/>
 							</div>
 						</>

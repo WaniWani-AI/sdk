@@ -9,4 +9,3 @@ The chat panel feels native on phones. Nothing to change in existing code.
 - A streaming answer no longer fights the visitor's scroll. Scroll up to read and the thread stays put; scroll back down and it follows again.
 - On a touch keyboard, Return adds a line and the send button sends.
 - Controls dim when pressed, small buttons get a 44px touch area, the dock clears the iPhone home indicator, and the hover styles of a few buttons now apply.
-- A light haptic tick when the visitor sends a message on an Android phone, through the Vibration API. iPhones have no web vibration API and feel nothing. On by default; turn it off with the new `haptics` option (`data-haptics="false"` on the script embed).

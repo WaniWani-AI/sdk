@@ -46,7 +46,6 @@ import { isTouchPrimary } from "../hooks/use-touch-primary";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
-import { hapticTick } from "../lib/haptics";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
 import { useBootTiming } from "../lib/timing-context";
 import { cn } from "../lib/utils";
@@ -476,13 +475,10 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 
 		const submitComposer = useCallback(() => {
 			if (composerText.trim()) {
-				if (config.haptics !== false) {
-					hapticTick();
-				}
 				openWith(composerText);
 				setComposerText("");
 			}
-		}, [composerText, openWith, config.haptics]);
+		}, [composerText, openWith]);
 
 		const onComposerFocus = useCallback(() => {
 			// Once a conversation exists, the visitor has history they can't see
@@ -769,7 +765,6 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 						locale={config.locale}
 						messages={embedMessages.messages}
 						initializing={!ready}
-						haptics={config.haptics}
 					/>
 				</div>
 			</div>

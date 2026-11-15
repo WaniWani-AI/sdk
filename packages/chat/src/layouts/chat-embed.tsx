@@ -38,7 +38,6 @@ import { useSuggestionRow } from "../hooks/use-suggestion-row";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, type Messages, useTranslation } from "../i18n";
 import { copyText, formatTranscript } from "../lib/conversation-transcript";
-import { hapticTick } from "../lib/haptics";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
 import {
 	bearerToken,
@@ -117,7 +116,6 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			hidePoweredBy = false,
 			menu,
 			restartConfirm = false,
-			haptics = true,
 		} = props;
 
 		// Preset → base theme. `light` and the unset case let the CSS
@@ -376,16 +374,6 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			return () => observer.disconnect();
 		}, [scrollToBottom]);
 
-		const handleComposerSubmit = useCallback(
-			(message: Parameters<typeof engine.handleSubmit>[0]) => {
-				if (haptics) {
-					hapticTick();
-				}
-				return engine.handleSubmit(message);
-			},
-			[haptics, engine.handleSubmit],
-		);
-
 		const suggestionsState = useSuggestionRow({
 			messages: engine.messages,
 			status: engine.status,
@@ -501,9 +489,6 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 					properties: { text: suggestion, index, origin },
 				});
 				suggestionsState.clear();
-				if (haptics) {
-					hapticTick();
-				}
 				engine.handleSubmit({ text: suggestion, files: [] });
 			},
 			[
@@ -513,7 +498,6 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				engine.handleSubmit,
 				welcome,
 				widgetEvents,
-				haptics,
 			],
 		);
 
@@ -837,7 +821,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 									status={engine.status}
 									empty={composerEmpty}
 									data-multiline={multiline ? "true" : "false"}
-									onSubmit={handleComposerSubmit}
+									onSubmit={engine.handleSubmit}
 									attachmentsEnabled={uploads.enabled}
 									globalDrop={uploads.enabled}
 									multiple={uploads.enabled}
