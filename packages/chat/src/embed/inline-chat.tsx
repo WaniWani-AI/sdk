@@ -187,7 +187,6 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 					locale={config.locale}
 					messages={messages}
 					initializing={!ready}
-					haptics={config.haptics}
 				/>
 			</WidgetEventsProvider>
 		);

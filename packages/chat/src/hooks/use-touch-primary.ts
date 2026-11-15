@@ -4,7 +4,7 @@
 // Phones and tablets without a trackpad match; a laptop with a touch screen
 // does not, because its primary pointer is still fine and can hover. The chat
 // reads this where touch needs different behavior, not only a different size:
-// the Enter key in the composer, the haptic tick.
+// the Enter key in the composer.
 // ============================================================================
 
 import { useSyncExternalStore } from "react";

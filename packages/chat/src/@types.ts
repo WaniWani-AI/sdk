@@ -487,13 +487,6 @@ export interface ChatEmbedProps
 	 * Defaults to `true`.
 	 */
 	showTableToolbar?: boolean;
-	/**
-	 * Play a light haptic tick when the visitor sends a message on a touch
-	 * device. Android uses the Vibration API; iOS has no haptics API, so a
-	 * hidden system switch is toggled instead, which Apple can stop honoring
-	 * in any release. Off by default.
-	 */
-	haptics?: boolean;
 }
 
 // ============================================================================

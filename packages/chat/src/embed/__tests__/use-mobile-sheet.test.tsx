@@ -27,9 +27,6 @@ const { act, createElement, useRef } = await import("react");
 const { createRoot } = await import("react-dom/client");
 const { useMobileSheet } = await import("../use-mobile-sheet");
 const { lockDocumentScroll } = await import("../../lib/scroll-lock");
-const { hapticTick } = await import("../../lib/haptics");
-
-const TOUCH_QUERY = "(hover: none) and (pointer: coarse)";
 
 /** A stand-in for `window.visualViewport`. */
 class FakeViewport extends EventTarget {
@@ -179,40 +176,5 @@ describe("lockDocumentScroll", () => {
 			true,
 		);
 		release();
-	});
-});
-
-describe("hapticTick", () => {
-	function withTouch(touch: boolean, run: () => void) {
-		const real = win.matchMedia;
-		// biome-ignore lint/suspicious/noExplicitAny: happy-dom stub
-		(win as any).matchMedia = (query: string) => ({
-			...real.call(win, query),
-			matches: touch && query === TOUCH_QUERY,
-		});
-		try {
-			run();
-		} finally {
-			win.matchMedia = real;
-		}
-	}
-
-	test("vibrates briefly on a touch device that has the Vibration API", () => {
-		const calls: number[] = [];
-		// biome-ignore lint/suspicious/noExplicitAny: happy-dom stub
-		(navigator as any).vibrate = (ms: number) => {
-			calls.push(ms);
-			return true;
-		};
-		withTouch(true, hapticTick);
-		withTouch(false, hapticTick);
-		expect(calls).toEqual([8]);
-		// biome-ignore lint/suspicious/noExplicitAny: happy-dom stub
-		delete (navigator as any).vibrate;
-	});
-
-	test("without the Vibration API it toggles a hidden switch and cleans up", () => {
-		withTouch(true, hapticTick);
-		expect(document.head.querySelector("input[switch]")).toBeNull();
 	});
 });
