@@ -406,7 +406,8 @@ export interface EmbedConfig {
 	panelHistory?: boolean;
 	/**
 	 * Play a light haptic tick when the visitor sends a message on a touch
-	 * device. Off by default. Surfaced as `data-haptics`.
+	 * device (Android only). On by default; `false` turns it off. Surfaced as
+	 * `data-haptics`.
 	 */
 	haptics?: boolean;
 	/**

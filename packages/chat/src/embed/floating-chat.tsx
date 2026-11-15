@@ -516,7 +516,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 
 		const submitComposer = useCallback(() => {
 			if (composerText.trim()) {
-				if (config.haptics) {
+				if (config.haptics !== false) {
 					hapticTick();
 				}
 				openWith(composerText);

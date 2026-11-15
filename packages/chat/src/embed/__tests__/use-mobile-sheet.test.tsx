@@ -211,8 +211,7 @@ describe("hapticTick", () => {
 		delete (navigator as any).vibrate;
 	});
 
-	test("without the Vibration API it toggles a hidden switch and cleans up", () => {
-		withTouch(true, hapticTick);
-		expect(document.head.querySelector("input[switch]")).toBeNull();
+	test("does nothing where the Vibration API is missing (iOS)", () => {
+		expect(() => withTouch(true, hapticTick)).not.toThrow();
 	});
 });

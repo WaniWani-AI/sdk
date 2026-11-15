@@ -117,7 +117,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			hidePoweredBy = false,
 			menu,
 			restartConfirm = false,
-			haptics = false,
+			haptics = true,
 		} = props;
 
 		// Preset → base theme. `light` and the unset case let the CSS

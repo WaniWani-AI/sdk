@@ -1,14 +1,10 @@
 // ============================================================================
-// A light haptic tick on touch devices.
+// A light haptic tick on touch devices, through the Vibration API.
 //
-// The web has no haptics API on iOS. Android's Chrome has the Vibration API
-// (`navigator.vibrate`). Safari 18 added the `switch` checkbox, and iOS plays
-// its system tick when one toggles, so on iOS a hidden switch is clicked
-// instead. That trick is undocumented behavior: Apple can drop it in any
-// release, and then the call does nothing.
-//
-// Both paths only work inside a user gesture (a tap handler). Outside one,
-// or with system haptics off, nothing happens and nothing throws.
+// Android browsers implement `navigator.vibrate`. Safari does not, and every
+// browser on iOS runs on Safari's engine, so on an iPhone this does nothing.
+// The call only takes effect inside a user gesture (a tap handler); outside
+// one, or where the API is missing, nothing happens and nothing throws.
 // ============================================================================
 
 import { isTouchPrimary } from "../hooks/use-touch-primary";
@@ -16,29 +12,16 @@ import { isTouchPrimary } from "../hooks/use-touch-primary";
 const VIBRATE_MS = 8;
 
 export function hapticTick(): void {
-	if (typeof document === "undefined" || !isTouchPrimary()) {
+	if (
+		typeof navigator === "undefined" ||
+		typeof navigator.vibrate !== "function" ||
+		!isTouchPrimary()
+	) {
 		return;
 	}
 	try {
-		if (typeof navigator.vibrate === "function") {
-			navigator.vibrate(VIBRATE_MS);
-			return;
-		}
-		iosSwitchTick();
+		navigator.vibrate(VIBRATE_MS);
 	} catch {
 		// Haptics are decoration. A browser that refuses them changes nothing.
 	}
-}
-
-function iosSwitchTick(): void {
-	const label = document.createElement("label");
-	label.setAttribute("aria-hidden", "true");
-	label.style.display = "none";
-	const input = document.createElement("input");
-	input.type = "checkbox";
-	input.setAttribute("switch", "");
-	label.appendChild(input);
-	document.head.appendChild(label);
-	label.click();
-	label.remove();
 }
