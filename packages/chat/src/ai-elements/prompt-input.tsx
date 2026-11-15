@@ -29,6 +29,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { isTouchPrimary } from "../hooks/use-touch-primary";
 import { useTranslation } from "../i18n";
 import { rememberDocumentPreview } from "../lib/document-previews";
 import { cn } from "../lib/utils";
@@ -679,17 +680,43 @@ export const PromptInputTools = ({
 
 export type PromptInputTextareaProps = ComponentProps<"textarea">;
 
+/** `field-sizing: content` grows the box with its text: iOS 26.2+, Chrome 123+. */
+function supportsFieldSizing(): boolean {
+	return (
+		typeof CSS !== "undefined" &&
+		typeof CSS.supports === "function" &&
+		CSS.supports("field-sizing", "content")
+	);
+}
+
 export const PromptInputTextarea = ({
 	onChange,
 	onKeyDown,
 	className,
 	placeholder,
+	value,
 	...props
 }: PromptInputTextareaProps) => {
 	const { t } = useTranslation();
 	const attachments = usePromptInputAttachments();
 	const [isComposing, setIsComposing] = useState(false);
 	const resolvedPlaceholder = placeholder ?? t.promptInput.placeholder;
+	const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+	// Browsers without `field-sizing` (iPhones before iOS 26.2) would keep the
+	// box one row tall. Size it from the text instead; `max-h-48` still caps
+	// it, and past that it scrolls.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the text changes
+	useEffect(() => {
+		const el = textareaRef.current;
+		if (!el || supportsFieldSizing()) {
+			return;
+		}
+		el.style.height = "auto";
+		if (el.value) {
+			el.style.height = `${el.scrollHeight}px`;
+		}
+	}, [value]);
 
 	const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = useCallback(
 		(e) => {
@@ -703,6 +730,11 @@ export const PromptInputTextarea = ({
 					return;
 				}
 				if (e.shiftKey) {
+					return;
+				}
+				// On a touch keyboard Return adds a line, as in every native
+				// messenger; the send button sends.
+				if (isTouchPrimary()) {
 					return;
 				}
 				e.preventDefault();
@@ -770,7 +802,10 @@ export const PromptInputTextarea = ({
 				"ww:field-sizing-content ww:max-h-48 ww:min-h-0 ww:w-full ww:resize-none ww:border-0 ww:bg-transparent ww:px-3 ww:py-2 ww:text-base ww:sm:text-sm ww:outline-none ww:placeholder:text-muted-foreground",
 				className,
 			)}
+			ref={textareaRef}
 			name="message"
+			rows={1}
+			value={value}
 			onCompositionEnd={() => setIsComposing(false)}
 			onCompositionStart={() => setIsComposing(true)}
 			onKeyDown={handleKeyDown}
@@ -975,7 +1010,7 @@ function PromptInputAttachment({ file }: { file: AttachmentItem }) {
 			<button
 				aria-label={t.promptInput.removeAttachment}
 				className={cn(
-					"ww:shrink-0 ww:rounded-full ww:p-1 ww:opacity-60 ww:transition-opacity hover:ww:bg-muted hover:ww:opacity-100",
+					"ww:shrink-0 ww:rounded-full ww:p-1 ww:opacity-60 ww:transition-opacity ww:hover:bg-muted ww:hover:opacity-100",
 					failed ? null : "ww:ml-auto",
 				)}
 				onClick={() => attachments.remove(file.id)}

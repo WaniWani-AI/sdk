@@ -27,6 +27,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { flushSync } from "react-dom";
 import type { ChatHandle } from "../@types";
 import { Avatar, avatarFor } from "../components/avatar";
 import BorderGlow from "../components/border-glow";
@@ -37,6 +38,7 @@ import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
+import { hapticTick } from "../lib/haptics";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
 import { useBootTiming } from "../lib/timing-context";
 import { cn } from "../lib/utils";
@@ -47,6 +49,7 @@ import { useEmbedWelcomeProps } from "./embed-welcome";
 import { panelClassName, panelLayoutOf } from "./panel-layout";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { type EmbedMessages, useEmbedMessages } from "./use-messages-url";
+import { useMobileSheet } from "./use-mobile-sheet";
 import { useNearPageBottom } from "./use-near-page-bottom";
 import { usePanelHistory } from "./use-panel-history";
 import { usePanelState } from "./use-panel-state";
@@ -429,6 +432,14 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 		const openPanel = useCallback(() => {
 			setPhase("open");
 		}, []);
+		// Open the panel and focus its input inside the same tap. iOS raises
+		// the keyboard only for a focus that a user gesture makes, so the
+		// focus can't wait for an effect after the commit: `flushSync` commits
+		// the open state (the panel turns visible and focusable) right here.
+		const openAndFocus = useCallback(() => {
+			flushSync(() => setPhase("open"));
+			chatRef.current?.focus();
+		}, []);
 		// Collapse back to the resting (narrow) input, dropping the CTAs. Marks the
 		// collapse as deliberate so the auto-expand doesn't reopen the card behind
 		// the visitor's back — they get the CTAs again by clicking the bar.
@@ -505,10 +516,13 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 
 		const submitComposer = useCallback(() => {
 			if (composerText.trim()) {
+				if (config.haptics) {
+					hapticTick();
+				}
 				openWith(composerText);
 				setComposerText("");
 			}
-		}, [composerText, openWith]);
+		}, [composerText, openWith, config.haptics]);
 
 		const onComposerFocus = useCallback(() => {
 			// A read-only dock (phones) is a button in disguise: open the panel
@@ -521,11 +535,11 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 			}
 			// Once a conversation exists, the visitor has history they can't see
 			// while minimized — refocusing the dock reopens the full chat rather
-			// than re-offering the suggestion pills. Focusing the chat input happens
-			// in the focus effect, once the panel is painted.
+			// than re-offering the suggestion pills. The chat input takes focus in
+			// this same handler, so on a phone the keyboard moves straight from
+			// the dock to the panel instead of closing and opening again.
 			if (dockClickOpens || (chatRef.current?.messages.length ?? 0) > 0) {
-				setPhase("open");
-				setFocusNonce((n) => n + 1);
+				openAndFocus();
 			} else {
 				// First focus with no conversation: widen the bar (and reveal the
 				// CTAs, if any) — but stay docked. The chat only opens on send.
@@ -533,7 +547,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 				userDismissed.current = false;
 				setPhase((p) => (p === "input" ? "expanded" : p));
 			}
-		}, [dockReadOnly, dockClickOpens]);
+		}, [dockReadOnly, dockClickOpens, openAndFocus]);
 
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.
@@ -555,6 +569,9 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 		const dockShown = appeared && !(nearBottom && composerText.length === 0);
 
 		const panelState = usePanelState(phase === "open", panelRef);
+		// Through the close animation too, so the sheet keeps its size above
+		// the keyboard until it is gone.
+		useMobileSheet(narrow && visible && panelState !== "hidden", panelRef);
 		const panelLayout = panelLayoutOf(config.panelLayout);
 
 		const dockComposerRow = (
@@ -580,6 +597,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 					onFocus={onComposerFocus}
 					onClick={dockClickOpens ? onComposerFocus : undefined}
 					readOnly={dockReadOnly}
+					enterKeyHint="send"
 					onKeyDown={(e) => {
 						if (e.key === "Enter" && !e.shiftKey) {
 							e.preventDefault();
@@ -598,7 +616,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 					aria-label={t.promptInput.submit}
 					className={cn(
 						PARTS.dockSend,
-						"ww:relative ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:bg-foreground ww:text-background ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40",
+						"ww-hit ww:relative ww:flex ww:size-8 ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:bg-foreground ww:text-background ww:transition-opacity ww:hover:opacity-90 ww:disabled:opacity-40",
 					)}
 				>
 					<ArrowUp className="ww:size-4" />
@@ -613,7 +631,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 				aria-label={t.launcher.close}
 				className={cn(
 					PARTS.close,
-					"ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer",
+					"ww-hit ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors ww:hover:bg-accent ww:hover:text-foreground ww:cursor-pointer",
 				)}
 			>
 				<XIcon className="ww:size-4" />
@@ -649,7 +667,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 								onPointerLeave={() => setDockHovered(false)}
 								className={cn(
 									PARTS.dock,
-									"ww:fixed ww:bottom-3 ww:sm:bottom-4 ww:left-0 ww:right-0 ww:mx-auto ww:z-[var(--ww-z-index)] ww:flex ww:flex-col",
+									"ww:fixed ww:bottom-[max(0.75rem,env(safe-area-inset-bottom))] ww:sm:bottom-4 ww:left-0 ww:right-0 ww:mx-auto ww:z-[var(--ww-z-index)] ww:flex ww:flex-col",
 									"ww:w-[calc(100vw-2rem)] ww:transition-[max-width] ww:duration-300 ww:ease-out",
 									showCard
 										? "ww:max-w-[var(--ww-dock-width-expanded)]"
@@ -693,7 +711,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 											aria-label={t.launcher.close}
 											className={cn(
 												PARTS.dockClose,
-												"ww:absolute ww:right-2 ww:top-2 ww:z-10 ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer",
+												"ww-hit ww:absolute ww:right-2 ww:top-2 ww:z-10 ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors ww:hover:bg-accent ww:hover:text-foreground ww:cursor-pointer",
 											)}
 										>
 											<XIcon className="ww:size-4" />
@@ -827,6 +845,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 									locale={config.locale}
 									messages={embedMessages.messages}
 									initializing={!ready}
+									haptics={config.haptics}
 								/>
 							</div>
 						</>

@@ -21,7 +21,7 @@ export function PoweredBy() {
 			rel="noopener noreferrer"
 			className={cn(
 				PARTS.poweredBy,
-				"ww:flex ww:items-center ww:gap-1.5 ww:whitespace-nowrap ww:text-[length:var(--ww-disclaimer-size)] ww:text-[color:var(--ww-disclaimer-fg)] ww:opacity-70 hover:ww:opacity-100 ww:transition-opacity",
+				"ww:flex ww:items-center ww:gap-1.5 ww:whitespace-nowrap ww:text-[length:var(--ww-disclaimer-size)] ww:text-[color:var(--ww-disclaimer-fg)] ww:opacity-70 ww:hover:opacity-100 ww:transition-opacity",
 			)}
 		>
 			<span>{t.poweredBy.label}</span>

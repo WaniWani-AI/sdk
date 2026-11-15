@@ -405,6 +405,11 @@ export interface EmbedConfig {
 	 */
 	panelHistory?: boolean;
 	/**
+	 * Play a light haptic tick when the visitor sends a message on a touch
+	 * device. Off by default. Surfaced as `data-haptics`.
+	 */
+	haptics?: boolean;
+	/**
 	 * What a click or focus on the floating bar's input does before any
 	 * conversation exists. `expand` (default) widens the bar and shows the
 	 * chips; `open` opens the panel, as a tap does on phones. Surfaced as
@@ -957,6 +962,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const panelHistory = bool("data-panel-history");
 	if (panelHistory !== undefined) {
 		config.panelHistory = panelHistory;
+	}
+
+	const haptics = bool("data-haptics");
+	if (haptics !== undefined) {
+		config.haptics = haptics;
 	}
 
 	const dockClick = str("data-dock-click")?.trim().toLowerCase();

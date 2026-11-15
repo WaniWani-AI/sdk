@@ -634,12 +634,14 @@ describe("parseConfigFromScript — floating bar behaviours", () => {
 			"data-dock-glow": "false",
 			"data-dock-readonly-mobile": "true",
 			"data-panel-history": "true",
+			"data-haptics": "true",
 		});
 		expect(cfg.dockChipsTrigger).toEqual(["scroll"]);
 		expect(cfg.dockPointerVars).toBe(true);
 		expect(cfg.dockGlow).toBe(false);
 		expect(cfg.dockReadonlyMobile).toBe(true);
 		expect(cfg.panelHistory).toBe(true);
+		expect(cfg.haptics).toBe(true);
 	});
 
 	test("unset attributes stay unset so the runtime defaults apply", async () => {
