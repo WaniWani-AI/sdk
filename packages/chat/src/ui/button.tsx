@@ -18,7 +18,8 @@ export const Button = ({
 	<button
 		type={type}
 		className={cn(
-			"ww:inline-flex ww:cursor-pointer ww:items-center ww:justify-center ww:rounded-md ww:font-medium ww:transition-colors ww:disabled:pointer-events-none",
+			// `ww-hit` pads the touch area to 44px on touch screens (tailwind.css).
+			"ww-hit ww:inline-flex ww:cursor-pointer ww:items-center ww:justify-center ww:rounded-md ww:font-medium ww:transition-colors ww:disabled:pointer-events-none",
 			variant !== "themed" && "ww:disabled:opacity-50",
 			variant === "default" &&
 				"ww:bg-primary ww:text-primary-foreground ww:hover:bg-primary/90",

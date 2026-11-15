@@ -130,16 +130,42 @@
 	clip-path: inset(calc(100% - 60px) 12% 0 12% round 24px);
 }
 
-/* Mobile: the panel is a full-screen sheet — reveal it edge-to-edge (no
-   rounding) from a centered strip near the bottom where the dock spans. */
+/* Phones: the panel is a full-screen sheet.
+
+   Size and position come from the visual viewport (`--ww-vv-height`,
+   `--ww-vv-top`, written by `useMobileSheet`), so the sheet always fills the
+   area above the soft keyboard instead of letting the browser pan the page.
+   Without those variables (no `visualViewport`, or a pinch-zoomed page) it
+   falls back to the whole layout viewport.
+
+   Safe-area padding keeps the header clear of the notch and the composer
+   clear of the home indicator. The bottom inset drops while the keyboard is
+   up (`data-keyboard`), because the keyboard covers that strip.
+
+   It moves in with `transform` + `opacity` only. The desktop card's
+   `clip-path` reveal repaints the whole screen on every frame at this size,
+   and the textarea has to sit at its final place when the tap that opened the
+   sheet focuses it, or iOS scrolls the page to reach it. */
 @media (max-width: 639px) {
+	[data-waniwani-floating="panel"] {
+		top: var(--ww-vv-top, 0px);
+		bottom: auto;
+		height: var(--ww-vv-height, 100%);
+		padding-top: env(safe-area-inset-top, 0px);
+		padding-bottom: env(safe-area-inset-bottom, 0px);
+	}
+	[data-waniwani-floating="panel"][data-keyboard] {
+		padding-bottom: 0;
+	}
 	[data-waniwani-floating="panel"][data-state="opening"],
 	[data-waniwani-floating="panel"][data-state="shown"] {
-		clip-path: inset(0 round 0);
+		clip-path: none;
+		transform: translateY(0);
 	}
 	[data-waniwani-floating="panel"][data-state="closing"],
 	[data-waniwani-floating="panel"][data-state="hidden"] {
-		clip-path: inset(calc(100% - 72px) 6% 0 6% round 22px);
+		clip-path: none;
+		transform: translateY(2.5rem);
 	}
 }
 
@@ -181,6 +207,40 @@
 		transition: clip-path var(--ww-panel-open-duration) cubic-bezier(0.22, 1, 0.36, 1),
 			opacity var(--ww-panel-close-duration) ease, visibility 0s;
 	}
+}
+
+@media (max-width: 639px) and (prefers-reduced-motion: no-preference) {
+	[data-waniwani-floating="panel"] {
+		transition: transform var(--ww-panel-close-duration) cubic-bezier(0.22, 1, 0.36, 1),
+			opacity var(--ww-panel-close-duration) ease,
+			visibility 0s linear var(--ww-panel-close-duration);
+	}
+	[data-waniwani-floating="panel"][data-state="opening"],
+	[data-waniwani-floating="panel"][data-state="shown"] {
+		transition: transform var(--ww-panel-open-duration) cubic-bezier(0.22, 1, 0.36, 1),
+			opacity var(--ww-panel-close-duration) ease, visibility 0s;
+	}
+}
+
+/* ─── Touch ─────────────────────────────────────────────────────────────
+   No grey tap flash from the browser, and no double-tap zoom on controls
+   (which also removes the wait for a second tap). Pressed controls dim at
+   once, the way native ones do; zero specificity and the components layer
+   let a client's own `:active` rule or a utility class win.
+
+   `.ww-hit` grows a small control's touch area to 44px (Apple's minimum)
+   with an invisible pseudo-element, so the icon keeps its drawn size. The
+   negative inset is computed from the control's own size and is never
+   positive, so controls already 44px or larger are left as they are.
+   Both rules sit in the `@layer components` block further down.
+   ───────────────────────────────────────────────────────────────────── */
+:where([data-waniwani-chat]) {
+	-webkit-tap-highlight-color: transparent;
+}
+
+:where([data-waniwani-chat])
+	:where(button, a, input, textarea, label, [role="button"]) {
+	touch-action: manipulation;
 }
 
 @media (min-width: 640px) and (prefers-reduced-motion: no-preference) {
@@ -344,6 +404,24 @@
 	/* The queue is full: dimmed whatever the empty-state tokens say. */
 	:where([data-waniwani-chat]) .ww-send[data-submit-blocked="true"] {
 		opacity: 0.5;
+	}
+
+	/* Touch press feedback and the 44px hit area: see "Touch" above. */
+	:where([data-waniwani-chat]) .ww-hit {
+		position: relative;
+	}
+
+	@media (hover: none) and (pointer: coarse) {
+		:where([data-waniwani-chat])
+			:where(button:not(:disabled), [role="button"]):active {
+			opacity: 0.6;
+		}
+
+		:where([data-waniwani-chat]) .ww-hit::after {
+			content: "";
+			position: absolute;
+			inset: min(0px, calc((100% - 44px) / 2));
+		}
 	}
 
 	:where([data-waniwani-chat]) .ww-stop,

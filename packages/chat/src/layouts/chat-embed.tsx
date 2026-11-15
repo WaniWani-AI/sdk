@@ -38,6 +38,7 @@ import { useSuggestionRow } from "../hooks/use-suggestion-row";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, type Messages, useTranslation } from "../i18n";
 import { copyText, formatTranscript } from "../lib/conversation-transcript";
+import { hapticTick } from "../lib/haptics";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
 import {
 	bearerToken,
@@ -78,6 +79,9 @@ export const ChatEmbed = forwardRef<ChatHandle, ChatEmbedProps>(
 	},
 );
 
+/** Within this distance of the bottom, the thread follows new content again. */
+const FOLLOW_DISTANCE_PX = 80;
+
 const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 	function ChatEmbedInner(props, ref) {
 		const { t, locale: activeLocale, ready: localeReady } = useTranslation();
@@ -113,6 +117,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			hidePoweredBy = false,
 			menu,
 			restartConfirm = false,
+			haptics = false,
 		} = props;
 
 		// Preset → base theme. `light` and the unset case let the CSS
@@ -220,8 +225,11 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 		const scrollContentRef = useRef<HTMLDivElement>(null);
 		const bottomRef = useRef<HTMLDivElement>(null);
 		const [atBottom, setAtBottom] = useState(true);
-		const atBottomRef = useRef(atBottom);
-		atBottomRef.current = atBottom;
+		// Whether the view follows new content to the bottom. Set when the
+		// visitor sends or comes back to the bottom; cleared as soon as they
+		// scroll up, so an answer streaming in never drags them away from what
+		// they are reading.
+		const followRef = useRef(true);
 
 		const focusInput = useCallback(() => {
 			const container = rootRef.current;
@@ -287,47 +295,64 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			return () => scroller.removeEventListener("click", onClick);
 		}, [widgetEvents]);
 
-		// Auto-scroll on new messages / streaming tokens. When the user
-		// just sent a message we always jump to the bottom — they expect
-		// to see what they typed and the response forming below it. For
-		// streaming assistant tokens we only stick if the user is already
-		// at the bottom, so reading older messages mid-stream isn't yanked
-		// away. Forcing the scroll on user submit also flips `atBottom`
-		// back to true, so widget iframes growing afterward (via the
-		// content ResizeObserver below) re-stick the view too.
-		// biome-ignore lint/correctness/useExhaustiveDependencies: scroll on length + last-message identity changes
+		// A message the visitor just sent always comes into view, with a smooth
+		// scroll so the jump reads as motion. Everything after that (the answer
+		// streaming in, widget iframes growing) moves the view through the
+		// ResizeObserver below, with instant scrolls: a smooth scroll restarted
+		// on every token stutters, and on iOS it also kills the visitor's own
+		// momentum scroll.
+		// biome-ignore lint/correctness/useExhaustiveDependencies: runs when a message is added or removed
 		useEffect(() => {
 			const last = engine.messages[engine.messages.length - 1];
-			if (last?.role === "user" || atBottomRef.current) {
+			if (last?.role === "user") {
+				followRef.current = true;
 				scrollToBottom("smooth");
+			} else if (followRef.current) {
+				scrollToBottom("auto");
 			}
-		}, [engine.messages.length, engine.messages[engine.messages.length - 1]]);
+		}, [engine.messages.length]);
+
+		// Follow or stop following from the visitor's own scrolling. Any move
+		// up stops it, checked first: a scroll up starts inside the "near the
+		// bottom" band, and the next streamed token would pull the visitor
+		// back before they ever left it. Coming back within reach of the bottom
+		// starts it again. Content that shrinks also moves `scrollTop` up (the
+		// browser clamps it), so only a move up while the content kept its
+		// height or grew counts.
+		useEffect(() => {
+			const scroller = scrollRef.current;
+			if (!scroller) {
+				return;
+			}
+			let lastTop = scroller.scrollTop;
+			let lastHeight = scroller.scrollHeight;
+			const onScroll = () => {
+				const top = scroller.scrollTop;
+				const height = scroller.scrollHeight;
+				const distance = height - top - scroller.clientHeight;
+				if (top < lastTop - 1 && height >= lastHeight) {
+					followRef.current = false;
+				} else if (distance <= FOLLOW_DISTANCE_PX) {
+					followRef.current = true;
+				}
+				lastTop = top;
+				lastHeight = height;
+			};
+			scroller.addEventListener("scroll", onScroll, { passive: true });
+			return () => scroller.removeEventListener("scroll", onScroll);
+		}, []);
 
 		useEffect(() => {
 			scrollToBottom("auto");
 		}, [scrollToBottom]);
 
-		// Keep the view pinned to the bottom whenever either the scroll
-		// container or its inner content resizes. Two reasons:
-		//   - The embed host can settle asynchronously (`ResizeObserver`
-		//     mirroring the parent's max-height runs after the first paint)
-		//     which shrinks the scroll container.
-		//   - MCP App widgets render in iframes that grow once their
-		//     handshake completes and the host reports its content height;
-		//     the React `messages` array doesn't change, so the
-		//     length/identity effect above can't catch it.
-		//
-		// Track the previous scrollHeight *and* clientHeight so we can
-		// decide whether the user was at the bottom *before* this resize.
-		// `atBottom` from the IntersectionObserver is racy here: when an
-		// iframe suddenly grows, the bottom sentinel flicks out of view
-		// and the IO fires before the RO callback, leaving
-		// `atBottomRef.current = false` even though the user was clearly
-		// stuck to the bottom moments earlier. Both dimensions need the
-		// pre-resize value: e.g. when the host shrinks (its mirrored
-		// max-height settling), clientHeight drops while scrollHeight is
-		// unchanged, and using the post-resize clientHeight against the
-		// pre-resize scrollHeight would miss the at-bottom case.
+		// Keep the view pinned to the bottom while it follows, whenever the
+		// scroll container or its content changes size:
+		//   - streamed tokens and MCP App iframes that grow after their
+		//     handshake make the content taller without a new message;
+		//   - the soft keyboard and the embed host settling its height make the
+		//     container shorter.
+		// Instant on purpose (see the message effect above).
 		useEffect(() => {
 			if (typeof ResizeObserver === "undefined") {
 				return;
@@ -337,18 +362,8 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			if (!scroller && !content) {
 				return;
 			}
-			let prevScrollHeight = scroller?.scrollHeight ?? 0;
-			let prevClientHeight = scroller?.clientHeight ?? 0;
 			const observer = new ResizeObserver(() => {
-				const s = scrollRef.current;
-				if (!s) {
-					return;
-				}
-				const wasAtBottom =
-					s.scrollTop + prevClientHeight >= prevScrollHeight - 5;
-				prevScrollHeight = s.scrollHeight;
-				prevClientHeight = s.clientHeight;
-				if (wasAtBottom) {
+				if (followRef.current) {
 					scrollToBottom("auto");
 				}
 			});
@@ -360,6 +375,16 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			}
 			return () => observer.disconnect();
 		}, [scrollToBottom]);
+
+		const handleComposerSubmit = useCallback(
+			(message: Parameters<typeof engine.handleSubmit>[0]) => {
+				if (haptics) {
+					hapticTick();
+				}
+				return engine.handleSubmit(message);
+			},
+			[haptics, engine.handleSubmit],
+		);
 
 		const suggestionsState = useSuggestionRow({
 			messages: engine.messages,
@@ -476,6 +501,9 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 					properties: { text: suggestion, index, origin },
 				});
 				suggestionsState.clear();
+				if (haptics) {
+					hapticTick();
+				}
 				engine.handleSubmit({ text: suggestion, files: [] });
 			},
 			[
@@ -485,6 +513,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				engine.handleSubmit,
 				welcome,
 				widgetEvents,
+				haptics,
 			],
 		);
 
@@ -707,7 +736,9 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 					ref={scrollRef}
 					className={cn(
 						PARTS.thread,
-						"ww:relative ww:flex-1 ww:min-h-0",
+						// `overscroll-contain`: a swipe past either end of the thread
+						// stops there instead of scrolling the page behind the chat.
+						"ww:relative ww:flex-1 ww:min-h-0 ww:overscroll-contain",
 						fullscreenToolCallId ? "ww:overflow-hidden" : "ww:overflow-y-auto",
 					)}
 				>
@@ -767,7 +798,10 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 						<div className="ww:sticky ww:bottom-2 ww:flex ww:justify-center ww:pointer-events-none">
 							<Button
 								type="button"
-								onClick={() => scrollToBottom("smooth")}
+								onClick={() => {
+									followRef.current = true;
+									scrollToBottom("smooth");
+								}}
 								size="icon"
 								variant="outline"
 								className={cn(
@@ -803,7 +837,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 									status={engine.status}
 									empty={composerEmpty}
 									data-multiline={multiline ? "true" : "false"}
-									onSubmit={engine.handleSubmit}
+									onSubmit={handleComposerSubmit}
 									attachmentsEnabled={uploads.enabled}
 									globalDrop={uploads.enabled}
 									multiple={uploads.enabled}

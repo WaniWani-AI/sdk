@@ -1256,6 +1256,36 @@ describe("PromptInputSubmit — Stop and the full-queue guard are separate state
 		expect(submits()).toBe(1);
 	});
 
+	test("on a touch keyboard Enter adds a line instead of sending", () => {
+		const realMatchMedia = win.matchMedia;
+		// biome-ignore lint/suspicious/noExplicitAny: happy-dom stub
+		(win as any).matchMedia = (query: string) => ({
+			...realMatchMedia.call(win, query),
+			matches: query === "(hover: none) and (pointer: coarse)",
+			addEventListener: () => {},
+			removeEventListener: () => {},
+		});
+		try {
+			mountWithSubmit({ status: "ready" });
+			const submits = countedSubmits();
+			const textarea = container.querySelector("textarea");
+			let defaultPrevented = true;
+			act(() => {
+				const event = new win.KeyboardEvent("keydown", {
+					key: "Enter",
+					bubbles: true,
+					cancelable: true,
+				});
+				textarea?.dispatchEvent(event as unknown as KeyboardEvent);
+				defaultPrevented = event.defaultPrevented;
+			});
+			expect(submits()).toBe(0);
+			expect(defaultPrevented).toBe(false);
+		} finally {
+			win.matchMedia = realMatchMedia;
+		}
+	});
+
 	test("a disabled submit button blocks Enter when there is no Stop to keep live", () => {
 		mountWithSubmit({ status: "ready", disabled: true });
 		const submits = countedSubmits();

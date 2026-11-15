@@ -116,7 +116,7 @@ export function ThreadMenu({
 								key={thread.threadId}
 								className={cn(
 									PARTS.menuItem,
-									"ww:flex ww:items-center ww:gap-2 ww:px-3 ww:py-2 ww:text-xs hover:ww:bg-foreground/5",
+									"ww:flex ww:items-center ww:gap-2 ww:px-3 ww:py-2 ww:text-xs ww:hover:bg-foreground/5",
 									isActive && "ww:bg-foreground/5",
 								)}
 							>
@@ -147,7 +147,7 @@ export function ThreadMenu({
 									}}
 									title={t.threadMenu.deleteThread}
 									aria-label={t.threadMenu.deleteThread}
-									className="ww:p-1 ww:rounded ww:text-muted-foreground hover:ww:text-foreground hover:ww:bg-foreground/10 ww:transition-colors ww:cursor-pointer"
+									className="ww:p-1 ww:rounded ww:text-muted-foreground ww:hover:text-foreground ww:hover:bg-foreground/10 ww:transition-colors ww:cursor-pointer"
 								>
 									<TrashIcon label={t.threadMenu.deleteThread} />
 								</button>

@@ -35,16 +35,18 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import type { ChatHandle } from "../@types";
 import BorderGlow from "../components/border-glow";
 import { Suggestions } from "../components/suggestions";
 import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useNarrowViewport } from "../hooks/use-narrow-viewport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
+import { isTouchPrimary } from "../hooks/use-touch-primary";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, useTranslation } from "../i18n";
 import { ChatEmbed } from "../layouts/chat-embed";
+import { hapticTick } from "../lib/haptics";
 import { resolveSuggestions } from "../lib/resolve-suggestions";
 import { useBootTiming } from "../lib/timing-context";
 import { cn } from "../lib/utils";
@@ -55,6 +57,7 @@ import { useEmbedWelcomeProps } from "./embed-welcome";
 import { panelClassName, panelLayoutOf } from "./panel-layout";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { type EmbedMessages, useEmbedMessages } from "./use-messages-url";
+import { useMobileSheet } from "./use-mobile-sheet";
 import { usePanelState } from "./use-panel-state";
 import { useVisibilityGate } from "./use-pathname";
 import { useSuggestions } from "./use-suggestions";
@@ -402,18 +405,38 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 			widgetEvents.emit({ name: isOpen ? "chat.opened" : "chat.closed" });
 		}, [visible, open, widgetEvents]);
 
-		const openWith = useCallback((text: string) => {
-			setOpen(true);
-			// Hand focus to the panel's own input. The in-flow composer is page
-			// content and stays visible behind the panel, so without this the
-			// caret sits in a box the visitor can no longer see and their next
-			// keystrokes land there. (The floating dock gets this for free: it
-			// goes `visibility: hidden` when the panel opens, which drops focus.)
-			setFocusNonce((n) => n + 1);
-			const trimmed = text.trim();
-			if (trimmed) {
-				chatRef.current?.sendMessage(trimmed);
-			}
+		const openWith = useCallback(
+			(text: string) => {
+				const trimmed = text.trim();
+				setOpen(true);
+				if (trimmed && narrow) {
+					// A phone needs the screen for the answer, and a keyboard
+					// raised over it would hide half of it. Let go of the in-flow
+					// box instead of moving the caret into the panel.
+					textareaRef.current?.blur();
+				} else {
+					// Hand focus to the panel's own input. The in-flow composer is
+					// page content and stays visible behind the panel, so without
+					// this the caret sits in a box the visitor can no longer see
+					// and their next keystrokes land there. (The floating dock gets
+					// this for free: it goes `visibility: hidden` when the panel
+					// opens, which drops focus.)
+					setFocusNonce((n) => n + 1);
+				}
+				if (trimmed) {
+					chatRef.current?.sendMessage(trimmed);
+				}
+			},
+			[narrow],
+		);
+
+		// Open the panel and focus its input inside the same tap. iOS raises
+		// the keyboard only for a focus that a user gesture makes, so the
+		// focus can't wait for an effect after the commit: `flushSync` commits
+		// the open state (the panel turns visible and focusable) right here.
+		const openAndFocus = useCallback(() => {
+			flushSync(() => setOpen(true));
+			chatRef.current?.focus();
 		}, []);
 
 		useImperativeHandle(
@@ -453,21 +476,23 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 
 		const submitComposer = useCallback(() => {
 			if (composerText.trim()) {
+				if (config.haptics) {
+					hapticTick();
+				}
 				openWith(composerText);
 				setComposerText("");
 			}
-		}, [composerText, openWith]);
+		}, [composerText, openWith, config.haptics]);
 
 		const onComposerFocus = useCallback(() => {
 			// Once a conversation exists, the visitor has history they can't see
 			// from the in-flow box — clicking back into it reopens the panel rather
-			// than starting a second, parallel composer. Focusing the chat input
-			// happens in the focus effect, once the panel is painted.
+			// than starting a second, parallel composer. The chat input takes
+			// focus in this same handler, so the keyboard stays up on a phone.
 			if ((chatRef.current?.messages.length ?? 0) > 0) {
-				setOpen(true);
-				setFocusNonce((n) => n + 1);
+				openAndFocus();
 			}
-		}, []);
+		}, [openAndFocus]);
 
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.
@@ -487,7 +512,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 				aria-label={t.launcher.close}
 				className={cn(
 					PARTS.close,
-					"ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors hover:ww:bg-accent hover:ww:text-foreground ww:cursor-pointer",
+					"ww-hit ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors ww:hover:bg-accent ww:hover:text-foreground ww:cursor-pointer",
 				)}
 			>
 				<XIcon className="ww:size-4" />
@@ -495,6 +520,9 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 		);
 
 		const panelState = usePanelState(visible && open, panelRef);
+		// Through the close animation too, so the sheet keeps its size above
+		// the keyboard until it is gone.
+		useMobileSheet(narrow && visible && panelState !== "hidden", panelRef);
 		const panelLayout = panelLayoutOf(config.panelLayout);
 
 		const fieldRow = (
@@ -507,7 +535,14 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 					onChange={(e) => setComposerText(e.target.value)}
 					onFocus={onComposerFocus}
 					onKeyDown={(e) => {
-						if (e.key === "Enter" && !e.shiftKey) {
+						if (
+							e.key === "Enter" &&
+							!e.shiftKey &&
+							!e.nativeEvent.isComposing &&
+							// On a touch keyboard Return adds a line, as in every
+							// native messenger; the send button sends.
+							!isTouchPrimary()
+						) {
 							e.preventDefault();
 							submitComposer();
 						}
@@ -530,7 +565,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 					disabled={!composerText.trim()}
 					aria-label={t.promptInput.submit}
 					className={cn(
-						"ww:relative ww:flex ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:transition-opacity hover:ww:opacity-90 disabled:ww:opacity-40",
+						"ww-hit ww:relative ww:flex ww:shrink-0 ww:items-center ww:justify-center ww:rounded-full ww:transition-opacity ww:hover:opacity-90 ww:disabled:opacity-40",
 						size.send,
 					)}
 					style={{ background: SEND_BG, color: SEND_FG }}
@@ -548,7 +583,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 			<button
 				ref={triggerRef}
 				type="button"
-				onClick={() => openWith("")}
+				onClick={openAndFocus}
 				className={cn(
 					"ww:flex ww:w-full ww:items-center ww:text-left ww:cursor-pointer",
 					size.row,
@@ -612,7 +647,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 			) : (
 				<div
 					className={cn(
-						asTrigger && "ww:transition-colors hover:ww:border-primary/40",
+						asTrigger && "ww:transition-colors ww:hover:border-primary/40",
 					)}
 					style={boxStyle}
 				>
@@ -734,6 +769,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 						locale={config.locale}
 						messages={embedMessages.messages}
 						initializing={!ready}
+						haptics={config.haptics}
 					/>
 				</div>
 			</div>

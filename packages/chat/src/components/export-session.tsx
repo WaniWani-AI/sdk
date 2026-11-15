@@ -67,7 +67,7 @@ export function ExportSessionButton({
 			onClick={handleExport}
 			disabled={saving}
 			title={t.exportSession.tooltip}
-			className="ww:ml-auto ww:text-[10px] ww:font-mono ww:uppercase ww:tracking-wider ww:text-muted-foreground hover:ww:text-foreground ww:cursor-pointer ww:transition-colors ww:disabled:opacity-40"
+			className="ww:ml-auto ww:text-[10px] ww:font-mono ww:uppercase ww:tracking-wider ww:text-muted-foreground ww:hover:text-foreground ww:cursor-pointer ww:transition-colors ww:disabled:opacity-40"
 		>
 			{label}
 		</button>

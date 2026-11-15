@@ -74,7 +74,7 @@ export function AiDisclaimer({
 						rel="noopener noreferrer"
 						className={cn(
 							PARTS.disclaimerLink,
-							"ww:underline ww:underline-offset-2 ww:text-[color:inherit] hover:ww:opacity-80",
+							"ww:underline ww:underline-offset-2 ww:text-[color:inherit] ww:hover:opacity-80",
 						)}
 					>
 						{segment.label}

@@ -539,6 +539,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					messages={overrides?.messages}
 					className={className}
 					initializing={!ready}
+					haptics={config.haptics}
 				/>
 			</WidgetEventsProvider>
 		);
