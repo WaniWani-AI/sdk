@@ -8,6 +8,7 @@ export const PARTS = {
 	menuButton: "ww-menu-button",
 	menu: "ww-menu",
 	menuItem: "ww-menu-item",
+	layoutToggle: "ww-layout-toggle",
 	close: "ww-close",
 	thread: "ww-thread",
 	scrollLatest: "ww-scroll-latest",

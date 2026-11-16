@@ -53,10 +53,12 @@ import { PARTS } from "../parts";
 import { themeToCSSProperties } from "../theme";
 import type { ComposerSize, EmbedConfig } from "./config";
 import { useEmbedWelcomeProps } from "./embed-welcome";
-import { panelClassName, panelLayoutOf } from "./panel-layout";
+import { LayoutToggleButton } from "./layout-toggle-button";
+import { panelClassName } from "./panel-layout";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { type EmbedMessages, useEmbedMessages } from "./use-messages-url";
 import { useMobileSheet } from "./use-mobile-sheet";
+import { usePanelLayout } from "./use-panel-layout";
 import { usePanelState } from "./use-panel-state";
 import { useVisibilityGate } from "./use-pathname";
 import { useSuggestions } from "./use-suggestions";
@@ -519,7 +521,24 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 		// Through the close animation too, so the sheet keeps its size above
 		// the keyboard until it is gone.
 		useMobileSheet(narrow && visible && panelState !== "hidden", panelRef);
-		const panelLayout = panelLayoutOf(config.panelLayout);
+		const panelLayoutControl = usePanelLayout(config, (layout) => {
+			widgetEvents.emit({
+				name: "panel.layout.changed",
+				properties: { layout },
+			});
+		});
+		const panelLayout = panelLayoutControl.layout;
+		const headerActions = (
+			<>
+				{panelLayoutControl.dockable && (
+					<LayoutToggleButton
+						layout={panelLayout}
+						onToggle={panelLayoutControl.toggle}
+					/>
+				)}
+				{closeButton}
+			</>
+		);
 
 		const fieldRow = (
 			<div className={cn("ww:flex ww:items-end", size.row)}>
@@ -736,7 +755,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 						body={body}
 						appearance={config.appearance}
 						title={config.title}
-						headerActions={closeButton}
+						headerActions={headerActions}
 						// Force the header on: the close control lives in
 						// `headerActions`, so honoring `hideHeader` would leave an
 						// opened (full-screen on mobile) panel with no way back to the

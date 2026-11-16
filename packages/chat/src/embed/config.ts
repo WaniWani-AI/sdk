@@ -421,6 +421,13 @@ export interface EmbedConfig {
 	 */
 	panelLayout?: PanelLayout;
 	/**
+	 * Adds a header button that lets the visitor move the open panel between
+	 * `modal` and `sidebar`; `panelLayout` is where it starts. Off by default.
+	 * Only applies when `mode` is `"floating"` or `"composer"`. Surfaced as
+	 * `data-panel-dockable`.
+	 */
+	panelDockable?: boolean;
+	/**
 	 * `false` hides the copy and download toolbar above tables in answers.
 	 * Shown by default. Surfaced as `data-show-table-toolbar`.
 	 */
@@ -967,6 +974,11 @@ export function parseConfigFromScript(): Partial<EmbedConfig> {
 	const panelLayout = str("data-panel-layout")?.trim().toLowerCase();
 	if (panelLayout === "modal" || panelLayout === "sidebar") {
 		config.panelLayout = panelLayout;
+	}
+
+	const panelDockable = bool("data-panel-dockable");
+	if (panelDockable !== undefined) {
+		config.panelDockable = panelDockable;
 	}
 
 	const showTableToolbar = bool("data-show-table-toolbar");

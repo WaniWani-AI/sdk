@@ -87,6 +87,8 @@ export const es: Messages = {
 		open: "Abrir chat",
 		close: "Cerrar chat",
 		minimize: "Minimizar",
+		toSidebar: "Mover el panel a la derecha",
+		toModal: "Devolver el panel al centro",
 	},
 	menu: {
 		newChat: "Nueva conversación",

@@ -748,6 +748,225 @@ describe("panel layout", () => {
 	});
 });
 
+describe("panel layout toggle", () => {
+	const toggle = (root: ParentNode) =>
+		root.querySelector(
+			".ww-panel .ww-layout-toggle",
+		) as HTMLButtonElement | null;
+	const layoutOf = (root: ParentNode) =>
+		root.querySelector(".ww-panel")?.getAttribute("data-layout");
+
+	test("renders no layout toggle by default, header actions hold only the close", async () => {
+		await renderSettled(createElement(FloatingChat, { config: CONFIG }));
+		expect(toggle(container)).toBeNull();
+		const actions = container.querySelector(".ww-panel .ww-header-actions");
+		expect(actions?.querySelectorAll("button").length).toBe(1);
+		expect(actions?.querySelector(".ww-close")).not.toBeNull();
+	});
+
+	test("renders no layout toggle when panelDockable is false", async () => {
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: { ...CONFIG, panelDockable: false },
+			}),
+		);
+		expect(toggle(container)).toBeNull();
+	});
+
+	test("dockable: the toggle sits before the close button and flips the layout", async () => {
+		const ref = createRef<FloatingChatHandle>();
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: { ...CONFIG, panelDockable: true },
+				ref,
+			}),
+		);
+		await act(async () => {
+			ref.current?.open();
+		});
+		const button = toggle(container);
+		expect(button).not.toBeNull();
+		expect(button?.getAttribute("data-layout")).toBe("modal");
+		expect(button?.getAttribute("aria-label")).toBe(
+			"Move the panel to the right",
+		);
+		const actions = container.querySelector(".ww-panel .ww-header-actions");
+		const buttons = Array.from(actions?.querySelectorAll("button") ?? []);
+		const closeIndex = buttons.findIndex((b) =>
+			b.classList.contains("ww-close"),
+		);
+		expect(buttons.indexOf(button as HTMLButtonElement)).toBeLessThan(
+			closeIndex,
+		);
+
+		await act(async () => {
+			button?.click();
+		});
+		expect(layoutOf(container)).toBe("sidebar");
+		expect(container.querySelector(".ww-panel")?.className).toContain(
+			"ww:sm:w-[var(--ww-sidebar-width)]",
+		);
+		expect(button?.getAttribute("data-layout")).toBe("sidebar");
+		expect(button?.getAttribute("aria-label")).toBe(
+			"Bring the panel back to the center",
+		);
+	});
+
+	test("dockable: the chevron points where the panel will go", async () => {
+		const ref = createRef<FloatingChatHandle>();
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: { ...CONFIG, panelDockable: true },
+				ref,
+			}),
+		);
+		await act(async () => {
+			ref.current?.open();
+		});
+		const icon = () =>
+			toggle(container)?.querySelector("svg")?.getAttribute("class") ?? "";
+		expect(icon()).toContain("panel-right-close");
+		await act(async () => {
+			toggle(container)?.click();
+		});
+		expect(icon()).toContain("panel-right-open");
+	});
+
+	test("dockable: the placement survives close and reopen", async () => {
+		const ref = createRef<FloatingChatHandle>();
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: { ...CONFIG, panelDockable: true },
+				ref,
+			}),
+		);
+		await act(async () => {
+			ref.current?.open();
+		});
+		await act(async () => {
+			toggle(container)?.click();
+		});
+		await act(async () => {
+			ref.current?.close();
+		});
+		await act(async () => {
+			ref.current?.open();
+		});
+		expect(layoutOf(container)).toBe("sidebar");
+	});
+
+	test("dockable: the toggle still flips state on a narrow viewport", async () => {
+		setViewportWidth(390);
+		const ref = createRef<FloatingChatHandle>();
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: { ...CONFIG, panelDockable: true },
+				ref,
+			}),
+		);
+		await act(async () => {
+			ref.current?.open();
+		});
+		await act(async () => {
+			toggle(container)?.click();
+		});
+		expect(layoutOf(container)).toBe("sidebar");
+		expect(toggle(container)?.getAttribute("data-layout")).toBe("sidebar");
+	});
+
+	test("dockable: menu, layout toggle and close all render in the header", async () => {
+		const ref = createRef<FloatingChatHandle>();
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: {
+					...CONFIG,
+					panelDockable: true,
+					menu: ["restart", "copy-conversation"],
+				},
+				ref,
+			}),
+		);
+		await act(async () => {
+			ref.current?.open();
+		});
+		const header = container.querySelector(".ww-panel .ww-header");
+		expect(header?.querySelector(".ww-menu-button")).not.toBeNull();
+		expect(header?.querySelector(".ww-layout-toggle")).not.toBeNull();
+		expect(header?.querySelector(".ww-close")).not.toBeNull();
+	});
+
+	test("dockable: emits panel.layout.changed with the new layout", async () => {
+		const seen: string[] = [];
+		const ref = createRef<FloatingChatHandle>();
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: {
+					...CONFIG,
+					panelDockable: true,
+					onEvent: (event) => {
+						if (event.name === "panel.layout.changed") {
+							seen.push(event.properties.layout);
+						}
+					},
+				},
+				ref,
+			}),
+		);
+		await act(async () => {
+			ref.current?.open();
+		});
+		await act(async () => {
+			toggle(container)?.click();
+		});
+		expect(seen).toEqual(["sidebar"]);
+	});
+
+	test("dockable: two clicks in one tick never report a layout the panel does not have", async () => {
+		const seen: string[] = [];
+		const ref = createRef<FloatingChatHandle>();
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: {
+					...CONFIG,
+					panelDockable: true,
+					onEvent: (event) => {
+						if (event.name === "panel.layout.changed") {
+							seen.push(event.properties.layout);
+						}
+					},
+				},
+				ref,
+			}),
+		);
+		await act(async () => {
+			ref.current?.open();
+		});
+		await act(async () => {
+			toggle(container)?.click();
+			toggle(container)?.click();
+		});
+		const layout = layoutOf(container);
+		expect(layout).toBe("modal");
+		expect(seen.at(-1) ?? "modal").toBe(layout);
+	});
+
+	test("composer: the toggle flips the portaled panel", async () => {
+		const panelContainer = document.createElement("div");
+		document.body.appendChild(panelContainer);
+		portalTargets.push(panelContainer);
+		await renderSettled(
+			createElement(ComposerChat, {
+				config: { ...CONFIG, mode: "composer", panelDockable: true },
+				panelContainer,
+			}),
+		);
+		await act(async () => {
+			toggle(panelContainer)?.click();
+		});
+		expect(layoutOf(panelContainer)).toBe("sidebar");
+	});
+});
+
 describe("panel input multiline", () => {
 	test("flags the form once the text spans more than one line", async () => {
 		await act(async () => {

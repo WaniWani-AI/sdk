@@ -87,6 +87,8 @@ export const fr: Messages = {
 		open: "Ouvrir le chat",
 		close: "Fermer le chat",
 		minimize: "Réduire",
+		toSidebar: "Ranger le panneau à droite",
+		toModal: "Ramener le panneau au centre",
 	},
 	menu: {
 		newChat: "Nouvelle conversation",

@@ -725,6 +725,26 @@ describe("parseConfigFromScript: panel layout", () => {
 		expect(modal.panelLayout).toBe("modal");
 	});
 
+	test("data-panel-dockable parses true, false and nothing", async () => {
+		const on = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-panel-dockable": "true",
+		});
+		expect(on.panelDockable).toBe(true);
+		const off = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-panel-dockable": "false",
+		});
+		expect(off.panelDockable).toBe(false);
+		const unset = await parseWithAttrs({ "data-token": "wwp_test" });
+		expect("panelDockable" in unset).toBe(false);
+		const junk = await parseWithAttrs({
+			"data-token": "wwp_test",
+			"data-panel-dockable": "yes",
+		});
+		expect("panelDockable" in junk).toBe(false);
+	});
+
 	test("an unset or unknown data-panel-layout stays unset", async () => {
 		expect(
 			"panelLayout" in (await parseWithAttrs({ "data-token": "wwp_test" })),
