@@ -899,6 +899,35 @@ describe("panel dock toggle", () => {
 		expect(seen).toEqual(["sidebar"]);
 	});
 
+	test("dockable: two clicks in one tick never report a layout the panel does not have", async () => {
+		const seen: string[] = [];
+		const ref = createRef<FloatingChatHandle>();
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: {
+					...CONFIG,
+					panelDockable: true,
+					onEvent: (event) => {
+						if (event.name === "panel.layout.changed") {
+							seen.push(event.properties.layout);
+						}
+					},
+				},
+				ref,
+			}),
+		);
+		await act(async () => {
+			ref.current?.open();
+		});
+		await act(async () => {
+			toggle(container)?.click();
+			toggle(container)?.click();
+		});
+		const layout = layoutOf(container);
+		expect(layout).toBe("modal");
+		expect(seen.at(-1) ?? "modal").toBe(layout);
+	});
+
 	test("composer: the toggle flips the portaled panel", async () => {
 		const panelContainer = document.createElement("div");
 		document.body.appendChild(panelContainer);

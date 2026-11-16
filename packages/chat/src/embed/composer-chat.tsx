@@ -521,21 +521,20 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 		// Through the close animation too, so the sheet keeps its size above
 		// the keyboard until it is gone.
 		useMobileSheet(narrow && visible && panelState !== "hidden", panelRef);
-		const panelLayoutControl = usePanelLayout(config);
-		const panelLayout = panelLayoutControl.layout;
-		const togglePanelLayout = useCallback(() => {
-			panelLayoutControl.toggle();
+		const panelLayoutControl = usePanelLayout(config, (layout) => {
 			widgetEvents.emit({
 				name: "panel.layout.changed",
-				properties: {
-					layout: panelLayoutControl.layout === "modal" ? "sidebar" : "modal",
-				},
+				properties: { layout },
 			});
-		}, [panelLayoutControl, widgetEvents]);
+		});
+		const panelLayout = panelLayoutControl.layout;
 		const headerActions = (
 			<>
 				{panelLayoutControl.dockable && (
-					<DockButton layout={panelLayout} onToggle={togglePanelLayout} />
+					<DockButton
+						layout={panelLayout}
+						onToggle={panelLayoutControl.toggle}
+					/>
 				)}
 				{closeButton}
 			</>

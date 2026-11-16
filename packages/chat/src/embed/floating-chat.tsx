@@ -570,17 +570,13 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 		// Through the close animation too, so the sheet keeps its size above
 		// the keyboard until it is gone.
 		useMobileSheet(narrow && visible && panelState !== "hidden", panelRef);
-		const panelLayoutControl = usePanelLayout(config);
-		const panelLayout = panelLayoutControl.layout;
-		const togglePanelLayout = useCallback(() => {
-			panelLayoutControl.toggle();
+		const panelLayoutControl = usePanelLayout(config, (layout) => {
 			widgetEvents.emit({
 				name: "panel.layout.changed",
-				properties: {
-					layout: panelLayoutControl.layout === "modal" ? "sidebar" : "modal",
-				},
+				properties: { layout },
 			});
-		}, [panelLayoutControl, widgetEvents]);
+		});
+		const panelLayout = panelLayoutControl.layout;
 
 		const dockComposerRow = (
 			<div className="ww:flex ww:items-center ww:gap-1 ww:pl-3.5 ww:pr-1.5 ww:py-1.5 ww:sm:pl-4 ww:sm:pr-2 ww:sm:py-2">
@@ -648,7 +644,10 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 		const headerActions = (
 			<>
 				{panelLayoutControl.dockable && (
-					<DockButton layout={panelLayout} onToggle={togglePanelLayout} />
+					<DockButton
+						layout={panelLayout}
+						onToggle={panelLayoutControl.toggle}
+					/>
 				)}
 				{closeButton}
 			</>

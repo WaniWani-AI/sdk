@@ -36,13 +36,17 @@ type HookConfig = Pick<EmbedConfig, "panelLayout" | "panelDockable">;
 let container: HTMLElement;
 let root: ReturnType<typeof createRoot>;
 let latest: PanelLayoutControl | null = null;
+let changes: string[] = [];
 
 function Harness({ config }: { config: HookConfig }) {
-	latest = usePanelLayout(config);
+	latest = usePanelLayout(config, (layout) => {
+		changes.push(layout);
+	});
 	return createElement("div", { "data-layout": latest.layout });
 }
 
 async function mount(config: HookConfig) {
+	changes = [];
 	await act(async () => {
 		root.render(createElement(Harness, { config }));
 	});
@@ -95,6 +99,37 @@ describe("usePanelLayout", () => {
 			latest?.toggle();
 		});
 		expect(latest?.layout).toBe("modal");
+	});
+
+	test("inert: never reports a change", async () => {
+		await mount({ panelLayout: "sidebar" });
+		await act(async () => {
+			latest?.toggle();
+		});
+		expect(changes).toEqual([]);
+	});
+
+	test("reports each committed change and never the mount", async () => {
+		await mount({ panelDockable: true });
+		expect(changes).toEqual([]);
+		await act(async () => {
+			latest?.toggle();
+		});
+		expect(changes).toEqual(["sidebar"]);
+		await act(async () => {
+			latest?.toggle();
+		});
+		expect(changes).toEqual(["sidebar", "modal"]);
+	});
+
+	test("two toggles in one tick report what React committed", async () => {
+		await mount({ panelDockable: true });
+		await act(async () => {
+			latest?.toggle();
+			latest?.toggle();
+		});
+		expect(latest?.layout).toBe("modal");
+		expect(changes.at(-1) ?? "modal").toBe("modal");
 	});
 
 	test("dockable: panelLayout is the starting placement", async () => {
