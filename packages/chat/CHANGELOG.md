@@ -1,5 +1,19 @@
 # @waniwani/chat
 
+## 1.4.0
+
+### Minor Changes
+
+- [#199](https://github.com/WaniWani-AI/sdk/pull/199) [`006ae0d`](https://github.com/WaniWani-AI/sdk/commit/006ae0d7a47eb4fcaa23ad5cf80d49ce6591279a) Thanks [@maximeantoine1997](https://github.com/maximeantoine1997)! - The chat panel feels native on phones. Nothing to change in existing code.
+  
+  - The full-screen panel fills the space above the soft keyboard and follows it, so the header and input stay in view, and the page behind it no longer scrolls.
+  - The panel slides up on phones, and the keyboard stays up when a tap opens it.
+  - A streaming answer no longer fights the visitor's scroll. Scroll up to read and the thread stays put; scroll back down and it follows again.
+  - On a touch keyboard, Return adds a line and the send button sends.
+  - Controls dim when pressed, small buttons get a 44px touch area, the dock clears the iPhone home indicator, and the hover styles of a few buttons now apply.
+
+- [#202](https://github.com/WaniWani-AI/sdk/pull/202) [`e926d0c`](https://github.com/WaniWani-AI/sdk/commit/e926d0cceebe92e495282b7017e747663c8d11f9) Thanks [@pancakeInDev](https://github.com/pancakeInDev)! - `data-panel-dockable="true"` adds a header button that lets the visitor move the open panel between the centered modal and the right-hand sidebar; `data-panel-layout` is where it starts. Off by default, so nothing changes without the attribute. New wording keys `launcher.toSidebar` and `launcher.toModal`, new part `ww-layout-toggle`, new `onEvent` event `panel.layout.changed`.
+
 ## 1.3.0
 
 ### Minor Changes
