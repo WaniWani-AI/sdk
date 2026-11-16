@@ -89,6 +89,8 @@ export interface Messages {
 		open: string;
 		close: string;
 		minimize: string;
+		dock: string;
+		undock: string;
 	};
 	menu: {
 		newChat: string;
@@ -210,6 +212,8 @@ export const en: Messages = {
 		open: "Open chat",
 		close: "Close chat",
 		minimize: "Minimize",
+		dock: "Move the panel to the right",
+		undock: "Bring the panel back to the centre",
 	},
 	menu: {
 		newChat: "New chat",

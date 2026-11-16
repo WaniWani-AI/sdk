@@ -13,6 +13,7 @@
 // ============================================================================
 
 import type { SuggestionOrigin } from "../lib/resolve-suggestions";
+import type { PanelLayout } from "./config";
 
 /** Surface the widget is mounted on. */
 export type WidgetMode = "inline" | "floating" | "composer";
@@ -64,7 +65,8 @@ export type WidgetEventDetail =
 				origin: SuggestionOrigin;
 			};
 	  }
-	| { name: "link.clicked"; properties: { url: string } };
+	| { name: "link.clicked"; properties: { url: string } }
+	| { name: "panel.layout.changed"; properties: { layout: PanelLayout } };
 
 /** Payload handed to `onEvent` subscribers. Discriminated on `name`. */
 export type WidgetEvent = WidgetEventBase & WidgetEventDetail;

@@ -45,6 +45,7 @@ export const PARTS = {
 	dockInput: "ww-dock-input",
 	dockSend: "ww-dock-send",
 	dockClose: "ww-dock-close",
+	dockToggle: "ww-dock-toggle",
 	panel: "ww-panel",
 	composer: "ww-composer",
 	dialog: "ww-dialog",
