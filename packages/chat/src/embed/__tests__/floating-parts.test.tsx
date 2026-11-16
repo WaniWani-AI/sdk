@@ -810,6 +810,26 @@ describe("panel dock toggle", () => {
 		);
 	});
 
+	test("dockable: the chevron points where the panel will go", async () => {
+		const ref = createRef<FloatingChatHandle>();
+		await renderSettled(
+			createElement(FloatingChat, {
+				config: { ...CONFIG, panelDockable: true },
+				ref,
+			}),
+		);
+		await act(async () => {
+			ref.current?.open();
+		});
+		const icon = () =>
+			toggle(container)?.querySelector("svg")?.getAttribute("class") ?? "";
+		expect(icon()).toContain("panel-right-close");
+		await act(async () => {
+			toggle(container)?.click();
+		});
+		expect(icon()).toContain("panel-right-open");
+	});
+
 	test("dockable: the placement survives close and reopen", async () => {
 		const ref = createRef<FloatingChatHandle>();
 		await renderSettled(

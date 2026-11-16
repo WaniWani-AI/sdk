@@ -12,7 +12,7 @@ interface DockButtonProps {
 export function DockButton({ layout, onToggle }: DockButtonProps) {
 	const { t } = useTranslation();
 	const label = layout === "modal" ? t.launcher.dock : t.launcher.undock;
-	const Icon = layout === "modal" ? PanelRightOpen : PanelRightClose;
+	const Icon = layout === "modal" ? PanelRightClose : PanelRightOpen;
 	return (
 		<button
 			type="button"
