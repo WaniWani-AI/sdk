@@ -44,8 +44,8 @@ import { cn } from "../lib/utils";
 import { PARTS } from "../parts";
 import { themeToCSSProperties } from "../theme";
 import type { DockChipsTrigger, EmbedConfig } from "./config";
-import { DockButton } from "./dock-button";
 import { useEmbedWelcomeProps } from "./embed-welcome";
+import { LayoutToggleButton } from "./layout-toggle-button";
 import { panelClassName } from "./panel-layout";
 import { useRemoteEmbedConfig } from "./remote-config";
 import { type EmbedMessages, useEmbedMessages } from "./use-messages-url";
@@ -644,7 +644,7 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 		const headerActions = (
 			<>
 				{panelLayoutControl.dockable && (
-					<DockButton
+					<LayoutToggleButton
 						layout={panelLayout}
 						onToggle={panelLayoutControl.toggle}
 					/>

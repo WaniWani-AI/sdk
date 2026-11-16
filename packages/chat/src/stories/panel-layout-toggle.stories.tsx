@@ -5,7 +5,7 @@ import type { EmbedConfig } from "../embed/config";
 import { FloatingChat, type FloatingChatHandle } from "../embed/floating-chat";
 import { PARTS } from "../parts";
 
-// The stock panel with the dock toggle: no brand CSS, so the stories show the
+// The stock panel with the layout toggle: no brand CSS, so the stories show the
 // default button, icons and motion an integrator gets from the attribute alone.
 
 const MOCK_ORIGIN = "https://dockable.mock";
@@ -120,7 +120,7 @@ interface DockArgs {
 const handle = createRef<FloatingChatHandle>();
 
 const meta: Meta<DockArgs> = {
-	title: "Chat/Panel Dock Toggle",
+	title: "Chat/Panel Layout Toggle",
 	render: ({ config }) => (
 		<>
 			<HostPage />
@@ -142,11 +142,11 @@ export const Default: Story = {
 		handle.current?.open();
 		await find(canvasElement, `.${PARTS.panel}[data-state="shown"]`);
 		await find(canvasElement, `.${PARTS.close}`);
-		await expectAbsent(canvasElement, `.${PARTS.dockToggle}`);
+		await expectAbsent(canvasElement, `.${PARTS.layoutToggle}`);
 	},
 };
 
-/** The toggle moves the panel from the centre to the right edge and back. */
+/** The toggle moves the panel from the center to the right edge and back. */
 export const Dockable: Story = {
 	args: { config: { panelDockable: true } },
 	play: async ({ canvasElement }) => {
@@ -155,11 +155,11 @@ export const Dockable: Story = {
 		await find(canvasElement, `.${PARTS.panel}[data-state="shown"]`);
 		const button = await find<HTMLButtonElement>(
 			canvasElement,
-			`.${PARTS.dockToggle}[data-layout="modal"]`,
+			`.${PARTS.layoutToggle}[data-layout="modal"]`,
 		);
 		button.click();
 		await find(canvasElement, `.${PARTS.panel}[data-layout="sidebar"]`);
-		await find(canvasElement, `.${PARTS.dockToggle}[data-layout="sidebar"]`);
+		await find(canvasElement, `.${PARTS.layoutToggle}[data-layout="sidebar"]`);
 	},
 };
 
@@ -170,6 +170,6 @@ export const DockableStartsDocked: Story = {
 		await find(canvasElement, `.${PARTS.panel}[data-layout="sidebar"]`);
 		handle.current?.open();
 		await find(canvasElement, `.${PARTS.panel}[data-state="shown"]`);
-		await find(canvasElement, `.${PARTS.dockToggle}[data-layout="sidebar"]`);
+		await find(canvasElement, `.${PARTS.layoutToggle}[data-layout="sidebar"]`);
 	},
 };

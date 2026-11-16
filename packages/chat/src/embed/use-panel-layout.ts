@@ -9,13 +9,9 @@ export interface PanelLayoutControl {
 }
 
 /**
- * The live placement of the chat panel. Without `panelDockable` the layout
- * is whatever the snippet set and `toggle` is a no-op, so the two panel
- * hosts render exactly as before. With it, `toggle` flips `modal` and
- * `sidebar`; the choice lives in component state, so it survives close and
- * reopen within the page load and resets on remount. `onLayoutChange` runs
- * once per committed change, after the render that applied it, never on
- * mount, so it reports the layout the panel actually has.
+ * `toggle` is a no-op without `panelDockable`. The layout lives in component
+ * state: it survives close and reopen, and resets on remount.
+ * `onLayoutChange` fires after each committed change, never on mount.
  */
 export function usePanelLayout(
 	config: Pick<EmbedConfig, "panelLayout" | "panelDockable">,

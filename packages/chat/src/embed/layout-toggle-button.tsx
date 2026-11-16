@@ -4,14 +4,17 @@ import { cn } from "../lib/utils";
 import { PARTS } from "../parts";
 import type { PanelLayout } from "./config";
 
-interface DockButtonProps {
+interface LayoutToggleButtonProps {
 	layout: PanelLayout;
 	onToggle: () => void;
 }
 
-export function DockButton({ layout, onToggle }: DockButtonProps) {
+export function LayoutToggleButton({
+	layout,
+	onToggle,
+}: LayoutToggleButtonProps) {
 	const { t } = useTranslation();
-	const label = layout === "modal" ? t.launcher.dock : t.launcher.undock;
+	const label = layout === "modal" ? t.launcher.toSidebar : t.launcher.toModal;
 	const Icon = layout === "modal" ? PanelRightClose : PanelRightOpen;
 	return (
 		<button
@@ -21,7 +24,7 @@ export function DockButton({ layout, onToggle }: DockButtonProps) {
 			title={label}
 			data-layout={layout}
 			className={cn(
-				PARTS.dockToggle,
+				PARTS.layoutToggle,
 				"ww-hit ww:flex ww:size-7 ww:items-center ww:justify-center ww:rounded-md ww:text-muted-foreground ww:transition-colors ww:hover:bg-accent ww:hover:text-foreground ww:cursor-pointer",
 			)}
 		>

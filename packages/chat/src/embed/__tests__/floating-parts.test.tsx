@@ -748,13 +748,15 @@ describe("panel layout", () => {
 	});
 });
 
-describe("panel dock toggle", () => {
+describe("panel layout toggle", () => {
 	const toggle = (root: ParentNode) =>
-		root.querySelector(".ww-panel .ww-dock-toggle") as HTMLButtonElement | null;
+		root.querySelector(
+			".ww-panel .ww-layout-toggle",
+		) as HTMLButtonElement | null;
 	const layoutOf = (root: ParentNode) =>
 		root.querySelector(".ww-panel")?.getAttribute("data-layout");
 
-	test("renders no dock toggle by default, header actions hold only the close", async () => {
+	test("renders no layout toggle by default, header actions hold only the close", async () => {
 		await renderSettled(createElement(FloatingChat, { config: CONFIG }));
 		expect(toggle(container)).toBeNull();
 		const actions = container.querySelector(".ww-panel .ww-header-actions");
@@ -762,7 +764,7 @@ describe("panel dock toggle", () => {
 		expect(actions?.querySelector(".ww-close")).not.toBeNull();
 	});
 
-	test("renders no dock toggle when panelDockable is false", async () => {
+	test("renders no layout toggle when panelDockable is false", async () => {
 		await renderSettled(
 			createElement(FloatingChat, {
 				config: { ...CONFIG, panelDockable: false },
@@ -806,7 +808,7 @@ describe("panel dock toggle", () => {
 		);
 		expect(button?.getAttribute("data-layout")).toBe("sidebar");
 		expect(button?.getAttribute("aria-label")).toBe(
-			"Bring the panel back to the centre",
+			"Bring the panel back to the center",
 		);
 	});
 
@@ -872,7 +874,7 @@ describe("panel dock toggle", () => {
 		expect(toggle(container)?.getAttribute("data-layout")).toBe("sidebar");
 	});
 
-	test("dockable: menu, dock toggle and close all render in the header", async () => {
+	test("dockable: menu, layout toggle and close all render in the header", async () => {
 		const ref = createRef<FloatingChatHandle>();
 		await renderSettled(
 			createElement(FloatingChat, {
@@ -889,7 +891,7 @@ describe("panel dock toggle", () => {
 		});
 		const header = container.querySelector(".ww-panel .ww-header");
 		expect(header?.querySelector(".ww-menu-button")).not.toBeNull();
-		expect(header?.querySelector(".ww-dock-toggle")).not.toBeNull();
+		expect(header?.querySelector(".ww-layout-toggle")).not.toBeNull();
 		expect(header?.querySelector(".ww-close")).not.toBeNull();
 	});
 
