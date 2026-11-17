@@ -33,6 +33,7 @@ import {
 	applyVisitorId,
 	collectVisitorContext,
 	getOrCreateVisitorId,
+	getVisitorIdSource,
 } from "../lib/visitor-context";
 import { usePageToolCalls } from "./use-page-tool-calls";
 
@@ -461,6 +462,7 @@ export function useChatEngine(props: ChatBaseProps) {
 					// Anonymous visitor id — the server stamps it onto chat events'
 					// `visitor_id` so visits link a `page.viewed` to its conversation.
 					id: visitorId,
+					idSource: getVisitorIdSource(),
 					client: {
 						...existingClient,
 						...(vc && { memoryUserId: vc.memoryUserId }),
@@ -518,7 +520,10 @@ export function useChatEngine(props: ChatBaseProps) {
 				const extra = mcpExtra(bodyRef.current?.extra);
 				return {
 					channelId: bodyString("channelId"),
-					visitor: { id: getOrCreateVisitorId() },
+					visitor: {
+						id: getOrCreateVisitorId(),
+						idSource: getVisitorIdSource(),
+					},
 					...(extra ? { extra } : {}),
 				};
 			},
