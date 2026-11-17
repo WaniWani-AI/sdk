@@ -1,5 +1,11 @@
 # @waniwani/chat
 
+## 1.5.0
+
+### Minor Changes
+
+- [#207](https://github.com/WaniWani-AI/sdk/pull/207) [`7975faf`](https://github.com/WaniWani-AI/sdk/commit/7975faf098d46b4e40fb62c5e7409741c72c4a87) Thanks [@maximeantoine1997](https://github.com/maximeantoine1997)! - The chat keeps less in the browser, under fixed names, and nothing lives longer than 13 months. The browser keys are `waniwani-visitor-id` (localStorage, 13 months from creation), `waniwani-session` (the chat conversation and the browsing agent's flow session) and `waniwani-config` (sessionStorage, deleted when the tab closes), and the IndexedDB database `waniwani-threads`, which the chat creates only when thread history is on and from which it deletes threads 13 months old. A saved conversation reopens after a reload in the same tab, and a new tab starts a new one. The chat no longer sends `memoryUserId` (in `extra` or in `visitor.client`): an MCP server that needs the anonymous visitor reads `_meta["waniwani/visitorId"]`, and should not treat it as proof of identity. On load the chat deletes the keys older releases wrote (`waniwani-memory-user-id`, `waniwani:eve-conversation:*`, `waniwani:config:*`, `waniwani:webmcp:session` and the `waniwani-memory` database); local thread history saved by older releases is not carried over.
+
 ## 1.4.2
 
 ### Patch Changes
