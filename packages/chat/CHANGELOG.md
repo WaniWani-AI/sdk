@@ -1,5 +1,11 @@
 # @waniwani/chat
 
+## 1.4.2
+
+### Patch Changes
+
+- [#208](https://github.com/WaniWani-AI/sdk/pull/208) [`9680549`](https://github.com/WaniWani-AI/sdk/commit/9680549d6dc3b553e50609e655c8e94ad32ca6b5) Thanks [@claude](https://github.com/apps/claude)! - `dist/embed.js` ships without a source map. Sites that load the embed from jsDelivr no longer point browsers at `embed.js.map`, which carried the chat's full source. Nothing changes for you: the embed tag stays the same, and the React entry (`@waniwani/chat`) keeps its maps for your own bundler.
+
 ## 1.4.1
 
 ### Patch Changes
