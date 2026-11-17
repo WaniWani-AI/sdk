@@ -1,5 +1,11 @@
 # @waniwani/chat
 
+## 1.4.1
+
+### Patch Changes
+
+- [#204](https://github.com/WaniWani-AI/sdk/pull/204) [`eb61901`](https://github.com/WaniWani-AI/sdk/commit/eb61901c300666e65d3e70b8c2688e45960e0183) Thanks [@maximeantoine1997](https://github.com/maximeantoine1997)! - On iPhones, the chat panel's background now runs under the keyboard, so the host page no longer shows through the translucent iOS 26 keyboard and Safari's address bar. Tapping the input no longer makes the panel jump while the keyboard opens, and when the keyboard closes the composer slides straight back down instead of waiting for iOS to report the new viewport. While the keyboard is up, the line under the composer (powered-by and AI disclaimer) is hidden; it comes back as the keyboard closes. Nothing to change in existing code.
+
 ## 1.4.0
 
 ### Minor Changes
