@@ -81,7 +81,7 @@ mock.module("../../lib/thread-store", () => ({
 }));
 
 const { useChatEngine } = await import("../use-chat-engine");
-const { getOrCreateMemoryUserId } = await import("../../lib/memory-user-id");
+const { getOrCreateVisitorId } = await import("../../lib/visitor-context");
 type HookReturn = ReturnType<typeof useChatEngine>;
 type EngineProps = Parameters<typeof useChatEngine>[0];
 type ToolCallHandler = NonNullable<EngineProps["onToolCall"]>;
@@ -1168,7 +1168,7 @@ describe("onToolCall set: a replaced conversation drops late answers", () => {
 		const now = new Date().toISOString();
 		await upsertThread({
 			threadId: "thread_other",
-			memoryUserId: "user_other",
+			visitorId: "user_other",
 			title: "Other thread",
 			messages: [
 				{
@@ -1386,18 +1386,18 @@ function endStream(stream: ControlledStream | undefined) {
 }
 
 async function clearThreads(): Promise<string> {
-	const memoryUserId = await getOrCreateMemoryUserId();
-	for (const t of await threadStore.listThreads(memoryUserId)) {
+	const visitorId = getOrCreateVisitorId();
+	for (const t of await threadStore.listThreads(visitorId)) {
 		await threadStore.deleteThread(t.threadId);
 	}
-	return memoryUserId;
+	return visitorId;
 }
 
 async function storeThread(threadId: string, messages: UIMessage[]) {
 	const now = new Date().toISOString();
 	await threadStore.upsertThread({
 		threadId,
-		memoryUserId: await getOrCreateMemoryUserId(),
+		visitorId: getOrCreateVisitorId(),
 		title: threadId,
 		messages,
 		createdAt: now,

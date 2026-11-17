@@ -1,6 +1,7 @@
 import type { AttachedDocument } from "@waniwani/core/documents/types";
 import type { UIMessageChunk } from "ai";
 import { EveAgentStore, type MessageStreamEvent } from "eve/client";
+import { readTabSession, writeTabSession } from "../tab-session";
 import { installEveShims } from "./shims";
 import { type EveEvent, uiMessageChunks } from "./ui-stream";
 
@@ -57,25 +58,22 @@ export function sessionKey(input: {
 		: `${channel}:${input.threadId}`;
 }
 
-function storageKey(key: string): string {
-	return `waniwani:eve-conversation:${key}`;
+function isSavedSession(value: unknown): value is SavedSession {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"conversationId" in value &&
+		typeof value.conversationId === "string" &&
+		"ownerSecret" in value &&
+		typeof value.ownerSecret === "string"
+	);
 }
 
 export function savedSession(key: string): SavedSession | null {
 	try {
-		const parsed: unknown = JSON.parse(
-			localStorage.getItem(storageKey(key)) ?? "null",
-		);
-		return typeof parsed === "object" &&
-			parsed !== null &&
-			"conversationId" in parsed &&
-			typeof parsed.conversationId === "string" &&
-			"ownerSecret" in parsed &&
-			typeof parsed.ownerSecret === "string"
-			? {
-					conversationId: parsed.conversationId,
-					ownerSecret: parsed.ownerSecret,
-				}
+		const value = readTabSession().chat?.[key];
+		return isSavedSession(value)
+			? { conversationId: value.conversationId, ownerSecret: value.ownerSecret }
 			: null;
 	} catch {
 		return null;
@@ -84,11 +82,17 @@ export function savedSession(key: string): SavedSession | null {
 
 export function saveSession(key: string, saved: SavedSession | null): void {
 	try {
+		const session = readTabSession();
+		const chat = { ...session.chat };
 		if (saved) {
-			localStorage.setItem(storageKey(key), JSON.stringify(saved));
+			chat[key] = {
+				conversationId: saved.conversationId,
+				ownerSecret: saved.ownerSecret,
+			};
 		} else {
-			localStorage.removeItem(storageKey(key));
+			delete chat[key];
 		}
+		writeTabSession({ ...session, chat });
 	} catch {}
 }
 

@@ -27,12 +27,6 @@ async function importThreadStore() {
 	)) as typeof import("../thread-store");
 }
 
-async function importMemoryUserId() {
-	return (await import(
-		`../memory-user-id?t=${Date.now()}-${Math.random()}`
-	)) as typeof import("../memory-user-id");
-}
-
 function makeMessage(id: string, text: string): UIMessage {
 	return {
 		id,
@@ -45,7 +39,7 @@ function makeThread(overrides: Partial<StoredThread> = {}): StoredThread {
 	const now = new Date().toISOString();
 	return {
 		threadId: overrides.threadId ?? "thread-1",
-		memoryUserId: overrides.memoryUserId ?? "user-1",
+		visitorId: overrides.visitorId ?? "user-1",
 		title: overrides.title ?? "Test thread",
 		messages: overrides.messages ?? [makeMessage("m1", "hello")],
 		sessionId: overrides.sessionId,
@@ -65,19 +59,19 @@ describe("thread-store", () => {
 		expect(loaded?.messages.length).toBe(1);
 	});
 
-	test("listThreads filters by memoryUserId, newest first", async () => {
+	test("listThreads filters by visitorId, newest first", async () => {
 		const store = await importThreadStore();
 		const t1 = makeThread({
 			threadId: "a",
-			memoryUserId: "u1",
+			visitorId: "u1",
 			updatedAt: "2026-04-01T00:00:00.000Z",
 		});
 		const t2 = makeThread({
 			threadId: "b",
-			memoryUserId: "u1",
+			visitorId: "u1",
 			updatedAt: "2026-04-02T00:00:00.000Z",
 		});
-		const tOther = makeThread({ threadId: "c", memoryUserId: "u2" });
+		const tOther = makeThread({ threadId: "c", visitorId: "u2" });
 		await store.upsertThread(t1);
 		await store.upsertThread(t2);
 		await store.upsertThread(tOther);
@@ -117,14 +111,14 @@ describe("thread-store", () => {
 		await store.upsertThread(
 			makeThread({
 				threadId: "old",
-				memoryUserId: "u1",
+				visitorId: "u1",
 				updatedAt: "2026-04-01T00:00:00.000Z",
 			}),
 		);
 		await store.upsertThread(
 			makeThread({
 				threadId: "new",
-				memoryUserId: "u1",
+				visitorId: "u1",
 				updatedAt: "2026-04-10T00:00:00.000Z",
 			}),
 		);
@@ -133,50 +127,15 @@ describe("thread-store", () => {
 		expect(active).toBe("new");
 	});
 
-	test("two memoryUserIds see independent thread sets", async () => {
+	test("two visitorIds see independent thread sets", async () => {
 		const store = await importThreadStore();
-		await store.upsertThread(makeThread({ threadId: "a", memoryUserId: "u1" }));
-		await store.upsertThread(makeThread({ threadId: "b", memoryUserId: "u2" }));
+		await store.upsertThread(makeThread({ threadId: "a", visitorId: "u1" }));
+		await store.upsertThread(makeThread({ threadId: "b", visitorId: "u2" }));
 
 		const u1 = await store.listThreads("u1");
 		const u2 = await store.listThreads("u2");
 		expect(u1.map((t) => t.threadId)).toEqual(["a"]);
 		expect(u2.map((t) => t.threadId)).toEqual(["b"]);
-	});
-
-	test("upgrade path v1 → v2 preserves the ids store", async () => {
-		// Open as v1 with only the legacy `ids` store, write a memoryUserId.
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.open("waniwani-memory", 1);
-			req.onupgradeneeded = () => {
-				const db = req.result;
-				if (!db.objectStoreNames.contains("ids")) {
-					db.createObjectStore("ids");
-				}
-			};
-			req.onsuccess = () => {
-				const db = req.result;
-				const tx = db.transaction("ids", "readwrite");
-				tx.objectStore("ids").put("legacy-user", "memoryUserId");
-				tx.oncomplete = () => {
-					db.close();
-					resolve();
-				};
-				tx.onerror = () => reject(tx.error);
-			};
-			req.onerror = () => reject(req.error);
-		});
-
-		// Re-open via the SDK helper which now requests v2; threads store must exist
-		// AND the legacy id must still be readable.
-		const memMod = await importMemoryUserId();
-		const id = await memMod.getOrCreateMemoryUserId();
-		expect(id).toBe("legacy-user");
-
-		const store = await importThreadStore();
-		await store.upsertThread(makeThread({ memoryUserId: "legacy-user" }));
-		const list = await store.listThreads("legacy-user");
-		expect(list.length).toBe(1);
 	});
 });
 
@@ -216,5 +175,43 @@ describe("thread-store — a reloaded turn still shows what was attached", () =>
 		expect(loaded?.messages[0]?.parts).toEqual([
 			{ type: "text", text: "read this" },
 		]);
+	});
+});
+
+describe("thread-store: threads expire 13 months after creation", () => {
+	const DAY = 24 * 60 * 60 * 1000;
+
+	test("listThreads hides and deletes a thread 13 months old", async () => {
+		const store = await importThreadStore();
+		const old = new Date(Date.now() - 396 * DAY).toISOString();
+		await store.upsertThread(
+			makeThread({ threadId: "fresh", visitorId: "u1" }),
+		);
+		await store.upsertThread(
+			makeThread({
+				threadId: "old",
+				visitorId: "u1",
+				createdAt: old,
+				updatedAt: new Date().toISOString(),
+			}),
+		);
+
+		const list = await store.listThreads("u1");
+		expect(list.map((t) => t.threadId)).toEqual(["fresh"]);
+		expect(await store.loadThread("old")).toBeNull();
+	});
+
+	test("a thread updated recently still expires from its creation date", async () => {
+		const store = await importThreadStore();
+		expect(
+			store.isExpiredThread({
+				createdAt: new Date(Date.now() - 396 * DAY).toISOString(),
+			}),
+		).toBe(true);
+		expect(
+			store.isExpiredThread({
+				createdAt: new Date(Date.now() - 300 * DAY).toISOString(),
+			}),
+		).toBe(false);
 	});
 });

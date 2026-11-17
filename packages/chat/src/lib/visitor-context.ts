@@ -1,5 +1,5 @@
 import { getOrCreateVisitorId } from "@waniwani/core/shared/visitor-id";
-import { getOrCreateMemoryUserId } from "./memory-user-id";
+import { removeLegacyStorage } from "./legacy-storage";
 
 // ============================================================================
 // Types
@@ -23,7 +23,6 @@ export interface VisitorContext {
 	connectionType: string;
 	referrer: string;
 	visitorId: string;
-	memoryUserId: string;
 }
 
 // ============================================================================
@@ -112,8 +111,8 @@ export {
 
 export async function collectVisitorContext(): Promise<VisitorContext> {
 	const ua = navigator.userAgent;
+	removeLegacyStorage();
 	const visitorId = getOrCreateVisitorId();
-	const memoryUserId = await getOrCreateMemoryUserId();
 
 	return {
 		userAgent: ua,
@@ -134,6 +133,5 @@ export async function collectVisitorContext(): Promise<VisitorContext> {
 		connectionType: (navigator as any).connection?.effectiveType ?? "unknown",
 		referrer: document.referrer,
 		visitorId,
-		memoryUserId,
 	};
 }

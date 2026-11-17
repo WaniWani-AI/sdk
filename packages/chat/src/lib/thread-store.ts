@@ -1,13 +1,14 @@
+import { STORAGE_MAX_AGE_MS } from "@waniwani/core/shared/visitor-id";
 import type { UIMessage } from "ai";
 import {
-	openMemoryDb,
+	openThreadDb,
 	THREADS_BY_USER_INDEX,
 	THREADS_STORE,
-} from "./memory-user-id";
+} from "./thread-db";
 
 export interface StoredThread {
 	threadId: string;
-	memoryUserId: string;
+	visitorId: string;
 	title: string;
 	messages: UIMessage[];
 	sessionId?: string;
@@ -26,7 +27,7 @@ function isStoredThread(value: unknown): value is StoredThread {
 	const v = value as Record<string, unknown>;
 	return (
 		typeof v.threadId === "string" &&
-		typeof v.memoryUserId === "string" &&
+		typeof v.visitorId === "string" &&
 		typeof v.title === "string" &&
 		Array.isArray(v.messages) &&
 		typeof v.createdAt === "string" &&
@@ -42,7 +43,7 @@ async function withDb<T>(
 	}
 	let db: IDBDatabase | null = null;
 	try {
-		db = await openMemoryDb();
+		db = await openThreadDb();
 		return await fn(db);
 	} catch {
 		return null;
@@ -62,15 +63,37 @@ function promisifyRequest<T>(req: IDBRequest<T>): Promise<T> {
 	});
 }
 
-export async function listThreads(
-	memoryUserId: string,
-): Promise<StoredThread[]> {
+/**
+ * True once a thread is 13 months old, counted from its creation. A thread
+ * with an unreadable date counts as expired.
+ */
+export function isExpiredThread(
+	thread: Pick<StoredThread, "createdAt">,
+	now: number = Date.now(),
+): boolean {
+	const created = Date.parse(thread.createdAt);
+	return Number.isNaN(created) || now - created >= STORAGE_MAX_AGE_MS;
+}
+
+/**
+ * The visitor's threads, newest first. Threads past the 13-month limit are
+ * deleted here, so a returning visitor never sees one and none outlives it.
+ */
+export async function listThreads(visitorId: string): Promise<StoredThread[]> {
 	const result = await withDb(async (db) => {
-		const tx = db.transaction(THREADS_STORE, "readonly");
+		const tx = db.transaction(THREADS_STORE, "readwrite");
 		const store = tx.objectStore(THREADS_STORE);
 		const index = store.index(THREADS_BY_USER_INDEX);
-		const all = await promisifyRequest(index.getAll(memoryUserId));
-		const threads = (all ?? []).filter(isStoredThread);
+		const all = await promisifyRequest(index.getAll(visitorId));
+		const now = Date.now();
+		const threads: StoredThread[] = [];
+		for (const value of all ?? []) {
+			if (isStoredThread(value) && !isExpiredThread(value, now)) {
+				threads.push(value);
+			} else {
+				store.delete((value as { threadId: IDBValidKey }).threadId);
+			}
+		}
 		threads.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
 		return threads;
 	});
@@ -84,7 +107,7 @@ export async function loadThread(
 		const tx = db.transaction(THREADS_STORE, "readonly");
 		const store = tx.objectStore(THREADS_STORE);
 		const value = await promisifyRequest(store.get(threadId));
-		return isStoredThread(value) ? value : null;
+		return isStoredThread(value) && !isExpiredThread(value) ? value : null;
 	});
 	return result ?? null;
 }
@@ -113,12 +136,20 @@ export async function upsertThread(thread: StoredThread): Promise<void> {
 			store.put(trimmed);
 		});
 
-		// Evict oldest threads beyond the per-user cap.
+		// Delete threads past 13 months, then the oldest beyond the per-user cap.
 		const tx2 = db.transaction(THREADS_STORE, "readwrite");
 		const store2 = tx2.objectStore(THREADS_STORE);
 		const index = store2.index(THREADS_BY_USER_INDEX);
-		const all = await promisifyRequest(index.getAll(trimmed.memoryUserId));
-		const userThreads = (all ?? []).filter(isStoredThread);
+		const all = await promisifyRequest(index.getAll(trimmed.visitorId));
+		const now = Date.now();
+		const userThreads: StoredThread[] = [];
+		for (const t of (all ?? []).filter(isStoredThread)) {
+			if (isExpiredThread(t, now)) {
+				store2.delete(t.threadId);
+			} else {
+				userThreads.push(t);
+			}
+		}
 		if (userThreads.length > MAX_THREADS_PER_USER) {
 			userThreads.sort((a, b) => (a.updatedAt < b.updatedAt ? -1 : 1));
 			const toEvict = userThreads.slice(
@@ -152,9 +183,9 @@ export async function deleteThread(threadId: string): Promise<void> {
 }
 
 export async function getActiveThreadId(
-	memoryUserId: string,
+	visitorId: string,
 ): Promise<string | null> {
-	const threads = await listThreads(memoryUserId);
+	const threads = await listThreads(visitorId);
 	return threads[0]?.threadId ?? null;
 }
 

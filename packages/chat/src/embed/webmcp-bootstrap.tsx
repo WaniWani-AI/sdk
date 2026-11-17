@@ -10,6 +10,7 @@ import {
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { debugLog } from "../lib/debug";
+import { readTabSession, writeTabSession } from "../lib/tab-session";
 import type { EmbedConfig } from "./config";
 import { injectEmbedCss } from "./embed-css";
 import { loadCachedConfig } from "./remote-config";
@@ -39,16 +40,14 @@ import { WebMcpOverlay } from "./webmcp-overlay";
  * was abandoned on, and one that changes between calls restarts every flow.
  * Visitor identity is separate and persistent, and both are sent.
  */
-const SESSION_KEY = "waniwani:webmcp:session";
-
 function tabSessionId(): string {
 	try {
-		const stored = sessionStorage.getItem(SESSION_KEY);
-		if (stored) {
-			return stored;
+		const session = readTabSession();
+		if (session.agent) {
+			return session.agent;
 		}
 		const minted = crypto.randomUUID();
-		sessionStorage.setItem(SESSION_KEY, minted);
+		writeTabSession({ ...session, agent: minted });
 		return minted;
 	} catch {
 		// Private mode, or a browser refusing storage. A per-load id still keys a

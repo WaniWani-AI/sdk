@@ -88,8 +88,8 @@ let win: Window;
 
 beforeEach(() => {
 	win = new Window({ url: "https://shop.test/pricing" });
-	Object.defineProperty(globalThis, "localStorage", {
-		value: win.localStorage,
+	Object.defineProperty(globalThis, "sessionStorage", {
+		value: win.sessionStorage,
 		configurable: true,
 		writable: true,
 	});
@@ -103,15 +103,26 @@ beforeEach(() => {
 	runtime.sends = [];
 });
 
+const STORAGE_KEY = "waniwani-session";
+
+function storedSessions(): Record<string, unknown> {
+	const raw = win.sessionStorage.getItem(STORAGE_KEY);
+	return raw === null ? {} : (JSON.parse(raw).chat ?? {});
+}
+
 function storedAt(key: string): unknown {
-	const raw = win.localStorage.getItem(key);
-	return raw === null ? null : JSON.parse(raw);
+	return storedSessions()[key] ?? null;
+}
+
+function store(key: string, value: unknown): void {
+	win.sessionStorage.setItem(
+		STORAGE_KEY,
+		JSON.stringify({ chat: { ...storedSessions(), [key]: value } }),
+	);
 }
 
 function keyFor(threadId?: string): string {
-	return threadId === undefined
-		? `waniwani:eve-conversation:${CHANNEL}`
-		: `waniwani:eve-conversation:${CHANNEL}:${threadId}`;
+	return threadId === undefined ? CHANNEL : `${CHANNEL}:${threadId}`;
 }
 
 type Deferred = { resolve: () => void; promise: Promise<void> };
@@ -320,10 +331,12 @@ describe("EveTransport – one direct conversation per saved thread", () => {
 			ownerSecret: route.requests[0]?.ownerSecret,
 		});
 		const keys: string[] = [];
-		for (let index = 0; index < win.localStorage.length; index += 1) {
-			keys.push(win.localStorage.key(index) ?? "");
+		for (let index = 0; index < win.sessionStorage.length; index += 1) {
+			keys.push(win.sessionStorage.key(index) ?? "");
 		}
-		expect(keys).toEqual([keyFor()]);
+		expect(keys).toEqual([STORAGE_KEY]);
+		expect(Object.keys(storedSessions())).toEqual([keyFor()]);
+		expect(win.localStorage.length).toBe(0);
 	});
 
 	test("starting a new thread closes the runtime session but keeps the outgoing thread's conversation", async () => {
@@ -642,7 +655,7 @@ describe("EveTransport – documents attached to a direct turn", () => {
 
 describe("EveTransport – MCP extra on a direct turn", () => {
 	test("the chat's extra rides every direct turn as x-waniwani-extra", async () => {
-		const extra = { memoryUserId: "mem_1", locale: "en-US", plan: "gold" };
+		const extra = { accountId: "acc_1", locale: "en-US", plan: "gold" };
 		const route = sessionRouteStub();
 		const { chat, context } = chatStub({ extra });
 		const transport = build(route, context);
@@ -778,10 +791,7 @@ describe("eveTransport – a sessionApi resolved after mount", () => {
 	});
 
 	test("while the resolver answers undefined, restore() shows nothing and keepsSession() is false", async () => {
-		win.localStorage.setItem(
-			keyFor(),
-			JSON.stringify({ conversationId: "conv_old", ownerSecret: "secret" }),
-		);
+		store(keyFor(), { conversationId: "conv_old", ownerSecret: "secret" });
 		const { context } = chatStub();
 		const transport = eveTransport(() => undefined)(context);
 
@@ -810,5 +820,18 @@ describe("eveTransport – a sessionApi resolved after mount", () => {
 		const transport = eveTransport("https://app.test/api/session")(context);
 
 		expect(transport.keepsSession?.()).toBe(true);
+	});
+});
+
+describe("the saved conversations live under one sessionStorage key", () => {
+	test("deleting the last conversation removes the key", async () => {
+		const { saveSession } = await import("./session");
+		saveSession("a", { conversationId: "c1", ownerSecret: "s1" });
+		saveSession("b", { conversationId: "c2", ownerSecret: "s2" });
+		expect(Object.keys(storedSessions())).toEqual(["a", "b"]);
+		saveSession("a", null);
+		expect(Object.keys(storedSessions())).toEqual(["b"]);
+		saveSession("b", null);
+		expect(win.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
 	});
 });

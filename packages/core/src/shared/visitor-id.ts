@@ -14,6 +14,62 @@
 const VISITOR_ID_KEY = "waniwani-visitor-id";
 
 /**
+ * The longest anything the chat keeps in the browser lives: 13 months, the
+ * CNIL ceiling for a tracker. Counted from when the value was created or set,
+ * never renewed by a visit.
+ */
+export const STORAGE_MAX_AGE_MS = 395 * 24 * 60 * 60 * 1000;
+
+/** What the key holds: the id and the time it was created or set. */
+interface StoredVisitorId {
+	id: string;
+	createdAt: number;
+}
+
+/**
+ * Read the stored id. A plain-string value with no creation time counts as
+ * created at this read and is rewritten with one, so its 13 months start
+ * here. An expired id reads as none.
+ */
+function readStored(now: number): string | null {
+	const raw = localStorage.getItem(VISITOR_ID_KEY);
+	if (!raw) {
+		return null;
+	}
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(raw);
+	} catch {
+		parsed = undefined;
+	}
+	if (
+		typeof parsed === "object" &&
+		parsed !== null &&
+		typeof (parsed as StoredVisitorId).id === "string" &&
+		(parsed as StoredVisitorId).id &&
+		typeof (parsed as StoredVisitorId).createdAt === "number"
+	) {
+		const stored = parsed as StoredVisitorId;
+		if (now - stored.createdAt >= STORAGE_MAX_AGE_MS) {
+			localStorage.removeItem(VISITOR_ID_KEY);
+			return null;
+		}
+		return stored.id;
+	}
+	try {
+		writeStored(raw, now);
+	} catch {
+		// Keep the plain-string id for this load even if the rewrite fails.
+	}
+	return raw;
+}
+
+function writeStored(id: string, now: number): void {
+	const value: StoredVisitorId = { id, createdAt: now };
+	localStorage.setItem(VISITOR_ID_KEY, JSON.stringify(value));
+}
+
+/**
  * A random opaque id, generated synchronously. Prefers `crypto.randomUUID`
  * and falls back to a `crypto.getRandomValues` UUIDv4 when it is missing
  * (older browsers), and finally to a non-crypto random string when the Web
@@ -45,7 +101,8 @@ function randomId(): string {
 
 /**
  * Synchronously return a stable, persisted visitor id, creating one on first
- * call. Runs with no async work and no `crypto.subtle` dependency, so it never
+ * call. An id older than {@link STORAGE_MAX_AGE_MS} is replaced by a new
+ * one. Runs with no async work and no `crypto.subtle` dependency, so it never
  * races an in-flight promise and never fails on a non-secure context — callers
  * can rely on a visitor id being present on the very first event or request.
  *
@@ -55,8 +112,9 @@ function randomId(): string {
  * id and send both.
  */
 export function getOrCreateVisitorId(): string {
+	const now = Date.now();
 	try {
-		const stored = localStorage.getItem(VISITOR_ID_KEY);
+		const stored = readStored(now);
 		if (stored) {
 			return stored;
 		}
@@ -69,7 +127,7 @@ export function getOrCreateVisitorId(): string {
 	const id = randomId();
 
 	try {
-		localStorage.setItem(VISITOR_ID_KEY, id);
+		writeStored(id, now);
 	} catch {
 		// Ignore storage failures.
 	}
@@ -80,7 +138,8 @@ export function getOrCreateVisitorId(): string {
 /**
  * Override the persisted visitor id with a caller-supplied one — typically the
  * distinct id the host site already tracks in PostHog, Amplitude, Segment, etc.
- * The value is stored under the same key as the auto-generated id, so it
+ * The value is stored under the same key as the auto-generated id, with a new
+ * creation time (its 13 months start when it is set), so it
  * becomes the single source of truth every later read
  * (`getOrCreateVisitorId`, `collectVisitorContext`) returns, and it is what the
  * chat sends to the server on every request. That threads it through to MCP
@@ -98,7 +157,7 @@ export function setVisitorId(id: string): string {
 	}
 
 	try {
-		localStorage.setItem(VISITOR_ID_KEY, trimmed);
+		writeStored(trimmed, Date.now());
 	} catch {
 		// Storage unavailable (private mode / non-secure context). The value
 		// can't persist here — consistent with getOrCreateVisitorId, which also

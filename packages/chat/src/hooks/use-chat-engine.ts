@@ -223,11 +223,11 @@ export function useChatEngine(props: ChatBaseProps) {
 		if (!enableThreadHistory) {
 			return;
 		}
-		const memoryUserId = visitorContextRef.current?.memoryUserId;
-		if (!memoryUserId) {
+		const visitorId = visitorContextRef.current?.visitorId;
+		if (!visitorId) {
 			return;
 		}
-		const list = await listThreads(memoryUserId);
+		const list = await listThreads(visitorId);
 		setThreads(list);
 	}, [enableThreadHistory]);
 
@@ -293,15 +293,15 @@ export function useChatEngine(props: ChatBaseProps) {
 			if (!enableThreadHistory) {
 				return;
 			}
-			const memoryUserId = visitorContextRef.current?.memoryUserId;
-			if (!memoryUserId) {
+			const visitorId = visitorContextRef.current?.visitorId;
+			if (!visitorId) {
 				setIsThreadHistoryReady(true);
 				return;
 			}
 
 			try {
 				const targetId =
-					controlledThreadId ?? (await getActiveThreadId(memoryUserId));
+					controlledThreadId ?? (await getActiveThreadId(visitorId));
 				if (cancelled || mountEpoch !== switchEpochRef.current) {
 					return;
 				}
@@ -310,7 +310,7 @@ export function useChatEngine(props: ChatBaseProps) {
 					if (cancelled || mountEpoch !== switchEpochRef.current) {
 						return;
 					}
-					if (stored && stored.memoryUserId === memoryUserId) {
+					if (stored && stored.visitorId === visitorId) {
 						activeThreadIdRef.current = stored.threadId;
 						setActiveThreadIdState(stored.threadId);
 						threadCreatedAtRef.current = stored.createdAt;
@@ -367,12 +367,8 @@ export function useChatEngine(props: ChatBaseProps) {
 				!Array.isArray(callerValue)
 					? (callerValue as Record<string, unknown>)
 					: undefined;
-			const memoryUserId = visitorContextRef.current?.memoryUserId;
 			const locale = visitorContextRef.current?.language;
 			const autoExtra: Record<string, unknown> = {};
-			if (memoryUserId) {
-				autoExtra.memoryUserId = memoryUserId;
-			}
 			if (locale) {
 				autoExtra.locale = locale;
 			}
@@ -461,10 +457,7 @@ export function useChatEngine(props: ChatBaseProps) {
 					// Anonymous visitor id — the server stamps it onto chat events'
 					// `visitor_id` so visits link a `page.viewed` to its conversation.
 					id: visitorId,
-					client: {
-						...existingClient,
-						...(vc && { memoryUserId: vc.memoryUserId }),
-					},
+					client: existingClient,
 				};
 
 				// Read per send, so it follows a single-page site's in-app navigation.
@@ -747,15 +740,15 @@ export function useChatEngine(props: ChatBaseProps) {
 						// Best-effort — silently ignore failures
 					}
 				}
-				const memoryUserId = ctx?.memoryUserId;
-				if (!memoryUserId || cancelled || epoch !== switchEpochRef.current) {
+				const visitorId = ctx?.visitorId;
+				if (!visitorId || cancelled || epoch !== switchEpochRef.current) {
 					if (!cancelled) {
 						setIsThreadHistoryReady(true);
 					}
 					return;
 				}
 				const targetId =
-					controlledThreadId ?? (await getActiveThreadId(memoryUserId));
+					controlledThreadId ?? (await getActiveThreadId(visitorId));
 				if (cancelled || epoch !== switchEpochRef.current) {
 					return;
 				}
@@ -764,7 +757,7 @@ export function useChatEngine(props: ChatBaseProps) {
 					if (cancelled || epoch !== switchEpochRef.current) {
 						return;
 					}
-					if (stored && stored.memoryUserId === memoryUserId) {
+					if (stored && stored.visitorId === visitorId) {
 						activeThreadIdRef.current = stored.threadId;
 						setActiveThreadIdState(stored.threadId);
 						threadCreatedAtRef.current = stored.createdAt;
@@ -991,10 +984,10 @@ export function useChatEngine(props: ChatBaseProps) {
 		if (!enableThreadHistoryRef.current) {
 			return undefined;
 		}
-		const memoryUserId = visitorContextRef.current?.memoryUserId;
+		const visitorId = visitorContextRef.current?.visitorId;
 		const threadId = activeThreadIdRef.current;
 		const msgs = messagesRef.current;
-		if (!memoryUserId || !threadId || msgs.length === 0) {
+		if (!visitorId || !threadId || msgs.length === 0) {
 			return undefined;
 		}
 		if (!threadCreatedAtRef.current) {
@@ -1013,7 +1006,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		}
 		return {
 			threadId,
-			memoryUserId,
+			visitorId,
 			title: threadTitleRef.current,
 			messages: msgs,
 			sessionId: sessionIdRef.current,
