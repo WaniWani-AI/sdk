@@ -70,7 +70,11 @@ export default defineConfig([
 		dts: false,
 		clean: false,
 		splitting: false,
-		sourcemap: true,
+		// Customer sites load this file straight from jsDelivr, so a map here is
+		// the chat's whole source handed to anyone who opens devtools on their
+		// page. It would also be wrong: `build:embed-css` rewrites the file after
+		// esbuild writes the map, which shifts every column after the CSS.
+		sourcemap: false,
 		minify: true,
 		outDir: "dist",
 		noExternal: [/.*/], // bundle everything including React
