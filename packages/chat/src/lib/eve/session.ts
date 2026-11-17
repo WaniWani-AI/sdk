@@ -57,25 +57,38 @@ export function sessionKey(input: {
 		: `${channel}:${input.threadId}`;
 }
 
-function storageKey(key: string): string {
-	return `waniwani:eve-conversation:${key}`;
+/**
+ * The sessionStorage key holding every saved conversation of this tab, as one
+ * object mapped by {@link sessionKey}. A reload in the same tab reopens the
+ * conversation; a new tab starts a new one.
+ */
+const STORAGE_KEY = "waniwani-chat-session";
+
+function isSavedSession(value: unknown): value is SavedSession {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"conversationId" in value &&
+		typeof value.conversationId === "string" &&
+		"ownerSecret" in value &&
+		typeof value.ownerSecret === "string"
+	);
+}
+
+function readAll(): Record<string, unknown> {
+	const parsed: unknown = JSON.parse(
+		sessionStorage.getItem(STORAGE_KEY) ?? "null",
+	);
+	return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+		? (parsed as Record<string, unknown>)
+		: {};
 }
 
 export function savedSession(key: string): SavedSession | null {
 	try {
-		const parsed: unknown = JSON.parse(
-			localStorage.getItem(storageKey(key)) ?? "null",
-		);
-		return typeof parsed === "object" &&
-			parsed !== null &&
-			"conversationId" in parsed &&
-			typeof parsed.conversationId === "string" &&
-			"ownerSecret" in parsed &&
-			typeof parsed.ownerSecret === "string"
-			? {
-					conversationId: parsed.conversationId,
-					ownerSecret: parsed.ownerSecret,
-				}
+		const value = readAll()[key];
+		return isSavedSession(value)
+			? { conversationId: value.conversationId, ownerSecret: value.ownerSecret }
 			: null;
 	} catch {
 		return null;
@@ -84,10 +97,19 @@ export function savedSession(key: string): SavedSession | null {
 
 export function saveSession(key: string, saved: SavedSession | null): void {
 	try {
+		const all = readAll();
 		if (saved) {
-			localStorage.setItem(storageKey(key), JSON.stringify(saved));
+			all[key] = {
+				conversationId: saved.conversationId,
+				ownerSecret: saved.ownerSecret,
+			};
 		} else {
-			localStorage.removeItem(storageKey(key));
+			delete all[key];
+		}
+		if (Object.keys(all).length > 0) {
+			sessionStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+		} else {
+			sessionStorage.removeItem(STORAGE_KEY);
 		}
 	} catch {}
 }

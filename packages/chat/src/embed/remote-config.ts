@@ -23,17 +23,27 @@ import type { VisibilityRules } from "./visibility";
 // the same tab can render the fully-assembled chrome immediately, with the
 // background revalidation updating fields silently if anything changed.
 // Session scope auto-expires per tab and is origin-isolated, so we don't
-// need an explicit TTL.
+// need an explicit TTL. One key holds every config of the tab, mapped by
+// `api|token|channelId`.
 // ---------------------------------------------------------------------------
 
-const CACHE_PREFIX = "waniwani:config:";
+const CACHE_KEY = "waniwani-config";
 
-function cacheKey(
+function cacheEntry(
 	api: string,
 	token: string,
 	channelId: string | undefined,
 ): string {
-	return `${CACHE_PREFIX}${api}|${token}|${channelId ?? ""}`;
+	return `${api}|${token}|${channelId ?? ""}`;
+}
+
+function readCache(): Record<string, unknown> {
+	const parsed: unknown = JSON.parse(
+		window.sessionStorage.getItem(CACHE_KEY) ?? "null",
+	);
+	return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+		? (parsed as Record<string, unknown>)
+		: {};
 }
 
 export function loadCachedConfig(
@@ -45,12 +55,10 @@ export function loadCachedConfig(
 		return null;
 	}
 	try {
-		const raw = window.sessionStorage.getItem(cacheKey(api, token, channelId));
-		if (!raw) {
-			return null;
-		}
-		const parsed = JSON.parse(raw) as Partial<EmbedConfig>;
-		return parsed && typeof parsed === "object" ? parsed : null;
+		const entry = readCache()[cacheEntry(api, token, channelId)];
+		return entry && typeof entry === "object"
+			? (entry as Partial<EmbedConfig>)
+			: null;
 	} catch {
 		return null;
 	}
@@ -66,10 +74,14 @@ export function saveCachedConfig(
 		return;
 	}
 	try {
-		window.sessionStorage.setItem(
-			cacheKey(api, token, channelId),
-			JSON.stringify(config),
-		);
+		let all: Record<string, unknown>;
+		try {
+			all = readCache();
+		} catch {
+			all = {};
+		}
+		all[cacheEntry(api, token, channelId)] = config;
+		window.sessionStorage.setItem(CACHE_KEY, JSON.stringify(all));
 	} catch {
 		// sessionStorage can be disabled (private mode, quota) — silently skip.
 	}

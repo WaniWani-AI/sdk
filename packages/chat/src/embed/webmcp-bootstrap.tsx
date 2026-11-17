@@ -39,7 +39,7 @@ import { WebMcpOverlay } from "./webmcp-overlay";
  * was abandoned on, and one that changes between calls restarts every flow.
  * Visitor identity is separate and persistent, and both are sent.
  */
-const SESSION_KEY = "waniwani:webmcp:session";
+const SESSION_KEY = "waniwani-agent-session";
 
 function tabSessionId(): string {
 	try {

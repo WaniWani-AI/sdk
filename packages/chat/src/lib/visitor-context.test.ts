@@ -17,6 +17,20 @@ const { applyVisitorId, getOrCreateVisitorId, setVisitorId } = await import(
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 const KEY = "waniwani-visitor-id";
+const { STORAGE_MAX_AGE_MS } = await import("@waniwani/core/shared/visitor-id");
+
+/** The id the key holds, or null. */
+function storedId(): string | null {
+	const raw = localStorage.getItem(KEY);
+	return raw === null ? null : (JSON.parse(raw) as { id: string }).id;
+}
+
+function storedCreatedAt(): number | undefined {
+	const raw = localStorage.getItem(KEY);
+	return raw === null
+		? undefined
+		: (JSON.parse(raw) as { createdAt: number }).createdAt;
+}
 
 describe("getOrCreateVisitorId", () => {
 	beforeEach(() => {
@@ -28,7 +42,7 @@ describe("getOrCreateVisitorId", () => {
 		const id = getOrCreateVisitorId();
 		expect(typeof id).toBe("string");
 		expect(id.length).toBeGreaterThan(0);
-		expect(localStorage.getItem(KEY)).toBe(id);
+		expect(storedId()).toBe(id);
 	});
 
 	test("returns the same persisted id on subsequent calls", () => {
@@ -40,6 +54,30 @@ describe("getOrCreateVisitorId", () => {
 	test("honours a pre-existing stored id", () => {
 		localStorage.setItem(KEY, "preexisting-id");
 		expect(getOrCreateVisitorId()).toBe("preexisting-id");
+	});
+
+	test("keeps a legacy plain-string id and starts its 13 months now", () => {
+		localStorage.setItem(KEY, "legacy-id");
+		const before = Date.now();
+		expect(getOrCreateVisitorId()).toBe("legacy-id");
+		expect(storedId()).toBe("legacy-id");
+		expect(storedCreatedAt()).toBeGreaterThanOrEqual(before);
+	});
+
+	test("keeps an id younger than 13 months and does not renew it", () => {
+		const createdAt = Date.now() - STORAGE_MAX_AGE_MS + 60_000;
+		localStorage.setItem(KEY, JSON.stringify({ id: "young", createdAt }));
+		expect(getOrCreateVisitorId()).toBe("young");
+		expect(storedCreatedAt()).toBe(createdAt);
+	});
+
+	test("replaces an id 13 months old with a new one", () => {
+		const createdAt = Date.now() - STORAGE_MAX_AGE_MS;
+		localStorage.setItem(KEY, JSON.stringify({ id: "expired", createdAt }));
+		const id = getOrCreateVisitorId();
+		expect(id).not.toBe("expired");
+		expect(storedId()).toBe(id);
+		expect(storedCreatedAt()).toBeGreaterThan(createdAt);
 	});
 
 	test("returns an id even when crypto is unavailable (non-secure context)", () => {
@@ -65,7 +103,7 @@ describe("setVisitorId", () => {
 	test("persists a host-supplied id and returns it", () => {
 		const returned = setVisitorId("posthog-distinct-123");
 		expect(returned).toBe("posthog-distinct-123");
-		expect(localStorage.getItem(KEY)).toBe("posthog-distinct-123");
+		expect(storedId()).toBe("posthog-distinct-123");
 	});
 
 	test("becomes the id every later read returns", () => {
@@ -80,22 +118,32 @@ describe("setVisitorId", () => {
 		expect(getOrCreateVisitorId()).not.toBe(auto);
 	});
 
+	test("starts a new 13 months when the host sets an id", () => {
+		localStorage.setItem(
+			KEY,
+			JSON.stringify({ id: "old", createdAt: Date.now() - 1_000_000 }),
+		);
+		const before = Date.now();
+		setVisitorId("host-id");
+		expect(storedCreatedAt()).toBeGreaterThanOrEqual(before);
+	});
+
 	test("trims surrounding whitespace", () => {
 		expect(setVisitorId("  padded-id  ")).toBe("padded-id");
-		expect(localStorage.getItem(KEY)).toBe("padded-id");
+		expect(storedId()).toBe("padded-id");
 	});
 
 	test("ignores a blank id and keeps the current one", () => {
 		localStorage.setItem(KEY, "existing-id");
 		expect(setVisitorId("   ")).toBe("existing-id");
-		expect(localStorage.getItem(KEY)).toBe("existing-id");
+		expect(storedId()).toBe("existing-id");
 	});
 
 	test("mints and keeps an auto id when a blank id is set with none stored", () => {
 		expect(localStorage.getItem(KEY)).toBeNull();
 		const returned = setVisitorId("");
 		expect(returned.length).toBeGreaterThan(0);
-		expect(localStorage.getItem(KEY)).toBe(returned);
+		expect(storedId()).toBe(returned);
 	});
 });
 

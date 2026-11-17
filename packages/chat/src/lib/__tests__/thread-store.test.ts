@@ -27,12 +27,6 @@ async function importThreadStore() {
 	)) as typeof import("../thread-store");
 }
 
-async function importMemoryUserId() {
-	return (await import(
-		`../memory-user-id?t=${Date.now()}-${Math.random()}`
-	)) as typeof import("../memory-user-id");
-}
-
 function makeMessage(id: string, text: string): UIMessage {
 	return {
 		id,
@@ -143,41 +137,6 @@ describe("thread-store", () => {
 		expect(u1.map((t) => t.threadId)).toEqual(["a"]);
 		expect(u2.map((t) => t.threadId)).toEqual(["b"]);
 	});
-
-	test("upgrade path v1 → v2 preserves the ids store", async () => {
-		// Open as v1 with only the legacy `ids` store, write a memoryUserId.
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.open("waniwani-memory", 1);
-			req.onupgradeneeded = () => {
-				const db = req.result;
-				if (!db.objectStoreNames.contains("ids")) {
-					db.createObjectStore("ids");
-				}
-			};
-			req.onsuccess = () => {
-				const db = req.result;
-				const tx = db.transaction("ids", "readwrite");
-				tx.objectStore("ids").put("legacy-user", "memoryUserId");
-				tx.oncomplete = () => {
-					db.close();
-					resolve();
-				};
-				tx.onerror = () => reject(tx.error);
-			};
-			req.onerror = () => reject(req.error);
-		});
-
-		// Re-open via the SDK helper which now requests v2; threads store must exist
-		// AND the legacy id must still be readable.
-		const memMod = await importMemoryUserId();
-		const id = await memMod.getOrCreateMemoryUserId();
-		expect(id).toBe("legacy-user");
-
-		const store = await importThreadStore();
-		await store.upsertThread(makeThread({ memoryUserId: "legacy-user" }));
-		const list = await store.listThreads("legacy-user");
-		expect(list.length).toBe(1);
-	});
 });
 
 describe("thread-store — a reloaded turn still shows what was attached", () => {
@@ -216,5 +175,43 @@ describe("thread-store — a reloaded turn still shows what was attached", () =>
 		expect(loaded?.messages[0]?.parts).toEqual([
 			{ type: "text", text: "read this" },
 		]);
+	});
+});
+
+describe("thread-store: threads expire 13 months after creation", () => {
+	const DAY = 24 * 60 * 60 * 1000;
+
+	test("listThreads hides and deletes a thread 13 months old", async () => {
+		const store = await importThreadStore();
+		const old = new Date(Date.now() - 396 * DAY).toISOString();
+		await store.upsertThread(
+			makeThread({ threadId: "fresh", memoryUserId: "u1" }),
+		);
+		await store.upsertThread(
+			makeThread({
+				threadId: "old",
+				memoryUserId: "u1",
+				createdAt: old,
+				updatedAt: new Date().toISOString(),
+			}),
+		);
+
+		const list = await store.listThreads("u1");
+		expect(list.map((t) => t.threadId)).toEqual(["fresh"]);
+		expect(await store.loadThread("old")).toBeNull();
+	});
+
+	test("a thread updated recently still expires from its creation date", async () => {
+		const store = await importThreadStore();
+		expect(
+			store.isExpiredThread({
+				createdAt: new Date(Date.now() - 396 * DAY).toISOString(),
+			}),
+		).toBe(true);
+		expect(
+			store.isExpiredThread({
+				createdAt: new Date(Date.now() - 300 * DAY).toISOString(),
+			}),
+		).toBe(false);
 	});
 });
