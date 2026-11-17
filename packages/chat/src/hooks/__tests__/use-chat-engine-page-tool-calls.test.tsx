@@ -1168,7 +1168,7 @@ describe("onToolCall set: a replaced conversation drops late answers", () => {
 		const now = new Date().toISOString();
 		await upsertThread({
 			threadId: "thread_other",
-			memoryUserId: "user_other",
+			visitorId: "user_other",
 			title: "Other thread",
 			messages: [
 				{
@@ -1386,18 +1386,18 @@ function endStream(stream: ControlledStream | undefined) {
 }
 
 async function clearThreads(): Promise<string> {
-	const memoryUserId = getOrCreateVisitorId();
-	for (const t of await threadStore.listThreads(memoryUserId)) {
+	const visitorId = getOrCreateVisitorId();
+	for (const t of await threadStore.listThreads(visitorId)) {
 		await threadStore.deleteThread(t.threadId);
 	}
-	return memoryUserId;
+	return visitorId;
 }
 
 async function storeThread(threadId: string, messages: UIMessage[]) {
 	const now = new Date().toISOString();
 	await threadStore.upsertThread({
 		threadId,
-		memoryUserId: getOrCreateVisitorId(),
+		visitorId: getOrCreateVisitorId(),
 		title: threadId,
 		messages,
 		createdAt: now,

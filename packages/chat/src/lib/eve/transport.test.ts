@@ -655,7 +655,7 @@ describe("EveTransport – documents attached to a direct turn", () => {
 
 describe("EveTransport – MCP extra on a direct turn", () => {
 	test("the chat's extra rides every direct turn as x-waniwani-extra", async () => {
-		const extra = { memoryUserId: "mem_1", locale: "en-US", plan: "gold" };
+		const extra = { accountId: "acc_1", locale: "en-US", plan: "gold" };
 		const route = sessionRouteStub();
 		const { chat, context } = chatStub({ extra });
 		const transport = build(route, context);

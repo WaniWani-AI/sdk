@@ -23,11 +23,6 @@ export interface VisitorContext {
 	connectionType: string;
 	referrer: string;
 	visitorId: string;
-	/**
-	 * The visitor id again, under the name MCP servers read from
-	 * `_meta["waniwani/extra"].memoryUserId`. Kept for those servers.
-	 */
-	memoryUserId: string;
 }
 
 // ============================================================================
@@ -138,6 +133,5 @@ export async function collectVisitorContext(): Promise<VisitorContext> {
 		connectionType: (navigator as any).connection?.effectiveType ?? "unknown",
 		referrer: document.referrer,
 		visitorId,
-		memoryUserId: visitorId,
 	};
 }

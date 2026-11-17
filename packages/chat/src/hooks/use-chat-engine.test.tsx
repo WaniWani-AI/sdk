@@ -504,7 +504,7 @@ describe("useChatEngine – widget events", () => {
 		const now = new Date().toISOString();
 		await upsertThread({
 			threadId: "thread_stored",
-			memoryUserId: "user_test",
+			visitorId: "user_test",
 			title: "Stored thread",
 			messages: [],
 			sessionId: "sess_stored",
@@ -1088,6 +1088,17 @@ describe("useChatEngine – what a direct turn is handed", () => {
 		expect(direct.extra).toEqual(fallback?.extra);
 		expect(direct.extra).toMatchObject({ locale: "xx-host", plan: "gold" });
 		expect(direct.channelId).toBe("chan_1");
+	});
+
+	test("the visitor id is not copied into extra", async () => {
+		const { probe } = await mountWithTransport({
+			body: { channelId: "chan_1" },
+		});
+
+		const direct = contextOf(probe).body();
+
+		expect(direct.extra ?? {}).not.toHaveProperty("memoryUserId");
+		expect(direct.extra ?? {}).not.toHaveProperty("visitorId");
 	});
 
 	test("takeTurnInput hands over the composer's documents exactly once", async () => {

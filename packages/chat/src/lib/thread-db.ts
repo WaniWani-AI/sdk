@@ -8,7 +8,7 @@
 export const DB_NAME = "waniwani-threads";
 export const DB_VERSION = 1;
 export const THREADS_STORE = "threads";
-export const THREADS_BY_USER_INDEX = "by_memoryUserId";
+export const THREADS_BY_USER_INDEX = "by_visitorId";
 export const THREADS_BY_UPDATED_INDEX = "by_updatedAt";
 
 export function applyThreadDbUpgrade(db: IDBDatabase): void {
@@ -16,7 +16,7 @@ export function applyThreadDbUpgrade(db: IDBDatabase): void {
 		const threads = db.createObjectStore(THREADS_STORE, {
 			keyPath: "threadId",
 		});
-		threads.createIndex(THREADS_BY_USER_INDEX, "memoryUserId", {
+		threads.createIndex(THREADS_BY_USER_INDEX, "visitorId", {
 			unique: false,
 		});
 		threads.createIndex(THREADS_BY_UPDATED_INDEX, "updatedAt", {

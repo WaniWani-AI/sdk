@@ -8,7 +8,7 @@ import {
 
 export interface StoredThread {
 	threadId: string;
-	memoryUserId: string;
+	visitorId: string;
 	title: string;
 	messages: UIMessage[];
 	sessionId?: string;
@@ -27,7 +27,7 @@ function isStoredThread(value: unknown): value is StoredThread {
 	const v = value as Record<string, unknown>;
 	return (
 		typeof v.threadId === "string" &&
-		typeof v.memoryUserId === "string" &&
+		typeof v.visitorId === "string" &&
 		typeof v.title === "string" &&
 		Array.isArray(v.messages) &&
 		typeof v.createdAt === "string" &&
@@ -79,14 +79,12 @@ export function isExpiredThread(
  * The visitor's threads, newest first. Threads past the 13-month limit are
  * deleted here, so a returning visitor never sees one and none outlives it.
  */
-export async function listThreads(
-	memoryUserId: string,
-): Promise<StoredThread[]> {
+export async function listThreads(visitorId: string): Promise<StoredThread[]> {
 	const result = await withDb(async (db) => {
 		const tx = db.transaction(THREADS_STORE, "readwrite");
 		const store = tx.objectStore(THREADS_STORE);
 		const index = store.index(THREADS_BY_USER_INDEX);
-		const all = await promisifyRequest(index.getAll(memoryUserId));
+		const all = await promisifyRequest(index.getAll(visitorId));
 		const now = Date.now();
 		const threads: StoredThread[] = [];
 		for (const value of all ?? []) {
@@ -142,7 +140,7 @@ export async function upsertThread(thread: StoredThread): Promise<void> {
 		const tx2 = db.transaction(THREADS_STORE, "readwrite");
 		const store2 = tx2.objectStore(THREADS_STORE);
 		const index = store2.index(THREADS_BY_USER_INDEX);
-		const all = await promisifyRequest(index.getAll(trimmed.memoryUserId));
+		const all = await promisifyRequest(index.getAll(trimmed.visitorId));
 		const now = Date.now();
 		const userThreads: StoredThread[] = [];
 		for (const t of (all ?? []).filter(isStoredThread)) {
@@ -185,9 +183,9 @@ export async function deleteThread(threadId: string): Promise<void> {
 }
 
 export async function getActiveThreadId(
-	memoryUserId: string,
+	visitorId: string,
 ): Promise<string | null> {
-	const threads = await listThreads(memoryUserId);
+	const threads = await listThreads(visitorId);
 	return threads[0]?.threadId ?? null;
 }
 
