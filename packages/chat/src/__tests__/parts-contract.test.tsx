@@ -60,6 +60,23 @@ const SEEDED_MESSAGES: UIMessage[] = [
 	},
 ];
 
+/**
+ * Re-renders until `predicate` holds. On a loaded CI runner the seeded thread
+ * has committed after the first `act()` and not yet at the assertion, which
+ * then found no message rows at all.
+ */
+async function waitFor(predicate: () => boolean, timeout = 2000) {
+	const deadline = Date.now() + timeout;
+	while (!predicate()) {
+		if (Date.now() > deadline) {
+			throw new Error("waitFor timed out");
+		}
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 5));
+		});
+	}
+}
+
 const CHROME_PARTS = [
 	"ww-root",
 	"ww-content",
@@ -284,6 +301,9 @@ describe("chat chrome parts", () => {
 				}),
 			);
 		});
+		await waitFor(
+			() => container.querySelector(".ww-message-assistant") !== null,
+		);
 
 		expect(
 			container.querySelectorAll(".ww-message .ww-avatar[data-slot=message]")
