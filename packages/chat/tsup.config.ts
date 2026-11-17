@@ -70,7 +70,7 @@ export default defineConfig([
 		dts: false,
 		clean: false,
 		splitting: false,
-		sourcemap: true,
+		sourcemap: false,
 		minify: true,
 		outDir: "dist",
 		noExternal: [/.*/], // bundle everything including React

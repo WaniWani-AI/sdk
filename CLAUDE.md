@@ -11,6 +11,10 @@ The repo is a bun workspace with four published packages, one private package an
 - `packages/core` → `@waniwani/core`, private and never published: the wire contract both sides share (`shared/*`, the WebMCP bridge and types, the tracking client and types, the document and KB types). tsup inlines it into both packages, code and `.d.ts`. `packages/chat` imports nothing outside itself except `@waniwani/core`; keep it that way.
 - `packages/kit/examples/oney`: a private example app built with the kit. The kit's template contract generates, serves and ejects it.
 
+## This repo is public
+
+Anyone can read this repo, its pull requests, issues, commits, changesets, changelogs and code comments. Never write a person's name in any of them, and never name a customer, a prospect or a partner company. Write "a customer" or "a teammate" instead. Leave out links to internal tools too (Slack threads, Linear tickets, Notion pages, app admin pages, Claude session links). A PR opened from Slack gets a "Requested by" line and a thread link at the top of its body: delete both before you push.
+
 ## Public API tiers
 
 The SDK ships two public tiers plus a private one. The legacy tier was removed in 0.20.0: no `src/legacy/`, no re-exports, no entry point serving it.
