@@ -1,6 +1,7 @@
 import type { AttachedDocument } from "@waniwani/core/documents/types";
 import type { UIMessageChunk } from "ai";
 import { EveAgentStore, type MessageStreamEvent } from "eve/client";
+import { readTabSession, writeTabSession } from "../tab-session";
 import { installEveShims } from "./shims";
 import { type EveEvent, uiMessageChunks } from "./ui-stream";
 
@@ -57,13 +58,6 @@ export function sessionKey(input: {
 		: `${channel}:${input.threadId}`;
 }
 
-/**
- * The sessionStorage key holding every saved conversation of this tab, as one
- * object mapped by {@link sessionKey}. A reload in the same tab reopens the
- * conversation; a new tab starts a new one.
- */
-const STORAGE_KEY = "waniwani-chat-session";
-
 function isSavedSession(value: unknown): value is SavedSession {
 	return (
 		typeof value === "object" &&
@@ -75,18 +69,9 @@ function isSavedSession(value: unknown): value is SavedSession {
 	);
 }
 
-function readAll(): Record<string, unknown> {
-	const parsed: unknown = JSON.parse(
-		sessionStorage.getItem(STORAGE_KEY) ?? "null",
-	);
-	return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-		? (parsed as Record<string, unknown>)
-		: {};
-}
-
 export function savedSession(key: string): SavedSession | null {
 	try {
-		const value = readAll()[key];
+		const value = readTabSession().chat?.[key];
 		return isSavedSession(value)
 			? { conversationId: value.conversationId, ownerSecret: value.ownerSecret }
 			: null;
@@ -97,20 +82,17 @@ export function savedSession(key: string): SavedSession | null {
 
 export function saveSession(key: string, saved: SavedSession | null): void {
 	try {
-		const all = readAll();
+		const session = readTabSession();
+		const chat = { ...session.chat };
 		if (saved) {
-			all[key] = {
+			chat[key] = {
 				conversationId: saved.conversationId,
 				ownerSecret: saved.ownerSecret,
 			};
 		} else {
-			delete all[key];
+			delete chat[key];
 		}
-		if (Object.keys(all).length > 0) {
-			sessionStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-		} else {
-			sessionStorage.removeItem(STORAGE_KEY);
-		}
+		writeTabSession({ ...session, chat });
 	} catch {}
 }
 

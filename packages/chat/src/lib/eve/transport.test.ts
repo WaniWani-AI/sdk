@@ -103,11 +103,11 @@ beforeEach(() => {
 	runtime.sends = [];
 });
 
-const STORAGE_KEY = "waniwani-chat-session";
+const STORAGE_KEY = "waniwani-session";
 
 function storedSessions(): Record<string, unknown> {
 	const raw = win.sessionStorage.getItem(STORAGE_KEY);
-	return raw === null ? {} : JSON.parse(raw);
+	return raw === null ? {} : (JSON.parse(raw).chat ?? {});
 }
 
 function storedAt(key: string): unknown {
@@ -117,7 +117,7 @@ function storedAt(key: string): unknown {
 function store(key: string, value: unknown): void {
 	win.sessionStorage.setItem(
 		STORAGE_KEY,
-		JSON.stringify({ ...storedSessions(), [key]: value }),
+		JSON.stringify({ chat: { ...storedSessions(), [key]: value } }),
 	);
 }
 

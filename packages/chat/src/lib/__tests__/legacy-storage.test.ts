@@ -51,8 +51,7 @@ describe("removeLegacyStorage", () => {
 		sessionStorage.setItem("waniwani:config:https://a|wwp_1|", "{}");
 		sessionStorage.setItem("waniwani:webmcp:session", "old");
 		sessionStorage.setItem("waniwani-config", "{}");
-		sessionStorage.setItem("waniwani-chat-session", "{}");
-		sessionStorage.setItem("waniwani-agent-session", "keep");
+		sessionStorage.setItem("waniwani-session", "{}");
 
 		(await freshModule()).removeLegacyStorage();
 
@@ -67,11 +66,7 @@ describe("removeLegacyStorage", () => {
 			"host-key",
 			"waniwani-visitor-id",
 		]);
-		expect(sessionKeys).toEqual([
-			"waniwani-agent-session",
-			"waniwani-chat-session",
-			"waniwani-config",
-		]);
+		expect(sessionKeys).toEqual(["waniwani-config", "waniwani-session"]);
 	});
 
 	test("deletes the old waniwani-memory database and keeps waniwani-threads", async () => {

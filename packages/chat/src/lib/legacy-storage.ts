@@ -4,10 +4,9 @@
  *
  * - localStorage `waniwani-memory-user-id`: replaced by `waniwani-visitor-id`
  * - localStorage `waniwani:eve-conversation:*`: replaced by sessionStorage
- *   `waniwani-chat-session`
+ *   `waniwani-session`
  * - sessionStorage `waniwani:config:*`: replaced by `waniwani-config`
- * - sessionStorage `waniwani:webmcp:session`: replaced by
- *   `waniwani-agent-session`
+ * - sessionStorage `waniwani:webmcp:session`: replaced by `waniwani-session`
  * - IndexedDB database `waniwani-memory`: replaced by `waniwani-threads`. Its
  *   conversations are not moved. `deleteDatabase` never creates a database.
  */
