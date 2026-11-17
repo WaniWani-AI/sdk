@@ -132,15 +132,18 @@
 
 /* Phones: the panel is a full-screen sheet.
 
-   Size and position come from the visual viewport (`--ww-vv-height`,
-   `--ww-vv-top`, written by `useMobileSheet`), so the sheet always fills the
-   area above the soft keyboard instead of letting the browser pan the page.
-   Without those variables (no `visualViewport`, or a pinch-zoomed page) it
-   falls back to the whole layout viewport.
+   The sheet keeps its full height, so its own background runs under the
+   soft keyboard: the iOS 26 keyboard, its form bar and Safari's address pill
+   are translucent, and a sheet that stopped at the keyboard showed the host
+   page through them. The content is padded up by the keyboard's height
+   (`--ww-keyboard-inset`) instead, so the composer sits on the keyboard, and
+   the sheet follows the visual viewport's top (`--ww-vv-top`) if the browser
+   pans anyway. Both come from `useMobileSheet`; without them (no
+   `visualViewport`, or a pinch-zoomed page) the sheet is plain full screen.
 
    Safe-area padding keeps the header clear of the notch and the composer
-   clear of the home indicator. The bottom inset drops while the keyboard is
-   up (`data-keyboard`), because the keyboard covers that strip.
+   clear of the home indicator. With the keyboard up, the keyboard's height
+   is the larger of the two bottom paddings and wins.
 
    It moves in with `transform` + `opacity` only. The desktop card's
    `clip-path` reveal repaints the whole screen on every frame at this size,
@@ -150,12 +153,26 @@
 	[data-waniwani-floating="panel"] {
 		top: var(--ww-vv-top, 0px);
 		bottom: auto;
-		height: var(--ww-vv-height, 100%);
+		height: 100%;
 		padding-top: env(safe-area-inset-top, 0px);
-		padding-bottom: env(safe-area-inset-bottom, 0px);
+		padding-bottom: max(
+			var(--ww-keyboard-inset, 0px),
+			env(safe-area-inset-bottom, 0px)
+		);
 	}
-	[data-waniwani-floating="panel"][data-keyboard] {
-		padding-bottom: 0;
+	/* While the visitor types, the composer sits right on the keyboard: the
+	   line under it (powered-by and AI disclaimer) comes back once the
+	   keyboard closes. */
+	/* Collapsed rather than removed, so it can grow back with the slide
+	   below instead of pushing the composer up in one step. */
+	[data-waniwani-floating="panel"] .ww-footer {
+		max-height: 6rem;
+	}
+	[data-waniwani-floating="panel"][data-keyboard] .ww-footer {
+		max-height: 0;
+		padding-block: 0;
+		opacity: 0;
+		overflow: hidden;
 	}
 	[data-waniwani-floating="panel"][data-state="opening"],
 	[data-waniwani-floating="panel"][data-state="shown"] {
@@ -219,6 +236,20 @@
 	[data-waniwani-floating="panel"][data-state="shown"] {
 		transition: transform var(--ww-panel-open-duration) cubic-bezier(0.22, 1, 0.36, 1),
 			opacity var(--ww-panel-close-duration) ease, visibility 0s;
+	}
+	/* The keyboard is closing: slide the composer down with it. iOS only
+	   reports the new viewport once the keyboard has gone, so the padding
+	   drops when the field loses focus (`useMobileSheet`) and this carries
+	   the motion. The open sheet's own transitions stay listed. */
+	[data-waniwani-floating="panel"][data-state="shown"][data-keyboard-closing] {
+		transition: padding-bottom 0.25s cubic-bezier(0.25, 0.1, 0.25, 1),
+			transform var(--ww-panel-open-duration) cubic-bezier(0.22, 1, 0.36, 1),
+			opacity var(--ww-panel-close-duration) ease, visibility 0s;
+	}
+	/* The disclaimer line grows back in the same slide. */
+	[data-waniwani-floating="panel"][data-keyboard-closing] .ww-footer {
+		transition: max-height 0.25s cubic-bezier(0.25, 0.1, 0.25, 1),
+			padding 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.25s ease;
 	}
 }
 

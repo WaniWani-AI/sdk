@@ -7,6 +7,7 @@ for (const key of [
 	"navigator",
 	"HTMLElement",
 	"HTMLInputElement",
+	"HTMLTextAreaElement",
 	"Element",
 	"Node",
 	"Event",
@@ -53,6 +54,21 @@ function touchEvent(type: string, x: number, y: number, target: Element) {
 	return event;
 }
 
+/** A `touchend`: the finger that lifted is in `changedTouches`. */
+function tap(type: string, x: number, y: number, target: Element) {
+	const event = new win.Event(type, {
+		bubbles: true,
+		cancelable: true,
+		composed: true,
+	});
+	Object.defineProperty(event, "changedTouches", {
+		value: [{ clientX: x, clientY: y }],
+	});
+	Object.defineProperty(event, "touches", { value: [] });
+	target.dispatchEvent(event as unknown as Event);
+	return event;
+}
+
 let viewport: FakeViewport;
 let container: HTMLElement;
 let root: ReturnType<typeof createRoot>;
@@ -90,7 +106,11 @@ afterEach(() => {
 function Sheet({ active }: { active: boolean }) {
 	const ref = useRef<HTMLDivElement>(null);
 	useMobileSheet(active, ref);
-	return createElement("div", { ref, id: "panel" });
+	return createElement(
+		"div",
+		{ ref, id: "panel" },
+		createElement("textarea", { id: "field" }),
+	);
 }
 
 function panel(): HTMLElement {
@@ -102,16 +122,19 @@ function panel(): HTMLElement {
 }
 
 describe("useMobileSheet", () => {
-	test("sizes the panel to the visual viewport and flags the keyboard", () => {
+	test("pads the panel by the keyboard's height and flags the keyboard", () => {
 		act(() => root.render(createElement(Sheet, { active: true })));
-		expect(panel().style.getPropertyValue("--ww-vv-height")).toBe("800px");
+		expect(panel().style.getPropertyValue("--ww-keyboard-inset")).toBe("0px");
 		expect(panel().hasAttribute("data-keyboard")).toBe(false);
 
+		const field = container.querySelector("#field") as unknown as HTMLElement;
+		act(() => field.focus());
 		act(() => viewport.move(460, 120));
-		expect(panel().style.getPropertyValue("--ww-vv-height")).toBe("460px");
+		expect(panel().style.getPropertyValue("--ww-keyboard-inset")).toBe("340px");
 		expect(panel().style.getPropertyValue("--ww-vv-top")).toBe("120px");
 		expect(panel().hasAttribute("data-keyboard")).toBe(true);
 
+		act(() => field.blur());
 		act(() => viewport.move(800, 0));
 		expect(panel().hasAttribute("data-keyboard")).toBe(false);
 	});
@@ -119,7 +142,7 @@ describe("useMobileSheet", () => {
 	test("a pinch-zoomed page keeps the plain full-screen layout", () => {
 		viewport.scale = 2;
 		act(() => root.render(createElement(Sheet, { active: true })));
-		expect(panel().style.getPropertyValue("--ww-vv-height")).toBe("");
+		expect(panel().style.getPropertyValue("--ww-keyboard-inset")).toBe("");
 	});
 
 	test("locks page scrolling while active and lets go when it closes", () => {
@@ -128,13 +151,50 @@ describe("useMobileSheet", () => {
 
 		act(() => root.render(createElement(Sheet, { active: false })));
 		expect(document.documentElement.style.overflow).toBe("");
-		expect(panel().style.getPropertyValue("--ww-vv-height")).toBe("");
+		expect(panel().style.getPropertyValue("--ww-keyboard-inset")).toBe("");
+	});
+
+	test("a tap on a text field focuses it without the browser's own focus", () => {
+		act(() => root.render(createElement(Sheet, { active: true })));
+		const field = container.querySelector("#field") as unknown as HTMLElement;
+		touchEvent("touchstart", 10, 300, field);
+		const end = tap("touchend", 12, 302, field);
+		expect(end.defaultPrevented).toBe(true);
+		expect(document.activeElement).toBe(field);
+		expect(field.style.transform).toBe("");
+	});
+
+	test("the keyboard counts as up only while a text field has focus", () => {
+		act(() => root.render(createElement(Sheet, { active: true })));
+		const field = container.querySelector("#field") as unknown as HTMLElement;
+		act(() => field.focus());
+		act(() => viewport.move(460, 0));
+		expect(panel().style.getPropertyValue("--ww-keyboard-inset")).toBe("340px");
+
+		// iOS still reports the keyboard's viewport while it closes.
+		act(() => field.blur());
+		expect(panel().style.getPropertyValue("--ww-keyboard-inset")).toBe("0px");
+		expect(panel().hasAttribute("data-keyboard")).toBe(false);
+		expect(panel().hasAttribute("data-keyboard-closing")).toBe(true);
+
+		// A late viewport event with the old size doesn't bring it back up.
+		act(() => viewport.move(460, 0));
+		expect(panel().style.getPropertyValue("--ww-keyboard-inset")).toBe("0px");
+	});
+
+	test("a drag that ends on a text field is a scroll, not a tap", () => {
+		act(() => root.render(createElement(Sheet, { active: true })));
+		const field = container.querySelector("#field") as unknown as HTMLElement;
+		touchEvent("touchstart", 10, 300, field);
+		const end = tap("touchend", 10, 200, field);
+		expect(end.defaultPrevented).toBe(false);
+		expect(document.activeElement).not.toBe(field);
 	});
 
 	test("does nothing while inactive", () => {
 		act(() => root.render(createElement(Sheet, { active: false })));
 		expect(document.documentElement.style.overflow).toBe("");
-		expect(panel().style.getPropertyValue("--ww-vv-height")).toBe("");
+		expect(panel().style.getPropertyValue("--ww-keyboard-inset")).toBe("");
 	});
 });
 

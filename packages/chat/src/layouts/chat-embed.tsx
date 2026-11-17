@@ -35,9 +35,11 @@ import { useChatEngine } from "../hooks/use-chat-engine";
 import { useDocumentUpload } from "../hooks/use-document-upload";
 import { useMultiline } from "../hooks/use-multiline";
 import { useSuggestionRow } from "../hooks/use-suggestion-row";
+import { isTouchPrimary } from "../hooks/use-touch-primary";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
 import { I18nProvider, type Messages, useTranslation } from "../i18n";
 import { copyText, formatTranscript } from "../lib/conversation-transcript";
+import { focusWithoutScroll } from "../lib/focus-without-scroll";
 import { buildResourceEndpoint } from "../lib/resource-endpoint";
 import {
 	bearerToken,
@@ -235,7 +237,15 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 				return;
 			}
 			const textarea = container.querySelector("textarea");
-			if (textarea) {
+			if (!textarea) {
+				return;
+			}
+			// On a touch screen this focus raises the keyboard, and Safari
+			// would scroll the page to the field first (see
+			// `lib/focus-without-scroll.ts`).
+			if (isTouchPrimary()) {
+				focusWithoutScroll(textarea);
+			} else {
 				textarea.focus();
 			}
 		}, []);
