@@ -102,6 +102,7 @@ export function detectDeviceType(ua: string): "mobile" | "tablet" | "desktop" {
 export {
 	applyVisitorId,
 	getOrCreateVisitorId,
+	getVisitorIdSource,
 	setVisitorId,
 	type VisitorIdInput,
 } from "@waniwani/core/shared/visitor-id";

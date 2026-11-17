@@ -14,6 +14,44 @@
 const VISITOR_ID_KEY = "waniwani-visitor-id";
 
 /**
+ * Where the stored visitor id came from, kept beside it under its own key.
+ * The server needs this to tell a host analytics id (a PostHog distinct id, an
+ * Amplitude device id) from one the chat minted, because both can be random
+ * UUIDs.
+ */
+const VISITOR_ID_SOURCE_KEY = "waniwani-visitor-id-source";
+
+/**
+ * `customer`: the host page set the id through `visitorId` or `setVisitorId`.
+ * `generated`: the chat minted it.
+ */
+export type VisitorIdSource = "customer" | "generated";
+
+function storeVisitorIdSource(source: VisitorIdSource): void {
+	try {
+		localStorage.setItem(VISITOR_ID_SOURCE_KEY, source);
+	} catch {
+		// Storage unavailable: getVisitorIdSource reads "generated", which
+		// matches the freshly minted id getOrCreateVisitorId returns here.
+	}
+}
+
+/**
+ * Where the current visitor id came from. An id stored before this key
+ * existed reads as `generated`; a host that sets its own id writes `customer`
+ * again on the next page load.
+ */
+export function getVisitorIdSource(): VisitorIdSource {
+	try {
+		return localStorage.getItem(VISITOR_ID_SOURCE_KEY) === "customer"
+			? "customer"
+			: "generated";
+	} catch {
+		return "generated";
+	}
+}
+
+/**
  * A random opaque id, generated synchronously. Prefers `crypto.randomUUID`
  * and falls back to a `crypto.getRandomValues` UUIDv4 when it is missing
  * (older browsers), and finally to a non-crypto random string when the Web
@@ -73,6 +111,7 @@ export function getOrCreateVisitorId(): string {
 	} catch {
 		// Ignore storage failures.
 	}
+	storeVisitorIdSource("generated");
 
 	return id;
 }
@@ -99,6 +138,7 @@ export function setVisitorId(id: string): string {
 
 	try {
 		localStorage.setItem(VISITOR_ID_KEY, trimmed);
+		localStorage.setItem(VISITOR_ID_SOURCE_KEY, "customer");
 	} catch {
 		// Storage unavailable (private mode / non-secure context). The value
 		// can't persist here — consistent with getOrCreateVisitorId, which also
