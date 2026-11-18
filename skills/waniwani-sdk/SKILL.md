@@ -41,6 +41,7 @@ it is the complete page index, always current, and cheap to read.
 | Track events and build a revenue funnel | [/sdk/tracking/overview](https://docs.waniwani.ai/sdk/tracking/overview), [events](https://docs.waniwani.ai/sdk/tracking/events), [identify](https://docs.waniwani.ai/sdk/tracking/identify), [sessions](https://docs.waniwani.ai/sdk/tracking/sessions) |
 | Know where each event belongs in a flow | [/sdk/tracking/instrumentation](https://docs.waniwani.ai/sdk/tracking/instrumentation) |
 | Check a typed event payload | [/sdk/reference/event-schema](https://docs.waniwani.ai/sdk/reference/event-schema) |
+| Send events, or call any route the SDK uses, from a language without an SDK | [/http-api/overview](https://docs.waniwani.ai/http-api/overview) (keys, regions, envelope), [/sdk/tracking/http](https://docs.waniwani.ai/sdk/tracking/http) (event batches) |
 | Add knowledge-base search | [/sdk/knowledge-base/overview](https://docs.waniwani.ai/sdk/knowledge-base/overview) |
 | Send an email from a tool or flow node | [/sdk/modules/email](https://docs.waniwani.ai/sdk/modules/email) |
 | Embed the chat widget (`@waniwani/chat`) | [/sdk/chat/embed](https://docs.waniwani.ai/sdk/chat/embed) (script tag), [/sdk/chat/react](https://docs.waniwani.ai/sdk/chat/react) |
