@@ -87,6 +87,11 @@ export interface WaniwaniChatOverrides {
 	 * title, `false` hides tool calls entirely.
 	 */
 	showToolCalls?: ShowToolCalls;
+	/**
+	 * Text shown for a tool call, keyed by tool name. A tool with no entry
+	 * shows its own title, or its name in words.
+	 */
+	toolLabels?: Record<string, string>;
 	/** Enable file attachments in the input. */
 	allowAttachments?: boolean;
 	/**
@@ -263,6 +268,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				suggestions: overrides?.suggestions,
 				enableThreadHistory: overrides?.enableThreadHistory,
 				showToolCalls: overrides?.showToolCalls,
+				toolLabels: overrides?.toolLabels,
 				appearance: overrides?.appearance,
 				disclaimer: overrides?.disclaimer,
 				hidePoweredBy: overrides?.hidePoweredBy,
@@ -280,6 +286,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				overrides?.suggestions,
 				overrides?.enableThreadHistory,
 				overrides?.showToolCalls,
+				overrides?.toolLabels,
 				overrides?.appearance,
 				overrides?.disclaimer,
 				overrides?.hidePoweredBy,
@@ -531,6 +538,7 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 					suggestions={suggestions}
 					enableThreadHistory={config.enableThreadHistory}
 					showToolCalls={config.showToolCalls}
+					toolLabels={config.toolLabels}
 					disclaimer={config.disclaimer}
 					hidePoweredBy={config.hidePoweredBy}
 					documentUpload={config.documentUpload}
