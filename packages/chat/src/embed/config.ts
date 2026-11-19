@@ -285,6 +285,11 @@ export interface EmbedConfig {
 	 * Surfaced as `data-show-tool-calls` on the embed script tag.
 	 */
 	showToolCalls?: ShowToolCalls;
+	/**
+	 * Text shown for a tool call, keyed by tool name. A tool with no entry
+	 * shows its own title, or its name in words.
+	 */
+	toolLabels?: Record<string, string>;
 	/** Title shown in the chat header. Defaults to `"Assistant"`. */
 	title?: string;
 	/**

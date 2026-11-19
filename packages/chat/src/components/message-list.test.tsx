@@ -36,7 +36,7 @@ const { act, createElement } = await import("react");
 const { createRoot } = await import("react-dom/client");
 type Root = ReturnType<typeof createRoot>;
 
-const { MessageList } = await import("./message-list");
+const { MessageList, toolLabel } = await import("./message-list");
 
 const PDF = {
 	documentId: "doc_pdf",
@@ -285,5 +285,26 @@ describe("MessageList — parts an AI SDK 7 server adds", () => {
 		const widgets = container.querySelectorAll(".ww-widget");
 		expect(widgets).toHaveLength(1);
 		expect(widgets[0].getAttribute("data-display-mode")).toBe("inline");
+	});
+});
+
+describe("toolLabel", () => {
+	test("the channel's text wins over the tool title and name", () => {
+		expect(
+			toolLabel(
+				{ toolName: "home_quote", title: "Devis habitation" },
+				{ home_quote: "Calcul de votre devis" },
+			),
+		).toBe("Calcul de votre devis");
+	});
+
+	test("falls back to the tool title, then to the name in words", () => {
+		expect(toolLabel({ toolName: "home_quote", title: "Devis" }, {})).toBe(
+			"Devis",
+		);
+		expect(toolLabel({ toolName: "home_quote" }, undefined)).toBe("Home quote");
+		expect(toolLabel({ toolName: "home_quote" }, { home_quote: "  " })).toBe(
+			"Home quote",
+		);
 	});
 });

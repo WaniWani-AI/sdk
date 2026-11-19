@@ -303,6 +303,11 @@ export interface ChatBaseProps {
 	 */
 	showToolCalls?: ShowToolCalls;
 	/**
+	 * Text shown for a tool call, keyed by tool name. A tool with no entry
+	 * shows its own title, or its name in words.
+	 */
+	toolLabels?: Record<string, string>;
+	/**
 	 * Skip fetching `/config` and `/tools` from the API on mount.
 	 * Use when the chat endpoint doesn't serve these routes (e.g. embed widgets
 	 * talking directly to the Waniwani app).
