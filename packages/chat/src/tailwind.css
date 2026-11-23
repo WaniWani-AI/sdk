@@ -488,6 +488,42 @@
 	animation-delay: calc(var(--ww-suggestion-stagger) * var(--ww-index, 0));
 }
 
+/* ─── Composer embed: entrance ─────────────────────────────────────────
+   The in-flow composer holds back until its config has resolved and it is
+   on screen (`data-appeared="true"`), then rises into place on the floating
+   dock's curve: opacity, a 1rem lift, a slight scale and a soft blur. The
+   glow variant starts its border sweep on the same flag.
+
+   The pills ride the same flag. Their fade-in is paused while the box is
+   held back, so the stagger plays when the box arrives rather than unseen
+   at mount, and starts a beat after the box so it reads as a second step.
+
+   The held-back state applies everywhere; with reduced motion the swap is
+   instant. Everything is in `:where()` so a host's own rules win, and after
+   the `.ww-suggestion` rules above so it overrides their delay and the
+   play state their `animation` shorthand resets. */
+:where([data-waniwani-composer="input"][data-appeared="false"]) {
+	opacity: 0;
+	transform: translateY(1rem) scale(0.98);
+	filter: blur(4px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	:where([data-waniwani-composer="input"]) {
+		transition: opacity 0.32s ease,
+			transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), filter 0.32s ease;
+	}
+	:where([data-waniwani-composer="input"][data-appeared="false"] .ww-suggestion) {
+		animation-play-state: paused;
+	}
+}
+
+:where([data-waniwani-composer="input"] .ww-suggestion) {
+	animation-delay: calc(
+		0.16s + var(--ww-suggestion-stagger) * var(--ww-index, 0)
+	);
+}
+
 /* Opt-in assistant bubble. Off by default (assistant messages are plain
    text). When `appearance.assistantBubble` is true the host stamps
    `data-assistant-bubble="true"` and assistant bubbles get a filled surface

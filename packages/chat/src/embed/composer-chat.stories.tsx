@@ -281,13 +281,178 @@ export const NoSuggestions: Story = {
 };
 
 // ============================================================================
+// Entrance
+//
+// The composer holds back until its config has resolved and it is on screen,
+// then rises into place on the floating dock's curve. The glow sweep and the
+// pill stagger start on the same flag, so all three read as one arrival.
+// ============================================================================
+
+/**
+ * The entrance on a loop. "Replay entrance" remounts the composer, so you can
+ * watch the lift, the glow sweep and the pill stagger as often as you like.
+ * Switch `variant`, `size` or `theme` in the controls to compare them.
+ */
+export const Entrance: Story = {
+	render: (args) => <EntranceReplayStory {...args} />,
+};
+
+/** The same replay with `variant: "outline"`: the lift and pills, no sweep. */
+export const EntranceOutline: Story = {
+	args: { variant: "outline" },
+	render: (args) => <EntranceReplayStory {...args} />,
+};
+
+/** The same replay on a dark page. */
+export const EntranceDark: Story = {
+	args: { theme: "dark" },
+	render: (args) => <EntranceReplayStory {...args} />,
+};
+
+/**
+ * Composers below the fold. Each one waits until it is on screen before it
+ * plays its entrance, so scroll down slowly and watch them arrive one by one.
+ * Scrolling back up does not replay them: the entrance plays once per mount.
+ */
+export const EntranceOnScroll: Story = {
+	render: (args) => <EntranceScrollStory {...args} />,
+};
+
+function EntranceReplayStory(args: ComposerArgs) {
+	const [run, setRun] = useState(0);
+	const dark = args.theme === "dark";
+	return (
+		<HeroPage dark={dark}>
+			<ComposerMount key={run} config={buildConfig(args)} />
+			<ReplayButton dark={dark} onClick={() => setRun((n) => n + 1)} />
+		</HeroPage>
+	);
+}
+
+const SCROLL_SECTIONS: {
+	heading: string;
+	body: string;
+	look: ComposerAppearance;
+}[] = [
+	{
+		heading: "Still have a question?",
+		body: "A glow composer at the end of an article, the way a help page would place it.",
+		look: { variant: "glow" },
+	},
+	{
+		heading: "Talk to sales",
+		body: "An outline composer under a pricing table. It lifts in without the sweep.",
+		look: { variant: "outline", showSuggestions: false },
+	},
+	{
+		heading: "Search the docs",
+		body: "A large glow composer as the last call to action on the page.",
+		look: { variant: "glow", size: "lg", align: "center" },
+	},
+];
+
+function EntranceScrollStory(args: ComposerArgs) {
+	const dark = args.theme === "dark";
+	const config = buildConfig(args);
+	return (
+		<div
+			style={{
+				background: dark ? "#0f1115" : "#f7f7f8",
+				color: dark ? "#e5e7eb" : "#1f2937",
+				fontFamily: "system-ui, sans-serif",
+			}}
+		>
+			<section
+				style={{
+					minHeight: "100vh",
+					display: "flex",
+					flexDirection: "column",
+					alignItems: "center",
+					justifyContent: "center",
+					textAlign: "center",
+					padding: "0 24px",
+				}}
+			>
+				<h1 style={{ fontSize: 40, fontWeight: 800 }}>Scroll down</h1>
+				<p style={{ marginTop: 12, maxWidth: 520, opacity: 0.8 }}>
+					Every composer on this page is below the fold. Each one plays its
+					entrance when it comes into view.
+				</p>
+				<div style={{ marginTop: 32, fontSize: 28, opacity: 0.5 }}>↓</div>
+			</section>
+			{SCROLL_SECTIONS.map((section) => (
+				<section
+					key={section.heading}
+					style={{
+						maxWidth: 640,
+						margin: "0 auto",
+						padding: "0 24px",
+						minHeight: "90vh",
+						display: "flex",
+						flexDirection: "column",
+						justifyContent: "center",
+					}}
+				>
+					<h2 style={{ fontSize: 28, fontWeight: 700 }}>{section.heading}</h2>
+					<p style={{ marginTop: 8, marginBottom: 24, opacity: 0.75 }}>
+						{section.body}
+					</p>
+					<ComposerMount config={{ ...config, composer: section.look }} />
+				</section>
+			))}
+			<div style={{ height: "30vh" }} />
+		</div>
+	);
+}
+
+/** One composer with its own panel container. */
+function ComposerMount({ config }: { config: EmbedConfig }) {
+	const panelContainer = usePanelContainer();
+	if (!panelContainer) {
+		return null;
+	}
+	return <ComposerChat config={config} panelContainer={panelContainer} />;
+}
+
+function ReplayButton({
+	dark,
+	onClick,
+}: {
+	dark: boolean;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			style={{
+				position: "fixed",
+				right: 24,
+				bottom: 24,
+				padding: "10px 16px",
+				borderRadius: 9999,
+				border: `1px solid ${dark ? "#374151" : "#d1d5db"}`,
+				background: dark ? "#1f2937" : "#ffffff",
+				color: dark ? "#e5e7eb" : "#1f2937",
+				fontSize: 14,
+				fontWeight: 600,
+				cursor: "pointer",
+				boxShadow: "0 4px 14px rgba(0, 0, 0, 0.08)",
+			}}
+		>
+			Replay entrance
+		</button>
+	);
+}
+
+// ============================================================================
 // Variants
 //
 // Two starting points. Anything past them is CSS — see the `CssVariables`
 // story at the bottom.
 // ============================================================================
 
-/** Filled box with the one-off border sweep once the config resolves. */
+/** Filled box with the one-off border sweep once it arrives on screen. */
 export const Glow: Story = {
 	args: { variant: "glow" },
 };
