@@ -56,6 +56,7 @@ import { useEmbedWelcomeProps } from "./embed-welcome";
 import { LayoutToggleButton } from "./layout-toggle-button";
 import { panelClassName } from "./panel-layout";
 import { useRemoteEmbedConfig } from "./remote-config";
+import { useInViewOnce } from "./use-in-view-once";
 import { type EmbedMessages, useEmbedMessages } from "./use-messages-url";
 import { useMobileSheet } from "./use-mobile-sheet";
 import { usePanelLayout } from "./use-panel-layout";
@@ -254,6 +255,13 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 		const textareaRef = useRef<HTMLTextAreaElement>(null);
 		// The `button` variant renders no textarea; `focus()` lands here instead.
 		const triggerRef = useRef<HTMLButtonElement>(null);
+		const composerRef = useRef<HTMLDivElement>(null);
+		// The entrance, the glow sweep and the pill stagger all wait for this:
+		// the config has resolved (so the box arrives with its final placeholder
+		// and pills) and the box is on screen. A composer below the fold plays
+		// its entrance when the visitor scrolls to it, not unseen at mount. See
+		// the `data-appeared` CSS, which uses the floating dock's curve.
+		const appeared = useInViewOnce(composerRef, ready && visible);
 		const [open, setOpen] = useState(false);
 		const panelRef = useRef<HTMLDivElement>(null);
 		const [composerText, setComposerText] = useState("");
@@ -649,7 +657,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 		const box =
 			variant === "glow" ? (
 				<BorderGlow
-					animated={ready}
+					animated={appeared}
 					backgroundColor={BG}
 					borderRadius={radius}
 					edgeSensitivity={30}
@@ -674,10 +682,12 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 		// decides how wide it is; height is content-driven (no `data-height`).
 		const composer = (
 			<div
+				ref={composerRef}
 				data-waniwani-chat=""
 				data-color-scheme={preset === "auto" ? "auto" : undefined}
 				data-waniwani-composer="input"
 				data-composer-variant={variant}
+				data-appeared={appeared ? "true" : "false"}
 				// While the panel is open the composer is content behind an
 				// overlay: keep it in layout (removing it would shift the page)
 				// but inert, so tabbing inside the panel can't walk into the box
