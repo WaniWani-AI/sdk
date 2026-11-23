@@ -20,6 +20,11 @@ async function reply(
 	return message?.parts.length ? message : undefined;
 }
 
+/** Sessions recorded before eve 0.83 carry the runtime's own task messages as `message.received` with a `kind`. */
+function authoredByRuntime(data: object): boolean {
+	return "kind" in data && Boolean(data.kind);
+}
+
 /** A resumed session's events as the messages the chat shows. */
 export async function historyMessages(
 	events: readonly MessageStreamEvent[],
@@ -27,7 +32,7 @@ export async function historyMessages(
 	const turns: { visitor: UIMessage; events: EveEvent[] }[] = [];
 	for (const event of events) {
 		const text =
-			event.type === "message.received" && !event.data.kind
+			event.type === "message.received" && !authoredByRuntime(event.data)
 				? event.data.message
 				: undefined;
 		if (text !== undefined) {
