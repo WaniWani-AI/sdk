@@ -773,6 +773,7 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 						enableThreadHistory={config.enableThreadHistory}
 						documentUpload={config.documentUpload}
 						showToolCalls={config.showToolCalls}
+						toolLabels={config.toolLabels}
 						disclaimer={config.disclaimer}
 						suggestionsLayout={config.suggestionsLayout}
 						suggestionsPosition={config.suggestionsPosition}

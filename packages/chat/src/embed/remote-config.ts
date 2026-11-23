@@ -127,6 +127,8 @@ interface RemoteConfigResponse {
 	 * `titles-only` → `"titles-only"`.
 	 */
 	toolCallDisplay?: "full" | "titles-only" | "hidden" | null;
+	/** Channel text shown for a tool call, keyed by tool name. */
+	toolLabels?: unknown;
 	/**
 	 * Per-URL show/hide rules for the floating bar (WAN-516). Consumed by the
 	 * embed to gate the floating dock per `window.location.pathname`. `null`
@@ -310,6 +312,10 @@ function remoteToConfigPartial(
 	} else if (data.toolCallDisplay === "hidden") {
 		out.showToolCalls = false;
 	}
+	const toolLabels = parseToolLabels(data.toolLabels);
+	if (toolLabels) {
+		out.toolLabels = toolLabels;
+	}
 	if (data.visibility) {
 		out.visibility = data.visibility;
 	}
@@ -331,6 +337,19 @@ function remoteToConfigPartial(
 	return out;
 }
 
+/** Keeps the non-empty string labels of a channel's `toolLabels` map. */
+function parseToolLabels(raw: unknown): Record<string, string> | undefined {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+		return undefined;
+	}
+	const labels: Record<string, string> = {};
+	for (const [name, label] of Object.entries(raw)) {
+		if (typeof label === "string" && label.trim()) {
+			labels[name] = label.trim();
+		}
+	}
+	return Object.keys(labels).length > 0 ? labels : undefined;
+}
 /**
  * Fetch the remote config on mount and return an `EmbedConfig` that
  * re-resolves through the layered merge (defaults < remote < data-attrs <

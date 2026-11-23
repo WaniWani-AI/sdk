@@ -66,6 +66,15 @@ function formatToolName(name: string | undefined): string {
 	return name.replace(/[-_]/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
+/** The channel's text for the tool, else the tool's title, else its name in words. */
+export function toolLabel(
+	part: { toolName?: string; title?: string },
+	labels: Record<string, string> | undefined,
+): string {
+	const custom = part.toolName ? labels?.[part.toolName]?.trim() : undefined;
+	return custom || part.title || formatToolName(part.toolName);
+}
+
 /** Picks a timeline icon for a tool step: a globe for search-like tools, a
  * wrench for everything else. */
 function pickStepIcon(name: string | undefined): LucideIcon {
@@ -135,6 +144,8 @@ interface MessageListProps {
 	 * call are always rendered regardless of this flag.
 	 */
 	showToolCalls?: ShowToolCalls;
+	/** Text shown for a tool call, keyed by tool name. */
+	toolLabels?: Record<string, string>;
 	/**
 	 * Cached tool catalog keyed by tool name. Drives spec-canonical widget
 	 * resolution: if a tool's definition `_meta` carries a widget resource
@@ -176,6 +187,7 @@ export function MessageList({
 	fullscreenToolCallId,
 	debug,
 	showToolCalls = true,
+	toolLabels,
 	toolDefinitions,
 	messageClassNames,
 	trailing,
@@ -337,7 +349,7 @@ export function MessageList({
 										? { icon: ClockIcon, label: t.reasoning.thinking }
 										: {
 												icon: pickStepIcon(last.toolName),
-												label: last.title ?? formatToolName(last.toolName),
+												label: toolLabel(last, toolLabels),
 											};
 								return (
 									<ChainOfThought
@@ -368,8 +380,7 @@ export function MessageList({
 														</ChainOfThoughtReasoning>
 													);
 												}
-												const title =
-													part.title ?? formatToolName(part.toolName);
+												const title = toolLabel(part, toolLabels);
 												const icon = pickStepIcon(part.toolName);
 												if (showToolCalls === "titles-only") {
 													return (
@@ -420,7 +431,7 @@ export function MessageList({
 							toolParts.length === 1 &&
 							(() => {
 								const part = toolParts[0];
-								const title = part.title ?? formatToolName(part.toolName);
+								const title = toolLabel(part, toolLabels);
 								if (showToolCalls === "titles-only") {
 									return <ToolIndicator title={title} state={part.state} />;
 								}

@@ -111,6 +111,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 			hideHeader = false,
 			enableThreadHistory = false,
 			showToolCalls = true,
+			toolLabels,
 			initializing = false,
 			onScreen = true,
 			mode,
@@ -764,6 +765,7 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 								fullscreenToolCallId={fullscreenToolCallId}
 								debug={debug}
 								showToolCalls={showToolCalls}
+								toolLabels={toolLabels}
 								showTableToolbar={showTableToolbar}
 								toolDefinitions={engine.toolDefinitions}
 								messageClassNames={{

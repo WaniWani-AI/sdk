@@ -306,6 +306,38 @@ const DOCUMENT_UPLOAD = {
 	accept: ["application/pdf", "image/png"],
 };
 
+describe("fetchRemoteConfig — toolLabels", () => {
+	async function labelsFor(toolLabels: unknown) {
+		const { restore } = stubFetch({
+			success: true,
+			data: { welcomeMessage: null, toolLabels },
+		});
+		try {
+			return (await fetchRemoteConfig(API, "wwp_test")).toolLabels;
+		} finally {
+			restore();
+		}
+	}
+
+	test("keeps the channel's labels, trimmed", async () => {
+		expect(await labelsFor({ home_quote: " Calcul du devis " })).toEqual({
+			home_quote: "Calcul du devis",
+		});
+	});
+
+	test("drops empty and non-string entries", async () => {
+		expect(await labelsFor({ a: "", b: 3, c: "Recherche" })).toEqual({
+			c: "Recherche",
+		});
+	});
+
+	test("leaves the field out when nothing usable comes back", async () => {
+		expect(await labelsFor(null)).toBeUndefined();
+		expect(await labelsFor({ a: "  " })).toBeUndefined();
+		expect(await labelsFor(["x"])).toBeUndefined();
+	});
+});
+
 async function partialFor(documentUpload: unknown) {
 	const { restore } = stubFetch({
 		success: true,
