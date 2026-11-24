@@ -1286,6 +1286,37 @@ describe("PromptInputSubmit — Stop and the full-queue guard are separate state
 		}
 	});
 
+	test("on a touch keyboard Cmd or Ctrl + Enter still sends", () => {
+		const realMatchMedia = win.matchMedia;
+		// biome-ignore lint/suspicious/noExplicitAny: happy-dom stub
+		(win as any).matchMedia = (query: string) => ({
+			...realMatchMedia.call(win, query),
+			matches: query === "(hover: none) and (pointer: coarse)",
+			addEventListener: () => {},
+			removeEventListener: () => {},
+		});
+		try {
+			mountWithSubmit({ status: "ready" });
+			const submits = countedSubmits();
+			const textarea = container.querySelector("textarea");
+			for (const modifier of [{ metaKey: true }, { ctrlKey: true }]) {
+				act(() => {
+					textarea?.dispatchEvent(
+						new win.KeyboardEvent("keydown", {
+							key: "Enter",
+							bubbles: true,
+							cancelable: true,
+							...modifier,
+						}) as unknown as KeyboardEvent,
+					);
+				});
+			}
+			expect(submits()).toBe(2);
+		} finally {
+			win.matchMedia = realMatchMedia;
+		}
+	});
+
 	test("a disabled submit button blocks Enter when there is no Stop to keep live", () => {
 		mountWithSubmit({ status: "ready", disabled: true });
 		const submits = countedSubmits();
