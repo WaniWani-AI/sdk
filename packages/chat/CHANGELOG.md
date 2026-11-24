@@ -1,5 +1,17 @@
 # @waniwani/chat
 
+## 1.6.0
+
+### Minor Changes
+
+- [#215](https://github.com/WaniWani-AI/sdk/pull/215) [`fb08dc8`](https://github.com/WaniWani-AI/sdk/commit/fb08dc8e6240458c6cd19cd6b50b2e0316951b0b) Thanks [@maximeantoine1997](https://github.com/maximeantoine1997)! - The composer (`mode: "composer"`) now plays an entrance when it comes on screen: it rises into place on the floating bar's curve, the `glow` variant runs its border sweep at the same moment, and the suggestion pills fade in one by one after it. A composer below the fold waits until the visitor scrolls to it, and plays the entrance once. With reduced motion the composer appears at once. Nothing to change in your config.
+
+- [#213](https://github.com/WaniWani-AI/sdk/pull/213) [`98c13f9`](https://github.com/WaniWani-AI/sdk/commit/98c13f95e701ee64076492cddfe04b24f885b88d) Thanks [@reztin](https://github.com/reztin)! - The chat can show its own text for a tool call instead of the tool's name. Set `toolLabels` (a map of tool name to text) on `WaniwaniChat`, `ChatEmbed` or the embed config, or let the channel's `/config` response send it. A tool with no entry keeps its title, or its name in words, as before.
+
+### Patch Changes
+
+- [#216](https://github.com/WaniWani-AI/sdk/pull/216) [`734ed9f`](https://github.com/WaniWani-AI/sdk/commit/734ed9fed54874d622902e1f10c0030e991bafc7) Thanks [@pancakeInDev](https://github.com/pancakeInDev)! - The chat talks straight to the agent runtime again. The runtime moved to a newer message stream format that the bundled client refused, so every message went through the chat route instead, the `waniwani-session` key was never written, and on a channel without thread history a conversation did not reopen after a reload. Nothing to change in existing code: a page that loads `embed.js` through the platform's loader gets the fix on its own.
+
 ## 1.5.0
 
 ### Minor Changes
