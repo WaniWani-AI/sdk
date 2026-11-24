@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	mock,
+	test,
+} from "bun:test";
 import type { AttachedDocument } from "@waniwani/core/documents/types";
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import { Window } from "happy-dom";
@@ -73,8 +81,16 @@ class FakeEveAgentStore {
 	}
 }
 
+// `mock.module` holds for the rest of the test process, and `bun test` runs
+// every file in one process, so the real client goes back after this file.
+// Otherwise `runtime-wire.test.ts` gets the stub whenever it runs later.
+const realEveClient = { ...(await import("eve/client")) };
 // @ts-expect-error -- bun:test `mock.module` exists at runtime but has no TS type
 mock.module("eve/client", () => ({ EveAgentStore: FakeEveAgentStore }));
+afterAll(() => {
+	// @ts-expect-error -- bun:test `mock.module` exists at runtime but has no TS type
+	mock.module("eve/client", () => realEveClient);
+});
 
 const { EveTransport, eveTransport } = await import("./transport");
 type SessionRequest = import("./session").SessionRequest;
