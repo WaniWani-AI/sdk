@@ -563,8 +563,10 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 							!e.shiftKey &&
 							!e.nativeEvent.isComposing &&
 							// On a touch keyboard Return adds a line, as in every
-							// native messenger; the send button sends.
-							!isTouchPrimary()
+							// native messenger; the send button sends. Cmd or
+							// Ctrl + Enter still sends, for a tablet with a
+							// hardware keyboard.
+							(!isTouchPrimary() || e.metaKey || e.ctrlKey)
 						) {
 							e.preventDefault();
 							submitComposer();

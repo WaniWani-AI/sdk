@@ -733,8 +733,9 @@ export const PromptInputTextarea = ({
 					return;
 				}
 				// On a touch keyboard Return adds a line, as in every native
-				// messenger; the send button sends.
-				if (isTouchPrimary()) {
+				// messenger; the send button sends. Cmd or Ctrl + Enter still
+				// sends, for a tablet with a hardware keyboard.
+				if (isTouchPrimary() && !e.metaKey && !e.ctrlKey) {
 					return;
 				}
 				e.preventDefault();
