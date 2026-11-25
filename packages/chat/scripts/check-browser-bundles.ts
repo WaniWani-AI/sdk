@@ -93,10 +93,28 @@ const CHAT_MAX_BYTES = 450_000;
 const chatBytes = statSync(resolve(dist, "index.js")).size;
 if (chatBytes > CHAT_MAX_BYTES) {
 	console.error(
-		`index.js is ${chatBytes} bytes, over its ${CHAT_MAX_BYTES} cap. If eve's client grew it, check that\n` +
-			"`eveSharesZod` in tsup.config.ts still resolves eve's vendored zod to the shared one.",
+		`index.js is ${chatBytes} bytes, over its ${CHAT_MAX_BYTES} cap.`,
 	);
 	process.exit(1);
+}
+
+// The browser talks to the agent only through the app's chat route, so a
+// customer's Content-Security-Policy needs the app's origin and nothing else.
+const RUNTIME_MARKERS = ["eveHost", "/eve/v1", "includeTailIndex"];
+const shipped = [
+	...reachable(resolve(dist, "index.js")),
+	resolve(dist, "embed.js"),
+];
+for (const file of shipped) {
+	const source = readFileSync(file, "utf8");
+	for (const marker of RUNTIME_MARKERS) {
+		if (source.includes(marker)) {
+			console.error(
+				`${file} contains "${marker}": the chat must reach the agent through the app's chat route only.`,
+			);
+			process.exit(1);
+		}
+	}
 }
 
 console.log(`Browser bundles OK (${ENTRIES.join(", ")})`);

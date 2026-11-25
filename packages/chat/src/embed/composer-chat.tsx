@@ -39,7 +39,6 @@ import { createPortal, flushSync } from "react-dom";
 import type { ChatHandle } from "../@types";
 import BorderGlow from "../components/border-glow";
 import { Suggestions } from "../components/suggestions";
-import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useNarrowViewport } from "../hooks/use-narrow-viewport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { isTouchPrimary } from "../hooks/use-touch-primary";
@@ -503,7 +502,6 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.
 		const body: Record<string, unknown> = { mode: "composer" };
-		const transport = useDirectTransport(config.sessionApi);
 		if (config.mcpServerUrl) {
 			body.mcpServerUrl = config.mcpServerUrl;
 		}
@@ -758,7 +756,6 @@ const ComposerChatInner = forwardRef<ComposerChatHandle, InnerProps>(
 					className={cn(PARTS.panel, panelClassName(panelLayout))}
 				>
 					<ChatEmbed
-						transport={transport}
 						ref={chatRef}
 						mode="composer"
 						api={config.api ?? ""}

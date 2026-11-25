@@ -594,59 +594,8 @@ describe("chatTimingLogs metadata", () => {
 	});
 });
 
-async function sessionApiFor(sessionApi: unknown) {
-	const { restore } = stubFetch({
-		success: true,
-		data: { welcomeMessage: null, sessionApi },
-	});
-	try {
-		return await fetchRemoteConfig(API, "wwp_test");
-	} finally {
-		restore();
-	}
-}
-
 describe("fetchRemoteConfig — sessionApi", () => {
-	test("a non-empty string reaches the config partial", async () => {
-		const partial = await sessionApiFor(
-			"https://app.waniwani.ai/api/mcp/agent/session",
-		);
-
-		expect(partial.sessionApi).toBe(
-			"https://app.waniwani.ai/api/mcp/agent/session",
-		);
-	});
-
-	const ignored: [string, unknown][] = [
-		["an empty string", ""],
-		["null", null],
-		["a number", 42],
-		["a boolean", true],
-		["an object", { url: "https://app.waniwani.ai/session" }],
-		["an array", ["https://app.waniwani.ai/session"]],
-	];
-	for (const [label, value] of ignored) {
-		test(`${label} is ignored`, async () => {
-			const partial = await sessionApiFor(value);
-
-			expect(partial).not.toHaveProperty("sessionApi");
-		});
-	}
-
-	test("a server that predates the field leaves the key off entirely", async () => {
-		const { restore } = stubFetch({
-			success: true,
-			data: { welcomeMessage: "Hi" },
-		});
-		try {
-			const partial = await fetchRemoteConfig(API, "wwp_test");
-			expect(partial).not.toHaveProperty("sessionApi");
-		} finally {
-			restore();
-		}
-	});
-
-	test("the mounted embed config picks up the remote sessionApi", async () => {
+	test("a server that still sends sessionApi cannot turn on a direct runtime connection", async () => {
 		const { restore } = stubFetch({
 			success: true,
 			data: {
@@ -655,11 +604,12 @@ describe("fetchRemoteConfig — sessionApi", () => {
 			},
 		});
 		try {
+			const partial = await fetchRemoteConfig(API, "wwp_test");
+			expect(partial).not.toHaveProperty("sessionApi");
+
 			const { latest } = mountHook({ api: API, token: "wwp_test" });
 			await waitFor(() => latest().welcomeMessage === "Hi");
-			expect(latest().sessionApi).toBe(
-				"https://app.waniwani.ai/api/mcp/agent/session",
-			);
+			expect(latest()).not.toHaveProperty("sessionApi");
 		} finally {
 			restore();
 		}

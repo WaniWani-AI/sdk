@@ -30,7 +30,6 @@ import { useSuggestions } from "../embed/use-suggestions";
 import type { WidgetEvent } from "../embed/widget-events";
 import { createWidgetEventEmitter } from "../embed/widget-events";
 import { WidgetEventsProvider } from "../embed/widget-events-context";
-import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import type { Locale, LocaleMessageOverrides, MessageOverrides } from "../i18n";
 import {
@@ -109,9 +108,7 @@ export interface WaniwaniChatOverrides {
 	/** Override the MCP server URL (rarely needed). */
 	mcpServerUrl?: string;
 	/**
-	 * The app's agent-runtime session route (`/api/mcp/agent/session`). Set,
-	 * turns go straight to the agent runtime for a chat the route admits, and
-	 * through `api` for one it does not.
+	 * @deprecated Ignored. Every turn goes through `api`. Removed in 2.0.0.
 	 */
 	sessionApi?: string;
 	/**
@@ -509,10 +506,6 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 			body.channelId = config.channelId;
 		}
 
-		const transport = useDirectTransport(
-			overrides?.sessionApi ?? config.sessionApi,
-		);
-
 		if (!visible) {
 			return null;
 		}
@@ -522,7 +515,6 @@ export const WaniwaniChat = forwardRef<ChatHandle, WaniwaniChatProps>(
 				<ChatEmbed
 					ref={innerRef}
 					api={config.api ?? DEFAULT_API}
-					transport={transport}
 					headers={{ Authorization: `Bearer ${config.token}` }}
 					visitorId={visitorId}
 					skipRemoteConfig

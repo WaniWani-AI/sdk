@@ -14,7 +14,6 @@ import {
 	useRef,
 } from "react";
 import type { ChatHandle } from "../@types";
-import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { ChatEmbed } from "../layouts/chat-embed";
 import { useBootTiming } from "../lib/timing-context";
@@ -148,7 +147,6 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.
 		const body: Record<string, unknown> = { mode: "inline" };
-		const transport = useDirectTransport(config.sessionApi);
 		if (config.mcpServerUrl) {
 			body.mcpServerUrl = config.mcpServerUrl;
 		}
@@ -159,7 +157,6 @@ export const InlineChat = forwardRef<InlineChatHandle, InlineChatProps>(
 		return (
 			<WidgetEventsProvider value={widgetEvents}>
 				<ChatEmbed
-					transport={transport}
 					ref={chatRef}
 					mode="inline"
 					api={config.api ?? ""}
