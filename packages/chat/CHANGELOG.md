@@ -1,5 +1,13 @@
 # @waniwani/chat
 
+## 1.6.1
+
+### Patch Changes
+
+- [#219](https://github.com/WaniWani-AI/sdk/pull/219) [`ff8b8ce`](https://github.com/WaniWani-AI/sdk/commit/ff8b8ceab4aa0ee06ee3c614efc74b1be770b33b) Thanks [@maximeantoine1997](https://github.com/maximeantoine1997)! - The chat sends every turn through its `api` route (`https://app.waniwani.ai/api/mcp/chat` by default) and never connects to the agent runtime directly. A page's Content-Security-Policy only needs the app's origin in `connect-src`: `https://app.waniwani.ai`, or the EU app's origin for an EU org. The `sessionApi` prop on `WaniwaniChat` is deprecated and ignored, and goes away in 2.0.0.
+
+- [#217](https://github.com/WaniWani-AI/sdk/pull/217) [`5cf6a46`](https://github.com/WaniWani-AI/sdk/commit/5cf6a469c1bd2c91a3507b59da37632a4ebf6de6) Thanks [@maximeantoine1997](https://github.com/maximeantoine1997)! - On a touch device, Cmd or Ctrl + Enter now sends the message from the composer and the chat input. Return alone still adds a line there, so a tablet with a hardware keyboard can send without the send button.
+
 ## 1.6.0
 
 ### Minor Changes
