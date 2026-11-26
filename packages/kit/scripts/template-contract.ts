@@ -408,6 +408,19 @@ if (!docs.ok || undocumented.length > 0) {
 }
 console.log(`  ✓ /docs lists ${everything.join(", ")}`);
 
+heading("Ask it for its favicon");
+const favicon = await fetch(`http://localhost:${port}/favicon.ico`);
+const faviconType = favicon.headers.get("content-type") ?? "no content type";
+const faviconBody = await favicon.text();
+if (!favicon.ok || !faviconType.startsWith("image/svg+xml") || !faviconBody.includes("<svg")) {
+	served.stop();
+	fail(
+		`/favicon.ico answered ${favicon.status} ${faviconType}`,
+		"expected a redirect to /favicon.svg and the SVG from the app's config: `favicon` is not reaching the served build",
+	);
+}
+console.log("  ✓ /favicon.ico redirects to the app's SVG");
+
 // The template constructs its server without OAuth, so the page says so.
 if (docs.signIn !== "none" || docs.flowInputShown) {
 	served.stop();

@@ -820,6 +820,8 @@ export async function registerApp(server: McpServer): Promise<void> {
 		// The heading and overview of the /docs page, which \`docs: false\` turns off.
 		app,
 		docs: config.docs,
+		// Served at /favicon.svg when the app's config carries one.
+		favicon: config.favicon,
 	});
 }
 `;

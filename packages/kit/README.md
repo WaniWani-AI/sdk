@@ -547,6 +547,24 @@ export default defineApp({
 });
 ```
 
+### A favicon on the server's origin
+
+An MCP directory shows the icon it finds at the server's origin, and a
+submission audit flags an origin that has none. `favicon` takes the app's icon
+as SVG markup:
+
+```ts
+// waniwani.config.ts
+export default defineApp({
+  name: "oney",
+  favicon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">…</svg>`,
+});
+```
+
+`GET /favicon.svg` answers it as `image/svg+xml`, and `GET /favicon.ico`
+redirects there. Without the option both paths answer 404. Markup that is not
+an SVG document is not served, and the server logs why.
+
 ### Styling is Tailwind, and only Tailwind
 
 A widget styles itself with utility classes in its `ui.tsx`. There is no
