@@ -223,6 +223,12 @@ export type AppConfig = {
 	 * server whose tool list should only reach a client that signed in.
 	 */
 	docs?: boolean;
+	/**
+	 * The app's icon, as SVG markup. Served at `/favicon.svg`, with
+	 * `/favicon.ico` redirecting to it, which is where an MCP directory reads the
+	 * icon it shows next to the server. Unset, both paths answer 404.
+	 */
+	favicon?: string;
 };
 
 export function defineApp(config: AppConfig): AppConfig {

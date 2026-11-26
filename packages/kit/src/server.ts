@@ -15,6 +15,7 @@ import cors from "cors";
 import express, { type ErrorRequestHandler, type RequestHandler } from "express";
 import type { McpServer, ToolMeta, ViewName } from "skybridge/server";
 import { type DocsApp, type DocsEntry, docsHandler } from "./docs.js";
+import { faviconHandler, faviconRedirect, isSvgMarkup } from "./favicon.js";
 import type {
 	EndpointDefinition,
 	Shape,
@@ -87,6 +88,8 @@ export type Manifest = {
 	app?: DocsApp;
 	/** `false` leaves `/docs` unmounted. Anything else serves it. */
 	docs?: boolean;
+	/** SVG markup served at `/favicon.svg`. Absent: the path answers 404. */
+	favicon?: string;
 };
 
 /**
@@ -318,6 +321,17 @@ export async function registerApp(server: McpServer, manifest: Manifest): Promis
 	// endpoints live under `/api/` and `/.well-known/`.
 	if (manifest.docs !== false) {
 		server.express.get("/docs", docsHandler(docsModel(served, oauthEnabled(server))));
+	}
+
+	// The icon a directory listing shows for the server, read off its origin.
+	// Markup that is not an SVG is refused here rather than served as one.
+	if (manifest.favicon) {
+		if (isSvgMarkup(manifest.favicon)) {
+			server.express.get("/favicon.svg", faviconHandler(manifest.favicon));
+			server.express.get("/favicon.ico", faviconRedirect);
+		} else {
+			console.warn("[waniwani] `favicon` is not SVG markup, so /favicon.svg is not served");
+		}
 	}
 
 	// Widgets: one `data` schema drives the input schema, the structured output,
