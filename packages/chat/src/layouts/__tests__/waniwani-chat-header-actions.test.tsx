@@ -513,53 +513,6 @@ describe("WaniwaniChat header buttons", () => {
 	});
 });
 
-describe("WaniwaniChat standalone New chat (session kept, no thread history)", () => {
-	const sessionApi = "https://localhost/api/mcp/agent/session";
-
-	test("the header shows one New chat button, labelled, without title, icon hidden", async () => {
-		const el = await renderChat({ sessionApi });
-		const h = requireHeader(el);
-		const labels = Array.from(h.querySelectorAll("button")).map((b) =>
-			b.getAttribute("aria-label"),
-		);
-		expect(labels).toEqual(["New chat"]);
-		const b = button(el, "New chat");
-		expect(b.hasAttribute("title")).toBe(false);
-		for (const svg of Array.from(b.querySelectorAll("svg"))) {
-			expect(svg.getAttribute("aria-hidden")).toBe("true");
-			expect(svg.querySelector("title")).toBeNull();
-		}
-		expect(b.textContent).toBe("");
-	});
-
-	test("headerActions sit after the standalone New chat button", async () => {
-		const el = await renderChat({ sessionApi, headerActions: action("close") });
-		const h = requireHeader(el);
-		const node = h.querySelector('[data-testid="close"]');
-		if (!node) {
-			throw new Error("action node missing");
-		}
-		expect(precedes(button(el, "New chat"), node)).toBe(true);
-	});
-
-	test("clicking the standalone New chat resets the conversation", async () => {
-		seedMessages = [
-			{
-				id: "m1",
-				role: "user",
-				parts: [{ type: "text", text: "kept-session-question" }],
-			},
-		];
-		const el = await renderChat({ sessionApi });
-		expect(el.textContent).toContain("kept-session-question");
-		await act(async () => {
-			button(el, "New chat").click();
-		});
-		await flush();
-		expect(el.textContent).not.toContain("kept-session-question");
-	});
-});
-
 describe("ChatEmbed header with the actions menu", () => {
 	async function renderEmbed(
 		props: Partial<Parameters<typeof ChatEmbed>[0]> = {},

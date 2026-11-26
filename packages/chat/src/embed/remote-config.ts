@@ -105,8 +105,6 @@ interface RemoteConfigResponse {
 	 */
 	pageSuggestions?: unknown;
 	enableThreadHistory?: boolean | null;
-	/** Present when the org's chats talk to the agent runtime directly. */
-	sessionApi?: string | null;
 	/**
 	 * Channel-specific event source (e.g. the integration/source this channel
 	 * is attributed to). Stamped onto widget-originated events like
@@ -296,9 +294,6 @@ function remoteToConfigPartial(
 	}
 	if (typeof data.enableThreadHistory === "boolean") {
 		out.enableThreadHistory = data.enableThreadHistory;
-	}
-	if (typeof data.sessionApi === "string" && data.sessionApi) {
-		out.sessionApi = data.sessionApi;
 	}
 	// WebMCP is on by default and derives its endpoints from the token, so the
 	// only thing a channel can say about it is that it declines.

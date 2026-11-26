@@ -32,7 +32,6 @@ import type { ChatHandle } from "../@types";
 import { Avatar, avatarFor } from "../components/avatar";
 import BorderGlow from "../components/border-glow";
 import { Suggestions } from "../components/suggestions";
-import { useDirectTransport } from "../hooks/use-direct-transport";
 import { useNarrowViewport } from "../hooks/use-narrow-viewport";
 import { useSuggestionIngest } from "../hooks/use-suggestion-ingest";
 import { useTypingPlaceholder } from "../hooks/use-typing-placeholder";
@@ -550,7 +549,6 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 		// `mode` tags every chat request with the embed surface so server-logged
 		// chat events carry it in `properties.mode`, matching `page.viewed`.
 		const body: Record<string, unknown> = { mode: "floating" };
-		const transport = useDirectTransport(config.sessionApi);
 		if (config.mcpServerUrl) {
 			body.mcpServerUrl = config.mcpServerUrl;
 		}
@@ -822,7 +820,6 @@ const FloatingChatInner = forwardRef<FloatingChatHandle, InnerProps>(
 								className={cn(PARTS.panel, panelClassName(panelLayout))}
 							>
 								<ChatEmbed
-									transport={transport}
 									ref={chatRef}
 									mode="floating"
 									api={config.api ?? ""}

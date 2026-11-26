@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import { savedSession, saveSession } from "../eve/session";
 import {
 	readTabSession,
 	TAB_SESSION_KEY,
@@ -15,33 +14,30 @@ beforeEach(() => {
 	sessionStorage.clear();
 });
 
-const SAVED = { conversationId: "conv_1", ownerSecret: "secret_1" };
-
 describe("waniwani-session", () => {
-	test("the chat session and the agent session share one key", () => {
-		writeTabSession({ ...readTabSession(), agent: "agent_1" });
-		saveSession("chan_1", SAVED);
+	test("the agent session round-trips through one key", () => {
+		writeTabSession({ agent: "agent_1" });
 
 		expect(sessionStorage.length).toBe(1);
-		expect(JSON.parse(sessionStorage.getItem(TAB_SESSION_KEY) ?? "")).toEqual({
-			chat: { chan_1: SAVED },
-			agent: "agent_1",
-		});
+		expect(readTabSession()).toEqual({ agent: "agent_1" });
 	});
 
-	test("clearing the chat session keeps the agent session", () => {
-		writeTabSession({ agent: "agent_1", chat: { chan_1: SAVED } });
+	test("a conversation saved by an older chat is not read back", () => {
+		sessionStorage.setItem(
+			TAB_SESSION_KEY,
+			JSON.stringify({
+				chat: { chan_1: { conversationId: "c", ownerSecret: "s" } },
+				agent: "agent_1",
+			}),
+		);
 
-		saveSession("chan_1", null);
-
-		expect(savedSession("chan_1")).toBeNull();
 		expect(readTabSession()).toEqual({ agent: "agent_1" });
 	});
 
 	test("the key is removed when nothing is left in it", () => {
-		saveSession("chan_1", SAVED);
+		writeTabSession({ agent: "agent_1" });
 
-		saveSession("chan_1", null);
+		writeTabSession({});
 
 		expect(sessionStorage.getItem(TAB_SESSION_KEY)).toBeNull();
 	});
