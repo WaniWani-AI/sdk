@@ -357,6 +357,7 @@
 	--ww-suggestion-radius: 9999px;
 	--ww-suggestion-hover-bg: var(--ww-color-border);
 	--ww-suggestion-stagger: 50ms;
+	--ww-suggestion-fade: 1.75rem;
 	--ww-input-radius: 1rem;
 	--ww-input-border: var(--ww-color-border);
 	--ww-input-border-width: 1px;
@@ -467,14 +468,40 @@
 	border: var(--ww-dock-field-border-width) solid var(--ww-dock-field-border);
 }
 
-:where(.ww-suggestions[data-layout="single-row"]) {
-	max-height: calc(1lh + 1.25rem);
-	overflow: hidden;
+/* ─── Suggestion row ──────────────────────────────────────────────────
+   One line of pills that scrolls sideways. The scrollbar stays hidden:
+   the thin-scrollbar rule on `[data-waniwani-chat] *` above sits outside
+   any layer, so this needs the same unlayered footing and one more class
+   to win. An edge fades while pills are scrolled past it, set by
+   `data-overflow-start` / `data-overflow-end` from the component. */
+.ww-suggestions-row,
+[data-waniwani-chat] .ww-suggestions-row {
+	scrollbar-width: none;
 }
 
-:where(.ww-suggestions[data-layout="single-row"] .ww-suggestion) {
-	flex-shrink: 0;
-	white-space: nowrap;
+.ww-suggestions-row::-webkit-scrollbar,
+[data-waniwani-chat] .ww-suggestions-row::-webkit-scrollbar {
+	display: none;
+}
+
+:where(.ww-suggestions-row) {
+	--ww-fade-start: 0px;
+	--ww-fade-end: 0px;
+	mask-image: linear-gradient(
+		to right,
+		transparent,
+		#000 var(--ww-fade-start),
+		#000 calc(100% - var(--ww-fade-end)),
+		transparent
+	);
+}
+
+:where(.ww-suggestions-row[data-overflow-start]) {
+	--ww-fade-start: var(--ww-suggestion-fade);
+}
+
+:where(.ww-suggestions-row[data-overflow-end]) {
+	--ww-fade-end: var(--ww-suggestion-fade);
 }
 
 @media (prefers-reduced-motion: no-preference) {
