@@ -356,7 +356,11 @@ export interface EmbedConfig {
 	 * `data-disclaimer="false"` to hide).
 	 */
 	disclaimer?: string | false;
-	/** Surfaced as `data-suggestions-layout`: `wrap` (default) or `single-row`. */
+	/**
+	 * Surfaced as `data-suggestions-layout`: `wrap` or `single-row`.
+	 * @deprecated No effect: the suggestion row is always one line that
+	 * scrolls sideways. Removed in 2.0.0.
+	 */
 	suggestionsLayout?: "wrap" | "single-row";
 	/**
 	 * Surfaced as `data-suggestions-position`: `above-input` (default) or

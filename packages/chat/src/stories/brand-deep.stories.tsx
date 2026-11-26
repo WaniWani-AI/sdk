@@ -250,7 +250,6 @@ function brandConfig(): EmbedConfig {
 			},
 		},
 		messagesUrl: MESSAGES_URL,
-		suggestionsLayout: "single-row",
 		suggestionsPosition: "after-message",
 		sendIcon: "right",
 		menu: ["restart", "copy-conversation"],

@@ -43,6 +43,7 @@ const DEFAULTS: Record<string, string> = {
 	"--ww-suggestion-radius": "9999px",
 	"--ww-suggestion-hover-bg": "var(--ww-color-border)",
 	"--ww-suggestion-stagger": "50ms",
+	"--ww-suggestion-fade": "1.75rem",
 	"--ww-input-radius": "1rem",
 	"--ww-input-border": "var(--ww-color-border)",
 	"--ww-input-border-width": "1px",

@@ -477,7 +477,10 @@ export interface ChatEmbedProps
 	 * `messages.welcome` when `welcome` is unset. Defaults to `"cards"`.
 	 */
 	welcomeVariant?: "cards" | "pills";
-	/** `"single-row"` clips the suggestion row to one line. Defaults to `"wrap"`. */
+	/**
+	 * @deprecated No effect: the suggestion row is always one line that
+	 * scrolls sideways. Removed in 2.0.0.
+	 */
 	suggestionsLayout?: "wrap" | "single-row";
 	/**
 	 * `"after-message"` shows the suggestion row under the last assistant

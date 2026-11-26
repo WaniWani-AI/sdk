@@ -68,27 +68,46 @@ function render(props: Record<string, unknown>) {
 }
 
 describe("Suggestions", () => {
-	test("single-row clips to one line", () => {
-		render({ layout: "single-row" });
-		const row = container.querySelector(".ww-suggestions");
-		expect(row?.getAttribute("data-layout")).toBe("single-row");
+	test("renders one sideways-scrolling row of one-line pills", () => {
+		render({});
+		const row = container.querySelector(".ww-suggestions-row");
+		expect(row?.className).toContain("ww:overflow-x-auto");
+		expect(row?.className).not.toContain("flex-wrap");
+		const pill = container.querySelector(".ww-suggestion");
+		expect(pill?.className).toContain("ww:whitespace-nowrap");
+		expect(pill?.className).toContain("ww:max-w-full");
+		expect(pill?.getAttribute("title")).toBe(pills[0]);
+	});
+
+	test("the scrollbar rule outranks the chat's global thin scrollbar", () => {
 		const css = readFileSync(
 			new URL("../tailwind.css", import.meta.url),
 			"utf8",
 		);
-		expect(css).toContain(':where(.ww-suggestions[data-layout="single-row"])');
-		expect(css).toContain("overflow: hidden");
-		expect(css).not.toContain("flex-wrap: nowrap");
 		expect(css).toContain(
-			':where(.ww-suggestions[data-layout="single-row"] .ww-suggestion) {\n\tflex-shrink: 0;\n\twhite-space: nowrap;\n}',
+			".ww-suggestions-row,\n[data-waniwani-chat] .ww-suggestions-row {\n\tscrollbar-width: none;\n}",
+		);
+		expect(css).not.toContain('data-layout="single-row"');
+	});
+
+	test("a deprecated layout still reaches data-layout and changes nothing", () => {
+		render({ layout: "single-row" });
+		expect(
+			container.querySelector(".ww-suggestions")?.getAttribute("data-layout"),
+		).toBe("single-row");
+		expect(container.querySelector(".ww-suggestions-row")?.className).toContain(
+			"ww:overflow-x-auto",
 		);
 	});
 
-	test("wraps by default", () => {
-		render({});
+	test("centered pills center while they fit, without breaking the scroll", () => {
+		render({ align: "center" });
+		const pill = container.querySelector(".ww-suggestion");
+		expect(pill?.className).toContain("ww:first:ms-auto");
+		expect(pill?.className).toContain("ww:last:me-auto");
 		expect(
-			container.querySelector(".ww-suggestions")?.getAttribute("data-layout"),
-		).toBe("wrap");
+			container.querySelector(".ww-suggestions-row")?.className,
+		).not.toContain("justify-center");
 	});
 
 	test("renders data-index per pill", () => {
