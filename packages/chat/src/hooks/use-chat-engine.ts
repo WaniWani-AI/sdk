@@ -8,11 +8,13 @@ import type { ChatTransport, FileUIPart, UIMessage } from "ai";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatBaseProps, ChatTransportLifecycle } from "../@types";
+import { readAttachedDocuments } from "../ai-elements/attachments";
 import type { PromptInputMessage } from "../ai-elements/prompt-input";
 import { useWidgetEvents } from "../embed/widget-events-context";
 import { buildApiUrl } from "../lib/api-url";
 import { discardDocument } from "../lib/document-upload";
 import { LenientChatTransport } from "../lib/lenient-chat-transport";
+import { parseRetryAfter } from "../lib/retry-after";
 import {
 	deleteThread as deleteThreadFromStore,
 	deriveThreadTitle,
@@ -61,6 +63,18 @@ function normalizeSessionId(value: unknown): string | undefined {
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : undefined;
 }
+
+/**
+ * Why the last turn failed. `rate_limited` is a 429; `retryAt` is when its
+ * `Retry-After` header lets the next request go out, if it sent one. Every
+ * other failure (another HTTP error, no response, a stream that broke midway)
+ * is `failed`.
+ */
+export type TurnError =
+	| { kind: "rate_limited"; retryAt: number | undefined }
+	| { kind: "failed" };
+
+type FailedResponse = { status: number; retryAt: number | undefined };
 
 export interface QueuedMessage {
 	id: string;
@@ -335,6 +349,8 @@ export function useChatEngine(props: ChatBaseProps) {
 	}, []);
 
 	const turnRef = useRef<TurnTimer | null>(null);
+	const failedResponseRef = useRef<FailedResponse | null>(null);
+	const [turnError, setTurnError] = useState<TurnError | null>(null);
 	const bodyString = useCallback((key: string): string | undefined => {
 		const value = bodyRef.current?.[key];
 		return typeof value === "string" ? value : undefined;
@@ -487,8 +503,18 @@ export function useChatEngine(props: ChatBaseProps) {
 			fetch: (async (input, init) => {
 				const turn = turnRef.current;
 				turn?.mark("requestStart");
+				failedResponseRef.current = null;
 				try {
 					const response = await fetch(input, init);
+					if (!response.ok) {
+						failedResponseRef.current = {
+							status: response.status,
+							retryAt: parseRetryAfter(
+								response.headers.get("retry-after"),
+								Date.now(),
+							),
+						};
+					}
 					pendingModelContextRef.current = undefined;
 					setSessionId(response.headers.get(SESSION_HEADER_NAME));
 					return turn ? turn.instrument(response) : response;
@@ -610,6 +636,13 @@ export function useChatEngine(props: ChatBaseProps) {
 		onError(error) {
 			reportTurn("error");
 			console.warn("[Waniwani] Chat error:", error.message);
+			const failed = failedResponseRef.current;
+			failedResponseRef.current = null;
+			setTurnError(
+				failed?.status === 429
+					? { kind: "rate_limited", retryAt: failed.retryAt }
+					: { kind: "failed" },
+			);
 			widgetEvents.emit({
 				name: "chat.error",
 				properties: {
@@ -662,6 +695,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	}, []);
 
 	const beginTurn = useCallback(() => {
+		setTurnError(null);
 		markPageToolRequest();
 		turnRef.current = startTurn(
 			messagesRef.current.filter((m) => m.role === "user").length + 1,
@@ -909,6 +943,31 @@ export function useChatEngine(props: ChatBaseProps) {
 		],
 	);
 
+	/**
+	 * Sends the last user message again after a failed turn. Its id is kept, so
+	 * the message is replaced in place and whatever the failed turn streamed
+	 * after it is dropped.
+	 */
+	const retry = useCallback(() => {
+		const current = messagesRef.current;
+		let index = current.length - 1;
+		while (index >= 0 && current[index].role !== "user") {
+			index -= 1;
+		}
+		const lastUser = current[index];
+		if (!lastUser) {
+			return;
+		}
+		beginTurn();
+		const documents = readAttachedDocuments(lastUser.metadata);
+		pendingDocumentsRef.current = documents.length > 0 ? documents : undefined;
+		void sendMessage({
+			parts: lastUser.parts,
+			metadata: lastUser.metadata,
+			messageId: lastUser.id,
+		});
+	}, [sendMessage, beginTurn]);
+
 	const sendMessageAndWait = useCallback(
 		(text: string): Promise<unknown> => {
 			return new Promise((resolve, reject) => {
@@ -958,6 +1017,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	]);
 
 	const reset = useCallback(() => {
+		setTurnError(null);
 		dropPageToolCalls();
 		transportRef.current.reset?.();
 		setMessages([]);
@@ -1091,6 +1151,7 @@ export function useChatEngine(props: ChatBaseProps) {
 	}, [buildPersistSnapshot, refreshThreads]);
 
 	const startNewThread = useCallback(() => {
+		setTurnError(null);
 		// Bump epoch first so any in-flight `switchThread` load knows it's
 		// been invalidated and skips its setters when it eventually resolves.
 		switchEpochRef.current += 1;
@@ -1125,6 +1186,7 @@ export function useChatEngine(props: ChatBaseProps) {
 		async (threadId: string) => {
 			switchEpochRef.current += 1;
 			const epoch = switchEpochRef.current;
+			setTurnError(null);
 			// Stopped first and busy until the switch ends, so the outgoing thread is
 			// saved with every tool call answered and no queued message reaches it.
 			const stopped = await stopPageToolCalls({ keepBusy: true });
@@ -1299,6 +1361,8 @@ export function useChatEngine(props: ChatBaseProps) {
 		sendMessageAndWait,
 		stop,
 		reset,
+		turnError,
+		retry,
 		queuedMessages,
 		queueFull,
 		removeQueuedMessage,

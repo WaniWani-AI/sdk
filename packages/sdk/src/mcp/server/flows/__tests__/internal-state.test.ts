@@ -36,7 +36,7 @@ class ThrowingStore implements FlowStore {
 
 const INTRO = { verbatim: "Acme is the data controller." };
 const SEEDED: FlowInternalState = { intro: INTRO };
-const PREEXISTING = { sessionId: "s1", sessionIsPreexisting: true };
+const PREEXISTING = { key: "s1", sessionIsPreexisting: true };
 
 function flowConfig(
 	intro?: FlowConfig["intro"],

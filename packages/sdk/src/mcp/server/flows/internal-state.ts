@@ -54,22 +54,23 @@ export function initInternalState(config: FlowConfig): FlowInternalState {
  */
 export async function loadInternalState(args: {
 	store: FlowStore;
-	sessionId: string | undefined;
+	/** This flow's record key in the session, from `flowStateKey`. */
+	key: string | undefined;
 	/** False when the engine minted the session id in this call. */
 	sessionIsPreexisting: boolean;
 	/** What a session that has not started yet begins with. */
 	seed: FlowInternalState;
 }): Promise<FlowInternalState> {
-	const { store, sessionId, sessionIsPreexisting, seed } = args;
+	const { store, key, sessionIsPreexisting, seed } = args;
 
 	if (Object.keys(seed).length === 0) {
 		return {};
 	}
-	if (!sessionId || !sessionIsPreexisting) {
+	if (!key || !sessionIsPreexisting) {
 		return seed;
 	}
 	try {
-		const record = await store.get(sessionId);
+		const record = await store.get(key);
 		return record ? (record.internal ?? {}) : seed;
 	} catch {
 		return seed;

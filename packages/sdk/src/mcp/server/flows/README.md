@@ -2,7 +2,7 @@
 
 LangGraph-inspired multi-step conversational flows for MCP tools.
 
-You define a state graph, compile it into a tool, and the engine advances it step-by-step. Flow state is stored server-side in a key-value store, keyed by session ID.
+You define a state graph, compile it into a tool, and the engine advances it step-by-step. Flow state is stored server-side in a key-value store, one record per flow and session (`flow:<flowId>:<sessionId>`), so a session that runs two flows keeps both.
 
 ## How it works
 
@@ -12,7 +12,7 @@ You define a state graph, compile it into a tool, and the engine advances it ste
 4. Interrupt nodes pause and ask a question.
 5. Widget nodes pause and delegate rendering to a display tool.
 
-State is stored server-side via the Waniwani API, keyed by the session ID from `_meta`. The model doesn't need to round-trip any token — state is recovered automatically on every call.
+State is stored server-side via the Waniwani API, keyed by the flow id and the session ID from `_meta`. The model doesn't need to round-trip any token — state is recovered automatically on every call.
 
 ## Contract
 

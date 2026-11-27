@@ -4,6 +4,7 @@ import { FLOW_META_KEY } from "../../utils";
 import type { FlowTokenContent, McpServer, RegisteredTool } from "../@types";
 import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
+import { flowStateKey } from "../flow-store";
 
 class TestFlowStateStore {
 	private readonly map = new Map<string, FlowTokenContent>();
@@ -114,7 +115,7 @@ describe("compileFlow response contract", () => {
 		expect(parsed.status).toBe("interrupt");
 		expect(parsed.field).toBe("useCase");
 		expect(result.isError).toBe(undefined);
-		expect(await store.get(TEST_SESSION_ID)).toEqual({
+		expect(await store.get(flowStateKey(flow.name, TEST_SESSION_ID))).toEqual({
 			step: "ask_use_case",
 			state: {},
 			field: "useCase",
@@ -194,7 +195,7 @@ describe("compileFlow response contract", () => {
 		});
 
 		// State should be stored under the session ID
-		const tokenData = await store.get(TEST_SESSION_ID);
+		const tokenData = await store.get(flowStateKey(flow.name, TEST_SESSION_ID));
 		expect(tokenData).toMatchObject({
 			step: "ask_use_case",
 			state: {},
@@ -242,7 +243,9 @@ describe("compileFlow response contract", () => {
 		const parsed = parsePayload(result);
 
 		expect(parsed).toMatchObject({ status: "complete" });
-		const finalStored = await store.get(TEST_SESSION_ID);
+		const finalStored = await store.get(
+			flowStateKey(flow.name, TEST_SESSION_ID),
+		);
 		expect(finalStored?.state).toBeDefined();
 		expect(finalStored?.step).toBeUndefined();
 	});
@@ -333,7 +336,9 @@ describe("compileFlow response contract", () => {
 		const p4 = parsePayload(r4);
 
 		expect(p4.status).toBe("complete");
-		const finalStored = await store.get(TEST_SESSION_ID);
+		const finalStored = await store.get(
+			flowStateKey(flow.name, TEST_SESSION_ID),
+		);
 		expect(finalStored?.state).toBeDefined();
 		expect(finalStored?.step).toBeUndefined();
 	});
@@ -523,7 +528,7 @@ describe("compileFlow response contract", () => {
 				"IMPORTANT: You MUST now call the plan_picker tool to display the widget. Do NOT skip this step",
 		});
 		// Verify widget metadata in store
-		const tokenData = await store.get(TEST_SESSION_ID);
+		const tokenData = await store.get(flowStateKey(flow.name, TEST_SESSION_ID));
 		expect(tokenData).toMatchObject({
 			step: "pick_plan",
 			state: {},
@@ -569,7 +574,7 @@ describe("compileFlow response contract", () => {
 			description:
 				"IMPORTANT: You MUST now call the plan_picker tool to display the widget. Do NOT skip this step",
 		});
-		const tokenData = await store.get(TEST_SESSION_ID);
+		const tokenData = await store.get(flowStateKey(flow.name, TEST_SESSION_ID));
 		expect(tokenData).toMatchObject({
 			step: "pick_plan",
 			state: {},
@@ -776,7 +781,9 @@ describe("validate on interrupt", () => {
 		const p2 = parsePayload(r2);
 
 		expect(p2.status).toBe("complete");
-		const finalStored = await store.get(TEST_SESSION_ID);
+		const finalStored = await store.get(
+			flowStateKey(flow.name, TEST_SESSION_ID),
+		);
 		expect(finalStored?.state).toBeDefined();
 		expect(finalStored?.step).toBeUndefined();
 	});
@@ -821,7 +828,9 @@ describe("validate on interrupt", () => {
 		const p2 = parsePayload(r2);
 
 		expect(p2.status).toBe("complete");
-		const finalStored = await store.get(TEST_SESSION_ID);
+		const finalStored = await store.get(
+			flowStateKey(flow.name, TEST_SESSION_ID),
+		);
 		expect(finalStored?.state).toBeDefined();
 		expect(finalStored?.step).toBeUndefined();
 	});
@@ -1106,7 +1115,9 @@ describe("nested object state", () => {
 		const parsed = parsePayload(result);
 
 		expect(parsed.status).toBe("complete");
-		const finalStored = await store.get(TEST_SESSION_ID);
+		const finalStored = await store.get(
+			flowStateKey(flow.name, TEST_SESSION_ID),
+		);
 		expect(finalStored?.state).toBeDefined();
 		expect(finalStored?.step).toBeUndefined();
 	});
@@ -1228,7 +1239,9 @@ describe("nested object state", () => {
 		const p3 = parsePayload(r3);
 
 		expect(p3.status).toBe("complete");
-		const finalStored = await store.get(TEST_SESSION_ID);
+		const finalStored = await store.get(
+			flowStateKey(flow.name, TEST_SESSION_ID),
+		);
 		expect(finalStored?.state).toBeDefined();
 		expect(finalStored?.step).toBeUndefined();
 	});
@@ -1278,7 +1291,9 @@ describe("nested object state", () => {
 		const p2 = parsePayload(r2);
 
 		expect(p2.status).toBe("complete");
-		const finalStored = await store.get(TEST_SESSION_ID);
+		const finalStored = await store.get(
+			flowStateKey(flow.name, TEST_SESSION_ID),
+		);
 		expect(finalStored?.state).toBeDefined();
 		expect(finalStored?.step).toBeUndefined();
 	});
@@ -1339,7 +1354,7 @@ describe("nested object state", () => {
 		expect(p2.context).toContain("Invalid name");
 
 		// License should still be in state
-		const tokenData = await store.get(TEST_SESSION_ID);
+		const tokenData = await store.get(flowStateKey(flow.name, TEST_SESSION_ID));
 		expect((tokenData?.state as Record<string, unknown>)?.driver).toMatchObject(
 			{ license: "ABC" },
 		);
@@ -1382,7 +1397,7 @@ describe("nested object state", () => {
 
 		expect(p1.status).toBe("interrupt");
 		expect(p1.field).toBe("driver.license");
-		const record = await store.get(TEST_SESSION_ID);
+		const record = await store.get(flowStateKey(flow.name, TEST_SESSION_ID));
 		expect(record?.state).toEqual({ driver: { name: "Sent early" } });
 		expect(record?.asked).toEqual(["driver.license"]);
 	});
@@ -1435,7 +1450,9 @@ describe("nested object state", () => {
 		const p3 = parsePayload(r3);
 
 		expect(p3.status).toBe("complete");
-		const finalStored = await store.get(TEST_SESSION_ID);
+		const finalStored = await store.get(
+			flowStateKey(flow.name, TEST_SESSION_ID),
+		);
 		expect(finalStored?.state).toBeDefined();
 		expect(finalStored?.step).toBeUndefined();
 	});
@@ -1596,7 +1613,7 @@ describe("reset action", () => {
 		expect(parsed.field).toBe("phone");
 
 		// Verify state has the corrected email
-		const state = await store.get(TEST_SESSION_ID);
+		const state = await store.get(flowStateKey(flow.name, TEST_SESSION_ID));
 		expect(state?.state.email).toBe("new@test.com");
 		expect(state?.state.name).toBe("Alice");
 	});
@@ -1697,7 +1714,7 @@ describe("reset action", () => {
 		);
 
 		// Verify domain was computed
-		let state = await store.get(TEST_SESSION_ID);
+		let state = await store.get(flowStateKey(flow.name, TEST_SESSION_ID));
 		expect(state?.state.domain).toBe("old.com");
 
 		// Reset email → domain should be recomputed
@@ -1710,7 +1727,7 @@ describe("reset action", () => {
 		expect(parsed.status).toBe("interrupt");
 		expect(parsed.field).toBe("confirmed");
 
-		state = await store.get(TEST_SESSION_ID);
+		state = await store.get(flowStateKey(flow.name, TEST_SESSION_ID));
 		expect(state?.state.domain).toBe("new.com");
 		expect(state?.state.email).toBe("alice@new.com");
 	});
@@ -1814,7 +1831,9 @@ describe("reset action", () => {
 		);
 
 		// Final state is persisted (no step) so reset detects "already completed"
-		const finalStored = await store.get(TEST_SESSION_ID);
+		const finalStored = await store.get(
+			flowStateKey(flow.name, TEST_SESSION_ID),
+		);
 		expect(finalStored?.state).toBeDefined();
 		expect(finalStored?.step).toBeUndefined();
 
@@ -1885,7 +1904,7 @@ describe("reset action", () => {
 		expect(parsed.question).toBe("Address?");
 		expect(parsed.field).toBe("address");
 
-		const state = await store.get(TEST_SESSION_ID);
+		const state = await store.get(flowStateKey(flow.name, TEST_SESSION_ID));
 		expect(state?.state.email).toBe("new@test.com");
 		expect(state?.state.phone).toBe("123");
 	});
@@ -2071,7 +2090,7 @@ describe("auto-generated sessionId for sessionless clients", () => {
 		const sessionId = parsePayload(result).sessionId as string;
 
 		// Verify state was stored under the auto-generated sessionId
-		const stored = await store.get(sessionId);
+		const stored = await store.get(flowStateKey(flow.name, sessionId));
 		expect(stored).toMatchObject({
 			step: "ask_name",
 			state: {},
@@ -2101,7 +2120,7 @@ describe("auto-generated sessionId for sessionless clients", () => {
 		);
 
 		// Final state is persisted (no step → stale continue falls into "already completed")
-		const finalStored = await store.get(sessionId);
+		const finalStored = await store.get(flowStateKey(flow.name, sessionId));
 		expect(finalStored?.state).toBeDefined();
 		expect(finalStored?.step).toBeUndefined();
 	});

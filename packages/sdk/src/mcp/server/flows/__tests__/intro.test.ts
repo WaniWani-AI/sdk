@@ -8,7 +8,7 @@ import type {
 } from "../@types";
 import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
-import type { FlowStore } from "../flow-store";
+import { type FlowStore, flowStateKey } from "../flow-store";
 
 class MemoryFlowStore implements FlowStore {
 	private readonly map = new Map<string, FlowTokenContent>();
@@ -171,7 +171,9 @@ describe("flow intro", () => {
 			verbatim: VERBATIM,
 			instructions: INSTRUCTIONS,
 		});
-		expect((await store.get(SESSION_ID))?.internal).toBeUndefined();
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.internal,
+		).toBeUndefined();
 	});
 
 	test("intro is the first key in the serialized payload", async () => {
@@ -202,7 +204,9 @@ describe("flow intro", () => {
 
 		expect(parsed.status).toBe("complete");
 		expect(parsed.intro).toBeUndefined();
-		expect((await store.get(SESSION_ID))?.internal).toBeUndefined();
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.internal,
+		).toBeUndefined();
 	});
 
 	test("rides along on a start that completes the whole flow", async () => {
@@ -219,9 +223,11 @@ describe("flow intro", () => {
 		expect(parsed.status).toBe("complete");
 		expect(parsed.intro).toEqual({ verbatim: VERBATIM });
 		// `fields` waits for a question: a completed run fills nothing.
-		expect(Object.keys((await store.get(SESSION_ID))?.internal ?? {})).toEqual([
-			"fields",
-		]);
+		expect(
+			Object.keys(
+				(await store.get(flowStateKey(flow.name, SESSION_ID)))?.internal ?? {},
+			),
+		).toEqual(["fields"]);
 	});
 
 	test("rides along when the first step is a widget", async () => {
@@ -235,7 +241,9 @@ describe("flow intro", () => {
 		expect(parsed.status).toBe("widget");
 		expect(parsed.tool).toBe("quote_picker");
 		expect(parsed.intro).toEqual({ verbatim: VERBATIM });
-		expect((await store.get(SESSION_ID))?.internal).toBeUndefined();
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.internal,
+		).toBeUndefined();
 	});
 
 	test("is not attached to an error response, and survives to the next call", async () => {
@@ -246,7 +254,7 @@ describe("flow intro", () => {
 		const failed = parsePayload(await handler({ action: "continue" }, EXTRA));
 		expect(failed.status).toBe("error");
 		expect(failed.intro).toBeUndefined();
-		expect(await store.get(SESSION_ID)).toBeNull();
+		expect(await store.get(flowStateKey(flow.name, SESSION_ID))).toBeNull();
 
 		const parsed = parsePayload(
 			await handler({ action: "start", intent: INTENT }, EXTRA),
@@ -286,7 +294,9 @@ describe("flow intro", () => {
 
 		expect(parsed.status).toBe("interrupt");
 		expect(parsed.intro).toBeUndefined();
-		expect((await store.get(SESSION_ID))?.internal).toBeUndefined();
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.internal,
+		).toBeUndefined();
 	});
 
 	test("is delivered when the engine generates the session id", async () => {
@@ -332,7 +342,7 @@ describe("flow intro", () => {
 		);
 
 		expect("intro" in parsed).toBe(false);
-		expect(await store.get(SESSION_ID)).toEqual({
+		expect(await store.get(flowStateKey(flow.name, SESSION_ID))).toEqual({
 			step: "ask_address",
 			state: {},
 			field: "address",
@@ -346,7 +356,7 @@ describe("flow intro", () => {
 		const handler = await handlerFor(flow);
 
 		// Mid-flow record with no intro left on it.
-		await store.set(SESSION_ID, {
+		await store.set(flowStateKey(flow.name, SESSION_ID), {
 			step: "ask_occupancy",
 			state: KNOWN_LOCATION,
 			field: "occupancy",
@@ -373,7 +383,7 @@ describe("flow intro", () => {
 
 		// A record as a newer engine might have written it: the pending intro this
 		// version knows, plus a field it has never heard of.
-		await store.set(SESSION_ID, {
+		await store.set(flowStateKey(flow.name, SESSION_ID), {
 			step: "ask_occupancy",
 			state: KNOWN_LOCATION,
 			field: "occupancy",
@@ -391,7 +401,9 @@ describe("flow intro", () => {
 		);
 
 		expect(parsed.intro).toEqual({ verbatim: VERBATIM });
-		expect((await store.get(SESSION_ID))?.internal).toEqual({
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.internal,
+		).toEqual({
 			consent: { accepted: true },
 		} as FlowTokenContent["internal"]);
 	});
