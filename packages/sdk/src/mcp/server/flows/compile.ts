@@ -32,7 +32,7 @@ import {
 	serverOnly,
 } from "./definition-meta";
 import { executeFrom, resolveNextNode, type ValidateFn } from "./execute";
-import { type FlowStore, WaniwaniFlowStore } from "./flow-store";
+import { type FlowStore, flowStateKey, WaniwaniFlowStore } from "./flow-store";
 import { extractFlowGraph } from "./graph-extract";
 import {
 	initInternalState,
@@ -149,6 +149,8 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		meta?: Record<string, unknown>,
 		waniwani?: ScopedWaniWaniClient,
 	): Promise<HandledCall> {
+		const stateKey = sessionId ? flowStateKey(config.id, sessionId) : undefined;
+
 		/**
 		 * Run the engine from `node`, carrying this session's internal state and
 		 * asked fields through to the response assembler. Every branch below
@@ -214,7 +216,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 			const internal = await loadInternalState({
 				store,
-				sessionId,
+				key: stateKey,
 				sessionIsPreexisting,
 				seed: initialInternal,
 			});
@@ -226,7 +228,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		}
 
 		if (args.action === "continue") {
-			if (!sessionId) {
+			if (!stateKey) {
 				return {
 					content: {
 						status: "error" as const,
@@ -237,7 +239,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 			let flowState: Awaited<ReturnType<typeof store.get>>;
 			try {
-				flowState = await store.get(sessionId);
+				flowState = await store.get(stateKey);
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
 				reportSessionError({
@@ -309,7 +311,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 		}
 
 		if (args.action === "reset") {
-			if (!sessionId) {
+			if (!stateKey) {
 				return {
 					content: {
 						status: "error" as const,
@@ -320,7 +322,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 
 			let flowState: Awaited<ReturnType<typeof store.get>>;
 			try {
-				flowState = await store.get(sessionId);
+				flowState = await store.get(stateKey);
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
 				reportSessionError({
@@ -522,9 +524,9 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				contentObj.status === "interrupt" ? (contentObj.suggestions ?? []) : [],
 		} satisfies SuggestionsMeta;
 
-		// Persist flow state under session ID. On completion we store the final
-		// `{ state }` (no `step`) so customers can read the final state until
-		// the KV TTL expires; a stale `continue` falls into the "already
+		// Persist flow state under this flow's key in the session (see
+		// `flowStateKey`). On completion we store the final `{ state }` (no
+		// `step`) so customers can read the final state until the KV TTL expires; a stale `continue` falls into the "already
 		// completed" branch at the loader since `step` is undefined.
 		// TODO: expose a `deleteOnComplete` compile option for customers who
 		// want the prior behavior (drop the session as soon as END is reached).
@@ -534,7 +536,7 @@ export function compileFlow<TState extends Record<string, unknown>>(
 				asked: addAskedFields(result.asked ?? [], contentObj),
 			};
 			try {
-				await store.set(sessionId, tokenContent);
+				await store.set(flowStateKey(config.id, sessionId), tokenContent);
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
 				reportSessionError({

@@ -8,7 +8,7 @@ import type {
 	FlowWidgetContent,
 	RegisteredFlow,
 } from "./@types";
-import type { FlowStore } from "./flow-store";
+import { type FlowStore, flowStateKey } from "./flow-store";
 import { expandDotPaths, getNestedValue, isFilled } from "./nested";
 import { fieldsAskedBy } from "./state-updates";
 
@@ -39,6 +39,7 @@ export async function createFlowTestHarness(
 	const store = options?.stateStore;
 	const registered: RegisterToolArgs[] = [];
 	const sessionId = `test-session-${Math.random().toString(36).slice(2, 10)}`;
+	const stateKey = flowStateKey(flow.name, sessionId);
 
 	const server = {
 		registerTool: (...args: unknown[]) => {
@@ -97,7 +98,7 @@ export async function createFlowTestHarness(
 	async function toResult(parsed: FlowContent): Promise<FlowTestResult> {
 		return {
 			...parsed,
-			decodedState: store ? await store.get(sessionId) : null,
+			decodedState: store ? await store.get(stateKey) : null,
 		} satisfies FlowTestResult;
 	}
 
@@ -139,7 +140,7 @@ export async function createFlowTestHarness(
 		},
 
 		async lastState(): Promise<FlowTokenContent | null> {
-			return store ? store.get(sessionId) : null;
+			return store ? store.get(stateKey) : null;
 		},
 	};
 }

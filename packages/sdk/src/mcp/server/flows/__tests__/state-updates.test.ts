@@ -8,6 +8,7 @@ import type { FlowTokenContent, McpServer, RegisteredTool } from "../@types";
 import { END, START } from "../@types";
 import { createFlow } from "../create-flow";
 import { readFlowGraph } from "../definition-meta";
+import { flowStateKey } from "../flow-store";
 import { redacted } from "../redacted";
 import {
 	acceptStateUpdates,
@@ -334,7 +335,9 @@ describe("stateUpdates", () => {
 		});
 
 		expect(payload.field).toBe("postcode");
-		expect((await store.get(SESSION_ID))?.state).toEqual({
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state,
+		).toEqual({
 			plate: "1234ABC",
 			vehicleId: "v-1234ABC",
 		});
@@ -350,7 +353,9 @@ describe("stateUpdates", () => {
 			postcode: "28001",
 		});
 
-		expect((await store.get(SESSION_ID))?.state).toEqual({
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state,
+		).toEqual({
 			postcode: "28001",
 		});
 	});
@@ -393,7 +398,9 @@ describe("stateUpdates", () => {
 		);
 
 		expect(same.field).toBe("plate");
-		expect((await store.get(SESSION_ID))?.state).toMatchObject({
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state,
+		).toMatchObject({
 			postcode: "22222",
 			price: 300,
 		});
@@ -425,7 +432,7 @@ describe("stateUpdates", () => {
 	test("a record written without `asked` merges everything for that call", async () => {
 		const { flow, store } = carQuote();
 		const handler = await handlerFor(flow);
-		await store.set(SESSION_ID, {
+		await store.set(flowStateKey(flow.name, SESSION_ID), {
 			step: "ask_postcode",
 			state: { plate: "1234ABC", vehicleId: "v-1234ABC" },
 			field: "postcode",
@@ -439,7 +446,9 @@ describe("stateUpdates", () => {
 		);
 
 		expect(done.status).toBe("complete");
-		expect((await store.get(SESSION_ID))?.state.price).toBe(300);
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state.price,
+		).toBe(300);
 	});
 
 	test("accepts the field an interactive widget fills", async () => {
@@ -517,7 +526,9 @@ describe("stateUpdates", () => {
 			),
 		);
 		expect(done.status).toBe("complete");
-		expect((await store.get(SESSION_ID))?.state).toEqual({
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state,
+		).toEqual({
 			agreed: true,
 			name: "Ana",
 		});
@@ -571,7 +582,9 @@ describe("a value kept out of state", () => {
 
 		expect(Object.keys(payload.fields as object)).toEqual(["plate", "price"]);
 		expect(done.status).toBe("complete");
-		expect((await store.get(SESSION_ID))?.state).toEqual({
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state,
+		).toEqual({
 			plate: "1234ABC",
 			price: 300,
 		});
@@ -606,7 +619,9 @@ describe("a path through the prototype", () => {
 		expect(({} as Record<string, unknown>).postcode).toBeUndefined();
 		expect(({} as Record<string, unknown>).vehicleId).toBeUndefined();
 		expect(next.field).toBe("plate");
-		expect((await store.get(SESSION_ID))?.state).toEqual({
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state,
+		).toEqual({
 			plate: "1234ABC",
 			vehicleId: "v-1234ABC",
 		});
@@ -623,7 +638,9 @@ describe("values sent before their question", () => {
 		});
 
 		expect(payload.status).toBe("complete");
-		expect((await store.get(SESSION_ID))?.state.price).toBe(300);
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state.price,
+		).toBe(300);
 	});
 
 	test("a value the validator rejects comes back as the rejection", async () => {
@@ -658,7 +675,9 @@ describe("values sent before their question", () => {
 		const { payload } = await startWith(flow, { name: "Ana" });
 
 		expect(payload.status).toBe("complete");
-		expect((await store.get(SESSION_ID))?.state).toEqual({
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state,
+		).toEqual({
 			name: "Ana",
 			greeting: "Hi Ana",
 		});
@@ -706,7 +725,9 @@ describe("values sent before their question", () => {
 			EXTRA,
 		);
 
-		expect((await store.get(SESSION_ID))?.state.postcode).toBe("28001");
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state.postcode,
+		).toBe("28001");
 	});
 
 	test("a field marked neverPrefilled is asked even when answered up front", async () => {
@@ -742,7 +763,9 @@ describe("values sent before their question", () => {
 			agreed: true,
 		});
 		expect(payload.field).toBe("agreed");
-		expect((await store.get(SESSION_ID))?.state).toEqual({ name: "Ana" });
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state,
+		).toEqual({ name: "Ana" });
 
 		const done = parsePayload(
 			await handler(
@@ -788,7 +811,9 @@ describe("values sent before their question", () => {
 		});
 
 		expect(payload.field).toBe("driver.consent");
-		expect((await store.get(SESSION_ID))?.state).toEqual({
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state,
+		).toEqual({
 			driver: { name: "Ana" },
 		});
 	});
@@ -823,7 +848,9 @@ describe("values sent before their question", () => {
 
 		expect(payload.field).toBe("driver.license");
 		expect(payload.fieldSchema).toMatchObject({ type: "string" });
-		expect((await store.get(SESSION_ID))?.state).toEqual({
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state,
+		).toEqual({
 			driver: { name: "Ana" },
 		});
 	});
@@ -862,7 +889,9 @@ describe("values sent before their question", () => {
 
 		const { handler, payload } = await startWith(flow, { year: 2019 });
 		expect(payload.field).toBe("confirmed");
-		expect((await store.get(SESSION_ID))?.state.year).toBe(2021);
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state.year,
+		).toBe(2021);
 
 		const next = parsePayload(
 			await handler(
@@ -946,7 +975,9 @@ describe("values sent before their question", () => {
 		});
 
 		expect(payload.field).toBe("driver.license");
-		expect((await store.get(SESSION_ID))?.state).toEqual({
+		expect(
+			(await store.get(flowStateKey(flow.name, SESSION_ID)))?.state,
+		).toEqual({
 			driver: { name: "Ana" },
 		});
 	});

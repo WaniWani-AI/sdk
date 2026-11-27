@@ -16,6 +16,7 @@ import {
 	ToolLoopAgent,
 	type ToolSet,
 } from "ai";
+import { flowStateKey } from "../../src/mcp/server/flows/flow-store";
 import type { Engine } from "./engine";
 import { checkedFields, idealUserTurns, type Scenario } from "./fixtures";
 
@@ -300,9 +301,12 @@ export async function runConversation(input: {
 	}
 
 	const completed = lastPayload?.status === "complete";
-	const finalState = completed
-		? ((await store.get(sessionId))?.state ?? {})
-		: undefined;
+	// Versions before per-flow keys stored the record under the bare session id.
+	const finalRecord = completed
+		? ((await store.get(flowStateKey(flow.name, sessionId))) ??
+			(await store.get(sessionId)))
+		: null;
+	const finalState = completed ? (finalRecord?.state ?? {}) : undefined;
 	const wrongValues = finalState
 		? checkedFields(scenario).flatMap((field) => {
 				const got = normalize(finalState[field]);
