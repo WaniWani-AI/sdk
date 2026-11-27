@@ -1,5 +1,5 @@
 ---
-"@waniwani/sdk": patch
+"@waniwani/sdk": minor
 ---
 
 Each flow in a session now keeps its own state. The store key was the session id alone, so a session that started a second flow loaded the first flow's record: the second flow skipped its intro, resumed at the first flow's step and then overwrote that record. The key is now `flow:<flowId>:<sessionId>`.
