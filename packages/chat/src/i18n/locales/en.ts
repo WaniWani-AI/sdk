@@ -84,6 +84,15 @@ export interface Messages {
 		failedToLoad: string;
 		retry: string;
 	};
+	/** The bubble shown in the conversation when a turn fails. */
+	turnError: {
+		failed: string;
+		rateLimited: string;
+		waitAMoment: string;
+		tryAgainInSeconds: (count: number) => string;
+		tryAgainInMinutes: (count: number) => string;
+		retry: string;
+	};
 	launcher: {
 		prompt: string;
 		open: string;
@@ -205,6 +214,16 @@ export const en: Messages = {
 	},
 	widgetErrorBoundary: {
 		failedToLoad: "Widget failed to load",
+		retry: "Retry",
+	},
+	turnError: {
+		failed: "The reply didn't come through.",
+		rateLimited: "Too many messages in a short time.",
+		waitAMoment: "Wait a moment, then try again.",
+		tryAgainInSeconds: (count: number) =>
+			`You can try again in ${count} second${count === 1 ? "" : "s"}.`,
+		tryAgainInMinutes: (count: number) =>
+			`You can try again in ${count} minute${count === 1 ? "" : "s"}.`,
 		retry: "Retry",
 	},
 	launcher: {

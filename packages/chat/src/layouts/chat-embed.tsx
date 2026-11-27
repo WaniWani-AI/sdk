@@ -768,6 +768,8 @@ const ChatEmbedInner = forwardRef<ChatHandle, ChatEmbedProps>(
 								toolLabels={toolLabels}
 								showTableToolbar={showTableToolbar}
 								toolDefinitions={engine.toolDefinitions}
+								turnError={engine.turnError}
+								onRetry={engine.retry}
 								messageClassNames={{
 									message: classNames?.message,
 									userBubble: classNames?.userBubble,

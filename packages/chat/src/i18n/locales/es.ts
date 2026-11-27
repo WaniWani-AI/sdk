@@ -82,6 +82,16 @@ export const es: Messages = {
 		failedToLoad: "No se pudo cargar el widget",
 		retry: "Reintentar",
 	},
+	turnError: {
+		failed: "La respuesta no llegó.",
+		rateLimited: "Demasiados mensajes en poco tiempo.",
+		waitAMoment: "Espera un momento y vuelve a intentarlo.",
+		tryAgainInSeconds: (count: number) =>
+			`Podrás volver a intentarlo en ${count} segundo${count === 1 ? "" : "s"}.`,
+		tryAgainInMinutes: (count: number) =>
+			`Podrás volver a intentarlo en ${count} minuto${count === 1 ? "" : "s"}.`,
+		retry: "Reintentar",
+	},
 	launcher: {
 		prompt: "Pregunta lo que quieras…",
 		open: "Abrir chat",

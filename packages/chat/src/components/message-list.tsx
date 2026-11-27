@@ -48,12 +48,14 @@ import {
 	shouldShowWorkingIndicator,
 	WorkingIndicator,
 } from "../ai-elements/working-indicator";
+import type { TurnError } from "../hooks/use-chat-engine";
 import { useTranslation } from "../i18n";
 import { cn } from "../lib/utils";
 import { PARTS } from "../parts";
 import { Avatar } from "./avatar";
 import type { McpAppDisplayMode } from "./mcp-app-frame";
 import { McpAppFrame } from "./mcp-app-frame";
+import { TurnErrorBubble } from "./turn-error-bubble";
 import { WelcomeScreen } from "./welcome-screen";
 import { WidgetErrorBoundary } from "./widget-error-boundary";
 
@@ -164,6 +166,10 @@ interface MessageListProps {
 	trailing?: ReactNode;
 	/** `false` drops Streamdown's copy and download toolbar above tables. */
 	showTableToolbar?: boolean;
+	/** Why the last turn failed; shown as a bubble with a Retry button. */
+	turnError?: TurnError | null;
+	/** Sends the last user message again. */
+	onRetry?: () => void;
 }
 
 const TABLE_TOOLBAR_OFF = { table: false } as const;
@@ -192,6 +198,8 @@ export function MessageList({
 	messageClassNames,
 	trailing,
 	showTableToolbar = true,
+	turnError,
+	onRetry,
 }: MessageListProps) {
 	const { t } = useTranslation();
 	const lastMessage = messages[messages.length - 1];
@@ -612,6 +620,13 @@ export function MessageList({
 				);
 			})}
 			{showWorking && <WorkingIndicator />}
+			{turnError && onRetry && !isFullscreenActive && (
+				<Message from="assistant" className={PARTS.error}>
+					<BubbleRow avatar={messageAvatar}>
+						<TurnErrorBubble error={turnError} onRetry={onRetry} />
+					</BubbleRow>
+				</Message>
+			)}
 			{trailing &&
 				!isFullscreenActive &&
 				lastMessage?.role === "assistant" &&
